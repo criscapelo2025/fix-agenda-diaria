@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -25,7 +25,7 @@
         }
     </script>
     <style>
-        /* Estilo para el scrollbar en navegadores WebKit */
+        /* Estilo general de la interfaz */
         ::-webkit-scrollbar {
             width: 8px;
         }
@@ -39,12 +39,10 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
-        /* Clase para input de moneda */
         .currency-input {
             text-align: right;
             font-family: monospace;
         }
-        /* Estilo del Modal */
         .modal {
             transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
         }
@@ -54,6 +52,41 @@
         .modal.hidden {
             opacity: 0;
             visibility: hidden;
+        }
+        
+        /* --- ESTILOS DE IMPRESIÓN (SOLUCIÓN A4) --- */
+        @media print {
+            body {
+                background-color: white !important;
+                margin: 0;
+                padding: 0;
+            }
+            /* Ocultar elementos no necesarios para la impresión */
+            .no-print {
+                display: none !important;
+            }
+            /* Mostrar solo el contenido principal de la ruta */
+            #print-area {
+                display: block !important;
+                width: 100%;
+                max-width: 100%;
+                margin: 0;
+            }
+            /* Forzar el layout de las tarjetas de visita en formato de impresión */
+            .print-route-card {
+                page-break-inside: avoid; /* Evita que la tarjeta se parta entre páginas */
+                border: 1px solid #ccc !important;
+                margin-bottom: 10px !important;
+                padding: 10px !important;
+                box-shadow: none !important;
+            }
+            /* Quitar el layout de columnas del cuerpo para que ocupe el ancho completo */
+            .grid {
+                display: block;
+            }
+            .lg\:col-span-1, .lg\:col-span-2 {
+                width: 100%;
+            }
         }
     </style>
     <!-- Firebase Imports (Se mantienen para la estructura, pero las funciones son bloqueadas por el Plan B) -->
@@ -65,14 +98,16 @@
         // Global variables provided by the Canvas environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // CORRECCIÓN: El token de autenticación no es JSON, debe ser una cadena simple.
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
         
         // Configuración de la aplicación
         let app, db, auth;
         let userId = null;
         let isAuthReady = false;
-        let currentView = 'my_agenda'; // Estado para la vista: 'my_agenda', 'reporte_admin', 'mantenimiento'
+        let currentView = 'reporte_admin'; 
         let dbFailed = true; // FORZAMOS EL ERROR: La DB falló, activamos el Plan B de Reporte Manual.
+        let filterDate = new Date().toISOString().split('T')[0]; // Fecha de filtro predeterminada (hoy)
 
         setLogLevel('Debug'); // Para ver logs de Firebase
 
@@ -109,20 +144,65 @@
 
         // Función de inicialización y autenticación (Simplificada para el Plan B)
         async function initializeFirebase() {
-            // Asumimos el fallo de DB y usamos un ID de usuario fijo.
-            userId = 'admin_default_fix';
-            isAuthReady = true;
-            document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SIN CONEXIÓN`;
-            
-            showMessage("ERROR CRÍTICO: Base de Datos NO disponible. Activando Plan B (Reporte Manual).", 'fix-error');
+            try {
+                // 1. INTENTAR INICIALIZAR DB (CRÍTICO)
+                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
+                     throw new Error("La configuración de Firebase está vacía o no fue proporcionada.");
+                }
 
-            setupViewSelector(); 
-            renderAccessoryInputs(); 
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                dbFailed = false; // Si llegamos aquí, la conexión base está OK
+                
+                // 2. INTENTAR AUTENTICACIÓN
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}...`;
+                    } else {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            const anonymousUser = await signInAnonymously(auth);
+                            userId = anonymousUser.user.uid;
+                            isAuthReady = true;
+                            document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}... (Anónimo)`;
+                        }
+                    }
+                    // 3. INICIAR LISTENERS SOLO DESPUÉS DE OBTENER USERID
+                    setupVisitListener();
+                    renderAccessoryInputs();
+                    setupViewSelector();
+                });
+
+            } catch (error) {
+                console.error("Error al inicializar Firebase o autenticar:", error);
+                
+                // MODO DE SEGURIDAD PARA CONEXIÓN FALLIDA: La DB NO está disponible.
+                dbFailed = true; // Marcar la falla
+                userId = 'admin_default_fix';
+                isAuthReady = true;
+                document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SIN CONEXIÓN`;
+                
+                // Mostrar la notificación de error pero no bloquear la lista
+                showMessage("ERROR CRÍTICO: Base de Datos NO disponible. El guardado no funcionará.", 'fix-error');
+
+                setupViewSelector(); 
+                renderAccessoryInputs(); // Cargar accesorios para que el formulario funcione visualmente
+            }
+            
+            // Configuración inicial de la interfaz (fuera del try/catch)
+            document.getElementById('filterDateInput').value = filterDate;
         }
 
         // Las funciones de Firebase quedan bloqueadas por dbFailed = true.
         function getVisitsCollectionRef() {
-            return null; 
+            if (!db) {
+                return null; 
+            }
+            return collection(db, `artifacts/${appId}/public/data/visits`);
         }
         
         window.changeView = (newView) => {
@@ -137,40 +217,63 @@
             document.getElementById(`btn-${newView}`).classList.remove('bg-gray-200', 'text-gray-700');
             document.getElementById(`btn-${newView}`).classList.add('bg-fix-blue', 'text-white');
             
-            // Ocultar/mostrar formulario si estamos en una vista de reporte
+            // Ocultar/mostrar formulario y filtros según la vista
             const formContainer = document.getElementById('formContainer');
-            if (newView !== 'my_agenda') {
-                 formContainer.classList.add('hidden');
-                 document.getElementById('reportViewTitle').textContent = newView === 'mantenimiento' ? 'Agenda de Mantenimiento (CRM)' : 'Reporte Consolidado (Todas las Visitas)';
-            } else {
+            const filterContainer = document.getElementById('filterContainer');
+            
+            if (newView === 'my_agenda') {
                  formContainer.classList.remove('hidden');
+                 filterContainer.classList.add('hidden');
                  document.getElementById('reportViewTitle').textContent = 'Hoja de Visita Diaria';
+            } else {
+                 formContainer.classList.add('hidden');
+                 filterContainer.classList.remove('hidden'); // Mostrar filtros en vista Admin/Agenda
+                 document.getElementById('reportViewTitle').textContent = newView === 'mantenimiento' ? 'Agenda de Mantenimiento (CRM)' : 'Agenda de Rutas Diarias';
             }
+        };
+
+        window.filterVisitsByDate = () => {
+            filterDate = document.getElementById('filterDateInput').value;
+            setupVisitListener();
         };
         
         function setupViewSelector() {
-            window.changeView('my_agenda'); 
+            window.changeView('reporte_admin'); // Vista inicial es la Agenda del Admin
         }
 
         // Escucha de visitas (MODO MANUAL/SIMULACIÓN)
         function setupVisitListener() {
-            // En Plan B, solo renderizamos los datos simulados/ingresados en la sesión actual
+            if (dbFailed) {
+                // Si la DB falló, mostramos el estado de 'sin datos'
+                document.getElementById('visitsList').innerHTML = `<div class="text-center py-8 text-gray-500">Cargando agenda...</div><p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ SIN DATOS: Conexión DB fallida. Usar modo Copiar/Pegar.</p>`;
+                return;
+            }
+            
             let visits = [...visitsManual]; // Copiamos el array de visitas manuales
             
             // --- FILTRADO Y ORDENACIÓN MANUAL EN JAVASCRIPT ---
+            
             if (currentView === 'my_agenda') {
-                // Como no podemos autenticar, mostramos todos los registros ingresados en esta sesión
+                 // El técnico ve solo los registros que hizo en esta sesión
                 visits.sort((a, b) => {
-                    if (a.fechaInstalacion < b.fechaInstalacion) return 1;
-                    if (a.fechaInstalacion > b.fechaInstalacion) return -1;
+                    if (a.createdAt.seconds < b.createdAt.seconds) return 1;
+                    if (a.createdAt.seconds > b.createdAt.seconds) return -1;
                     return 0;
                 });
             } else if (currentView === 'reporte_admin') {
+                // VISTA ADMIN: Agenda de Rutas
+                if (filterDate) {
+                    // FILTRAR POR FECHA DE CITA
+                    visits = visits.filter(v => v.fechaInstalacion === filterDate);
+                }
+                
+                // Ordenar por hora de registro para mantener el orden de ruta (FIFO)
                 visits.sort((a, b) => {
-                     if (a.createdAt < b.createdAt) return 1;
-                     if (a.createdAt > b.createdAt) return -1;
+                     if (a.createdAt.seconds < b.createdAt.seconds) return -1;
+                     if (a.createdAt.seconds > b.createdAt.seconds) return 1;
                      return 0;
                 });
+
             } else if (currentView === 'mantenimiento') {
                 visits = visits.filter(v => v.fechaProximoMantenimiento);
                 visits.sort((a, b) => {
@@ -403,7 +506,9 @@ Observaciones: "${visitData.observacionesFinancieras}"
                     costoInstalacion: costoInstalacionCalculado,
                     cobroAccesorios: totalAccesoriosCalculado,
                     totalCliente: totalCliente,
-                }
+                },
+                // Aseguramos que todos los campos del formulario estén en el objeto para la exportación CSV
+                ...visitData 
             };
             visitsManual.push(newVisit);
             globalVisitsData[newVisitId] = newVisit;
@@ -424,7 +529,138 @@ Observaciones: "${visitData.observacionesFinancieras}"
             }
         };
 
+        // --- FUNCIÓN DE EXPORTACIÓN CSV (PLAN B) ---
+        window.exportToCsv = () => {
+            if (visitsManual.length === 0) {
+                showMessage("No hay registros en la sesión actual para exportar.", 'fix-accent');
+                return;
+            }
+
+            // Encabezados del CSV (Campos solicitados por usted)
+            const headers = [
+                "ID_REGISTRO", "FECHA_INTERVENCION", "NOMBRE_CLIENTE", "DIRECCION", 
+                "TELEFONO", "CEDULA_RUC", "CORREO", "TIPO_SERVICIO", 
+                "CANT_EQUIPOS", "DESCRIPCION_PRODUCTO", "SERIE_EQUIPO", 
+                "COSTO_INSTALACION", "COSTO_ACCESORIOS", "TOTAL_COBRO_CLIENTE", 
+                "ACCESORIOS_USADOS", "OBSERVACIONES_FINANCIERAS", "ESTADO", "ID_TECNICO"
+            ];
+
+            const csvRows = [headers.join(',')];
+
+            visitsManual.forEach(visit => {
+                const f = visit.financiera || {};
+                
+                // Formatear accesorios para CSV
+                const accesoriosCSV = (f.accesorios || [])
+                    .map(a => `${a.nombre} (${a.cantidad}x $${a.precioUnitario})`)
+                    .join(' | ');
+
+                const row = [
+                    `"${visit.id}"`,
+                    `"${visit.fechaInstalacion || ''}"`,
+                    `"${(visit.nombreCliente || '').replace(/"/g, '""')}"`,
+                    `"${(visit.direccion || '').replace(/"/g, '""')}"`,
+                    `"${visit.telefono || ''}"`,
+                    `"${visit.cedula || ''}"`,
+                    `"${visit.correo || ''}"`,
+                    `"${visit.tipoServicio || ''}"`,
+                    `"${visit.numEquipos || 1}"`,
+                    `"${(visit.descProducto || '').replace(/"/g, '""')}"`,
+                    `"${visit.serieEquipo || ''}"`,
+                    `"${(f.costoInstalacion || 0).toFixed(2)}"`,
+                    `"${(f.cobroAccesorios || 0).toFixed(2)}"`,
+                    `"${(f.totalCliente || 0).toFixed(2)}"`,
+                    `"${accesoriosCSV.replace(/"/g, '""')}"`,
+                    `"${(visit.observacionesFinancieras || '').replace(/"/g, '""')}"`,
+                    `"${visit.estado || ''}"`,
+                    `"${visit.userId || ''}"`
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const today = new Date().toISOString().split('T')[0];
+            const filename = `Reporte_FIX_Tecnico_${today}.csv`;
+
+            // Descargar el archivo
+            const link = document.createElement("a");
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showMessage(`✅ Archivo ${filename} descargado. Envíelo por correo.`, 'fix-report');
+            } else {
+                showMessage("Su navegador no soporta la descarga automática. Intente en Chrome.", 'fix-error');
+            }
+        };
+        
+        // --- FUNCIÓN DE IMPRESIÓN ---
+        window.printRoute = () => {
+             const routeList = document.getElementById('visitsList');
+             const reportTitle = document.getElementById('reportViewTitle').textContent;
+
+             if (routeList.children.length === 0) {
+                 showMessage("No hay visitas en esta agenda para imprimir.", 'fix-accent');
+                 return;
+             }
+
+             const originalBody = document.body.innerHTML;
+             
+             // Generar el contenido de impresión
+             let printableContent = `
+                 <div id="print-area" style="padding: 20px;">
+                     <h1 style="text-align: center; margin-bottom: 5px; font-size: 24px;">HOJA DE RUTA DIARIA FIX</h1>
+                     <h2 style="text-align: center; margin-bottom: 20px; font-size: 18px;">${reportTitle} - Fecha: ${filterDate || 'Todas'}</h2>
+                     <hr style="margin-bottom: 15px;">
+             `;
+
+             // Recorrer las visitas y crear tarjetas simplificadas para impresión
+             visitsManual.forEach((visit, index) => {
+                 // Solo imprimimos las visitas que están actualmente filtradas y renderizadas
+                 if (document.getElementById(`visit-item-${visit.id}`)) {
+                     const f = visit.financiera || {};
+                     const total = (f.costoInstalacion || 0).toFixed(2);
+                     const accesorios = (f.accesorios || []).map(a => `${a.nombre} (${a.cantidad}x)`).join(', ');
+                     
+                     printableContent += `
+                         <div class="print-route-card" style="border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 8px;">
+                             <div style="font-size: 20px; font-weight: bold; color: #1e3a8a; border-bottom: 2px solid #ccc; padding-bottom: 5px; margin-bottom: 10px;">
+                                 Ruta #${index + 1}: ${visit.nombreCliente}
+                             </div>
+                             <p style="margin: 3px 0; font-size: 14px;"><strong>Dirección:</strong> ${visit.direccion}</p>
+                             <p style="margin: 3px 0; font-size: 14px;"><strong>Teléfono:</strong> ${visit.telefono}</p>
+                             <p style="margin: 3px 0; font-size: 14px;"><strong>Fecha/Hora Programada:</strong> ${visit.fechaInstalacion}</p>
+                             <p style="margin: 3px 0; font-size: 14px;"><strong>Servicio:</strong> ${visit.tipoServicio} (${visit.numEquipos} equipos)</p>
+                             <p style="margin: 3px 0; font-size: 14px;"><strong>Descripción:</strong> ${visit.descProducto}</p>
+                             <p style="margin: 3px 0; font-size: 14px; font-weight: bold;"><strong>Costo Base (Instalación):</strong> $${total}</p>
+                             <p style="margin: 3px 0; font-size: 14px;"><strong>Accesorios:</strong> ${accesorios || 'Ninguno'}</p>
+                             <div style="margin-top: 10px; border-top: 1px dashed #eee; padding-top: 5px;">
+                                 <p style="font-size: 12px;">Firma del Cliente: _________________________________</p>
+                             </div>
+                         </div>
+                     `;
+                 }
+             });
+             
+             printableContent += '</div>';
+
+             // Reemplazar el cuerpo con el contenido imprimible y mandar a imprimir
+             document.body.innerHTML = printableContent;
+             window.print();
+             
+             // Volver al contenido original después de imprimir (o cancelar)
+             document.body.innerHTML = originalBody;
+             window.location.reload(); // Recargar para restaurar la lógica JS
+        };
+
+
         // --- FUNCIONES DE DB (BLOQUEADAS EN ESTE PLAN B) ---
+        // (Bloqueadas para asegurar que los botones de impresión/csv funcionen localmente)
         window.updateVisitStatusAndFinancials = async (visitId) => {
             showMessage("ERROR: Función deshabilitada (Conexión DB fallida).", 'fix-error');
         };
@@ -450,7 +686,7 @@ Observaciones: "${visitData.observacionesFinancieras}"
         function getAccessoryListFromDOM(visit) {
             const f = visit.financiera || {};
             return f.accesorios && f.accesorios.length > 0
-                ? f.accesorios.map(a => `${a.cantidad}x ${a.nombre} ($${a.subtotal.toFixed(2)})`).join(', ')
+                ? f.accesorios.map(a => `${a.cantidad}x ${a.nombre} ($${a.subtotal.toFixed(2)})`).join(' | ')
                 : 'Ninguno';
         }
 
@@ -459,17 +695,17 @@ Observaciones: "${visitData.observacionesFinancieras}"
         function renderVisits(visits) {
             const listContainer = document.getElementById('visitsList');
             if (dbFailed) {
-                // Si la conexión falló, mostramos el estado de 'sin datos'
-                document.getElementById('visitsList').innerHTML = `<div class="text-center py-8 text-gray-500">Cargando agenda...</div><p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ SIN DATOS: Conexión DB fallida. Usar modo Copiar/Pegar.</p>`;
-                return;
+                 // Si la conexión falló, mostramos el estado de 'sin datos'
+                 listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">Cargando agenda...</div><p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ SIN DATOS: Conexión DB fallida. Usar modo Copiar/Pegar.</p>`;
+                 return;
             }
 
             if (visits.length === 0) {
-                listContainer.innerHTML = `<p class="text-gray-500 p-4 italic">No hay visitas agendadas ${currentView === 'my_agenda' ? 'en tu agenda.' : 'en el sistema.'}</p>`;
+                listContainer.innerHTML = `<p class="text-gray-500 p-4 italic">No hay visitas registradas en esta sesión. Use el formulario de la izquierda.</p>`;
                 return;
             }
 
-            listContainer.innerHTML = visits.map(visit => {
+            listContainer.innerHTML = visits.map((visit, index) => { // Añadimos el index para el orden de ruta
                 const f = visit.financiera || {};
                 
                 // --- Cálculo Financiero (usando 0 si falla el dato) ---
@@ -485,6 +721,8 @@ Observaciones: "${visitData.observacionesFinancieras}"
                     estadoColor = 'bg-red-100 text-red-800';
                 } else if (visit.estado === 'Garantia No Aplica') {
                     estadoColor = 'bg-yellow-100 text-yellow-800';
+                } else if (visit.estado === 'MANUAL') {
+                     estadoColor = 'bg-fix-report text-white';
                 }
 
 
@@ -500,67 +738,43 @@ Observaciones: "${visitData.observacionesFinancieras}"
                 const noGarantiaCostText = f.costoGarantiaNoAplica ? ` + $${f.costoGarantiaNoAplica.toFixed(2)} (No Garantía)` : '';
                 
                 // --- Mensaje y Botón de Copia (Solo en Reporte/Mantenimiento) ---
-                let maintenanceSection = '';
+                let confirmationSection = '';
                 let adminEditButton = '';
 
-                if (currentView !== 'my_agenda') {
-                    // Solo en vistas de Reporte (Admin)
-                    adminEditButton = `
-                        <button onclick="showMessage('Función deshabilitada. Conexión DB fallida.', 'fix-error')" class="w-full bg-gray-400 text-white text-xs font-semibold py-1 rounded mt-2 transition duration-200 flex items-center justify-center">
-                            Editar (DB Desh.)
-                        </button>`;
-                }
-
-                if (visit.fechaProximoMantenimiento) {
-                    const message = `¡Hola ${visit.nombreCliente.split(' ')[0]}! Han pasado casi 6 meses desde que instalamos tu equipo Teka. ¡Es hora de un mantenimiento preventivo! Contáctanos para asegurar el óptimo rendimiento.`;
-                    
-                    if (currentView !== 'my_agenda') {
-                        maintenanceSection = `
-                            <div class="mt-2 pt-2 border-t border-dashed border-green-300">
-                                <p class="text-xs font-semibold text-green-700 bg-green-50 p-2 rounded">
-                                    Recordatorio Mantto. (${visit.fechaProximoMantenimiento}):
-                                </p>
-                                <button onclick="copyToClipboard('${message.replace(/'/g, "\\'")}')" class="w-full bg-fix-report hover:bg-fix-blue text-white text-xs font-semibold py-1 rounded mt-1 transition">
-                                    Copiar Mensaje Mantenimiento
-                                </button>
-                            </div>
-                        `;
-                    }
-                }
-
-                // --- Secciones de Vista ---
-                
-                // Campos adicionales para la vista de Reporte/Admin
-                let adminFields = '';
-                let adminClass = ''; 
-                if (currentView !== 'my_agenda') {
-                    adminFields = `<p class="text-xs text-gray-500 mt-1">
-                        <strong class="text-gray-700">Técnico ID:</strong> ${visit.userId.substring(0, 8)}...
-                        <strong class="text-gray-700 ml-4">Tel:</strong> ${visit.telefono || 'N/A'}
-                    </p>`;
-                    adminClass = 'border-2 border-fix-report/50';
-                }
-                
                 // La sección de Confirmación de Campo (para cambiar estado) queda deshabilitada.
-                let confirmationSection = '';
-                if (currentView === 'my_agenda') {
-                    confirmationSection = `
-                        <div class="mt-4 pt-4 border-t border-fix-light/30">
-                            <h4 class="text-base font-semibold text-fix-blue mb-2">Confirmación en Campo:</h4>
-                            <p class="text-xs text-red-500 font-bold">⚠️ Esta función está deshabilitada (Copiar/Pegar).</p>
-                        </div>
-                    `;
+                confirmationSection = `
+                    <div class="mt-4 pt-4 border-t border-fix-light/30">
+                        <h4 class="text-base font-semibold text-fix-blue mb-2">Confirmación en Campo:</h4>
+                        <p class="text-xs text-red-500 font-bold">⚠️ Esta función está deshabilitada (Copiar/Pegar).</p>
+                    </div>
+                `;
+                
+                // El botón de editar queda deshabilitado en este plan
+                adminEditButton = `
+                    <button onclick="showMessage('Función deshabilitada (Conexión DB fallida).', 'fix-error')" class="w-full bg-gray-400 text-white text-xs font-semibold py-1 rounded mt-2 transition duration-200 flex items-center justify-center">
+                        Editar (DB Desh.)
+                    </button>`;
+
+                // --- INDICADOR DE ORDEN DE RUTA ---
+                let routeOrderIndicator = '';
+                if (currentView === 'reporte_admin') {
+                     routeOrderIndicator = `<div class="absolute top-2 left-2 bg-fix-blue text-white text-lg font-bold w-8 h-8 rounded-full flex items-center justify-center">${index + 1}</div>`;
                 }
+
 
                 // --- Retorno Final ---
                 return `
-                    <div id="visit-item-${visit.id}" class="bg-white p-4 rounded-xl shadow-md border border-gray-100 hover:border-fix-light transition-all mb-3 ${adminClass}">
+                    <div id="visit-item-${visit.id}" class="bg-white p-4 rounded-xl shadow-md border border-gray-100 hover:border-fix-light transition-all mb-3 relative pl-12 print-route-card">
+                        ${routeOrderIndicator}
                         <div class="flex justify-between items-center mb-2">
-                            <h3 class="text-lg font-bold text-fix-blue">${visit.nombreCliente || 'Sin Nombre'} (ID: ${visit.id.substring(0, 5)}...)</h3>
-                            <span class="text-sm font-semibold px-3 py-1 rounded-full ${estadoColor}">${visit.estado}</span>
+                            <h3 class="text-lg font-bold text-fix-blue">${visit.nombreCliente || 'Sin Nombre'}</h3>
+                            <span class="text-sm font-semibold px-3 py-1 rounded-full ${estadoColor}">REGISTRO LOCAL</span>
                         </div>
                         
-                        ${adminFields} 
+                        <p class="text-xs text-gray-500 mt-1">
+                            <strong class="text-gray-700">Técnico ID:</strong> ${visit.userId}
+                            <strong class="text-gray-700 ml-4">Tel:</strong> ${visit.telefono || 'N/A'}
+                        </p>
 
                         <p class="text-sm text-gray-700 mb-1">
                             <strong class="text-gray-900">Fecha Intervención:</strong> ${formattedDate}
@@ -583,7 +797,6 @@ Observaciones: "${visitData.observacionesFinancieras}"
                         </p>
                         
                         ${confirmationSection}
-                        ${maintenanceSection}
                         ${adminEditButton}
                     </div>
                 `;
@@ -608,7 +821,7 @@ Observaciones: "${visitData.observacionesFinancieras}"
 
     <div class="max-w-7xl mx-auto p-4 md:p-8">
         <!-- Header -->
-        <header class="mb-8 border-b pb-4 flex flex-col md:flex-row items-start md:items-center justify-between">
+        <header class="mb-8 pb-4 flex flex-col md:flex-row items-start md:items-center justify-between no-print">
             <div class="flex items-center mb-4 md:mb-0">
                 <!-- Logo de FIX -->
                 <img src="https://placehold.co/100x40/1e3a8a/ffffff?text=FIX" 
@@ -625,26 +838,46 @@ Observaciones: "${visitData.observacionesFinancieras}"
         </header>
 
         <!-- Selector de Vistas para Administrador -->
-        <div class="mb-6 p-3 bg-white rounded-xl shadow-md flex flex-wrap gap-2 justify-center">
-             <button id="btn-my_agenda" onclick="changeView('my_agenda')" class="view-btn bg-fix-blue text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
-                 <span role="img" aria-label="Agenda">&#x1F4DC;</span> Mi Agenda (Técnico)
+        <div class="mb-6 p-3 bg-white rounded-xl shadow-md flex flex-wrap gap-2 justify-center no-print">
+             <button id="btn-my_agenda" onclick="changeView('my_agenda')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                 <span role="img" aria-label="Agenda">&#x1F4DC;</span> Reporte Diario Local
              </button>
-             <button id="btn-reporte_admin" onclick="changeView('reporte_admin')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
-                 <span role="img" aria-label="Reporte">&#x1F4CA;</span> Reporte Consolidado (Admin)
+             <button id="btn-reporte_admin" onclick="changeView('reporte_admin')" class="view-btn bg-fix-blue text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                 <span role="img" aria-label="Reporte">&#x1F4CA;</span> Agenda por Fecha
              </button>
-             <button id="btn-mantenimiento" onclick="changeView('mantenimiento')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
-                 <span role="img" aria-label="Mantenimiento">&#x1F6E0;</span> Agenda Mantenimiento (CRM)
+             <button id="btn-mantenimiento" onclick="changeView('mantenimiento')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm" disabled>
+                 <span role="img" aria-label="Mantenimiento">&#x1F6E0;</span> Agenda Mantenimiento (DB Desh.)
              </button>
+             <button onclick="exportToCsv()" class="bg-fix-report hover:bg-fix-blue text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-300 transform hover:scale-[1.01] mt-2 w-full md:w-auto">
+                <span role="img" aria-label="Exportar">&#x1F4E5;</span> EXPORTAR REPORTE CSV DIARIO
+            </button>
+        </div>
+        
+        <!-- Controles de Filtro de Agenda (Visible en Reporte Consolidado) -->
+        <div id="filterContainer" class="mb-6 p-3 bg-white rounded-xl shadow-md hidden border border-fix-report/30 no-print">
+            <h3 class="text-lg font-semibold text-gray-800 mb-3">Control de Agenda (Reporte)</h3>
+            <div class="flex flex-col sm:flex-row gap-3 items-center">
+                 <label class="flex-grow w-full sm:w-auto">
+                    <span class="text-sm text-gray-700">Filtrar por Fecha de Visita:</span>
+                    <input type="date" id="filterDateInput" onchange="filterVisitsByDate()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                 </label>
+                 <button onclick="filterDate=null; document.getElementById('filterDateInput').value=''; setupVisitListener();" class="mt-4 sm:mt-0 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                    Mostrar Todas
+                 </button>
+                 <button onclick="printRoute()" class="mt-4 sm:mt-0 bg-fix-blue hover:bg-fix-light text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                    <span role="img" aria-label="Imprimir">&#x1F5A8;</span> Imprimir Ruta del Día
+                 </button>
+            </div>
         </div>
 
         <!-- Message Box for notifications -->
-        <div id="messageBox" class="p-3 rounded-lg text-white mb-4 opacity-0 transition-opacity duration-300"></div>
+        <div id="messageBox" class="p-3 rounded-lg text-white mb-4 opacity-0 transition-opacity duration-300 no-print"></div>
         
         <!-- Main Content Layout (Two Columns on large screens) -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             <!-- Columna 1: Formulario de Registro de Visita (Oculto en vistas de reporte) -->
-            <div id="formContainer" class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-xl border border-gray-200 h-fit">
+            <div id="formContainer" class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-xl border border-gray-200 h-fit no-print">
                 <h2 class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Registrar Nueva Visita</h2>
                 
                 <form id="visitForm" onsubmit="event.preventDefault(); saveVisit();">
@@ -838,8 +1071,8 @@ Observaciones: "${visitData.observacionesFinancieras}"
         </div>
     </div>
     
-    <!-- Modal de Edición de Administrador -->
-    <div id="editModal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-75 hidden" onclick="closeEditModal()">
+    <!-- Modal de Edición de Administrador (Deshabilitado en Plan B) -->
+    <div id="editModal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-75 hidden no-print" onclick="closeEditModal()">
         <div class="modal-content bg-white p-6 rounded-xl shadow-2xl max-w-lg w-full transform scale-95" onclick="event.stopPropagation()">
             <h3 class="text-2xl font-bold mb-4 text-fix-report border-b pb-2">Editar Registro (Admin)</h3>
             <p class="text-sm text-gray-600 mb-4">Modifique los campos necesarios. Esto sobreescribe los cálculos automáticos del técnico.</p>
