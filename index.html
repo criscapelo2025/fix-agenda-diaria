@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -14,6 +14,8 @@
                         'fix-blue': '#1e3a8a', // Un azul corporativo
                         'fix-light': '#3b82f6',
                         'fix-accent': '#f59e0b', // Naranja/Amarillo para acento
+                        'fix-report': '#059669', // Color para el reporte de Administrador
+                        'fix-error': '#dc2626', // Color para errores
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
@@ -42,12 +44,23 @@
             text-align: right;
             font-family: monospace;
         }
+        /* Estilo del Modal */
+        .modal {
+            transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
+        }
+        .modal-content {
+            transition: transform 0.3s ease-out;
+        }
+        .modal.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
     </style>
     <!-- Firebase Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, addDoc, onSnapshot, collection, query, orderBy, serverTimestamp, setLogLevel, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, addDoc, onSnapshot, collection, query, orderBy, where, serverTimestamp, setLogLevel, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global variables provided by the Canvas environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -58,6 +71,7 @@
         let app, db, auth;
         let userId = null;
         let isAuthReady = false;
+        let currentView = 'my_agenda'; // Estado para la vista: 'my_agenda', 'reporte_admin', 'mantenimiento'
 
         setLogLevel('Debug'); // Para ver logs de Firebase
 
@@ -76,10 +90,9 @@
             'campana tradicional': 15,
             'campana decorativa': 36,
             'campana isla': 45,
-            'default': 0 // Para tipos no definidos
+            'default': 0
         };
 
-        // Catálogo de accesorios (Nombre: Precio)
         const ACCESORIOS_DEFAULT = {
             'Enchufe 220 50': 10,
             'Enchufe 220 20': 47,
@@ -90,10 +103,17 @@
             'Acople horno': 5,
         };
         let customAccessories = [];
+        let globalVisitsData = {}; // Cache para datos de edición
 
         // Función de inicialización y autenticación
         async function initializeFirebase() {
+            let errorDetected = false;
             try {
+                // Validación del config
+                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
+                    throw new Error("La configuración de Firebase está vacía o no fue proporcionada.");
+                }
+
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -104,12 +124,11 @@
                         userId = user.uid;
                         isAuthReady = true;
                         console.log('Usuario autenticado:', userId);
-                        document.getElementById('userIdDisplay').textContent = `ID Técnico: ${userId}`;
-                        // Iniciar la escucha de visitas solo después de la autenticación
+                        document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}...`;
                         setupVisitListener();
-                        renderAccessoryInputs(); // Renderizar accesorios al inicio
+                        renderAccessoryInputs();
+                        setupViewSelector();
                     } else {
-                        // Si no hay usuario, intentar iniciar sesión anónimamente o con token
                         if (initialAuthToken) {
                             await signInWithCustomToken(auth, initialAuthToken);
                         } else {
@@ -117,161 +136,201 @@
                             userId = anonymousUser.user.uid;
                             isAuthReady = true;
                             console.log('Sesión anónima iniciada:', userId);
-                            document.getElementById('userIdDisplay').textContent = `ID Técnico: ${userId} (Anónimo)`;
+                            document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}... (Anónimo)`;
                             setupVisitListener();
-                            renderAccessoryInputs(); // Renderizar accesorios al inicio
+                            renderAccessoryInputs();
+                            setupViewSelector();
                         }
                     }
                 });
 
             } catch (error) {
                 console.error("Error al inicializar Firebase o autenticar:", error);
-                document.getElementById('visitsList').innerHTML = `<p class="text-red-500 p-4">Error al conectar con la base de datos. Verifique la consola.</p>`;
+                errorDetected = true;
+                
+                // MODO DE SEGURIDAD PARA CONEXIÓN FALLIDA: Asume credenciales predeterminadas para que la app no colapse.
+                console.warn("ADVERTENCIA: Iniciando en Modo de Seguridad. Los registros no serán persistentes si la configuración de Firebase es incorrecta.");
+                userId = 'admin_default_fix';
+                isAuthReady = true;
+                document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SEGURIDAD ACTIVO`;
+                document.getElementById('visitsList').innerHTML = `<p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ Error de Conexión de Base de Datos. Use la URL publicada de GitHub.</p>`;
+                
+                setupVisitListener(); // Intentamos arrancar el listener con el userId default
+                renderAccessoryInputs();
+                setupViewSelector();
+
+                if (error.message.includes("configuración")) {
+                     showMessage("ERROR CRÍTICO: La configuración de la Base de Datos es inválida o faltante. Verifique la consola.", 'fix-error');
+                } else {
+                     showMessage("ERROR: La conexión inicial falló. Use la URL pública de GitHub.", 'fix-error');
+                }
             }
         }
+
+        // --- Lógica de Colecciones ---
+        const VISITS_COLLECTION_PATH = `artifacts/${appId}/public/data/visits`;
 
         function getVisitsCollectionRef() {
-            if (!db || !userId) {
-                console.error("Firestore no inicializado o userId no disponible.");
-                return null;
+            if (!db) {
+                // Si la conexión falló, no podemos devolver la referencia real
+                return null; 
             }
-            // Utilizamos el path privado para guardar la información de las visitas del técnico.
-            return collection(db, `artifacts/${appId}/users/${userId}/visits`);
+            return collection(db, VISITS_COLLECTION_PATH);
         }
         
-        // --- Lógica de Costos y Cálculo ---
+        // --- Lógica de Vistas (Admin/Técnico) ---
         
-        /**
-         * Calcula el costo de instalación basado en la cantidad y tipo de equipos.
-         */
+        window.changeView = (newView) => {
+            currentView = newView;
+            setupVisitListener();
+            
+            // Actualizar botones de vista activa
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.remove('bg-fix-blue', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700');
+            });
+            document.getElementById(`btn-${newView}`).classList.remove('bg-gray-200', 'text-gray-700');
+            document.getElementById(`btn-${newView}`).classList.add('bg-fix-blue', 'text-white');
+            
+            // Ocultar/mostrar formulario si estamos en una vista de reporte
+            const formContainer = document.getElementById('formContainer');
+            if (newView !== 'my_agenda') {
+                 formContainer.classList.add('hidden');
+                 document.getElementById('reportViewTitle').textContent = newView === 'mantenimiento' ? 'Agenda de Mantenimiento (CRM)' : 'Reporte Consolidado (Todas las Visitas)';
+            } else {
+                 formContainer.classList.remove('hidden');
+                 document.getElementById('reportViewTitle').textContent = 'Hoja de Visita Diaria';
+            }
+        };
+        
+        function setupViewSelector() {
+            window.changeView('my_agenda'); 
+        }
+
+        // Escucha en tiempo real de las visitas para la "Hoja de Visita Diaria"
+        function setupVisitListener() {
+            if (!isAuthReady || !userId || !db) {
+                console.warn("Listener no iniciado: DB no disponible.");
+                return;
+            }
+
+            let visitsQuery;
+            
+            if (currentView === 'my_agenda') {
+                visitsQuery = query(
+                    getVisitsCollectionRef(), 
+                    where("userId", "==", userId),
+                    orderBy("fechaInstalacion", "desc")
+                );
+            } else if (currentView === 'reporte_admin') {
+                visitsQuery = query(
+                    getVisitsCollectionRef(), 
+                    orderBy("createdAt", "desc") 
+                );
+            } else if (currentView === 'mantenimiento') {
+                visitsQuery = query(
+                    getVisitsCollectionRef(), 
+                    where("fechaProximoMantenimiento", "!=", null),
+                    orderBy("fechaProximoMantenimiento", "asc") 
+                );
+            }
+            
+            onSnapshot(visitsQuery, (querySnapshot) => {
+                const visits = [];
+                globalVisitsData = {}; // Limpiar caché
+                querySnapshot.forEach((doc) => {
+                    const data = { id: doc.id, ...doc.data() };
+                    visits.push(data);
+                    globalVisitsData[doc.id] = data; // Guardar en caché para edición
+                });
+                renderVisits(visits);
+            }, (error) => {
+                console.error("Error al escuchar las visitas: ", error);
+                document.getElementById('visitsList').innerHTML = `<p class="text-red-500 p-4">Error al cargar las visitas.</p>`;
+            });
+        }
+        
+        // --- Lógica de Costos y Accesorios ---
         function calcularCostoInstalacion(numEquipos, tiposEquipos) {
-            numEquipos = parseInt(numEquipos) || 0;
+             numEquipos = parseInt(numEquipos) || 0;
             if (numEquipos === 0) return 0;
-
             const hasCampanaIsla = tiposEquipos.some(tipo => tipo.toLowerCase().includes('campana isla'));
-
             if (numEquipos === 1) {
                 const tipoPrincipal = tiposEquipos.length > 0 ? tiposEquipos[0].toLowerCase() : 'default';
                 return COSTOS_INSTALACION[tipoPrincipal] || COSTOS_INSTALACION['default'];
             } else if (numEquipos === 2) {
                 let costoTotal = 0;
                 if (hasCampanaIsla) {
-                    costoTotal += 30; // Campana Isla tiene costo especial de $30
-                    costoTotal += 20; // El otro equipo cuesta $20
+                    costoTotal += 30;
+                    costoTotal += 20;
                 } else {
                     costoTotal = numEquipos * 20; 
                 }
                 return costoTotal;
-
             } else if (numEquipos >= 3) {
                 let costoTotal = 0;
-                // Contar cuántos equipos son "Campana Isla" o del tipo principal si no se puede determinar
                 const tipoPrincipal = tiposEquipos.length > 0 ? tiposEquipos[0].toLowerCase() : 'default';
-                
-                // Cálculo simplificado asumiendo 1 Campana Isla si aplica y el resto de $15
                 let numCampanaIsla = hasCampanaIsla ? 1 : 0;
-                
-                // Si el tipo principal es Campana Isla, aseguramos que al menos 1 sea 30
                 if(tipoPrincipal.includes('campana isla')) {
                      numCampanaIsla = 1;
                 }
-                
                 const numOtros = numEquipos - numCampanaIsla;
-                
-                // 3 o más equipos: $15 por equipo, Campana Isla $30.
                 costoTotal = (numOtros * 15) + (numCampanaIsla * 30);
-                
-                // Si el cálculo da negativo por error de conteo, lo corregimos con el costo mínimo
                 return costoTotal > 0 ? costoTotal : (numEquipos * 15);
             }
-
             return 0;
         }
 
-        /**
-         * Calcula el costo total de todos los accesorios dinámicos.
-         */
         function calcularCostoAccesorios() {
             let totalAccesorios = 0;
             const container = document.getElementById('accesoriosContainer');
             if (!container) return 0;
-            
             const accessoryItems = container.querySelectorAll('.accessory-item');
-
             accessoryItems.forEach(item => {
                 const quantityInput = item.querySelector('input[name^="acc_qty_"]');
                 const priceInput = item.querySelector('input[name^="acc_price_"]');
-                
                 const cantidad = parseInt(quantityInput.value) || 0;
                 const precio = parseFloat(priceInput.value) || 0;
-
                 totalAccesorios += cantidad * precio;
             });
-
             return totalAccesorios;
         }
 
-        /**
-         * Actualiza la etiqueta del Costo de Instalación en el formulario.
-         */
         window.updateInstallationCost = () => {
             const numEquipos = document.getElementById('numEquipos').value;
             const tipoServicio = document.querySelector('[name="tipoServicio"]').value; 
-            
             let tiposEquipos = [tipoServicio];
-            
             if (numEquipos > 1) {
                 tiposEquipos = Array(parseInt(numEquipos)).fill(tipoServicio);
             }
-
             const costoInstalacion = calcularCostoInstalacion(numEquipos, tiposEquipos);
             document.getElementById('costoInstalacionDisplay').textContent = `$${costoInstalacion.toFixed(2)}`;
-            document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2); // Guardar el valor calculado
-
-            window.updateTotalCobro(); // Llamar al cálculo total
+            document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2);
+            window.updateTotalCobro();
         };
 
-        /**
-         * Actualiza el Costo Total de Accesorios y el Total a Cobrar.
-         */
         window.updateTotalCobro = () => {
             const costoInstalacion = parseFloat(document.getElementById('costoInstalacionHidden').value) || 0;
             const totalAccesorios = calcularCostoAccesorios();
-            // Ya no usamos cobroGarantia manual ni viatico.
-
-            // Mostrar el total de accesorios calculado
             document.getElementById('totalAccesoriosDisplay').textContent = `$${totalAccesorios.toFixed(2)}`;
             document.getElementById('cobroAccesoriosHidden').value = totalAccesorios.toFixed(2);
-            
-            // Cálculo del Total a Cobrar al Cliente: Instalación + Accesorios
             const totalCliente = costoInstalacion + totalAccesorios; 
-
             document.getElementById('totalClienteDisplay').textContent = `$${totalCliente.toFixed(2)}`;
         };
-        
-        // --- Lógica de Accesorios Dinámicos ---
 
-        // Renderiza la lista inicial y personalizada de accesorios
         function renderAccessoryInputs() {
             const container = document.getElementById('accesoriosContainer');
-            if (!container) return; // Asegurar que el contenedor existe
-            
-            container.innerHTML = ''; // Limpiar
-
-            // Renderizar Accesorios por Defecto
+            if (!container) return; 
+            container.innerHTML = '';
             Object.entries(ACCESORIOS_DEFAULT).forEach(([name, price]) => {
                 container.appendChild(createAccessoryInputRow(name, price));
             });
-
-            // Renderizar Accesorios Personalizados (si existen)
             customAccessories.forEach(acc => {
                 container.appendChild(createAccessoryInputRow(acc.name, acc.price, true));
             });
-            
-            window.updateTotalCobro(); // Recalcular totales después de renderizar
+            window.updateTotalCobro();
         }
 
-        // Crea un elemento DOM para un accesorio
         function createAccessoryInputRow(name, price, isCustom = false) {
             const id = name.replace(/\s/g, '_').toLowerCase() + '_' + Date.now();
             const div = document.createElement('div');
@@ -300,25 +359,20 @@
             return div;
         }
 
-        // Añade un nuevo accesorio personalizado al catálogo y lo renderiza
         window.addCustomAccessory = () => {
             const customName = document.getElementById('newAccessoryName').value.trim();
             const customPrice = parseFloat(document.getElementById('newAccessoryPrice').value) || 0;
-
             if (customName && customPrice > 0) {
                 const newAcc = { name: customName, price: customPrice };
                 customAccessories.push(newAcc);
-                
                 document.getElementById('newAccessoryName').value = '';
                 document.getElementById('newAccessoryPrice').value = '0.00';
-                
                 renderAccessoryInputs();
             } else {
                 showMessage("Debe ingresar un nombre y un precio válido para el nuevo accesorio.", 'fix-accent');
             }
         }
         
-        // Elimina un accesorio personalizado
         window.removeAccessory = (buttonElement, name) => {
             const itemElement = buttonElement.closest('.accessory-item');
             if (itemElement) {
@@ -328,13 +382,9 @@
             }
         }
 
-
-        // --- Lógica de Firebase: Guardar Registro Inicial ---
-        
-        // Guarda una nueva visita en Firestore
         window.saveVisit = async () => {
-            if (!isAuthReady || !userId) {
-                showMessage("Aún se está autenticando. Intente de nuevo en un momento.", 'fix-accent');
+            if (!isAuthReady || !userId || !db) {
+                showMessage("ERROR: La base de datos no está disponible. Verifique la consola o use la URL pública.", 'fix-error');
                 return;
             }
 
@@ -346,7 +396,6 @@
                 visitData[key] = value.trim();
             }
 
-            // Mapeo y conversión de datos financieros
             const parseCurrency = (value) => parseFloat(value.replace('$', '').replace(/,/g, '')) || 0;
 
             const costoInstalacionCalculado = parseCurrency(document.getElementById('costoInstalacionHidden').value);
@@ -377,20 +426,12 @@
             }
 
             const financiera = {
-                // Costos calculados
-                costoInstalacion: costoInstalacionCalculado, // Costo Fijo CALCULADO
-                cobroAccesorios: totalAccesoriosCalculado, // Total Accesorios CALCULADO
-                
-                // Costos de Penalización (inicialmente 0)
+                costoInstalacion: costoInstalacionCalculado, 
+                cobroAccesorios: totalAccesoriosCalculado, 
                 costoSegundaVisita: 0.00, 
                 costoGarantiaNoAplica: 0.00,
-                
-                // Viático siempre es 0
                 viatico: 0.00, 
-                
-                // Total a cobrar al cliente (Instalación + Accesorios)
                 totalCliente: costoInstalacionCalculado + totalAccesoriosCalculado, 
-                
                 accesorios: accesoriosRegistrados,
                 observacionesFinancieras: visitData.observacionesFinancieras,
             };
@@ -399,16 +440,14 @@
                 ...visitData,
                 financiera,
                 createdAt: serverTimestamp(),
-                userId: userId,
+                userId: userId, 
                 fechaInstalacion: visitData.fechaInstalacion, 
                 estado: 'Pendiente', 
             };
 
-            // Limpieza de campos temporales/no necesarios
             delete finalData.costoInstalacionHidden;
             delete finalData.cobroAccesoriosHidden;
             
-            // Validación mínima de campos críticos
             if (!finalData.nombreCliente || !finalData.direccion || !finalData.fechaInstalacion) {
                 showMessage("Por favor, complete los campos obligatorios de Cliente/Dirección/Fecha de Instalación.", 'fix-accent');
                 return;
@@ -424,19 +463,16 @@
                 window.updateInstallationCost(); 
             } catch (e) {
                 console.error("Error al añadir documento: ", e);
-                showMessage("Error al guardar la visita. Verifique la consola.", 'red-500');
+                showMessage("Error al guardar la visita. Verifique la consola.", 'fix-error');
             }
         };
 
 
         // --- Lógica de Firebase: Actualizar Estado y Costos en Campo ---
         
-        /**
-         * Actualiza el estado de una visita y aplica costos de penalización/mantenimiento.
-         */
         window.updateVisitStatusAndFinancials = async (visitId) => {
-            if (!isAuthReady || !userId) {
-                showMessage("Aún se está autenticando. Intente de nuevo en un momento.", 'fix-accent');
+            if (!isAuthReady || !userId || !db) {
+                showMessage("ERROR: La base de datos no está disponible. No se puede actualizar el estado.", 'fix-error');
                 return;
             }
 
@@ -444,13 +480,12 @@
             const newStatus = itemContainer.querySelector(`#status-${visitId}`).value;
             const motivo = itemContainer.querySelector(`#motivo-${visitId}`).value.trim();
             
-            // Validaciones
             if ((newStatus === 'No Realizado' || newStatus === 'Garantia No Aplica') && !motivo) {
                 showMessage("Debe ingresar un motivo para el estado 'No Realizado' o 'Garantía No Aplica'.", 'fix-accent');
                 return;
             }
 
-            const visitRef = doc(db, `artifacts/${appId}/users/${userId}/visits`, visitId);
+            const visitRef = doc(db, VISITS_COLLECTION_PATH, visitId);
 
             let costoSegundaVisita = 0.00;
             let costoGarantiaNoAplica = 0.00;
@@ -462,20 +497,14 @@
                 costoGarantiaNoAplica = 20.00;
             } else if (newStatus === 'Completado') {
                 const today = new Date();
-                // Cálculo del recordatorio a 6 meses para mantenimiento
                 today.setMonth(today.getMonth() + 6);
                 fechaProximoMantenimiento = today.toISOString().split('T')[0];
             }
-            
-            // Recalcular el Total a Cobrar al Cliente con los nuevos costos de penalización
-            // Primero, necesitamos los costos base (Instalación + Accesorios) que ya están guardados
-            // Esto se hace en la vista de reporte (renderVisits) al recargar los datos.
 
             const updatePayload = {
                 estado: newStatus,
                 motivoNoRealizado: newStatus !== 'Completado' ? motivo : '',
                 fechaProximoMantenimiento: fechaProximoMantenimiento,
-                // Actualización de costos de penalización dentro de la estructura financiera
                 'financiera.costoSegundaVisita': costoSegundaVisita,
                 'financiera.costoGarantiaNoAplica': costoGarantiaNoAplica,
             };
@@ -485,13 +514,84 @@
                 showMessage(`Estado de visita ${visitId} actualizado a "${newStatus}".`, 'fix-light');
             } catch (e) {
                 console.error("Error al actualizar el estado: ", e);
-                showMessage("Error al actualizar el estado de la visita. Verifique la consola.", 'red-500');
+                showMessage("Error al actualizar el estado de la visita. Verifique la consola.", 'fix-error');
+            }
+        };
+        
+        // --- Lógica de Edición (Administrador) ---
+        
+        window.openEditModal = (visitId) => {
+            const visit = globalVisitsData[visitId];
+            if (!visit) {
+                showMessage("Error: Datos de visita no encontrados.", 'fix-error');
+                return;
+            }
+
+            // Llenar el modal con datos actuales
+            document.getElementById('edit-visit-id').value = visitId;
+            document.getElementById('edit-nombreCliente').value = visit.nombreCliente || '';
+            document.getElementById('edit-direccion').value = visit.direccion || '';
+            document.getElementById('edit-telefono').value = visit.telefono || '';
+            document.getElementById('edit-fechaInstalacion').value = visit.fechaInstalacion || '';
+            document.getElementById('edit-numEquipos').value = visit.numEquipos || 1;
+            document.getElementById('edit-costoInstalacion').value = (visit.financiera?.costoInstalacion || 0).toFixed(2);
+            document.getElementById('edit-cobroAccesorios').value = (visit.financiera?.cobroAccesorios || 0).toFixed(2);
+            document.getElementById('edit-costoSegundaVisita').value = (visit.financiera?.costoSegundaVisita || 0).toFixed(2);
+            document.getElementById('edit-costoGarantiaNoAplica').value = (visit.financiera?.costoGarantiaNoAplica || 0).toFixed(2);
+            
+            // Mostrar modal
+            const modal = document.getElementById('editModal');
+            modal.classList.remove('hidden');
+        };
+        
+        window.closeEditModal = () => {
+             document.getElementById('editModal').classList.add('hidden');
+        };
+
+        window.saveEditedVisit = async () => {
+            if (!isAuthReady || !userId || !db) {
+                showMessage("ERROR: La base de datos no está disponible. No se puede guardar la edición.", 'fix-error');
+                return;
+            }
+
+            const visitId = document.getElementById('edit-visit-id').value;
+            const visitRef = doc(db, VISITS_COLLECTION_PATH, visitId);
+
+            const newInstalacion = parseFloat(document.getElementById('edit-costoInstalacion').value) || 0;
+            const newAccesorios = parseFloat(document.getElementById('edit-cobroAccesorios').value) || 0;
+            const newSegundaVisita = parseFloat(document.getElementById('edit-costoSegundaVisita').value) || 0;
+            const newNoGarantia = parseFloat(document.getElementById('edit-costoGarantiaNoAplica').value) || 0;
+
+            const newTotalCliente = newInstalacion + newAccesorios + newSegundaVisita + newNoGarantia;
+
+            const updatePayload = {
+                nombreCliente: document.getElementById('edit-nombreCliente').value,
+                direccion: document.getElementById('edit-direccion').value,
+                telefono: document.getElementById('edit-telefono').value,
+                fechaInstalacion: document.getElementById('edit-fechaInstalacion').value,
+                numEquipos: parseInt(document.getElementById('edit-numEquipos').value) || 1,
+
+                // Actualizaciones financieras (Admin puede sobreescribir los cálculos automáticos)
+                'financiera.costoInstalacion': newInstalacion,
+                'financiera.cobroAccesorios': newAccesorios,
+                'financiera.costoSegundaVisita': newSegundaVisita,
+                'financiera.costoGarantiaNoAplica': newNoGarantia,
+                'financiera.totalCliente': newTotalCliente, // Recalcular total
+            };
+
+            try {
+                await updateDoc(visitRef, updatePayload);
+                showMessage(`Visita ID ${visitId} (Admin) modificada correctamente.`, 'fix-report');
+                closeEditModal();
+            } catch (e) {
+                console.error("Error al guardar edición: ", e);
+                showMessage("Error al guardar la edición. Verifique la consola.", 'fix-error');
             }
         };
 
+
         // --- Lógica de Interfaz de Usuario: Renderizado ---
 
-        // Muestra un mensaje temporal
         function showMessage(message, color) {
             const messageBox = document.getElementById('messageBox');
             messageBox.textContent = message;
@@ -501,42 +601,32 @@
                 messageBox.style.opacity = 0;
             }, 5000);
         }
-
-        // Escucha en tiempo real de las visitas para la "Hoja de Visita Diaria"
-        function setupVisitListener() {
-            if (!isAuthReady || !userId) return;
-
-            const q = query(getVisitsCollectionRef(), orderBy("fechaInstalacion", "desc"));
-            
-            onSnapshot(q, (querySnapshot) => {
-                const visits = [];
-                querySnapshot.forEach((doc) => {
-                    visits.push({ id: doc.id, ...doc.data() });
-                });
-                renderVisits(visits);
-            }, (error) => {
-                console.error("Error al escuchar las visitas: ", error);
-                document.getElementById('visitsList').innerHTML = `<p class="text-red-500 p-4">Error al cargar las visitas.</p>`;
-            });
+        
+        function getAccessoryListFromDOM(visit) {
+            const f = visit.financiera || {};
+            return f.accesorios && f.accesorios.length > 0
+                ? f.accesorios.map(a => `${a.cantidad}x ${a.nombre} ($${a.subtotal.toFixed(2)})`).join(', ')
+                : 'Ninguno';
         }
+
 
         // Renderiza la lista de visitas
         function renderVisits(visits) {
             const listContainer = document.getElementById('visitsList');
             if (visits.length === 0) {
-                listContainer.innerHTML = `<p class="text-gray-500 p-4 italic">No hay visitas agendadas aún.</p>`;
+                listContainer.innerHTML = `<p class="text-gray-500 p-4 italic">No hay visitas agendadas ${currentView === 'my_agenda' ? 'en tu agenda.' : 'en el sistema.'}</p>`;
                 return;
             }
 
             listContainer.innerHTML = visits.map(visit => {
                 const f = visit.financiera || {};
                 
-                // Recalcular el total sumando las penalizaciones al costo base
+                // --- Cálculo Financiero ---
                 const costoBase = (f.costoInstalacion || 0) + (f.cobroAccesorios || 0);
                 const penalizaciones = (f.costoSegundaVisita || 0) + (f.costoGarantiaNoAplica || 0);
                 const total = (costoBase + penalizaciones).toFixed(2);
                 
-                // Clases de color para el estado
+                // --- Estilos y Datos ---
                 let estadoColor = 'bg-blue-100 text-blue-800';
                 if (visit.estado === 'Completado') {
                     estadoColor = 'bg-green-100 text-green-800';
@@ -551,36 +641,96 @@
                     year: 'numeric', month: 'long', day: 'numeric' 
                 }) : 'Fecha no definida';
                 
-                const accesoriosText = f.accesorios && f.accesorios.length > 0
-                    ? f.accesorios.map(a => `${a.cantidad}x ${a.nombre} ($${a.subtotal.toFixed(2)})`).join(', ')
-                    : 'Ninguno';
-
+                const accesoriosText = getAccessoryListFromDOM(visit);
                 let motivoField = visit.motivoNoRealizado ? `<p class="text-xs text-red-600 italic">Motivo: ${visit.motivoNoRealizado}</p>` : '';
-                let maintenanceMessage = '';
-                if (visit.fechaProximoMantenimiento) {
-                    const message = `¡Hola ${visit.nombreCliente.split(' ')[0]}! Han pasado casi 6 meses desde que instalamos tu equipo Teka. ¡Es hora de un mantenimiento preventivo! Contáctanos para asegurar el óptimo rendimiento.`;
-                    maintenanceMessage = `<div class="mt-2 pt-2 border-t border-dashed">
-                        <p class="text-sm font-semibold text-green-700 bg-green-50 p-2 rounded">
-                            Recordatorio Mantenimiento (${visit.fechaProximoMantenimiento}):
-                        </p>
-                        <textarea readonly class="w-full text-xs text-gray-700 mt-1 p-2 border rounded resize-none" rows="3">${message}</textarea>
-                        <button onclick="navigator.clipboard.writeText('${message.replace(/'/g, "\\'")}')" class="w-full bg-green-500 hover:bg-green-600 text-white text-xs font-semibold py-1 rounded mt-1 transition">
-                            Copiar Mensaje
-                        </button>
-                    </div>`;
-                }
                 
                 const instCostText = `Inst: $${f.costoInstalacion ? f.costoInstalacion.toFixed(2) : '0.00'}`;
                 const secVisitCostText = f.costoSegundaVisita ? ` + $${f.costoSegundaVisita.toFixed(2)} (2da Visita)` : '';
                 const noGarantiaCostText = f.costoGarantiaNoAplica ? ` + $${f.costoGarantiaNoAplica.toFixed(2)} (No Garantía)` : '';
+                
+                // --- Mensaje y Botón de Copia (Solo en Reporte/Mantenimiento) ---
+                let maintenanceSection = '';
+                let adminEditButton = '';
 
+                if (currentView !== 'my_agenda') {
+                    // Solo en vistas de Reporte (Admin)
+                    adminEditButton = `
+                        <button onclick="openEditModal('${visit.id}')" class="w-full bg-fix-report hover:bg-fix-blue text-white text-xs font-semibold py-1 rounded mt-2 transition duration-200 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L15.232 5.232z" />
+                            </svg>
+                            Editar Finanzas (Admin)
+                        </button>`;
+                }
 
+                if (visit.fechaProximoMantenimiento) {
+                    const message = `¡Hola ${visit.nombreCliente.split(' ')[0]}! Han pasado casi 6 meses desde que instalamos tu equipo Teka. ¡Es hora de un mantenimiento preventivo! Contáctanos para asegurar el óptimo rendimiento.`;
+                    
+                    if (currentView !== 'my_agenda') {
+                        maintenanceSection = `
+                            <div class="mt-2 pt-2 border-t border-dashed border-green-300">
+                                <p class="text-xs font-semibold text-green-700 bg-green-50 p-2 rounded">
+                                    Recordatorio Mantto. (${visit.fechaProximoMantenimiento}):
+                                </p>
+                                <button onclick="copyToClipboard('${message.replace(/'/g, "\\'")}')" class="w-full bg-fix-report hover:bg-fix-blue text-white text-xs font-semibold py-1 rounded mt-1 transition">
+                                    Copiar Mensaje Mantenimiento
+                                </button>
+                            </div>
+                        `;
+                    }
+                }
+
+                // --- Secciones de Vista ---
+                
+                // Campos adicionales para la vista de Reporte/Admin
+                let adminFields = '';
+                let adminClass = ''; 
+                if (currentView !== 'my_agenda') {
+                    adminFields = `<p class="text-xs text-gray-500 mt-1">
+                        <strong class="text-gray-700">Técnico ID:</strong> ${visit.userId.substring(0, 8)}...
+                        <strong class="text-gray-700 ml-4">Tel:</strong> ${visit.telefono || 'N/A'}
+                    </p>`;
+                    adminClass = 'border-2 border-fix-report/50';
+                }
+                
+                // La sección de Confirmación de Campo solo la ve el Técnico (currentView === 'my_agenda')
+                let confirmationSection = '';
+                if (currentView === 'my_agenda') {
+                    confirmationSection = `
+                        <div class="mt-4 pt-4 border-t border-fix-light/30">
+                            <h4 class="text-base font-semibold text-fix-blue mb-2">Confirmación en Campo:</h4>
+                            <label class="block mb-2">
+                                <span class="text-gray-700 text-sm">Estado de la Intervención:</span>
+                                <select id="status-${visit.id}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2 text-sm">
+                                    <option value="Pendiente" ${visit.estado === 'Pendiente' ? 'selected' : ''}>1. Pendiente</option>
+                                    <option value="Completado" ${visit.estado === 'Completado' ? 'selected' : ''}>2. Completado (Instalación OK)</option>
+                                    <option value="No Realizado" ${visit.estado === 'No Realizado' ? 'selected' : ''}>3. No Realizado (Costo 2da Visita $12)</option>
+                                    <option value="Garantia No Aplica" ${visit.estado === 'Garantia No Aplica' ? 'selected' : ''}>4. Garantía No Aplica (Costo $20)</option>
+                                </select>
+                            </label>
+                            
+                            <label class="block mb-3">
+                                <span class="text-gray-700 text-sm">Motivo / Notas:</span>
+                                <textarea id="motivo-${visit.id}" rows="1" placeholder="Solo si la visita no se completó." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2 text-sm">${visit.motivoNoRealizado || ''}</textarea>
+                            </label>
+                            
+                            <button onclick="updateVisitStatusAndFinancials('${visit.id}')" class="w-full bg-fix-accent hover:bg-fix-blue text-white font-bold py-2 px-4 rounded-lg text-sm transition duration-300">
+                                Guardar Confirmación
+                            </button>
+                        </div>
+                    `;
+                }
+
+                // --- Retorno Final ---
                 return `
-                    <div id="visit-item-${visit.id}" class="bg-white p-4 rounded-xl shadow-md border border-gray-100 hover:border-fix-light transition-all mb-3">
+                    <div id="visit-item-${visit.id}" class="bg-white p-4 rounded-xl shadow-md border border-gray-100 hover:border-fix-light transition-all mb-3 ${adminClass}">
                         <div class="flex justify-between items-center mb-2">
-                            <h3 class="text-lg font-bold text-fix-blue">${visit.nombreCliente || 'Sin Nombre'}</h3>
+                            <h3 class="text-lg font-bold text-fix-blue">${visit.nombreCliente || 'Sin Nombre'} (ID: ${visit.id.substring(0, 5)}...)</h3>
                             <span class="text-sm font-semibold px-3 py-1 rounded-full ${estadoColor}">${visit.estado}</span>
                         </div>
+                        
+                        ${adminFields} 
+
                         <p class="text-sm text-gray-700 mb-1">
                             <strong class="text-gray-900">Fecha Intervención:</strong> ${formattedDate}
                         </p>
@@ -601,37 +751,14 @@
                             <strong class="text-fix-accent">Cobro Total:</strong> $${total} (${instCostText}${secVisitCostText}${noGarantiaCostText})
                         </p>
                         
-                        <!-- SECCIÓN DE ACTUALIZACIÓN DEL TÉCNICO EN CAMPO (LECTURA/ESTADO/MOTIVO) -->
-                        <div class="mt-4 pt-4 border-t border-fix-light/30">
-                            <h4 class="text-base font-semibold text-fix-blue mb-2">Confirmación en Campo:</h4>
-                            
-                            <label class="block mb-2">
-                                <span class="text-gray-700 text-sm">Estado de la Intervención:</span>
-                                <select id="status-${visit.id}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2 text-sm">
-                                    <option value="Pendiente" ${visit.estado === 'Pendiente' ? 'selected' : ''}>1. Pendiente</option>
-                                    <option value="Completado" ${visit.estado === 'Completado' ? 'selected' : ''}>2. Completado (Instalación OK)</option>
-                                    <option value="No Realizado" ${visit.estado === 'No Realizado' ? 'selected' : ''}>3. No Realizado (Costo 2da Visita $12)</option>
-                                    <option value="Garantia No Aplica" ${visit.estado === 'Garantia No Aplica' ? 'selected' : ''}>4. Garantía No Aplica (Costo $20)</option>
-                                </select>
-                            </label>
-                            
-                            <label class="block mb-3">
-                                <span class="text-gray-700 text-sm">Motivo / Notas (Obligatorio si no se completó):</span>
-                                <textarea id="motivo-${visit.id}" rows="1" placeholder="Solo si la visita no se realizó." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2 text-sm">${visit.motivoNoRealizado || ''}</textarea>
-                            </label>
-                            
-                            <button onclick="updateVisitStatusAndFinancials('${visit.id}')" class="w-full bg-fix-accent hover:bg-fix-blue text-white font-bold py-2 px-4 rounded-lg text-sm transition duration-300">
-                                Guardar Confirmación
-                            </button>
-                            
-                            ${maintenanceMessage}
-                        </div>
+                        ${confirmationSection}
+                        ${maintenanceSection}
+                        ${adminEditButton}
                     </div>
                 `;
             }).join('');
         }
 
-        // Función de copia al portapapeles (necesaria para el mensaje de mantenimiento)
         window.copyToClipboard = (text) => {
              const tempTextArea = document.createElement('textarea');
              tempTextArea.value = text;
@@ -650,21 +777,34 @@
 
     <div class="max-w-7xl mx-auto p-4 md:p-8">
         <!-- Header -->
-        <header class="mb-8 border-b pb-4 flex items-center justify-between">
-            <div class="flex items-center">
-                <!-- Placeholder para el Logo de FIX -->
+        <header class="mb-8 border-b pb-4 flex flex-col md:flex-row items-start md:items-center justify-between">
+            <div class="flex items-center mb-4 md:mb-0">
+                <!-- Logo de FIX -->
                 <img src="https://placehold.co/100x40/1e3a8a/ffffff?text=FIX" 
                      alt="Logo de FIX" 
                      class="h-10 w-auto mr-4 rounded-lg shadow-md"
                      onerror="this.onerror=null; this.src='https://placehold.co/100x40/1e3a8a/ffffff?text=FIX';">
                 
                 <div>
-                    <h1 class="text-3xl font-extrabold text-fix-blue">Agenda Diaria</h1>
+                    <h1 class="text-3xl font-extrabold text-fix-blue">FIX - Sistema de Gestión</h1>
                     <p class="text-gray-600">Registro de Atenciones a Domicilio (Teka)</p>
                 </div>
             </div>
-            <p id="userIdDisplay" class="text-xs text-gray-500 mt-1 self-end">ID Técnico: Cargando...</p>
+            <p id="userIdDisplay" class="text-xs text-gray-500 self-end">ID Usuario: Cargando...</p>
         </header>
+
+        <!-- Selector de Vistas para Administrador -->
+        <div class="mb-6 p-3 bg-white rounded-xl shadow-md flex flex-wrap gap-2 justify-center">
+             <button id="btn-my_agenda" onclick="changeView('my_agenda')" class="view-btn bg-fix-blue text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                 <span role="img" aria-label="Agenda">&#x1F4DC;</span> Mi Agenda (Técnico)
+             </button>
+             <button id="btn-reporte_admin" onclick="changeView('reporte_admin')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                 <span role="img" aria-label="Reporte">&#x1F4CA;</span> Reporte Consolidado (Admin)
+             </button>
+             <button id="btn-mantenimiento" onclick="changeView('mantenimiento')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                 <span role="img" aria-label="Mantenimiento">&#x1F6E0;</span> Agenda Mantenimiento (CRM)
+             </button>
+        </div>
 
         <!-- Message Box for notifications -->
         <div id="messageBox" class="p-3 rounded-lg text-white mb-4 opacity-0 transition-opacity duration-300"></div>
@@ -672,8 +812,8 @@
         <!-- Main Content Layout (Two Columns on large screens) -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            <!-- Columna 1: Formulario de Registro de Visita -->
-            <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-xl border border-gray-200 h-fit">
+            <!-- Columna 1: Formulario de Registro de Visita (Oculto en vistas de reporte) -->
+            <div id="formContainer" class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-xl border border-gray-200 h-fit">
                 <h2 class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Registrar Nueva Visita</h2>
                 
                 <form id="visitForm" onsubmit="event.preventDefault(); saveVisit();">
@@ -682,7 +822,6 @@
                     <div class="mb-6 p-4 border border-fix-blue/30 rounded-lg bg-fix-blue/5">
                         <h3 class="text-xl font-medium mb-4 text-fix-blue">1. Cliente y Agenda</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            
                             <label class="block">
                                 <span class="text-gray-700 font-medium">Nombre Completo del Cliente*</span>
                                 <input type="text" name="nombreCliente" placeholder="Ej: Juan Pérez" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
@@ -764,7 +903,6 @@
                             <label class="block">
                                 <span class="text-gray-700">Tipo de Equipo Principal / Servicio*</span>
                                 <select name="tipoServicio" onchange="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
-                                    <!-- Tipos de servicio para el cálculo de costos -->
                                     <option value="cocina induccion">Inst. Cocina Inducción</option>
                                     <option value="cocina a gas">Inst. Cocina a Gas</option>
                                     <option value="horno a gas">Inst. Horno a Gas</option>
@@ -796,7 +934,6 @@
                             <div class="p-3 bg-white rounded-lg shadow text-center">
                                 <span class="text-sm font-normal text-gray-600">Costo Instalación</span>
                                 <div id="costoInstalacionDisplay" class="text-fix-blue">$25.00</div>
-                                <!-- Campo oculto para guardar el valor calculado -->
                                 <input type="hidden" id="costoInstalacionHidden" name="costoInstalacionHidden" value="25.00">
                             </div>
                             <div class="p-3 bg-white rounded-lg shadow text-center">
@@ -819,7 +956,6 @@
                             <div></div>
                         </div>
                         <div id="accesoriosContainer" class="p-2 border border-gray-300 rounded-b-md mb-4 bg-gray-50">
-                            <!-- Los inputs de accesorios se renderizan aquí por JS -->
                             <p class="text-center text-gray-500">Cargando accesorios...</p>
                         </div>
                         
@@ -837,8 +973,6 @@
                         <!-- Cobros y Viáticos Manuales (Garantía / Viático) -->
                         <h4 class="text-lg font-medium mt-6 mb-3 text-gray-800 border-t pt-4">Notas Financieras (Viático fijo en $0.00)</h4>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            
-                            <!-- Campo de Viático ahora oculto/fijo a 0.00 -->
                             
                             <label class="block md:col-span-2">
                                 <span class="text-gray-700">Observaciones Financieras/Forma de Pago</span>
@@ -860,7 +994,7 @@
             <!-- Columna 2: Hoja de Visita Diaria (Lista en Tiempo Real - Simulación Móvil) -->
             <div class="lg:col-span-1">
                 <div class="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
-                    <h2 class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Hoja de Visita Diaria</h2>
+                    <h2 id="reportViewTitle" class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Hoja de Visita Diaria</h2>
                     <div id="visitsList" class="max-h-[80vh] overflow-y-auto">
                         <!-- Las visitas se renderizarán aquí en tiempo real -->
                         <div class="text-center py-8 text-gray-500">
@@ -872,13 +1006,75 @@
 
         </div>
     </div>
+    
+    <!-- Modal de Edición de Administrador -->
+    <div id="editModal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-75 hidden" onclick="closeEditModal()">
+        <div class="modal-content bg-white p-6 rounded-xl shadow-2xl max-w-lg w-full transform scale-95" onclick="event.stopPropagation()">
+            <h3 class="text-2xl font-bold mb-4 text-fix-report border-b pb-2">Editar Registro (Admin)</h3>
+            <p class="text-sm text-gray-600 mb-4">Modifique los campos necesarios. Esto sobreescribe los cálculos automáticos del técnico.</p>
+            
+            <form id="editForm" onsubmit="event.preventDefault(); saveEditedVisit();">
+                <input type="hidden" id="edit-visit-id">
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Cliente</span>
+                        <input type="text" id="edit-nombreCliente" class="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Teléfono</span>
+                        <input type="tel" id="edit-telefono" class="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block col-span-2">
+                        <span class="text-gray-700 text-sm">Dirección</span>
+                        <input type="text" id="edit-direccion" class="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Fecha Inst.</span>
+                        <input type="date" id="edit-fechaInstalacion" class="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Cant. Equipos</span>
+                        <input type="number" id="edit-numEquipos" min="1" class="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                </div>
+                
+                <h4 class="text-lg font-medium mb-3 text-gray-800 border-t pt-4">Ajustes Financieros</h4>
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Costo Instalación</span>
+                        <input type="number" step="0.01" id="edit-costoInstalacion" class="currency-input mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Cobro Accesorios</span>
+                        <input type="number" step="0.01" id="edit-cobroAccesorios" class="currency-input mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Costo 2da Visita ($12)</span>
+                        <input type="number" step="0.01" id="edit-costoSegundaVisita" class="currency-input mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">No Garantía ($20)</span>
+                        <input type="number" step="0.01" id="edit-costoGarantiaNoAplica" class="currency-input mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                </div>
 
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" onclick="closeEditModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="bg-fix-report hover:bg-fix-blue text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Guardar Cambios Admin
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </body>
 </html>
 <script>
     // Inicializar el costo de instalación y el total al cargar (llama a updateInstallationCost)
     document.addEventListener('DOMContentLoaded', () => {
-        // Ejecutar el cálculo inicial
         if (typeof window.updateInstallationCost === 'function') {
              window.updateInstallationCost();
         }
