@@ -160,6 +160,7 @@
         }
 
         // --- Lógica de Colecciones ---
+        // Se mantiene en PUBLIC para que el Administrador vea todos los registros.
         const VISITS_COLLECTION_PATH = `artifacts/${appId}/public/data/visits`;
 
         function getVisitsCollectionRef() {
@@ -202,34 +203,16 @@
         // Escucha en tiempo real de las visitas para la "Hoja de Visita Diaria"
         function setupVisitListener() {
             if (!isAuthReady || !userId || !db) {
-                // Si estamos en modo de seguridad (db = null), mostramos el error y terminamos.
                 document.getElementById('visitsList').innerHTML = `<p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ Error: La base de datos no está disponible. No se pueden cargar los registros.</p>`;
                 return;
             }
 
-            let visitsQuery;
-            
-            // 1. MI AGENDA (Técnico - Solo sus registros)
-            if (currentView === 'my_agenda') {
-                visitsQuery = query(
-                    getVisitsCollectionRef(), 
-                    where("userId", "==", userId)
-                );
-            // 2. REPORTE CONSOLIDADO (Admin - Todos los registros)
-            } else if (currentView === 'reporte_admin') {
-                visitsQuery = query(
-                    getVisitsCollectionRef()
-                );
-            // 3. AGENDA MANTENIMIENTO (Admin - Solo registros con fecha de mantto.)
-            } else if (currentView === 'mantenimiento') {
-                visitsQuery = query(
-                    getVisitsCollectionRef(), 
-                    where("fechaProximoMantenimiento", "!=", null)
-                );
-            }
+            // --- CONSULTA SIMPLIFICADA (SIN FILTROS NI ORDENACIÓN EN FIRESTORE) ---
+            // Cargamos todos los documentos de la colección pública para evitar errores de índice y conexión.
+            const visitsQuery = query(getVisitsCollectionRef());
             
             onSnapshot(visitsQuery, (querySnapshot) => {
-                const visits = [];
+                let visits = [];
                 globalVisitsData = {}; // Limpiar caché
                 querySnapshot.forEach((doc) => {
                     const data = { id: doc.id, ...doc.data() };
@@ -237,16 +220,18 @@
                     globalVisitsData[doc.id] = data; // Guardar en caché para edición
                 });
                 
-                // --- ORDENACIÓN MANUAL EN JAVASCRIPT (SOLUCIÓN AL ERROR DE ÍNDICE) ---
+                // --- FILTRADO Y ORDENACIÓN MANUAL EN JAVASCRIPT ---
                 if (currentView === 'my_agenda') {
-                    // Ordenar por fechaInstalacion descendente (más reciente primero)
+                    // 1. Filtrar por userId (Mi Agenda)
+                    visits = visits.filter(v => v.userId === userId);
+                    // 2. Ordenar por fechaInstalacion descendente
                     visits.sort((a, b) => {
                         if (a.fechaInstalacion < b.fechaInstalacion) return 1;
                         if (a.fechaInstalacion > b.fechaInstalacion) return -1;
                         return 0;
                     });
                 } else if (currentView === 'reporte_admin') {
-                    // Ordenar por createdAt descendente (registro más reciente)
+                    // Ordenar por createdAt descendente (Registro más reciente)
                     visits.sort((a, b) => {
                          const dateA = a.createdAt?.seconds || 0;
                          const dateB = b.createdAt?.seconds || 0;
@@ -255,14 +240,16 @@
                          return 0;
                     });
                 } else if (currentView === 'mantenimiento') {
-                    // Ordenar por fechaProximoMantenimiento ascendente (más próximo primero)
+                    // 1. Filtrar por existencia de fechaProximoMantenimiento
+                    visits = visits.filter(v => v.fechaProximoMantenimiento);
+                    // 2. Ordenar por fechaProximoMantenimiento ascendente
                     visits.sort((a, b) => {
                         if (a.fechaProximoMantenimiento < b.fechaProximoMantenimiento) return -1;
                         if (a.fechaProximoMantenimiento > b.fechaProximoMantenimiento) return 1;
                         return 0;
                     });
                 }
-                // --- FIN ORDENACIÓN MANUAL ---
+                // --- FIN FILTRADO Y ORDENACIÓN MANUAL ---
 
                 renderVisits(visits);
             }, (error) => {
