@@ -105,11 +105,40 @@
         let app, db, auth;
         let userId = null;
         let isAuthReady = false;
+        // La vista por defecto es el reporte/agenda del administrador
         let currentView = 'reporte_admin'; 
         let dbFailed = true; // FORZAMOS EL ERROR: La DB falló, activamos el Plan B de Reporte Manual.
         let filterDate = new Date().toISOString().split('T')[0]; // Fecha de filtro predeterminada (hoy)
 
         setLogLevel('Debug'); // Para ver logs de Firebase
+
+        // LISTADO DE TÉCNICOS (SOLICITADO POR EL USUARIO)
+        const LISTA_TECNICOS = [
+            "", // Opción vacía
+            "Cristian Capelo",
+            "Juan Carlos Pando",
+            "Andres Cardenas",
+            "Juana Cardenas",
+            "Alan Skykaz" // CORRECCIÓN DEL NOMBRE COMPLETO
+        ];
+        
+        // CATÁLOGO DE PRODUCTOS (Basado en la estructura del archivo BASE.csv)
+        const CATALOGO_PRODUCTOS = {
+            "915061": "ASP. AXIAL BLIND 100 110V-60HZ",
+            "981061": "ASP. AXIAL SLIM 100 110V-60HZ",
+            "982061": "ASP. AXIAL SLIM 120 110V-60HZ",
+            "1010061": "ASP. AXIAL ELEGANCE 100 110V-60HZ",
+            "1070061": "ASP. AXIAL SERENITY 100 110V-60HZ",
+            "1080061": "ASP. AXIAL SERENITY 120 110V-60HZ",
+            "8731112": "FREGADERO DM (33.22) 1C",
+            "10101003": "45.50 1C FREGADERO",
+            "7900605": "ROCIADOR ASTRO",
+            "7900650": "ROCIADOR SPIN",
+            "790066700": "ROCIADOR 300 INOX",
+            "112580027": "GBC 75030 KBB CRISTAL COCINA GAS", // Ejemplo promocion
+            "111910000": "MLH 845 SS - MICROONDAS", // Ejemplo promocion
+            "112570211": "GBC 75-G1 GBA BM COCINA GAS", // Ejemplo promocion
+        };
 
         // Catálogo de costos fijos de instalación por tipo de equipo (1 solo equipo)
         const COSTOS_INSTALACION = {
@@ -142,69 +171,13 @@
         let globalVisitsData = {}; // Cache para datos de edición
         let visitsManual = []; // Array para simular datos en Plan B
 
-        // Función de inicialización y autenticación (Simplificada para el Plan B)
-        async function initializeFirebase() {
-            try {
-                // 1. INTENTAR INICIALIZAR DB (CRÍTICO)
-                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                     throw new Error("La configuración de Firebase está vacía o no fue proporcionada.");
-                }
 
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                dbFailed = false; // Si llegamos aquí, la conexión base está OK
-                
-                // 2. INTENTAR AUTENTICACIÓN
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        isAuthReady = true;
-                        document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}...`;
-                    } else {
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            const anonymousUser = await signInAnonymously(auth);
-                            userId = anonymousUser.user.uid;
-                            isAuthReady = true;
-                            document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}... (Anónimo)`;
-                        }
-                    }
-                    // 3. INICIAR LISTENERS SOLO DESPUÉS DE OBTENER USERID
-                    setupVisitListener();
-                    renderAccessoryInputs();
-                    setupViewSelector();
-                });
+        // --- FUNCIONES CORE: ORDENACIÓN Y VISTAS (MOVIDAS AL INICIO) ---
 
-            } catch (error) {
-                console.error("Error al inicializar Firebase o autenticar:", error);
-                
-                // MODO DE SEGURIDAD PARA CONEXIÓN FALLIDA: La DB NO está disponible.
-                dbFailed = true; // Marcar la falla
-                userId = 'admin_default_fix';
-                isAuthReady = true;
-                document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SIN CONEXIÓN`;
-                
-                // Mostrar la notificación de error pero no bloquear la lista
-                showMessage("ERROR CRÍTICO: Base de Datos NO disponible. El guardado no funcionará.", 'fix-error');
-
-                setupViewSelector(); 
-                renderAccessoryInputs(); // Cargar accesorios para que el formulario funcione visualmente
-            }
-            
-            // Configuración inicial de la interfaz (fuera del try/catch)
-            document.getElementById('filterDateInput').value = filterDate;
+        function setupViewSelector() {
+            window.changeView('reporte_admin'); // Vista inicial es la Agenda del Admin
         }
 
-        // Las funciones de Firebase quedan bloqueadas por dbFailed = true.
-        function getVisitsCollectionRef() {
-            if (!db) {
-                return null; 
-            }
-            return collection(db, `artifacts/${appId}/public/data/visits`);
-        }
-        
         window.changeView = (newView) => {
             currentView = newView;
             setupVisitListener(); // Llama al listener manual
@@ -236,15 +209,10 @@
             filterDate = document.getElementById('filterDateInput').value;
             setupVisitListener();
         };
-        
-        function setupViewSelector() {
-            window.changeView('reporte_admin'); // Vista inicial es la Agenda del Admin
-        }
 
         // Escucha de visitas (MODO MANUAL/SIMULACIÓN)
         function setupVisitListener() {
             if (dbFailed) {
-                // Si la DB falló, mostramos el estado de 'sin datos'
                 document.getElementById('visitsList').innerHTML = `<div class="text-center py-8 text-gray-500">Cargando agenda...</div><p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ SIN DATOS: Conexión DB fallida. Usar modo Copiar/Pegar.</p>`;
                 return;
             }
@@ -286,6 +254,54 @@
 
             renderVisits(visits);
         }
+        
+        // --- AUTORELLENO Y RENDERIZADO DE ACCESORIOS (MOVIDAS AL INICIO) ---
+
+        window.autofillProduct = () => {
+            const codigo = document.getElementById('codProducto').value.trim();
+            const descripcionInput = document.getElementById('descProducto');
+            
+            if (CATALOGO_PRODUCTOS[codigo]) {
+                descripcionInput.value = CATALOGO_PRODUCTOS[codigo];
+            } else {
+                // Si el código no está en el catálogo, no borramos para permitir la entrada manual.
+            }
+        };
+        
+        function renderAccessoryInputs() {
+            const container = document.getElementById('accesoriosContainer');
+            if (!container) return; 
+            container.innerHTML = '';
+            Object.entries(ACCESORIOS_DEFAULT).forEach(([name, price]) => {
+                container.appendChild(createAccessoryInputRow(name, price));
+            });
+            customAccessories.forEach(acc => {
+                container.appendChild(createAccessoryInputRow(acc.name, acc.price, true));
+            });
+            window.updateTotalCobro();
+            
+            // Llenar el select de técnicos
+            const tecnicoSelect = document.querySelector('select[name="tecnico"]');
+            if (tecnicoSelect && tecnicoSelect.options.length === 0) { // Evita duplicados
+                LISTA_TECNICOS.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name || "--- Seleccionar Técnico ---";
+                    tecnicoSelect.appendChild(option);
+                });
+            }
+        }
+        
+        // --- FUNCIÓN DE BORRADO DE REGISTRO LOCAL (SOLICITADO POR EL USUARIO) ---
+        window.deleteVisitLocal = (visitId) => {
+             const confirmation = confirm(`¿Está seguro de eliminar el registro local con ID: ${visitId.substring(0, 8)}...?`);
+             if (confirmation) {
+                 visitsManual = visitsManual.filter(v => v.id !== visitId);
+                 delete globalVisitsData[visitId];
+                 setupVisitListener();
+                 showMessage(`Registro ${visitId.substring(0, 8)}... eliminado de la sesión local.`, 'fix-report');
+             }
+        };
         
         // --- Lógica de Costos y Accesorios --- (Sin cambios)
         function calcularCostoInstalacion(numEquipos, tiposEquipos) {
@@ -354,19 +370,6 @@
             const totalCliente = costoInstalacion + totalAccesorios; 
             document.getElementById('totalClienteDisplay').textContent = `$${totalCliente.toFixed(2)}`;
         };
-
-        function renderAccessoryInputs() {
-            const container = document.getElementById('accesoriosContainer');
-            if (!container) return; 
-            container.innerHTML = '';
-            Object.entries(ACCESORIOS_DEFAULT).forEach(([name, price]) => {
-                container.appendChild(createAccessoryInputRow(name, price));
-            });
-            customAccessories.forEach(acc => {
-                container.appendChild(createAccessoryInputRow(acc.name, acc.price, true));
-            });
-            window.updateTotalCobro();
-        }
 
         function createAccessoryInputRow(name, price, isCustom = false) {
             const id = name.replace(/\s/g, '_').toLowerCase() + '_' + Date.now();
@@ -542,7 +545,7 @@ Observaciones: "${visitData.observacionesFinancieras}"
                 "TELEFONO", "CEDULA_RUC", "CORREO", "TIPO_SERVICIO", 
                 "CANT_EQUIPOS", "DESCRIPCION_PRODUCTO", "SERIE_EQUIPO", 
                 "COSTO_INSTALACION", "COSTO_ACCESORIOS", "TOTAL_COBRO_CLIENTE", 
-                "ACCESORIOS_USADOS", "OBSERVACIONES_FINANCIERAS", "ESTADO", "ID_TECNICO"
+                "ACCESORIOS_USADOS", "OBSERVACIONES_FINANCIERAS", "ESTADO", "ID_TECNICO", "TECNICO_ASIGNADO", "NUMERO_FACTURA_COMPRA", "LUGAR_DE_COMPRA"
             ];
 
             const csvRows = [headers.join(',')];
@@ -573,7 +576,10 @@ Observaciones: "${visitData.observacionesFinancieras}"
                     `"${accesoriosCSV.replace(/"/g, '""')}"`,
                     `"${(visit.observacionesFinancieras || '').replace(/"/g, '""')}"`,
                     `"${visit.estado || ''}"`,
-                    `"${visit.userId || ''}"`
+                    `"${visit.userId || ''}"`,
+                    `"${(visit.tecnico || '').replace(/"/g, '""')}"`,
+                    `"${(visit.numFactura || '').replace(/"/g, '""')}"`,
+                    `"${(visit.lugarCompra || '').replace(/"/g, '""')}"`,
                 ];
                 csvRows.push(row.join(','));
             });
@@ -686,7 +692,7 @@ Observaciones: "${visitData.observacionesFinancieras}"
         function getAccessoryListFromDOM(visit) {
             const f = visit.financiera || {};
             return f.accesorios && f.accesorios.length > 0
-                ? f.accesorios.map(a => `${a.cantidad}x ${a.nombre} ($${a.subtotal.toFixed(2)})`).join(' | ')
+                ? f.accesorios.map(a => `${a.nombre} (${a.cantidad}x $${a.precioUnitario})`).join(' | ')
                 : 'Ninguno';
         }
 
@@ -754,6 +760,12 @@ Observaciones: "${visitData.observacionesFinancieras}"
                     <button onclick="showMessage('Función deshabilitada (Conexión DB fallida).', 'fix-error')" class="w-full bg-gray-400 text-white text-xs font-semibold py-1 rounded mt-2 transition duration-200 flex items-center justify-center">
                         Editar (DB Desh.)
                     </button>`;
+                
+                // --- Botón de Borrado Local ---
+                const deleteButton = `<button onclick="deleteVisitLocal('${visit.id}')" class="w-full bg-red-500 hover:bg-red-600 text-white text-xs font-semibold py-1 rounded mt-2 transition duration-200 flex items-center justify-center">
+                    Eliminar Registro Local
+                </button>`;
+
 
                 // --- INDICADOR DE ORDEN DE RUTA ---
                 let routeOrderIndicator = '';
@@ -772,7 +784,7 @@ Observaciones: "${visitData.observacionesFinancieras}"
                         </div>
                         
                         <p class="text-xs text-gray-500 mt-1">
-                            <strong class="text-gray-700">Técnico ID:</strong> ${visit.userId}
+                            <strong class="text-gray-700">Técnico:</strong> ${visit.tecnico || 'N/A'}
                             <strong class="text-gray-700 ml-4">Tel:</strong> ${visit.telefono || 'N/A'}
                         </p>
 
@@ -797,7 +809,7 @@ Observaciones: "${visitData.observacionesFinancieras}"
                         </p>
                         
                         ${confirmationSection}
-                        ${adminEditButton}
+                        ${deleteButton}
                     </div>
                 `;
             }).join('');
@@ -916,9 +928,12 @@ Observaciones: "${visitData.observacionesFinancieras}"
                                 <input type="date" name="fechaInstalacion" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
                             </label>
                             
+                            <!-- CAMPO TÉCNICO (Lista Desplegable) -->
                             <label class="block">
                                 <span class="text-gray-700 font-medium">Técnico Asignado (Opcional)</span>
-                                <input type="text" name="tecnico" placeholder="Ej: Cristian Capelo" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                <select name="tecnico" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                    <!-- Options populated by JS -->
+                                </select>
                             </label>
 
                         </div>
@@ -946,12 +961,12 @@ Observaciones: "${visitData.observacionesFinancieras}"
 
                             <label class="block">
                                 <span class="text-gray-700">Código del Producto</span>
-                                <input type="text" name="codProducto" placeholder="Ej: 112580027" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                <input type="text" id="codProducto" name="codProducto" placeholder="Ej: 112580027" oninput="autofillProduct()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
                             </label>
 
                             <label class="block md:col-span-2">
                                 <span class="text-gray-700">Descripción del Producto</span>
-                                <input type="text" name="descProducto" placeholder="Ej: GBC 75030 KBB CRISTAL COCINA GAS" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                <input type="text" id="descProducto" name="descProducto" placeholder="Ej: GBC 75030 KBB CRISTAL COCINA GAS" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
                             </label>
                             
                             <label class="block">
