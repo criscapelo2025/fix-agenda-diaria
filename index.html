@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -364,6 +364,10 @@
         }
 
         window.addCustomAccessory = () => {
+            if (dbFailed) {
+                showMessage("ERROR: Base de datos NO disponible. Edición deshabilitada.", 'fix-error');
+                return;
+            }
             const customName = document.getElementById('newAccessoryName').value.trim();
             const customPrice = parseFloat(document.getElementById('newAccessoryPrice').value) || 0;
             if (customName && customPrice > 0) {
@@ -378,6 +382,10 @@
         }
         
         window.removeAccessory = (buttonElement, name) => {
+             if (dbFailed) {
+                showMessage("ERROR: Base de datos NO disponible. Edición deshabilitada.", 'fix-error');
+                return;
+            }
             const itemElement = buttonElement.closest('.accessory-item');
             if (itemElement) {
                 itemElement.remove();
