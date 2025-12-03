@@ -155,7 +155,7 @@
                 document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SEGURIDAD ACTIVO`;
                 document.getElementById('visitsList').innerHTML = `<p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ Error de Conexión de Base de Datos. Use la URL publicada de GitHub.</p>`;
                 
-                setupVisitListener(); // Intentamos arrancar el listener con el userId default
+                setupVisitListener(); 
                 renderAccessoryInputs();
                 setupViewSelector();
 
@@ -210,28 +210,32 @@
         // Escucha en tiempo real de las visitas para la "Hoja de Visita Diaria"
         function setupVisitListener() {
             if (!isAuthReady || !userId || !db) {
-                console.warn("Listener no iniciado: DB no disponible.");
+                // Si estamos en modo de seguridad (db = null), no intentamos el listener de Firebase
+                if (userId !== 'admin_default_fix') return; 
+                
+                // Si estamos en modo seguridad, mostramos el mensaje de error en la lista
+                document.getElementById('visitsList').innerHTML = `<p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ Error: La base de datos no está disponible. No se pueden cargar los registros.</p>`;
                 return;
             }
 
             let visitsQuery;
             
+            // 1. MI AGENDA (Técnico - Solo sus registros)
             if (currentView === 'my_agenda') {
                 visitsQuery = query(
                     getVisitsCollectionRef(), 
-                    where("userId", "==", userId),
-                    orderBy("fechaInstalacion", "desc")
+                    where("userId", "==", userId) // SE REMUEVE orderBy para evitar error de índice
                 );
+            // 2. REPORTE CONSOLIDADO (Admin - Todos los registros)
             } else if (currentView === 'reporte_admin') {
                 visitsQuery = query(
-                    getVisitsCollectionRef(), 
-                    orderBy("createdAt", "desc") 
+                    getVisitsCollectionRef() // SE REMUEVE orderBy
                 );
+            // 3. AGENDA MANTENIMIENTO (Admin - Solo registros con fecha de mantto.)
             } else if (currentView === 'mantenimiento') {
                 visitsQuery = query(
                     getVisitsCollectionRef(), 
-                    where("fechaProximoMantenimiento", "!=", null),
-                    orderBy("fechaProximoMantenimiento", "asc") 
+                    where("fechaProximoMantenimiento", "!=", null) // SE REMUEVE orderBy
                 );
             }
             
@@ -243,6 +247,34 @@
                     visits.push(data);
                     globalVisitsData[doc.id] = data; // Guardar en caché para edición
                 });
+                
+                // --- ORDENACIÓN MANUAL EN JAVASCRIPT (SOLUCIÓN AL ERROR DE ÍNDICE) ---
+                if (currentView === 'my_agenda') {
+                    // Ordenar por fechaInstalacion descendente (más reciente primero)
+                    visits.sort((a, b) => {
+                        if (a.fechaInstalacion < b.fechaInstalacion) return 1;
+                        if (a.fechaInstalacion > b.fechaInstalacion) return -1;
+                        return 0;
+                    });
+                } else if (currentView === 'reporte_admin') {
+                    // Ordenar por createdAt descendente (registro más reciente)
+                    visits.sort((a, b) => {
+                         const dateA = a.createdAt?.seconds || 0;
+                         const dateB = b.createdAt?.seconds || 0;
+                         if (dateA < dateB) return 1;
+                         if (dateA > dateB) return -1;
+                         return 0;
+                    });
+                } else if (currentView === 'mantenimiento') {
+                    // Ordenar por fechaProximoMantenimiento ascendente (más próximo primero)
+                    visits.sort((a, b) => {
+                        if (a.fechaProximoMantenimiento < b.fechaProximoMantenimiento) return -1;
+                        if (a.fechaProximoMantenimiento > b.fechaProximoMantenimiento) return 1;
+                        return 0;
+                    });
+                }
+                // --- FIN ORDENACIÓN MANUAL ---
+
                 renderVisits(visits);
             }, (error) => {
                 console.error("Error al escuchar las visitas: ", error);
