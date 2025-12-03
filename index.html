@@ -1,0 +1,886 @@
+!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIX - Gestión de Visitas Diarias</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'fix-blue': '#1e3a8a', // Un azul corporativo
+                        'fix-light': '#3b82f6',
+                        'fix-accent': '#f59e0b', // Naranja/Amarillo para acento
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Estilo para el scrollbar en navegadores WebKit */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        /* Clase para input de moneda */
+        .currency-input {
+            text-align: right;
+            font-family: monospace;
+        }
+    </style>
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, addDoc, onSnapshot, collection, query, orderBy, serverTimestamp, setLogLevel, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // Configuración de la aplicación
+        let app, db, auth;
+        let userId = null;
+        let isAuthReady = false;
+
+        setLogLevel('Debug'); // Para ver logs de Firebase
+
+        // Catálogo de costos fijos de instalación por tipo de equipo (1 solo equipo)
+        const COSTOS_INSTALACION = {
+            'cocina induccion': 25,
+            'cocina a gas': 29,
+            'horno a gas': 29,
+            'horno electrico': 25,
+            'microondas': 25,
+            'refrigerador': 30,
+            'lavavajillas': 25,
+            'triturador': 15,
+            'fregadero': 13,
+            'griferia': 13,
+            'campana tradicional': 15,
+            'campana decorativa': 36,
+            'campana isla': 45,
+            'default': 0 // Para tipos no definidos
+        };
+
+        // Catálogo de accesorios (Nombre: Precio)
+        const ACCESORIOS_DEFAULT = {
+            'Enchufe 220 50': 10,
+            'Enchufe 220 20': 47,
+            'Enchufe 110': 5,
+            'Manguera metro': 5,
+            'Ducto metro': 5,
+            'Acople cocina': 5,
+            'Acople horno': 5,
+        };
+        let customAccessories = [];
+
+        // Función de inicialización y autenticación
+        async function initializeFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Autenticación
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        console.log('Usuario autenticado:', userId);
+                        document.getElementById('userIdDisplay').textContent = `ID Técnico: ${userId}`;
+                        // Iniciar la escucha de visitas solo después de la autenticación
+                        setupVisitListener();
+                        renderAccessoryInputs(); // Renderizar accesorios al inicio
+                    } else {
+                        // Si no hay usuario, intentar iniciar sesión anónimamente o con token
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            const anonymousUser = await signInAnonymously(auth);
+                            userId = anonymousUser.user.uid;
+                            isAuthReady = true;
+                            console.log('Sesión anónima iniciada:', userId);
+                            document.getElementById('userIdDisplay').textContent = `ID Técnico: ${userId} (Anónimo)`;
+                            setupVisitListener();
+                            renderAccessoryInputs(); // Renderizar accesorios al inicio
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error al inicializar Firebase o autenticar:", error);
+                document.getElementById('visitsList').innerHTML = `<p class="text-red-500 p-4">Error al conectar con la base de datos. Verifique la consola.</p>`;
+            }
+        }
+
+        function getVisitsCollectionRef() {
+            if (!db || !userId) {
+                console.error("Firestore no inicializado o userId no disponible.");
+                return null;
+            }
+            // Utilizamos el path privado para guardar la información de las visitas del técnico.
+            return collection(db, `artifacts/${appId}/users/${userId}/visits`);
+        }
+        
+        // --- Lógica de Costos y Cálculo ---
+        
+        /**
+         * Calcula el costo de instalación basado en la cantidad y tipo de equipos.
+         */
+        function calcularCostoInstalacion(numEquipos, tiposEquipos) {
+            numEquipos = parseInt(numEquipos) || 0;
+            if (numEquipos === 0) return 0;
+
+            const hasCampanaIsla = tiposEquipos.some(tipo => tipo.toLowerCase().includes('campana isla'));
+
+            if (numEquipos === 1) {
+                const tipoPrincipal = tiposEquipos.length > 0 ? tiposEquipos[0].toLowerCase() : 'default';
+                return COSTOS_INSTALACION[tipoPrincipal] || COSTOS_INSTALACION['default'];
+            } else if (numEquipos === 2) {
+                let costoTotal = 0;
+                if (hasCampanaIsla) {
+                    costoTotal += 30; // Campana Isla tiene costo especial de $30
+                    costoTotal += 20; // El otro equipo cuesta $20
+                } else {
+                    costoTotal = numEquipos * 20; 
+                }
+                return costoTotal;
+
+            } else if (numEquipos >= 3) {
+                let costoTotal = 0;
+                // Contar cuántos equipos son "Campana Isla" o del tipo principal si no se puede determinar
+                const tipoPrincipal = tiposEquipos.length > 0 ? tiposEquipos[0].toLowerCase() : 'default';
+                
+                // Cálculo simplificado asumiendo 1 Campana Isla si aplica y el resto de $15
+                let numCampanaIsla = hasCampanaIsla ? 1 : 0;
+                
+                // Si el tipo principal es Campana Isla, aseguramos que al menos 1 sea 30
+                if(tipoPrincipal.includes('campana isla')) {
+                     numCampanaIsla = 1;
+                }
+                
+                const numOtros = numEquipos - numCampanaIsla;
+                
+                // 3 o más equipos: $15 por equipo, Campana Isla $30.
+                costoTotal = (numOtros * 15) + (numCampanaIsla * 30);
+                
+                // Si el cálculo da negativo por error de conteo, lo corregimos con el costo mínimo
+                return costoTotal > 0 ? costoTotal : (numEquipos * 15);
+            }
+
+            return 0;
+        }
+
+        /**
+         * Calcula el costo total de todos los accesorios dinámicos.
+         */
+        function calcularCostoAccesorios() {
+            let totalAccesorios = 0;
+            const container = document.getElementById('accesoriosContainer');
+            if (!container) return 0;
+            
+            const accessoryItems = container.querySelectorAll('.accessory-item');
+
+            accessoryItems.forEach(item => {
+                const quantityInput = item.querySelector('input[name^="acc_qty_"]');
+                const priceInput = item.querySelector('input[name^="acc_price_"]');
+                
+                const cantidad = parseInt(quantityInput.value) || 0;
+                const precio = parseFloat(priceInput.value) || 0;
+
+                totalAccesorios += cantidad * precio;
+            });
+
+            return totalAccesorios;
+        }
+
+        /**
+         * Actualiza la etiqueta del Costo de Instalación en el formulario.
+         */
+        window.updateInstallationCost = () => {
+            const numEquipos = document.getElementById('numEquipos').value;
+            const tipoServicio = document.querySelector('[name="tipoServicio"]').value; 
+            
+            let tiposEquipos = [tipoServicio];
+            
+            if (numEquipos > 1) {
+                tiposEquipos = Array(parseInt(numEquipos)).fill(tipoServicio);
+            }
+
+            const costoInstalacion = calcularCostoInstalacion(numEquipos, tiposEquipos);
+            document.getElementById('costoInstalacionDisplay').textContent = `$${costoInstalacion.toFixed(2)}`;
+            document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2); // Guardar el valor calculado
+
+            window.updateTotalCobro(); // Llamar al cálculo total
+        };
+
+        /**
+         * Actualiza el Costo Total de Accesorios y el Total a Cobrar.
+         */
+        window.updateTotalCobro = () => {
+            const costoInstalacion = parseFloat(document.getElementById('costoInstalacionHidden').value) || 0;
+            const totalAccesorios = calcularCostoAccesorios();
+            // Ya no usamos cobroGarantia manual ni viatico.
+
+            // Mostrar el total de accesorios calculado
+            document.getElementById('totalAccesoriosDisplay').textContent = `$${totalAccesorios.toFixed(2)}`;
+            document.getElementById('cobroAccesoriosHidden').value = totalAccesorios.toFixed(2);
+            
+            // Cálculo del Total a Cobrar al Cliente: Instalación + Accesorios
+            const totalCliente = costoInstalacion + totalAccesorios; 
+
+            document.getElementById('totalClienteDisplay').textContent = `$${totalCliente.toFixed(2)}`;
+        };
+        
+        // --- Lógica de Accesorios Dinámicos ---
+
+        // Renderiza la lista inicial y personalizada de accesorios
+        function renderAccessoryInputs() {
+            const container = document.getElementById('accesoriosContainer');
+            if (!container) return; // Asegurar que el contenedor existe
+            
+            container.innerHTML = ''; // Limpiar
+
+            // Renderizar Accesorios por Defecto
+            Object.entries(ACCESORIOS_DEFAULT).forEach(([name, price]) => {
+                container.appendChild(createAccessoryInputRow(name, price));
+            });
+
+            // Renderizar Accesorios Personalizados (si existen)
+            customAccessories.forEach(acc => {
+                container.appendChild(createAccessoryInputRow(acc.name, acc.price, true));
+            });
+            
+            window.updateTotalCobro(); // Recalcular totales después de renderizar
+        }
+
+        // Crea un elemento DOM para un accesorio
+        function createAccessoryInputRow(name, price, isCustom = false) {
+            const id = name.replace(/\s/g, '_').toLowerCase() + '_' + Date.now();
+            const div = document.createElement('div');
+            div.className = 'accessory-item grid grid-cols-5 gap-2 items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 mb-2';
+            div.innerHTML = `
+                <div class="col-span-2 text-sm text-gray-700 font-medium truncate" title="${name}">
+                    ${name}
+                </div>
+                
+                <input type="number" step="1" min="0" value="0" name="acc_qty_${id}"
+                       oninput="updateTotalCobro()"
+                       class="w-full text-center rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm font-bold">
+                
+                <input type="number" step="0.01" value="${price.toFixed(2)}" name="acc_price_${id}"
+                       oninput="updateTotalCobro()"
+                       class="w-full currency-input rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm ${isCustom ? 'bg-yellow-50' : 'bg-gray-100'}">
+                
+                <div class="text-right">
+                    ${isCustom ? `<button type="button" onclick="removeAccessory(this, '${name}')" class="text-red-500 hover:text-red-700 transition duration-150">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>` : ''}
+                </div>
+            `;
+            return div;
+        }
+
+        // Añade un nuevo accesorio personalizado al catálogo y lo renderiza
+        window.addCustomAccessory = () => {
+            const customName = document.getElementById('newAccessoryName').value.trim();
+            const customPrice = parseFloat(document.getElementById('newAccessoryPrice').value) || 0;
+
+            if (customName && customPrice > 0) {
+                const newAcc = { name: customName, price: customPrice };
+                customAccessories.push(newAcc);
+                
+                document.getElementById('newAccessoryName').value = '';
+                document.getElementById('newAccessoryPrice').value = '0.00';
+                
+                renderAccessoryInputs();
+            } else {
+                showMessage("Debe ingresar un nombre y un precio válido para el nuevo accesorio.", 'fix-accent');
+            }
+        }
+        
+        // Elimina un accesorio personalizado
+        window.removeAccessory = (buttonElement, name) => {
+            const itemElement = buttonElement.closest('.accessory-item');
+            if (itemElement) {
+                itemElement.remove();
+                customAccessories = customAccessories.filter(acc => acc.name !== name);
+                window.updateTotalCobro();
+            }
+        }
+
+
+        // --- Lógica de Firebase: Guardar Registro Inicial ---
+        
+        // Guarda una nueva visita en Firestore
+        window.saveVisit = async () => {
+            if (!isAuthReady || !userId) {
+                showMessage("Aún se está autenticando. Intente de nuevo en un momento.", 'fix-accent');
+                return;
+            }
+
+            const form = document.getElementById('visitForm');
+            const data = new FormData(form);
+            const visitData = {};
+            
+            for (let [key, value] of data.entries()) {
+                visitData[key] = value.trim();
+            }
+
+            // Mapeo y conversión de datos financieros
+            const parseCurrency = (value) => parseFloat(value.replace('$', '').replace(/,/g, '')) || 0;
+
+            const costoInstalacionCalculado = parseCurrency(document.getElementById('costoInstalacionHidden').value);
+            const totalAccesoriosCalculado = parseCurrency(document.getElementById('cobroAccesoriosHidden').value);
+
+            const accesoriosRegistrados = [];
+            const container = document.getElementById('accesoriosContainer');
+            if (container) {
+                const accessoryItems = container.querySelectorAll('.accessory-item');
+
+                accessoryItems.forEach(item => {
+                    const name = item.querySelector('.truncate').textContent.trim();
+                    const quantityInput = item.querySelector('input[name^="acc_qty_"]');
+                    const priceInput = item.querySelector('input[name^="acc_price_"]');
+                    
+                    const cantidad = parseInt(quantityInput.value) || 0;
+                    const precioUnitario = parseFloat(priceInput.value) || 0;
+                    
+                    if (cantidad > 0) {
+                        accesoriosRegistrados.push({
+                            nombre: name,
+                            cantidad: cantidad,
+                            precioUnitario: precioUnitario,
+                            subtotal: cantidad * precioUnitario
+                        });
+                    }
+                });
+            }
+
+            const financiera = {
+                // Costos calculados
+                costoInstalacion: costoInstalacionCalculado, // Costo Fijo CALCULADO
+                cobroAccesorios: totalAccesoriosCalculado, // Total Accesorios CALCULADO
+                
+                // Costos de Penalización (inicialmente 0)
+                costoSegundaVisita: 0.00, 
+                costoGarantiaNoAplica: 0.00,
+                
+                // Viático siempre es 0
+                viatico: 0.00, 
+                
+                // Total a cobrar al cliente (Instalación + Accesorios)
+                totalCliente: costoInstalacionCalculado + totalAccesoriosCalculado, 
+                
+                accesorios: accesoriosRegistrados,
+                observacionesFinancieras: visitData.observacionesFinancieras,
+            };
+            
+            const finalData = {
+                ...visitData,
+                financiera,
+                createdAt: serverTimestamp(),
+                userId: userId,
+                fechaInstalacion: visitData.fechaInstalacion, 
+                estado: 'Pendiente', 
+            };
+
+            // Limpieza de campos temporales/no necesarios
+            delete finalData.costoInstalacionHidden;
+            delete finalData.cobroAccesoriosHidden;
+            
+            // Validación mínima de campos críticos
+            if (!finalData.nombreCliente || !finalData.direccion || !finalData.fechaInstalacion) {
+                showMessage("Por favor, complete los campos obligatorios de Cliente/Dirección/Fecha de Instalación.", 'fix-accent');
+                return;
+            }
+
+
+            try {
+                const docRef = await addDoc(getVisitsCollectionRef(), finalData);
+                showMessage(`Visita de ${finalData.nombreCliente} registrada con éxito. ID: ${docRef.id}`, 'fix-light');
+                form.reset();
+                customAccessories = []; 
+                renderAccessoryInputs(); 
+                window.updateInstallationCost(); 
+            } catch (e) {
+                console.error("Error al añadir documento: ", e);
+                showMessage("Error al guardar la visita. Verifique la consola.", 'red-500');
+            }
+        };
+
+
+        // --- Lógica de Firebase: Actualizar Estado y Costos en Campo ---
+        
+        /**
+         * Actualiza el estado de una visita y aplica costos de penalización/mantenimiento.
+         */
+        window.updateVisitStatusAndFinancials = async (visitId) => {
+            if (!isAuthReady || !userId) {
+                showMessage("Aún se está autenticando. Intente de nuevo en un momento.", 'fix-accent');
+                return;
+            }
+
+            const itemContainer = document.getElementById(`visit-item-${visitId}`);
+            const newStatus = itemContainer.querySelector(`#status-${visitId}`).value;
+            const motivo = itemContainer.querySelector(`#motivo-${visitId}`).value.trim();
+            
+            // Validaciones
+            if ((newStatus === 'No Realizado' || newStatus === 'Garantia No Aplica') && !motivo) {
+                showMessage("Debe ingresar un motivo para el estado 'No Realizado' o 'Garantía No Aplica'.", 'fix-accent');
+                return;
+            }
+
+            const visitRef = doc(db, `artifacts/${appId}/users/${userId}/visits`, visitId);
+
+            let costoSegundaVisita = 0.00;
+            let costoGarantiaNoAplica = 0.00;
+            let fechaProximoMantenimiento = null;
+
+            if (newStatus === 'No Realizado') {
+                costoSegundaVisita = 12.00; 
+            } else if (newStatus === 'Garantia No Aplica') {
+                costoGarantiaNoAplica = 20.00;
+            } else if (newStatus === 'Completado') {
+                const today = new Date();
+                // Cálculo del recordatorio a 6 meses para mantenimiento
+                today.setMonth(today.getMonth() + 6);
+                fechaProximoMantenimiento = today.toISOString().split('T')[0];
+            }
+            
+            // Recalcular el Total a Cobrar al Cliente con los nuevos costos de penalización
+            // Primero, necesitamos los costos base (Instalación + Accesorios) que ya están guardados
+            // Esto se hace en la vista de reporte (renderVisits) al recargar los datos.
+
+            const updatePayload = {
+                estado: newStatus,
+                motivoNoRealizado: newStatus !== 'Completado' ? motivo : '',
+                fechaProximoMantenimiento: fechaProximoMantenimiento,
+                // Actualización de costos de penalización dentro de la estructura financiera
+                'financiera.costoSegundaVisita': costoSegundaVisita,
+                'financiera.costoGarantiaNoAplica': costoGarantiaNoAplica,
+            };
+
+            try {
+                await updateDoc(visitRef, updatePayload);
+                showMessage(`Estado de visita ${visitId} actualizado a "${newStatus}".`, 'fix-light');
+            } catch (e) {
+                console.error("Error al actualizar el estado: ", e);
+                showMessage("Error al actualizar el estado de la visita. Verifique la consola.", 'red-500');
+            }
+        };
+
+        // --- Lógica de Interfaz de Usuario: Renderizado ---
+
+        // Muestra un mensaje temporal
+        function showMessage(message, color) {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.textContent = message;
+            messageBox.className = `p-3 rounded-lg text-white bg-${color} mb-4 transition-opacity duration-300`;
+            messageBox.style.opacity = 1;
+            setTimeout(() => {
+                messageBox.style.opacity = 0;
+            }, 5000);
+        }
+
+        // Escucha en tiempo real de las visitas para la "Hoja de Visita Diaria"
+        function setupVisitListener() {
+            if (!isAuthReady || !userId) return;
+
+            const q = query(getVisitsCollectionRef(), orderBy("fechaInstalacion", "desc"));
+            
+            onSnapshot(q, (querySnapshot) => {
+                const visits = [];
+                querySnapshot.forEach((doc) => {
+                    visits.push({ id: doc.id, ...doc.data() });
+                });
+                renderVisits(visits);
+            }, (error) => {
+                console.error("Error al escuchar las visitas: ", error);
+                document.getElementById('visitsList').innerHTML = `<p class="text-red-500 p-4">Error al cargar las visitas.</p>`;
+            });
+        }
+
+        // Renderiza la lista de visitas
+        function renderVisits(visits) {
+            const listContainer = document.getElementById('visitsList');
+            if (visits.length === 0) {
+                listContainer.innerHTML = `<p class="text-gray-500 p-4 italic">No hay visitas agendadas aún.</p>`;
+                return;
+            }
+
+            listContainer.innerHTML = visits.map(visit => {
+                const f = visit.financiera || {};
+                
+                // Recalcular el total sumando las penalizaciones al costo base
+                const costoBase = (f.costoInstalacion || 0) + (f.cobroAccesorios || 0);
+                const penalizaciones = (f.costoSegundaVisita || 0) + (f.costoGarantiaNoAplica || 0);
+                const total = (costoBase + penalizaciones).toFixed(2);
+                
+                // Clases de color para el estado
+                let estadoColor = 'bg-blue-100 text-blue-800';
+                if (visit.estado === 'Completado') {
+                    estadoColor = 'bg-green-100 text-green-800';
+                } else if (visit.estado === 'No Realizado') {
+                    estadoColor = 'bg-red-100 text-red-800';
+                } else if (visit.estado === 'Garantia No Aplica') {
+                    estadoColor = 'bg-yellow-100 text-yellow-800';
+                }
+
+
+                const formattedDate = visit.fechaInstalacion ? new Date(visit.fechaInstalacion + 'T00:00:00').toLocaleDateString('es-EC', { 
+                    year: 'numeric', month: 'long', day: 'numeric' 
+                }) : 'Fecha no definida';
+                
+                const accesoriosText = f.accesorios && f.accesorios.length > 0
+                    ? f.accesorios.map(a => `${a.cantidad}x ${a.nombre} ($${a.subtotal.toFixed(2)})`).join(', ')
+                    : 'Ninguno';
+
+                let motivoField = visit.motivoNoRealizado ? `<p class="text-xs text-red-600 italic">Motivo: ${visit.motivoNoRealizado}</p>` : '';
+                let maintenanceMessage = '';
+                if (visit.fechaProximoMantenimiento) {
+                    const message = `¡Hola ${visit.nombreCliente.split(' ')[0]}! Han pasado casi 6 meses desde que instalamos tu equipo Teka. ¡Es hora de un mantenimiento preventivo! Contáctanos para asegurar el óptimo rendimiento.`;
+                    maintenanceMessage = `<div class="mt-2 pt-2 border-t border-dashed">
+                        <p class="text-sm font-semibold text-green-700 bg-green-50 p-2 rounded">
+                            Recordatorio Mantenimiento (${visit.fechaProximoMantenimiento}):
+                        </p>
+                        <textarea readonly class="w-full text-xs text-gray-700 mt-1 p-2 border rounded resize-none" rows="3">${message}</textarea>
+                        <button onclick="navigator.clipboard.writeText('${message.replace(/'/g, "\\'")}')" class="w-full bg-green-500 hover:bg-green-600 text-white text-xs font-semibold py-1 rounded mt-1 transition">
+                            Copiar Mensaje
+                        </button>
+                    </div>`;
+                }
+                
+                const instCostText = `Inst: $${f.costoInstalacion ? f.costoInstalacion.toFixed(2) : '0.00'}`;
+                const secVisitCostText = f.costoSegundaVisita ? ` + $${f.costoSegundaVisita.toFixed(2)} (2da Visita)` : '';
+                const noGarantiaCostText = f.costoGarantiaNoAplica ? ` + $${f.costoGarantiaNoAplica.toFixed(2)} (No Garantía)` : '';
+
+
+                return `
+                    <div id="visit-item-${visit.id}" class="bg-white p-4 rounded-xl shadow-md border border-gray-100 hover:border-fix-light transition-all mb-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="text-lg font-bold text-fix-blue">${visit.nombreCliente || 'Sin Nombre'}</h3>
+                            <span class="text-sm font-semibold px-3 py-1 rounded-full ${estadoColor}">${visit.estado}</span>
+                        </div>
+                        <p class="text-sm text-gray-700 mb-1">
+                            <strong class="text-gray-900">Fecha Intervención:</strong> ${formattedDate}
+                        </p>
+                        <p class="text-sm text-gray-700 mb-1">
+                            <strong class="text-gray-900">Dirección:</strong> ${visit.direccion || 'N/A'}
+                        </p>
+                        <p class="text-sm text-gray-700 mb-1">
+                            <strong class="text-gray-900">Producto:</strong> ${visit.descProducto || 'N/A'} / ${visit.numEquipos || 1} equipo(s)
+                        </p>
+                        
+                        ${motivoField}
+                        
+                        <p class="text-sm text-gray-700 mb-1 pt-2 border-t border-dashed mt-2">
+                            <strong class="text-gray-900">Accesorios:</strong> ${accesoriosText}
+                        </p>
+                        
+                        <p class="text-sm text-gray-700 font-bold mt-2">
+                            <strong class="text-fix-accent">Cobro Total:</strong> $${total} (${instCostText}${secVisitCostText}${noGarantiaCostText})
+                        </p>
+                        
+                        <!-- SECCIÓN DE ACTUALIZACIÓN DEL TÉCNICO EN CAMPO (LECTURA/ESTADO/MOTIVO) -->
+                        <div class="mt-4 pt-4 border-t border-fix-light/30">
+                            <h4 class="text-base font-semibold text-fix-blue mb-2">Confirmación en Campo:</h4>
+                            
+                            <label class="block mb-2">
+                                <span class="text-gray-700 text-sm">Estado de la Intervención:</span>
+                                <select id="status-${visit.id}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2 text-sm">
+                                    <option value="Pendiente" ${visit.estado === 'Pendiente' ? 'selected' : ''}>1. Pendiente</option>
+                                    <option value="Completado" ${visit.estado === 'Completado' ? 'selected' : ''}>2. Completado (Instalación OK)</option>
+                                    <option value="No Realizado" ${visit.estado === 'No Realizado' ? 'selected' : ''}>3. No Realizado (Costo 2da Visita $12)</option>
+                                    <option value="Garantia No Aplica" ${visit.estado === 'Garantia No Aplica' ? 'selected' : ''}>4. Garantía No Aplica (Costo $20)</option>
+                                </select>
+                            </label>
+                            
+                            <label class="block mb-3">
+                                <span class="text-gray-700 text-sm">Motivo / Notas (Obligatorio si no se completó):</span>
+                                <textarea id="motivo-${visit.id}" rows="1" placeholder="Solo si la visita no se realizó." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2 text-sm">${visit.motivoNoRealizado || ''}</textarea>
+                            </label>
+                            
+                            <button onclick="updateVisitStatusAndFinancials('${visit.id}')" class="w-full bg-fix-accent hover:bg-fix-blue text-white font-bold py-2 px-4 rounded-lg text-sm transition duration-300">
+                                Guardar Confirmación
+                            </button>
+                            
+                            ${maintenanceMessage}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Función de copia al portapapeles (necesaria para el mensaje de mantenimiento)
+        window.copyToClipboard = (text) => {
+             const tempTextArea = document.createElement('textarea');
+             tempTextArea.value = text;
+             document.body.appendChild(tempTextArea);
+             tempTextArea.select();
+             document.execCommand('copy');
+             document.body.removeChild(tempTextArea);
+             showMessage('Mensaje copiado al portapapeles.', 'green-500');
+        };
+
+        // Inicializar Firebase al cargar la ventana
+        window.onload = initializeFirebase;
+    </script>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+
+    <div class="max-w-7xl mx-auto p-4 md:p-8">
+        <!-- Header -->
+        <header class="mb-8 border-b pb-4 flex items-center justify-between">
+            <div class="flex items-center">
+                <!-- Placeholder para el Logo de FIX -->
+                <img src="https://placehold.co/100x40/1e3a8a/ffffff?text=FIX" 
+                     alt="Logo de FIX" 
+                     class="h-10 w-auto mr-4 rounded-lg shadow-md"
+                     onerror="this.onerror=null; this.src='https://placehold.co/100x40/1e3a8a/ffffff?text=FIX';">
+                
+                <div>
+                    <h1 class="text-3xl font-extrabold text-fix-blue">Agenda Diaria</h1>
+                    <p class="text-gray-600">Registro de Atenciones a Domicilio (Teka)</p>
+                </div>
+            </div>
+            <p id="userIdDisplay" class="text-xs text-gray-500 mt-1 self-end">ID Técnico: Cargando...</p>
+        </header>
+
+        <!-- Message Box for notifications -->
+        <div id="messageBox" class="p-3 rounded-lg text-white mb-4 opacity-0 transition-opacity duration-300"></div>
+        
+        <!-- Main Content Layout (Two Columns on large screens) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Columna 1: Formulario de Registro de Visita -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-xl border border-gray-200 h-fit">
+                <h2 class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Registrar Nueva Visita</h2>
+                
+                <form id="visitForm" onsubmit="event.preventDefault(); saveVisit();">
+                    
+                    <!-- 1. Sección de Datos del Cliente y Visita -->
+                    <div class="mb-6 p-4 border border-fix-blue/30 rounded-lg bg-fix-blue/5">
+                        <h3 class="text-xl font-medium mb-4 text-fix-blue">1. Cliente y Agenda</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Nombre Completo del Cliente*</span>
+                                <input type="text" name="nombreCliente" placeholder="Ej: Juan Pérez" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Cédula o RUC</span>
+                                <input type="text" name="cedula" placeholder="Ej: 1712345678" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block md:col-span-2">
+                                <span class="text-gray-700 font-medium">Dirección de Instalación/Servicio*</span>
+                                <input type="text" name="direccion" placeholder="Ej: Av. Eloy Alfaro y Alemania, Edificio XYZ" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Teléfono / Celular</span>
+                                <input type="tel" name="telefono" placeholder="Ej: 0991234567" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Correo Electrónico</span>
+                                <input type="email" name="correo" placeholder="ejemplo@correo.com" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Fecha de Instalación/Intervención*</span>
+                                <input type="date" name="fechaInstalacion" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Técnico Asignado (Opcional)</span>
+                                <input type="text" name="tecnico" placeholder="Ej: Cristian Capelo" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                        </div>
+                    </div>
+
+                    <!-- 2. Sección de Datos del Producto y Compra -->
+                    <div class="mb-6 p-4 border border-gray-400/30 rounded-lg bg-gray-50">
+                        <h3 class="text-xl font-medium mb-4 text-gray-800">2. Producto y Servicio</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            
+                            <label class="block">
+                                <span class="text-gray-700">Fecha de Compra</span>
+                                <input type="date" name="fechaCompra" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700">Lugar de Compra</span>
+                                <input type="text" name="lugarCompra" placeholder="Ej: KYWI / Comercial Solis" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block">
+                                <span class="text-gray-700">Número de Factura de Compra</span>
+                                <input type="text" name="numFactura" placeholder="Ej: 001-005-00012345" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block">
+                                <span class="text-gray-700">Código del Producto</span>
+                                <input type="text" name="codProducto" placeholder="Ej: 112580027" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block md:col-span-2">
+                                <span class="text-gray-700">Descripción del Producto</span>
+                                <input type="text" name="descProducto" placeholder="Ej: GBC 75030 KBB CRISTAL COCINA GAS" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700">Serie del Equipo</span>
+                                <input type="text" name="serieEquipo" placeholder="Ej: ZP246000179" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Cantidad de Equipos a Instalar*</span>
+                                <input type="number" id="numEquipos" name="numEquipos" min="1" value="1" oninput="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700">Tipo de Equipo Principal / Servicio*</span>
+                                <select name="tipoServicio" onchange="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                    <!-- Tipos de servicio para el cálculo de costos -->
+                                    <option value="cocina induccion">Inst. Cocina Inducción</option>
+                                    <option value="cocina a gas">Inst. Cocina a Gas</option>
+                                    <option value="horno a gas">Inst. Horno a Gas</option>
+                                    <option value="horno electrico">Inst. Horno Eléctrico</option>
+                                    <option value="microondas">Inst. Microondas</option>
+                                    <option value="refrigerador">Inst. Refrigerador</option>
+                                    <option value="lavavajillas">Inst. Lavavajillas</option>
+                                    <option value="triturador">Inst. Triturador</option>
+                                    <option value="fregadero">Inst. Fregadero</option>
+                                    <option value="griferia">Inst. Grifería</option>
+                                    <option value="campana tradicional">Inst. Campana Tradicional</option>
+                                    <option value="campana decorativa">Inst. Campana Decorativa</option>
+                                    <option value="campana isla">Inst. Campana Isla</option>
+                                    <option value="Garantia">Garantía (No aplica costo fijo de inst.)</option>
+                                    <option value="Mantenimiento">Mantenimiento (No aplica costo fijo de inst.)</option>
+                                </select>
+                            </label>
+
+                        </div>
+                    </div>
+
+                    <!-- 3. Sección Financiera (Costos y Cobros) -->
+                    <div class="mb-6 p-4 border border-fix-accent/30 rounded-lg bg-fix-accent/5">
+                        <h3 class="text-xl font-medium mb-4 text-fix-accent">3. Aspectos Financieros y Accesorios</h3>
+                        <p class="text-sm text-gray-600 mb-4 font-semibold">Cálculos automáticos:</p>
+                        
+                        <!-- Resumen de Costos Calculados -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 font-bold text-lg text-gray-800">
+                            <div class="p-3 bg-white rounded-lg shadow text-center">
+                                <span class="text-sm font-normal text-gray-600">Costo Instalación</span>
+                                <div id="costoInstalacionDisplay" class="text-fix-blue">$25.00</div>
+                                <!-- Campo oculto para guardar el valor calculado -->
+                                <input type="hidden" id="costoInstalacionHidden" name="costoInstalacionHidden" value="25.00">
+                            </div>
+                            <div class="p-3 bg-white rounded-lg shadow text-center">
+                                <span class="text-sm font-normal text-gray-600">Total Accesorios</span>
+                                <div id="totalAccesoriosDisplay" class="text-fix-blue">$0.00</div>
+                                <input type="hidden" id="cobroAccesoriosHidden" name="cobroAccesoriosHidden" value="0.00">
+                            </div>
+                            <div class="p-3 bg-fix-accent/20 rounded-lg shadow text-center md:col-span-2">
+                                <span class="text-sm font-normal text-fix-blue">TOTAL COBRO CLIENTE (Inst. + Acc.)</span>
+                                <div id="totalClienteDisplay" class="text-fix-accent text-2xl">$25.00</div>
+                            </div>
+                        </div>
+
+                        <!-- Accesorios Dinámicos -->
+                        <h4 class="text-lg font-medium mt-6 mb-3 text-gray-800 border-t pt-4">Accesorios Utilizados</h4>
+                        <div class="grid grid-cols-5 gap-2 items-center text-xs font-semibold text-gray-600 p-2 bg-gray-100 rounded-t-md border-b">
+                            <div class="col-span-2">ACCESORIO</div>
+                            <div class="text-center">CANT.</div>
+                            <div class="text-right">PRECIO UNIT.</div>
+                            <div></div>
+                        </div>
+                        <div id="accesoriosContainer" class="p-2 border border-gray-300 rounded-b-md mb-4 bg-gray-50">
+                            <!-- Los inputs de accesorios se renderizan aquí por JS -->
+                            <p class="text-center text-gray-500">Cargando accesorios...</p>
+                        </div>
+                        
+                        <!-- Añadir Nuevo Accesorio -->
+                        <div class="grid grid-cols-5 gap-2 items-center bg-white p-3 rounded-md border border-dashed border-gray-400">
+                            <input type="text" id="newAccessoryName" placeholder="Nombre Nuevo Accesorio" class="col-span-2 p-2 rounded-md border-gray-300 text-sm">
+                            <div class="text-center text-gray-500">N/A</div>
+                            <input type="number" step="0.01" id="newAccessoryPrice" value="0.00" placeholder="Precio ($)" class="currency-input p-2 rounded-md border-gray-300 text-sm">
+                            <button type="button" onclick="addCustomAccessory()" class="bg-fix-light hover:bg-fix-blue text-white text-sm font-semibold p-2 rounded-md transition duration-200">
+                                Añadir
+                            </button>
+                        </div>
+
+
+                        <!-- Cobros y Viáticos Manuales (Garantía / Viático) -->
+                        <h4 class="text-lg font-medium mt-6 mb-3 text-gray-800 border-t pt-4">Notas Financieras (Viático fijo en $0.00)</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            
+                            <!-- Campo de Viático ahora oculto/fijo a 0.00 -->
+                            
+                            <label class="block md:col-span-2">
+                                <span class="text-gray-700">Observaciones Financieras/Forma de Pago</span>
+                                <textarea name="observacionesFinancieras" rows="2" placeholder="Detalle de forma de pago, costos adicionales no automáticos, etc." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2"></textarea>
+                            </label>
+                            
+                        </div>
+                    </div>
+                    
+                    <!-- Botón de Envío -->
+                    <div class="mt-6">
+                        <button type="submit" class="w-full bg-fix-blue hover:bg-fix-light text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-300 transform hover:scale-[1.01]">
+                            <span role="img" aria-label="Guardar">&#x1F4BE;</span> Guardar Visita en Agenda
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Columna 2: Hoja de Visita Diaria (Lista en Tiempo Real - Simulación Móvil) -->
+            <div class="lg:col-span-1">
+                <div class="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
+                    <h2 class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Hoja de Visita Diaria</h2>
+                    <div id="visitsList" class="max-h-[80vh] overflow-y-auto">
+                        <!-- Las visitas se renderizarán aquí en tiempo real -->
+                        <div class="text-center py-8 text-gray-500">
+                            Cargando agenda...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>
+<script>
+    // Inicializar el costo de instalación y el total al cargar (llama a updateInstallationCost)
+    document.addEventListener('DOMContentLoaded', () => {
+        // Ejecutar el cálculo inicial
+        if (typeof window.updateInstallationCost === 'function') {
+             window.updateInstallationCost();
+        }
+    });
+</script>
