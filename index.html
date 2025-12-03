@@ -173,7 +173,7 @@
 
         const ACCESORIOS_DEFAULT = {
             'Enchufe 220 50': 10,
-            'Enchufe 220 20': 47,
+            'Enchufe 220 20': 7, // CORREGIDO de 47 a 7
             'Enchufe 110': 5,
             'Manguera metro': 5,
             'Ducto metro': 5,
@@ -345,7 +345,10 @@
             // CORRECCIÓN: Al digitar el código, si existe, rellena.
             if (CATALOGO_PRODUCTOS[codigo]) {
                 descripcionInput.value = CATALOGO_PRODUCTOS[codigo];
-            } 
+            } else {
+                // Opcional: Borrar la descripción si el código no se encuentra
+                descripcionInput.value = '';
+            }
         };
         
         function renderAccessoryInputs() {
