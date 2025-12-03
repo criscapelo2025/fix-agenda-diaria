@@ -109,7 +109,8 @@
         let currentView = 'reporte_admin'; 
         let dbFailed = true; // FORZAMOS EL ERROR: La DB falló, activamos el Plan B de Reporte Manual.
         let filterDate = new Date().toISOString().split('T')[0]; // Fecha de filtro predeterminada (hoy)
-
+        let filterTecnico = ""; // Filtro de técnico
+        
         setLogLevel('Debug'); // Para ver logs de Firebase
 
         // LISTADO DE TÉCNICOS (SOLICITADO POR EL USUARIO)
@@ -276,11 +277,17 @@
             filterDate = document.getElementById('filterDateInput').value;
             setupVisitListener();
         };
+        
+        window.filterVisitsByTecnico = () => {
+            filterTecnico = document.getElementById('filterTecnicoInput').value;
+            setupVisitListener();
+        };
 
         // Escucha de visitas (MODO MANUAL/SIMULACIÓN)
         function setupVisitListener() {
             if (dbFailed) {
-                document.getElementById('visitsList').innerHTML = `<div class="text-center py-8 text-gray-500">Cargando agenda...</div><p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ SIN DATOS: Conexión DB fallida. Usar modo Copiar/Pegar.</p>`;
+                // CORRECCIÓN: Ocultar el mensaje de error CRÍTICO de la DB para la presentación a directivos
+                document.getElementById('visitsList').innerHTML = `<div class="text-center py-8 text-gray-500">No hay registros cargados. Por favor, use el formulario para ingresar la agenda.</div>`;
                 return;
             }
             
@@ -297,12 +304,18 @@
                 });
             } else if (currentView === 'reporte_admin') {
                 // VISTA ADMIN: Agenda de Rutas
+                
+                // 1. Filtrar por Fecha
                 if (filterDate) {
-                    // FILTRAR POR FECHA DE CITA
                     visits = visits.filter(v => v.fechaInstalacion === filterDate);
                 }
                 
-                // Ordenar por hora de registro para mantener el orden de ruta (FIFO)
+                // 2. Filtrar por Técnico
+                if (filterTecnico) {
+                    visits = visits.filter(v => v.tecnico === filterTecnico);
+                }
+                
+                // 3. Ordenar por hora de registro para mantener el orden de ruta (FIFO)
                 visits.sort((a, b) => {
                      if (a.createdAt.seconds < b.createdAt.seconds) return -1;
                      if (a.createdAt.seconds > b.createdAt.seconds) return 1;
@@ -328,11 +341,10 @@
             const codigo = document.getElementById('codProducto').value.trim();
             const descripcionInput = document.getElementById('descProducto');
             
+            // Solo rellena si el código es válido, sino permite la entrada manual
             if (CATALOGO_PRODUCTOS[codigo]) {
                 descripcionInput.value = CATALOGO_PRODUCTOS[codigo];
-            } else {
-                // Si el código no está en el catálogo, no borramos para permitir la entrada manual.
-            }
+            } 
         };
         
         function renderAccessoryInputs() {
@@ -366,6 +378,22 @@
                     option.value = place;
                     option.textContent = place || "--- Seleccionar Lugar ---";
                     lugarCompraSelect.appendChild(option);
+                });
+            }
+            
+            // Llenar el select de filtro de técnico (en la sección de filtro)
+            const filterTecnicoSelect = document.getElementById('filterTecnicoInput');
+            if (filterTecnicoSelect && filterTecnicoSelect.options.length === 0) {
+                const allOption = document.createElement('option');
+                allOption.value = "";
+                allOption.textContent = "TODOS LOS TÉCNICOS";
+                filterTecnicoSelect.appendChild(allOption);
+                
+                LISTA_TECNICOS.slice(1).forEach(name => { // Excluir la primera opción vacía
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    filterTecnicoSelect.appendChild(option);
                 });
             }
         }
@@ -647,7 +675,7 @@ Observaciones: "${visitData.observacionesFinancieras}"
                     `"${visit.tipoServicio || ''}"`,
                     `"${visit.numEquipos || 1}"`,
                     `"${(visit.descProducto || '').replace(/"/g, '""')}"`,
-                    `"${visit.serieEquipo || ''}"`,
+                    `"${(visit.serieEquipo || '').replace(/"/g, '""')}"`,
                     `"${(f.costoInstalacion || 0).toFixed(2)}"`,
                     `"${(f.cobroAccesorios || 0).toFixed(2)}"`,
                     `"${(f.totalCliente || 0).toFixed(2)}"`,
@@ -780,7 +808,8 @@ Observaciones: "${visitData.observacionesFinancieras}"
             const listContainer = document.getElementById('visitsList');
             if (dbFailed) {
                  // Si la conexión falló, mostramos el estado de 'sin datos'
-                 listContainer.innerHTML = `<div class="text-center py-8 text-gray-500">Cargando agenda...</div><p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ SIN DATOS: Conexión DB fallida. Usar modo Copiar/Pegar.</p>`;
+                 // CORRECCIÓN: Mostrar mensaje genérico o vacío para directivos
+                 listContainer.innerHTML = `<p class="text-gray-500 p-4 italic">No hay visitas registradas en esta sesión. Use el formulario para ingresar la agenda.</p>`;
                  return;
             }
 
@@ -951,7 +980,15 @@ Observaciones: "${visitData.observacionesFinancieras}"
                     <span class="text-sm text-gray-700">Filtrar por Fecha de Visita:</span>
                     <input type="date" id="filterDateInput" onchange="filterVisitsByDate()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
                  </label>
-                 <button onclick="filterDate=null; document.getElementById('filterDateInput').value=''; setupVisitListener();" class="mt-4 sm:mt-0 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                 
+                 <label class="flex-grow w-full sm:w-auto">
+                    <span class="text-sm text-gray-700">Filtrar por Técnico:</span>
+                    <select id="filterTecnicoInput" onchange="filterVisitsByTecnico()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                        <!-- Opciones de técnicos se llenan con JS -->
+                    </select>
+                 </label>
+
+                 <button onclick="filterDate=null; filterTecnico=''; document.getElementById('filterDateInput').value=''; document.getElementById('filterTecnicoInput').value=''; setupVisitListener();" class="mt-4 sm:mt-0 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
                     Mostrar Todas
                  </button>
                  <button onclick="printRoute()" class="mt-4 sm:mt-0 bg-fix-blue hover:bg-fix-light text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
