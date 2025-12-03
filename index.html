@@ -149,13 +149,11 @@
                 isAuthReady = true;
                 document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SEGURIDAD ACTIVO`;
                 
-                // Forzamos la visualización del error en la lista y las acciones iniciales
-                document.getElementById('visitsList').innerHTML = `<p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ Error: ${error.message.includes("configuración") ? 'Configuración de DB inválida' : 'Conexión inicial falló'}. Use la URL publicada.</p>`;
-                
+                // Forzamos la visualización del error como una notificación, no como un bloqueo de UI
                 showMessage("ERROR CRÍTICO: Base de Datos NO disponible. Verifique la consola.", 'fix-error');
 
-                // Si la DB no se inicializó (db es undefined/null), no se llama a setupVisitListener
-                setupViewSelector(); // Al menos cargamos la interfaz
+                // Si la DB no se inicializó (db es undefined/null), iniciamos el selector para que al menos la UI cargue
+                setupViewSelector(); 
             }
         }
 
@@ -203,12 +201,12 @@
         // Escucha en tiempo real de las visitas para la "Hoja de Visita Diaria"
         function setupVisitListener() {
             if (!isAuthReady || !userId || !db) {
-                document.getElementById('visitsList').innerHTML = `<p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ Error: La base de datos no está disponible. No se pueden cargar los registros.</p>`;
+                // Solución: Si no hay conexión, simplemente terminamos la función.
+                // El div 'visitsList' mantendrá el spinner "Cargando agenda..."
                 return;
             }
 
             // --- CONSULTA SIMPLIFICADA (SIN FILTROS NI ORDENACIÓN EN FIRESTORE) ---
-            // Cargamos todos los documentos de la colección pública para evitar errores de índice y conexión.
             const visitsQuery = query(getVisitsCollectionRef());
             
             onSnapshot(visitsQuery, (querySnapshot) => {
@@ -621,6 +619,11 @@
         // Renderiza la lista de visitas
         function renderVisits(visits) {
             const listContainer = document.getElementById('visitsList');
+            if (!db) {
+                // Si la conexión falló, ya no intentamos renderizar
+                return;
+            }
+
             if (visits.length === 0) {
                 listContainer.innerHTML = `<p class="text-gray-500 p-4 italic">No hay visitas agendadas ${currentView === 'my_agenda' ? 'en tu agenda.' : 'en el sistema.'}</p>`;
                 return;
