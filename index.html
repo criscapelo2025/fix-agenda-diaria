@@ -122,6 +122,18 @@
             "Alan Skykaz" // CORRECCIÓN DEL NOMBRE COMPLETO
         ];
         
+        // LISTA DE LUGARES DE COMPRA (SOLICITADO POR EL USUARIO)
+        const LUGARES_COMPRA = [
+            "", // Opción vacía
+            "COMERCIAL KYWI",
+            "COMERCIAL SOLIS",
+            "COMO HOGAR",
+            "SUKASA",
+            "COMERCIAL LUNA PAZMIÑO",
+            "Otro (Escribir manualmente)"
+        ];
+
+
         // CATÁLOGO DE PRODUCTOS (Basado en la estructura del archivo BASE.csv)
         const CATALOGO_PRODUCTOS = {
             "915061": "ASP. AXIAL BLIND 100 110V-60HZ",
@@ -135,9 +147,9 @@
             "7900605": "ROCIADOR ASTRO",
             "7900650": "ROCIADOR SPIN",
             "790066700": "ROCIADOR 300 INOX",
-            "112580027": "GBC 75030 KBB CRISTAL COCINA GAS", // Ejemplo promocion
-            "111910000": "MLH 845 SS - MICROONDAS", // Ejemplo promocion
-            "112570211": "GBC 75-G1 GBA BM COCINA GAS", // Ejemplo promocion
+            "112580027": "GBC 75030 KBB CRISTAL COCINA GAS", 
+            "111910000": "MLH 845 SS - MICROONDAS", 
+            "112570211": "GBC 75-G1 GBA BM COCINA GAS", 
         };
 
         // Catálogo de costos fijos de instalación por tipo de equipo (1 solo equipo)
@@ -172,7 +184,62 @@
         let visitsManual = []; // Array para simular datos en Plan B
 
 
-        // --- FUNCIONES CORE: ORDENACIÓN Y VISTAS (MOVIDAS AL INICIO) ---
+        // --- FUNCIONES CORE: INICIALIZACIÓN, ORDENACIÓN Y VISTAS (MOVIDAS AL INICIO) ---
+
+        // Función de inicialización y autenticación (Simplificada para el Plan B)
+        async function initializeFirebase() {
+            try {
+                // 1. INTENTAR INICIALIZAR DB (CRÍTICO)
+                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0 || initialAuthToken === null) {
+                     throw new Error("La configuración de Firebase está incompleta en el entorno.");
+                }
+
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                dbFailed = false; // Si llegamos aquí, la conexión base está OK
+                
+                // 2. INTENTAR AUTENTICACIÓN
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}...`;
+                    } else {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            const anonymousUser = await signInAnonymously(auth);
+                            userId = anonymousUser.user.uid;
+                            isAuthReady = true;
+                            document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}... (Anónimo)`;
+                        }
+                    }
+                    // 3. INICIAR LISTENERS SOLO DESPUÉS DE OBTENER USERID
+                    setupVisitListener();
+                    renderAccessoryInputs();
+                    setupViewSelector();
+                });
+
+            } catch (error) {
+                console.error("Error al inicializar Firebase o autenticar:", error);
+                
+                // MODO DE SEGURIDAD PARA CONEXIÓN FALLIDA: La DB NO está disponible.
+                dbFailed = true; // Marcar la falla
+                userId = 'admin_default_fix';
+                isAuthReady = true;
+                document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SIN CONEXIÓN`;
+                
+                // Mostrar la notificación de error pero no bloquear la lista
+                showMessage("ERROR CRÍTICO: Base de Datos NO disponible. El guardado no funcionará.", 'fix-error');
+
+                setupViewSelector(); 
+                renderAccessoryInputs(); // Cargar accesorios para que el formulario funcione visualmente
+            }
+            
+            // Configuración inicial de la interfaz (fuera del try/catch)
+            document.getElementById('filterDateInput').value = filterDate;
+        }
 
         function setupViewSelector() {
             window.changeView('reporte_admin'); // Vista inicial es la Agenda del Admin
@@ -288,6 +355,17 @@
                     option.value = name;
                     option.textContent = name || "--- Seleccionar Técnico ---";
                     tecnicoSelect.appendChild(option);
+                });
+            }
+            
+            // Llenar el select de lugar de compra
+            const lugarCompraSelect = document.querySelector('select[name="lugarCompra"]');
+            if (lugarCompraSelect && lugarCompraSelect.options.length === 0) {
+                 LUGARES_COMPRA.forEach(place => {
+                    const option = document.createElement('option');
+                    option.value = place;
+                    option.textContent = place || "--- Seleccionar Lugar ---";
+                    lugarCompraSelect.appendChild(option);
                 });
             }
         }
@@ -951,7 +1029,9 @@ Observaciones: "${visitData.observacionesFinancieras}"
                             
                             <label class="block">
                                 <span class="text-gray-700">Lugar de Compra</span>
-                                <input type="text" name="lugarCompra" placeholder="Ej: KYWI / Comercial Solis" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                <select name="lugarCompra" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                     <!-- Options populated by JS -->
+                                </select>
                             </label>
 
                             <label class="block">
