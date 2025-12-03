@@ -60,7 +60,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, addDoc, onSnapshot, collection, query, orderBy, where, serverTimestamp, setLogLevel, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, addDoc, onSnapshot, collection, query, where, serverTimestamp, setLogLevel, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global variables provided by the Canvas environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -107,63 +107,55 @@
 
         // Función de inicialización y autenticación
         async function initializeFirebase() {
-            let errorDetected = false;
             try {
-                // Validación del config
+                // 1. INTENTAR INICIALIZAR DB (CRÍTICO)
                 if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                    throw new Error("La configuración de Firebase está vacía o no fue proporcionada.");
+                     // Si no hay config, forzamos el error y el modo seguro.
+                     throw new Error("La configuración de Firebase está vacía o no fue proporcionada.");
                 }
 
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-
-                // Autenticación
+                
+                // 2. INTENTAR AUTENTICACIÓN
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         userId = user.uid;
                         isAuthReady = true;
-                        console.log('Usuario autenticado:', userId);
                         document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}...`;
-                        setupVisitListener();
-                        renderAccessoryInputs();
-                        setupViewSelector();
                     } else {
+                        // Si no hay usuario persistente, intentamos autenticación inicial o anónima
                         if (initialAuthToken) {
                             await signInWithCustomToken(auth, initialAuthToken);
                         } else {
                             const anonymousUser = await signInAnonymously(auth);
                             userId = anonymousUser.user.uid;
                             isAuthReady = true;
-                            console.log('Sesión anónima iniciada:', userId);
                             document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}... (Anónimo)`;
-                            setupVisitListener();
-                            renderAccessoryInputs();
-                            setupViewSelector();
                         }
                     }
+                    // 3. INICIAR LISTENERS SOLO DESPUÉS DE OBTENER USERID
+                    setupVisitListener();
+                    renderAccessoryInputs();
+                    setupViewSelector();
                 });
 
             } catch (error) {
                 console.error("Error al inicializar Firebase o autenticar:", error);
-                errorDetected = true;
                 
-                // MODO DE SEGURIDAD PARA CONEXIÓN FALLIDA: Asume credenciales predeterminadas para que la app no colapse.
-                console.warn("ADVERTENCIA: Iniciando en Modo de Seguridad. Los registros no serán persistentes si la configuración de Firebase es incorrecta.");
+                // MODO DE SEGURIDAD PARA CONEXIÓN FALLIDA: La DB NO está disponible.
                 userId = 'admin_default_fix';
                 isAuthReady = true;
                 document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SEGURIDAD ACTIVO`;
-                document.getElementById('visitsList').innerHTML = `<p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ Error de Conexión de Base de Datos. Use la URL publicada de GitHub.</p>`;
                 
-                setupVisitListener(); 
-                renderAccessoryInputs();
-                setupViewSelector();
+                // Forzamos la visualización del error en la lista y las acciones iniciales
+                document.getElementById('visitsList').innerHTML = `<p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ Error: ${error.message.includes("configuración") ? 'Configuración de DB inválida' : 'Conexión inicial falló'}. Use la URL publicada.</p>`;
+                
+                showMessage("ERROR CRÍTICO: Base de Datos NO disponible. Verifique la consola.", 'fix-error');
 
-                if (error.message.includes("configuración")) {
-                     showMessage("ERROR CRÍTICO: La configuración de la Base de Datos es inválida o faltante. Verifique la consola.", 'fix-error');
-                } else {
-                     showMessage("ERROR: La conexión inicial falló. Use la URL pública de GitHub.", 'fix-error');
-                }
+                // Si la DB no se inicializó (db es undefined/null), no se llama a setupVisitListener
+                setupViewSelector(); // Al menos cargamos la interfaz
             }
         }
 
@@ -210,10 +202,7 @@
         // Escucha en tiempo real de las visitas para la "Hoja de Visita Diaria"
         function setupVisitListener() {
             if (!isAuthReady || !userId || !db) {
-                // Si estamos en modo de seguridad (db = null), no intentamos el listener de Firebase
-                if (userId !== 'admin_default_fix') return; 
-                
-                // Si estamos en modo seguridad, mostramos el mensaje de error en la lista
+                // Si estamos en modo de seguridad (db = null), mostramos el error y terminamos.
                 document.getElementById('visitsList').innerHTML = `<p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ Error: La base de datos no está disponible. No se pueden cargar los registros.</p>`;
                 return;
             }
@@ -224,18 +213,18 @@
             if (currentView === 'my_agenda') {
                 visitsQuery = query(
                     getVisitsCollectionRef(), 
-                    where("userId", "==", userId) // SE REMUEVE orderBy para evitar error de índice
+                    where("userId", "==", userId)
                 );
             // 2. REPORTE CONSOLIDADO (Admin - Todos los registros)
             } else if (currentView === 'reporte_admin') {
                 visitsQuery = query(
-                    getVisitsCollectionRef() // SE REMUEVE orderBy
+                    getVisitsCollectionRef()
                 );
             // 3. AGENDA MANTENIMIENTO (Admin - Solo registros con fecha de mantto.)
             } else if (currentView === 'mantenimiento') {
                 visitsQuery = query(
                     getVisitsCollectionRef(), 
-                    where("fechaProximoMantenimiento", "!=", null) // SE REMUEVE orderBy
+                    where("fechaProximoMantenimiento", "!=", null)
                 );
             }
             
