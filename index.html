@@ -72,6 +72,7 @@
         let userId = null;
         let isAuthReady = false;
         let currentView = 'my_agenda'; // Estado para la vista: 'my_agenda', 'reporte_admin', 'mantenimiento'
+        let dbFailed = false; // Nuevo flag para el estado de la base de datos
 
         setLogLevel('Debug'); // Para ver logs de Firebase
 
@@ -110,7 +111,6 @@
             try {
                 // 1. INTENTAR INICIALIZAR DB (CRÍTICO)
                 if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                     // Si no hay config, forzamos el error y el modo seguro.
                      throw new Error("La configuración de Firebase está vacía o no fue proporcionada.");
                 }
 
@@ -125,7 +125,6 @@
                         isAuthReady = true;
                         document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}...`;
                     } else {
-                        // Si no hay usuario persistente, intentamos autenticación inicial o anónima
                         if (initialAuthToken) {
                             await signInWithCustomToken(auth, initialAuthToken);
                         } else {
@@ -145,25 +144,24 @@
                 console.error("Error al inicializar Firebase o autenticar:", error);
                 
                 // MODO DE SEGURIDAD PARA CONEXIÓN FALLIDA: La DB NO está disponible.
+                dbFailed = true; // Marcar la falla
                 userId = 'admin_default_fix';
                 isAuthReady = true;
-                document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SEGURIDAD ACTIVO`;
+                document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SIN CONEXIÓN`;
                 
-                // Forzamos la visualización del error como una notificación, no como un bloqueo de UI
-                showMessage("ERROR CRÍTICO: Base de Datos NO disponible. Verifique la consola.", 'fix-error');
+                // Mostrar la notificación de error pero no bloquear la lista
+                showMessage("ERROR CRÍTICO: Base de Datos NO disponible. El guardado no funcionará.", 'fix-error');
 
-                // Si la DB no se inicializó (db es undefined/null), iniciamos el selector para que al menos la UI cargue
                 setupViewSelector(); 
+                renderAccessoryInputs(); // Cargar accesorios para que el formulario funcione visualmente
             }
         }
 
         // --- Lógica de Colecciones ---
-        // Se mantiene en PUBLIC para que el Administrador vea todos los registros.
         const VISITS_COLLECTION_PATH = `artifacts/${appId}/public/data/visits`;
 
         function getVisitsCollectionRef() {
             if (!db) {
-                // Si la conexión falló, no podemos devolver la referencia real
                 return null; 
             }
             return collection(db, VISITS_COLLECTION_PATH);
@@ -200,9 +198,9 @@
 
         // Escucha en tiempo real de las visitas para la "Hoja de Visita Diaria"
         function setupVisitListener() {
-            if (!isAuthReady || !userId || !db) {
-                // Solución: Si no hay conexión, simplemente terminamos la función.
-                // El div 'visitsList' mantendrá el spinner "Cargando agenda..."
+            if (!isAuthReady || !userId || dbFailed) {
+                // Si la DB falló, mostramos el estado de 'sin datos'
+                document.getElementById('visitsList').innerHTML = `<div class="text-center py-8 text-gray-500">Cargando agenda...</div><p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ SIN DATOS: Conexión DB fallida. Edición y guardado deshabilitados.</p>`;
                 return;
             }
 
@@ -389,8 +387,8 @@
         }
 
         window.saveVisit = async () => {
-            if (!isAuthReady || !userId || !db) {
-                showMessage("ERROR: La base de datos no está disponible. Verifique la consola o use la URL pública.", 'fix-error');
+            if (!isAuthReady || !userId || dbFailed) {
+                showMessage("ERROR: Base de datos NO disponible. No se puede guardar el registro.", 'fix-error');
                 return;
             }
 
@@ -477,8 +475,8 @@
         // --- Lógica de Firebase: Actualizar Estado y Costos en Campo ---
         
         window.updateVisitStatusAndFinancials = async (visitId) => {
-            if (!isAuthReady || !userId || !db) {
-                showMessage("ERROR: La base de datos no está disponible. No se puede actualizar el estado.", 'fix-error');
+            if (!isAuthReady || !userId || dbFailed) {
+                showMessage("ERROR: Base de datos NO disponible. No se puede actualizar el estado.", 'fix-error');
                 return;
             }
 
@@ -527,6 +525,10 @@
         // --- Lógica de Edición (Administrador) ---
         
         window.openEditModal = (visitId) => {
+            if (dbFailed) {
+                 showMessage("ERROR: Base de datos NO disponible. No se puede editar.", 'fix-error');
+                 return;
+            }
             const visit = globalVisitsData[visitId];
             if (!visit) {
                 showMessage("Error: Datos de visita no encontrados.", 'fix-error');
@@ -555,8 +557,8 @@
         };
 
         window.saveEditedVisit = async () => {
-            if (!isAuthReady || !userId || !db) {
-                showMessage("ERROR: La base de datos no está disponible. No se puede guardar la edición.", 'fix-error');
+            if (!isAuthReady || !userId || dbFailed) {
+                showMessage("ERROR: Base de datos NO disponible. No se puede guardar la edición.", 'fix-error');
                 return;
             }
 
@@ -619,7 +621,7 @@
         // Renderiza la lista de visitas
         function renderVisits(visits) {
             const listContainer = document.getElementById('visitsList');
-            if (!db) {
+            if (dbFailed) {
                 // Si la conexión falló, ya no intentamos renderizar
                 return;
             }
