@@ -56,7 +56,7 @@
             visibility: hidden;
         }
     </style>
-    <!-- Firebase Imports -->
+    <!-- Firebase Imports (Se mantienen para la estructura, pero las funciones son bloqueadas por el Plan B) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -72,7 +72,7 @@
         let userId = null;
         let isAuthReady = false;
         let currentView = 'my_agenda'; // Estado para la vista: 'my_agenda', 'reporte_admin', 'mantenimiento'
-        let dbFailed = false; // Nuevo flag para el estado de la base de datos
+        let dbFailed = true; // FORZAMOS EL ERROR: La DB falló, activamos el Plan B de Reporte Manual.
 
         setLogLevel('Debug'); // Para ver logs de Firebase
 
@@ -105,73 +105,29 @@
         };
         let customAccessories = [];
         let globalVisitsData = {}; // Cache para datos de edición
+        let visitsManual = []; // Array para simular datos en Plan B
 
-        // Función de inicialización y autenticación
+        // Función de inicialización y autenticación (Simplificada para el Plan B)
         async function initializeFirebase() {
-            try {
-                // 1. INTENTAR INICIALIZAR DB (CRÍTICO)
-                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                     throw new Error("La configuración de Firebase está vacía o no fue proporcionada.");
-                }
+            // Asumimos el fallo de DB y usamos un ID de usuario fijo.
+            userId = 'admin_default_fix';
+            isAuthReady = true;
+            document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SIN CONEXIÓN`;
+            
+            showMessage("ERROR CRÍTICO: Base de Datos NO disponible. Activando Plan B (Reporte Manual).", 'fix-error');
 
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                
-                // 2. INTENTAR AUTENTICACIÓN
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        isAuthReady = true;
-                        document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}...`;
-                    } else {
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            const anonymousUser = await signInAnonymously(auth);
-                            userId = anonymousUser.user.uid;
-                            isAuthReady = true;
-                            document.getElementById('userIdDisplay').textContent = `ID Usuario: ${userId.substring(0, 8)}... (Anónimo)`;
-                        }
-                    }
-                    // 3. INICIAR LISTENERS SOLO DESPUÉS DE OBTENER USERID
-                    setupVisitListener();
-                    renderAccessoryInputs();
-                    setupViewSelector();
-                });
-
-            } catch (error) {
-                console.error("Error al inicializar Firebase o autenticar:", error);
-                
-                // MODO DE SEGURIDAD PARA CONEXIÓN FALLIDA: La DB NO está disponible.
-                dbFailed = true; // Marcar la falla
-                userId = 'admin_default_fix';
-                isAuthReady = true;
-                document.getElementById('userIdDisplay').textContent = `ID Usuario: MODO SIN CONEXIÓN`;
-                
-                // Mostrar la notificación de error pero no bloquear la lista
-                showMessage("ERROR CRÍTICO: Base de Datos NO disponible. El guardado no funcionará.", 'fix-error');
-
-                setupViewSelector(); 
-                renderAccessoryInputs(); // Cargar accesorios para que el formulario funcione visualmente
-            }
+            setupViewSelector(); 
+            renderAccessoryInputs(); 
         }
 
-        // --- Lógica de Colecciones ---
-        const VISITS_COLLECTION_PATH = `artifacts/${appId}/public/data/visits`;
-
+        // Las funciones de Firebase quedan bloqueadas por dbFailed = true.
         function getVisitsCollectionRef() {
-            if (!db) {
-                return null; 
-            }
-            return collection(db, VISITS_COLLECTION_PATH);
+            return null; 
         }
-        
-        // --- Lógica de Vistas (Admin/Técnico) ---
         
         window.changeView = (newView) => {
             currentView = newView;
-            setupVisitListener();
+            setupVisitListener(); // Llama al listener manual
             
             // Actualizar botones de vista activa
             document.querySelectorAll('.view-btn').forEach(btn => {
@@ -196,65 +152,39 @@
             window.changeView('my_agenda'); 
         }
 
-        // Escucha en tiempo real de las visitas para la "Hoja de Visita Diaria"
+        // Escucha de visitas (MODO MANUAL/SIMULACIÓN)
         function setupVisitListener() {
-            if (!isAuthReady || !userId || dbFailed) {
-                // Si la DB falló, mostramos el estado de 'sin datos'
-                document.getElementById('visitsList').innerHTML = `<div class="text-center py-8 text-gray-500">Cargando agenda...</div><p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ SIN DATOS: Conexión DB fallida. Edición y guardado deshabilitados.</p>`;
-                return;
-            }
-
-            // --- CONSULTA SIMPLIFICADA (SIN FILTROS NI ORDENACIÓN EN FIRESTORE) ---
-            const visitsQuery = query(getVisitsCollectionRef());
+            // En Plan B, solo renderizamos los datos simulados/ingresados en la sesión actual
+            let visits = [...visitsManual]; // Copiamos el array de visitas manuales
             
-            onSnapshot(visitsQuery, (querySnapshot) => {
-                let visits = [];
-                globalVisitsData = {}; // Limpiar caché
-                querySnapshot.forEach((doc) => {
-                    const data = { id: doc.id, ...doc.data() };
-                    visits.push(data);
-                    globalVisitsData[doc.id] = data; // Guardar en caché para edición
+            // --- FILTRADO Y ORDENACIÓN MANUAL EN JAVASCRIPT ---
+            if (currentView === 'my_agenda') {
+                // Como no podemos autenticar, mostramos todos los registros ingresados en esta sesión
+                visits.sort((a, b) => {
+                    if (a.fechaInstalacion < b.fechaInstalacion) return 1;
+                    if (a.fechaInstalacion > b.fechaInstalacion) return -1;
+                    return 0;
                 });
-                
-                // --- FILTRADO Y ORDENACIÓN MANUAL EN JAVASCRIPT ---
-                if (currentView === 'my_agenda') {
-                    // 1. Filtrar por userId (Mi Agenda)
-                    visits = visits.filter(v => v.userId === userId);
-                    // 2. Ordenar por fechaInstalacion descendente
-                    visits.sort((a, b) => {
-                        if (a.fechaInstalacion < b.fechaInstalacion) return 1;
-                        if (a.fechaInstalacion > b.fechaInstalacion) return -1;
-                        return 0;
-                    });
-                } else if (currentView === 'reporte_admin') {
-                    // Ordenar por createdAt descendente (Registro más reciente)
-                    visits.sort((a, b) => {
-                         const dateA = a.createdAt?.seconds || 0;
-                         const dateB = b.createdAt?.seconds || 0;
-                         if (dateA < dateB) return 1;
-                         if (dateA > dateB) return -1;
-                         return 0;
-                    });
-                } else if (currentView === 'mantenimiento') {
-                    // 1. Filtrar por existencia de fechaProximoMantenimiento
-                    visits = visits.filter(v => v.fechaProximoMantenimiento);
-                    // 2. Ordenar por fechaProximoMantenimiento ascendente
-                    visits.sort((a, b) => {
-                        if (a.fechaProximoMantenimiento < b.fechaProximoMantenimiento) return -1;
-                        if (a.fechaProximoMantenimiento > b.fechaProximoMantenimiento) return 1;
-                        return 0;
-                    });
-                }
-                // --- FIN FILTRADO Y ORDENACIÓN MANUAL ---
+            } else if (currentView === 'reporte_admin') {
+                visits.sort((a, b) => {
+                     if (a.createdAt < b.createdAt) return 1;
+                     if (a.createdAt > b.createdAt) return -1;
+                     return 0;
+                });
+            } else if (currentView === 'mantenimiento') {
+                visits = visits.filter(v => v.fechaProximoMantenimiento);
+                visits.sort((a, b) => {
+                    if (a.fechaProximoMantenimiento < b.fechaProximoMantenimiento) return -1;
+                    if (a.fechaProximoMantenimiento > b.fechaProximoMantenimiento) return 1;
+                    return 0;
+                });
+            }
+            // --- FIN FILTRADO Y ORDENACIÓN MANUAL ---
 
-                renderVisits(visits);
-            }, (error) => {
-                console.error("Error al escuchar las visitas: ", error);
-                document.getElementById('visitsList').innerHTML = `<p class="text-red-500 p-4">Error al cargar las visitas.</p>`;
-            });
+            renderVisits(visits);
         }
         
-        // --- Lógica de Costos y Accesorios ---
+        // --- Lógica de Costos y Accesorios --- (Sin cambios)
         function calcularCostoInstalacion(numEquipos, tiposEquipos) {
              numEquipos = parseInt(numEquipos) || 0;
             if (numEquipos === 0) return 0;
@@ -394,12 +324,13 @@
             }
         }
 
+        // --- FUNCIÓN CENTRAL DEL PLAN B: Copia a Portapapeles en lugar de guardar en DB ---
         window.saveVisit = async () => {
-            if (!isAuthReady || !userId || dbFailed) {
-                showMessage("ERROR: Base de datos NO disponible. No se puede guardar el registro.", 'fix-error');
+            if (!isAuthReady || !userId) {
+                showMessage("Aún se está inicializando la aplicación. Intente de nuevo.", 'fix-accent');
                 return;
             }
-
+            
             const form = document.getElementById('visitForm');
             const data = new FormData(form);
             const visitData = {};
@@ -408,206 +339,104 @@
                 visitData[key] = value.trim();
             }
 
-            const parseCurrency = (value) => parseFloat(value.replace('$', '').replace(/,/g, '')) || 0;
-
-            const costoInstalacionCalculado = parseCurrency(document.getElementById('costoInstalacionHidden').value);
-            const totalAccesoriosCalculado = parseCurrency(document.getElementById('cobroAccesoriosHidden').value);
-
-            const accesoriosRegistrados = [];
-            const container = document.getElementById('accesoriosContainer');
-            if (container) {
-                const accessoryItems = container.querySelectorAll('.accessory-item');
-
-                accessoryItems.forEach(item => {
-                    const name = item.querySelector('.truncate').textContent.trim();
-                    const quantityInput = item.querySelector('input[name^="acc_qty_"]');
-                    const priceInput = item.querySelector('input[name^="acc_price_"]');
-                    
-                    const cantidad = parseInt(quantityInput.value) || 0;
-                    const precioUnitario = parseFloat(priceInput.value) || 0;
-                    
-                    if (cantidad > 0) {
-                        accesoriosRegistrados.push({
-                            nombre: name,
-                            cantidad: cantidad,
-                            precioUnitario: precioUnitario,
-                            subtotal: cantidad * precioUnitario
-                        });
-                    }
-                });
-            }
-
-            const financiera = {
-                costoInstalacion: costoInstalacionCalculado, 
-                cobroAccesorios: totalAccesoriosCalculado, 
-                costoSegundaVisita: 0.00, 
-                costoGarantiaNoAplica: 0.00,
-                viatico: 0.00, 
-                totalCliente: costoInstalacionCalculado + totalAccesoriosCalculado, 
-                accesorios: accesoriosRegistrados,
-                observacionesFinancieras: visitData.observacionesFinancieras,
-            };
+            const costoInstalacionCalculado = parseFloat(document.getElementById('costoInstalacionHidden').value) || 0;
+            const totalAccesoriosCalculado = parseFloat(document.getElementById('cobroAccesoriosHidden').value) || 0;
+            const totalCliente = costoInstalacionCalculado + totalAccesoriosCalculado;
             
-            const finalData = {
-                ...visitData,
-                financiera,
-                createdAt: serverTimestamp(),
-                userId: userId, 
-                fechaInstalacion: visitData.fechaInstalacion, 
-                estado: 'Pendiente', 
-            };
+            const accesoriosUsados = [];
+            document.getElementById('accesoriosContainer').querySelectorAll('.accessory-item').forEach(item => {
+                 const name = item.querySelector('.truncate').textContent.trim();
+                 const qty = parseInt(item.querySelector('input[name^="acc_qty_"]').value) || 0;
+                 if (qty > 0) {
+                    accesoriosUsados.push(`${name} (Cant: ${qty})`);
+                 }
+            });
 
-            delete finalData.costoInstalacionHidden;
-            delete finalData.cobroAccesoriosHidden;
-            
-            if (!finalData.nombreCliente || !finalData.direccion || !finalData.fechaInstalacion) {
-                showMessage("Por favor, complete los campos obligatorios de Cliente/Dirección/Fecha de Instalación.", 'fix-accent');
+            if (!visitData.nombreCliente || !visitData.direccion || !visitData.fechaInstalacion) {
+                showMessage("Por favor, complete los campos obligatorios.", 'fix-accent');
                 return;
             }
 
+            // Crear el registro en formato CSV/Texto
+            const registroText = `
+REGISTRO DE VISITA FIX (COPIAR Y PEGAR EN EL REPORTE CENTRAL)
+===========================================================
+Fecha de Registro: ${new Date().toISOString().split('T')[0]}
+ID Técnico (Copia): ${userId}
+-----------------------------------------------------------
+CLIENTE:
+Nombre: "${visitData.nombreCliente}"
+Dirección: "${visitData.direccion}"
+Teléfono: "${visitData.telefono}"
+Cédula: "${visitData.cedula}"
+Correo: "${visitData.correo}"
+-----------------------------------------------------------
+SERVICIO:
+Fecha Instalación: ${visitData.fechaInstalacion}
+Tipo Equipo Principal: ${visitData.tipoServicio}
+Cant. Equipos: ${visitData.numEquipos}
+Producto: ${visitData.descProducto} (Cód: ${visitData.codProducto}, Serie: ${visitData.serieEquipo})
+-----------------------------------------------------------
+FINANCIERO:
+Costo Instalación: $${costoInstalacionCalculado.toFixed(2)}
+Total Accesorios: $${totalAccesoriosCalculado.toFixed(2)}
+TOTAL COBRO AL CLIENTE: $${totalCliente.toFixed(2)}
+Accesorios Usados: ${accesoriosUsados.join(' | ') || 'Ninguno'}
+Observaciones: "${visitData.observacionesFinancieras}"
+===========================================================
+`;
+            
+            // Simulación de guardado (para mostrar en la lista durante la sesión)
+            const newVisitId = 'MANUAL-' + Date.now();
+            const newVisit = {
+                id: newVisitId,
+                nombreCliente: visitData.nombreCliente,
+                direccion: visitData.direccion,
+                telefono: visitData.telefono,
+                fechaInstalacion: visitData.fechaInstalacion,
+                numEquipos: visitData.numEquipos,
+                estado: 'MANUAL',
+                userId: userId,
+                descProducto: visitData.descProducto,
+                createdAt: { seconds: Date.now() / 1000 },
+                financiera: {
+                    costoInstalacion: costoInstalacionCalculado,
+                    cobroAccesorios: totalAccesoriosCalculado,
+                    totalCliente: totalCliente,
+                }
+            };
+            visitsManual.push(newVisit);
+            globalVisitsData[newVisitId] = newVisit;
+            setupVisitListener(); // Recargar la lista simulada
 
-            try {
-                const docRef = await addDoc(getVisitsCollectionRef(), finalData);
-                showMessage(`Visita de ${finalData.nombreCliente} registrada con éxito. ID: ${docRef.id}`, 'fix-light');
-                form.reset();
-                customAccessories = []; 
-                renderAccessoryInputs(); 
-                window.updateInstallationCost(); 
-            } catch (e) {
-                console.error("Error al añadir documento: ", e);
-                showMessage("Error al guardar la visita. Verifique la consola.", 'fix-error');
+            // Copiar al portapapeles
+            window.copyToClipboard(registroText);
+
+            showMessage(`✅ REGISTRO COPIADO! Pegue este registro en su reporte central.`, 'fix-report');
+            form.reset();
+            customAccessories = []; 
+            renderAccessoryInputs(); 
+            window.updateInstallationCost(); 
+
+            // Si la DB estuviera disponible, se guardaría aquí.
+            if (!dbFailed) {
+                 // **NOTA:** Si la DB estuviera activa, el código aquí intentaría el addDoc
             }
         };
 
-
-        // --- Lógica de Firebase: Actualizar Estado y Costos en Campo ---
-        
+        // --- FUNCIONES DE DB (BLOQUEADAS EN ESTE PLAN B) ---
         window.updateVisitStatusAndFinancials = async (visitId) => {
-            if (!isAuthReady || !userId || dbFailed) {
-                showMessage("ERROR: Base de datos NO disponible. No se puede actualizar el estado.", 'fix-error');
-                return;
-            }
-
-            const itemContainer = document.getElementById(`visit-item-${visitId}`);
-            const newStatus = itemContainer.querySelector(`#status-${visitId}`).value;
-            const motivo = itemContainer.querySelector(`#motivo-${visitId}`).value.trim();
-            
-            if ((newStatus === 'No Realizado' || newStatus === 'Garantia No Aplica') && !motivo) {
-                showMessage("Debe ingresar un motivo para el estado 'No Realizado' o 'Garantía No Aplica'.", 'fix-accent');
-                return;
-            }
-
-            const visitRef = doc(db, VISITS_COLLECTION_PATH, visitId);
-
-            let costoSegundaVisita = 0.00;
-            let costoGarantiaNoAplica = 0.00;
-            let fechaProximoMantenimiento = null;
-
-            if (newStatus === 'No Realizado') {
-                costoSegundaVisita = 12.00; 
-            } else if (newStatus === 'Garantia No Aplica') {
-                costoGarantiaNoAplica = 20.00;
-            } else if (newStatus === 'Completado') {
-                const today = new Date();
-                today.setMonth(today.getMonth() + 6);
-                fechaProximoMantenimiento = today.toISOString().split('T')[0];
-            }
-
-            const updatePayload = {
-                estado: newStatus,
-                motivoNoRealizado: newStatus !== 'Completado' ? motivo : '',
-                fechaProximoMantenimiento: fechaProximoMantenimiento,
-                'financiera.costoSegundaVisita': costoSegundaVisita,
-                'financiera.costoGarantiaNoAplica': costoGarantiaNoAplica,
-            };
-
-            try {
-                await updateDoc(visitRef, updatePayload);
-                showMessage(`Estado de visita ${visitId} actualizado a "${newStatus}".`, 'fix-light');
-            } catch (e) {
-                console.error("Error al actualizar el estado: ", e);
-                showMessage("Error al actualizar el estado de la visita. Verifique la consola.", 'fix-error');
-            }
+            showMessage("ERROR: Función deshabilitada (Conexión DB fallida).", 'fix-error');
         };
-        
-        // --- Lógica de Edición (Administrador) ---
-        
         window.openEditModal = (visitId) => {
-            if (dbFailed) {
-                 showMessage("ERROR: Base de datos NO disponible. No se puede editar.", 'fix-error');
-                 return;
-            }
-            const visit = globalVisitsData[visitId];
-            if (!visit) {
-                showMessage("Error: Datos de visita no encontrados.", 'fix-error');
-                return;
-            }
-
-            // Llenar el modal con datos actuales
-            document.getElementById('edit-visit-id').value = visitId;
-            document.getElementById('edit-nombreCliente').value = visit.nombreCliente || '';
-            document.getElementById('edit-direccion').value = visit.direccion || '';
-            document.getElementById('edit-telefono').value = visit.telefono || '';
-            document.getElementById('edit-fechaInstalacion').value = visit.fechaInstalacion || '';
-            document.getElementById('edit-numEquipos').value = visit.numEquipos || 1;
-            document.getElementById('edit-costoInstalacion').value = (visit.financiera?.costoInstalacion || 0).toFixed(2);
-            document.getElementById('edit-cobroAccesorios').value = (visit.financiera?.cobroAccesorios || 0).toFixed(2);
-            document.getElementById('edit-costoSegundaVisita').value = (visit.financiera?.costoSegundaVisita || 0).toFixed(2);
-            document.getElementById('edit-costoGarantiaNoAplica').value = (visit.financiera?.costoGarantiaNoAplica || 0).toFixed(2);
-            
-            // Mostrar modal
-            const modal = document.getElementById('editModal');
-            modal.classList.remove('hidden');
+            showMessage("ERROR: Función deshabilitada (Conexión DB fallida).", 'fix-error');
         };
-        
-        window.closeEditModal = () => {
-             document.getElementById('editModal').classList.add('hidden');
-        };
-
         window.saveEditedVisit = async () => {
-            if (!isAuthReady || !userId || dbFailed) {
-                showMessage("ERROR: Base de datos NO disponible. No se puede guardar la edición.", 'fix-error');
-                return;
-            }
-
-            const visitId = document.getElementById('edit-visit-id').value;
-            const visitRef = doc(db, VISITS_COLLECTION_PATH, visitId);
-
-            const newInstalacion = parseFloat(document.getElementById('edit-costoInstalacion').value) || 0;
-            const newAccesorios = parseFloat(document.getElementById('edit-cobroAccesorios').value) || 0;
-            const newSegundaVisita = parseFloat(document.getElementById('edit-costoSegundaVisita').value) || 0;
-            const newNoGarantia = parseFloat(document.getElementById('edit-costoGarantiaNoAplica').value) || 0;
-
-            const newTotalCliente = newInstalacion + newAccesorios + newSegundaVisita + newNoGarantia;
-
-            const updatePayload = {
-                nombreCliente: document.getElementById('edit-nombreCliente').value,
-                direccion: document.getElementById('edit-direccion').value,
-                telefono: document.getElementById('edit-telefono').value,
-                fechaInstalacion: document.getElementById('edit-fechaInstalacion').value,
-                numEquipos: parseInt(document.getElementById('edit-numEquipos').value) || 1,
-
-                // Actualizaciones financieras (Admin puede sobreescribir los cálculos automáticos)
-                'financiera.costoInstalacion': newInstalacion,
-                'financiera.cobroAccesorios': newAccesorios,
-                'financiera.costoSegundaVisita': newSegundaVisita,
-                'financiera.costoGarantiaNoAplica': newNoGarantia,
-                'financiera.totalCliente': newTotalCliente, // Recalcular total
-            };
-
-            try {
-                await updateDoc(visitRef, updatePayload);
-                showMessage(`Visita ID ${visitId} (Admin) modificada correctamente.`, 'fix-report');
-                closeEditModal();
-            } catch (e) {
-                console.error("Error al guardar edición: ", e);
-                showMessage("Error al guardar la edición. Verifique la consola.", 'fix-error');
-            }
+            showMessage("ERROR: Función deshabilitada (Conexión DB fallida).", 'fix-error');
         };
-
 
         // --- Lógica de Interfaz de Usuario: Renderizado ---
-
+        
         function showMessage(message, color) {
             const messageBox = document.getElementById('messageBox');
             messageBox.textContent = message;
@@ -615,7 +444,7 @@
             messageBox.style.opacity = 1;
             setTimeout(() => {
                 messageBox.style.opacity = 0;
-            }, 5000);
+            }, 8000); // 8 segundos para que el usuario pueda leer el mensaje de copia
         }
         
         function getAccessoryListFromDOM(visit) {
@@ -630,7 +459,8 @@
         function renderVisits(visits) {
             const listContainer = document.getElementById('visitsList');
             if (dbFailed) {
-                // Si la conexión falló, ya no intentamos renderizar
+                // Si la conexión falló, mostramos el estado de 'sin datos'
+                document.getElementById('visitsList').innerHTML = `<div class="text-center py-8 text-gray-500">Cargando agenda...</div><p class="text-fix-error p-4 rounded-lg bg-red-50 font-bold">⚠️ SIN DATOS: Conexión DB fallida. Usar modo Copiar/Pegar.</p>`;
                 return;
             }
 
@@ -642,7 +472,7 @@
             listContainer.innerHTML = visits.map(visit => {
                 const f = visit.financiera || {};
                 
-                // --- Cálculo Financiero ---
+                // --- Cálculo Financiero (usando 0 si falla el dato) ---
                 const costoBase = (f.costoInstalacion || 0) + (f.cobroAccesorios || 0);
                 const penalizaciones = (f.costoSegundaVisita || 0) + (f.costoGarantiaNoAplica || 0);
                 const total = (costoBase + penalizaciones).toFixed(2);
@@ -676,11 +506,8 @@
                 if (currentView !== 'my_agenda') {
                     // Solo en vistas de Reporte (Admin)
                     adminEditButton = `
-                        <button onclick="openEditModal('${visit.id}')" class="w-full bg-fix-report hover:bg-fix-blue text-white text-xs font-semibold py-1 rounded mt-2 transition duration-200 flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L15.232 5.232z" />
-                            </svg>
-                            Editar Finanzas (Admin)
+                        <button onclick="showMessage('Función deshabilitada. Conexión DB fallida.', 'fix-error')" class="w-full bg-gray-400 text-white text-xs font-semibold py-1 rounded mt-2 transition duration-200 flex items-center justify-center">
+                            Editar (DB Desh.)
                         </button>`;
                 }
 
@@ -714,30 +541,13 @@
                     adminClass = 'border-2 border-fix-report/50';
                 }
                 
-                // La sección de Confirmación de Campo solo la ve el Técnico (currentView === 'my_agenda')
+                // La sección de Confirmación de Campo (para cambiar estado) queda deshabilitada.
                 let confirmationSection = '';
                 if (currentView === 'my_agenda') {
                     confirmationSection = `
                         <div class="mt-4 pt-4 border-t border-fix-light/30">
                             <h4 class="text-base font-semibold text-fix-blue mb-2">Confirmación en Campo:</h4>
-                            <label class="block mb-2">
-                                <span class="text-gray-700 text-sm">Estado de la Intervención:</span>
-                                <select id="status-${visit.id}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2 text-sm">
-                                    <option value="Pendiente" ${visit.estado === 'Pendiente' ? 'selected' : ''}>1. Pendiente</option>
-                                    <option value="Completado" ${visit.estado === 'Completado' ? 'selected' : ''}>2. Completado (Instalación OK)</option>
-                                    <option value="No Realizado" ${visit.estado === 'No Realizado' ? 'selected' : ''}>3. No Realizado (Costo 2da Visita $12)</option>
-                                    <option value="Garantia No Aplica" ${visit.estado === 'Garantia No Aplica' ? 'selected' : ''}>4. Garantía No Aplica (Costo $20)</option>
-                                </select>
-                            </label>
-                            
-                            <label class="block mb-3">
-                                <span class="text-gray-700 text-sm">Motivo / Notas:</span>
-                                <textarea id="motivo-${visit.id}" rows="1" placeholder="Solo si la visita no se completó." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2 text-sm">${visit.motivoNoRealizado || ''}</textarea>
-                            </label>
-                            
-                            <button onclick="updateVisitStatusAndFinancials('${visit.id}')" class="w-full bg-fix-accent hover:bg-fix-blue text-white font-bold py-2 px-4 rounded-lg text-sm transition duration-300">
-                                Guardar Confirmación
-                            </button>
+                            <p class="text-xs text-red-500 font-bold">⚠️ Esta función está deshabilitada (Copiar/Pegar).</p>
                         </div>
                     `;
                 }
