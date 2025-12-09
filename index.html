@@ -285,8 +285,6 @@
                     directionsRenderer.setDirections(response);
                 } else {
                     console.error('Error al calcular la ruta:', status);
-                    // Ocultamos el mensaje de error de mapeo para evitar confusiones
-                    // showMessage(`❌ ERROR DE MAPEO: No se pudo calcular la ruta. Código: ${status}`, 'fix-error');
                 }
             });
         }
@@ -398,7 +396,77 @@
             renderAccessoryInputs();
             window.updateInstallationCost();
         };
+        
+        // --- FUNCIÓN CRÍTICA DE ACTUALIZACIÓN DEL TÉCNICO ---
+        window.updateVisitStatusAndFinancials = async (visitId, newStatus) => {
+            if (dbFailed) {
+                showMessage("ERROR: Base de datos NO disponible. No se puede actualizar.", 'fix-error');
+                return;
+            }
+            if (!visitId || !newStatus) return;
 
+            // 1. Obtener la visita actual (desde el caché)
+            const currentVisit = globalVisitsData[visitId];
+            if (!currentVisit) {
+                showMessage("Error: No se encontró el registro para actualizar.", 'fix-error');
+                return;
+            }
+
+            // 2. Lógica de Cobro y Accesorios (Simplificada)
+            // Ya que el técnico solo necesita agregar el estado, accesorios y cobro
+            
+            let accessoriesUsed = [];
+            let totalCobro = 0;
+            
+            // 🚨 SIMULACIÓN DE MODAL: Aquí se asumiría la recolección de datos del Modal
+            // Para el ejemplo, usaremos un prompt simple para el cobro
+            if (newStatus === 'Completado' || newStatus === 'Garantia No Aplica') {
+                const cobroPrompt = prompt(`Ingrese el MONTO TOTAL COBRADO al cliente (solo números, ej: 45.50).`);
+                totalCobro = parseFloat(cobroPrompt) || currentVisit.financiera.totalCliente || 0;
+                
+                // Mantenemos los accesorios originales o solicitamos una lista simple
+                const accessoriesPrompt = prompt("Ingrese los accesorios usados (ej: Enchufe 220, Manguera 2m). (Opcional)");
+                
+                if (accessoriesPrompt) {
+                     // Lógica simple para manejar accesorios ingresados por texto
+                     accessoriesUsed = accessoriesPrompt.split(',').map(name => ({
+                         nombre: name.trim(),
+                         cantidad: 1,
+                         precioUnitario: 0 // Simplificamos el precio unitario
+                     }));
+                } else {
+                     accessoriesUsed = currentVisit.financiera.accesorios || [];
+                }
+            } else if (newStatus === 'No Realizado') {
+                const motivo = prompt("Ingrese el motivo por el cual no se realizó el servicio:");
+                currentVisit.motivoNoRealizado = motivo || 'No especificado';
+                totalCobro = 0;
+            }
+
+            // 3. Crear el objeto de actualización
+            const updates = {
+                estado: newStatus,
+                financiera: {
+                    ...currentVisit.financiera,
+                    // Actualizamos el cobro total con el valor ingresado por el técnico
+                    totalCliente: totalCobro,
+                    accesorios: accessoriesUsed,
+                },
+                // Si la visita no se realizó, agregamos el motivo (si existe)
+                ...(newStatus === 'No Realizado' && { motivoNoRealizado: currentVisit.motivoNoRealizado })
+            };
+
+            // 4. Actualizar en Firebase
+            database.ref('visits/' + visitId).update(updates)
+                .then(() => {
+                    showMessage(`✅ Estado de ${currentVisit.nombreCliente} actualizado a '${newStatus}' y cobro registrado.`, 'fix-report');
+                    // La escucha de Firebase se encargará de refrescar la lista
+                })
+                .catch((error) => {
+                    showMessage(`❌ Error al actualizar estado: ${error.message}`, 'fix-error');
+                });
+        };
+        
         // --- FUNCIÓN DE AUTOCOMPLETADO (¡CORREGIDA!) ---
         window.autofillProduct = () => {
             const codigo = document.getElementById('codProducto').value.trim();
@@ -438,14 +506,18 @@
             const formContainer = document.getElementById('formContainer');
             const filterContainer = document.getElementById('filterContainer');
             
-            if (newView === 'my_agenda') {
-                 formContainer.classList.remove('hidden');
-                 filterContainer.classList.add('hidden');
-                 document.getElementById('reportViewTitle').textContent = 'Hoja de Visita Diaria';
-            } else {
-                 formContainer.classList.add('hidden');
+            // 🚨 RESTRICCIÓN DE LA VISTA DEL TÉCNICO: SI NO ESTÁ EN REPORTE ADMIN, ES TÉCNICO
+            if (newView === 'reporte_admin') {
+                 // Modo Administrador: Permite ingresar datos y ver filtros
+                 formContainer.classList.remove('hidden'); 
                  filterContainer.classList.remove('hidden');
-                 document.getElementById('reportViewTitle').textContent = newView === 'mantenimiento' ? 'Agenda de Mantenimiento' : 'Agenda de Rutas Diarias';
+                 document.getElementById('reportViewTitle').textContent = 'Agenda de Rutas Diarias';
+
+            } else {
+                 // Modo Técnico (rutero): Solo ve el reporte/agenda
+                 formContainer.classList.add('hidden');
+                 filterContainer.classList.remove('hidden'); // Necesita filtros para ver su ruta
+                 document.getElementById('reportViewTitle').textContent = 'Mi Rutero Diario';
             }
         };
 
@@ -650,7 +722,6 @@
                  return;
              }
             
-            // 🚨 Encabezados del CSV (Alineado con el formato de Excel)
             const headers = [
                 "ID_REGISTRO", "FECHA_INTERVENCION", "TECNICO_ASIGNADO", "NOMBRE_CLIENTE", "DIRECCION", 
                 "TELEFONO", "CEDULA_RUC", "CORREO", "LUGAR_DE_COMPRA", "NUMERO_FACTURA_COMPRA",
@@ -674,9 +745,9 @@
                     `"${(visit.tecnico || '').replace(/"/g, '""')}"`,
                     `"${(visit.nombreCliente || '').replace(/"/g, '""')}"`,
                     `"${(visit.direccion || '').replace(/"/g, '""')}"`,
-                    `"${visit.telefono || ''}"`,
-                    `"${visit.cedula || ''}"`,
-                    `"${visit.correo || ''}"`,
+                    `"${(visit.telefono || '').replace(/"/g, '""')}"`,
+                    `"${(visit.cedula || '').replace(/"/g, '""')}"`,
+                    `"${(visit.correo || '').replace(/"/g, '""')}"`,
                     `"${(visit.lugarCompra || '').replace(/"/g, '""')}"`,
                     `"${(visit.numFactura || '').replace(/"/g, '""')}"`,
                     `"${visit.tipoServicio || ''}"`,
@@ -843,6 +914,32 @@
                 if (currentView === 'reporte_admin') {
                      routeOrderIndicator = `<div class="absolute top-2 left-2 bg-fix-blue text-white text-lg font-bold w-8 h-8 rounded-full flex items-center justify-center">${index + 1}</div>`;
                 }
+                
+                // 🚨 CONTROLES PARA EL TÉCNICO (NUEVO)
+                let technicianControls = '';
+                // Asumimos que el técnico usa la vista 'reporte_admin' para su rutero
+                if (currentView !== 'my_agenda') {
+                    technicianControls = `
+                        <div class="mt-4 pt-4 border-t border-fix-light/30">
+                            <h4 class="text-base font-semibold text-fix-blue mb-2">GESTIÓN EN CAMPO:</h4>
+                            <div class="grid grid-cols-2 gap-2">
+                                <select 
+                                    class="block w-full rounded-md border-gray-300 focus:ring-fix-light focus:border-fix-light p-2 text-sm"
+                                    onchange="updateVisitStatusAndFinancials('${visit.id}', this.value)"
+                                >
+                                    <option value="" disabled selected>Estado: ${visit.estado}</option>
+                                    <option value="Completado">✅ Completado</option>
+                                    <option value="Garantia No Aplica">⚠️ Garantía No Aplica</option>
+                                    <option value="No Realizado">❌ No Realizado</option>
+                                </select>
+                                <button onclick="updateVisitStatusAndFinancials('${visit.id}', 'Completado')" class="bg-fix-report hover:bg-fix-blue text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-200">
+                                    Registrar Servicio y Cobro
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2">Total Cobrado (Actualizado): $${total}</p>
+                        </div>
+                    `;
+                }
 
                 return `
                     <div id="visit-item-${visit.id}" class="bg-white p-4 rounded-xl shadow-md border border-gray-100 hover:border-fix-light transition-all mb-3 relative pl-12 print-route-card">
@@ -874,13 +971,10 @@
                         </p>
                         
                         <p class="text-sm text-gray-700 font-bold mt-2">
-                            <strong class="text-fix-accent">Cobro Total:</strong> $${total} (${instCostText}${secVisitCostText}${noGarantiaCostText})
+                            <strong class="text-fix-accent">Cobro Total Estimado:</strong> $${total} (${instCostText}${secVisitCostText}${noGarantiaCostText})
                         </p>
                         
-                        <div class="mt-4 pt-4 border-t border-fix-light/30">
-                            <h4 class="text-base font-semibold text-fix-blue mb-2">Confirmación en Campo:</h4>
-                            <p class="text-xs text-red-500 font-bold">⚠️ Deshabilitado para esta versión.</p>
-                        </div>
+                        ${technicianControls}
                         ${deleteButton}
                     </div>
                 `;
