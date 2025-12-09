@@ -111,22 +111,39 @@
             messageBox.style.opacity = 1;
             setTimeout(() => { messageBox.style.opacity = 0; }, 8000);
         }
-        
+
+        function calcularCostoAccesorios() {
+            let totalAccesorios = 0;
+            const container = document.getElementById('accesoriosContainer');
+            if (!container) return 0;
+            const accessoryItems = container.querySelectorAll('.accessory-item');
+            accessoryItems.forEach(item => {
+                const quantityInput = item.querySelector('input[name^="acc_qty_"]');
+                const priceInput = item.querySelector('input[name^="acc_price_"]');
+                const cantidad = parseInt(quantityInput.value) || 0;
+                const precio = parseFloat(priceInput.value) || 0;
+                totalAccesorios += cantidad * precio;
+            });
+            return totalAccesorios;
+        }
+
         function updateInstallationCost() {
             const numEquipos = document.getElementById('numEquipos').value;
             const tipoServicio = document.querySelector('[name="tipoServicio"]').value; 
             let tiposEquipos = [tipoServicio];
             if (numEquipos > 1) { tiposEquipos = Array(parseInt(numEquipos)).fill(tipoServicio); }
             const costoInstalacion = COSTOS_INSTALACION['cocina induccion']; // Simplificado
-            document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2);
+            if(document.getElementById('costoInstalacionHidden')) document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2);
             window.updateTotalCobro();
         }
 
         function updateTotalCobro() {
             const costoInstalacion = parseFloat(document.getElementById('costoInstalacionHidden').value) || 0;
-            const totalAccesorios = 0; // Simplificado
+            const totalAccesorios = calcularCostoAccesorios(); 
+            if(document.getElementById('cobroAccesoriosHidden')) document.getElementById('cobroAccesoriosHidden').value = totalAccesorios.toFixed(2);
             const totalCliente = costoInstalacion + totalAccesorios; 
             if(document.getElementById('totalClienteDisplay')) document.getElementById('totalClienteDisplay').textContent = `$${totalCliente.toFixed(2)}`;
+            if(document.getElementById('totalAccesoriosDisplay')) document.getElementById('totalAccesoriosDisplay').textContent = `$${totalAccesorios.toFixed(2)}`;
         }
         
         function createAccessoryInputRow(name, price, isCustom = false) {
@@ -142,18 +159,15 @@
              return div;
         }
 
-        // 🚨 FUNCIÓN DE LLENADO DE MENÚS (CORRECCIÓN FINAL DE SINCRONIZACIÓN) 🚨
+        // 🚨 FUNCIÓN DE LLENADO DE MENÚS Y ACCESORIOS (CORRECCIÓN FINAL) 🚨
         function renderAccessoryInputs() {
             const container = document.getElementById('accesoriosContainer');
             
-            // 🛠️ 1. POBLAR ACCESORIOS
+            // 🛠️ 1. POBLAR ACCESORIOS Y LIMPIAR CONTENEDOR
             if (container) {
                 container.innerHTML = '';
                 Object.entries(ACCESORIOS_DEFAULT).forEach(([name, price]) => {
                     container.appendChild(createAccessoryInputRow(name, price));
-                });
-                customAccessories.forEach(acc => {
-                    container.appendChild(createAccessoryInputRow(acc.name, acc.price, true));
                 });
                 window.updateTotalCobro();
             }
@@ -208,6 +222,12 @@
         window.saveVisit = () => { /* lógica de Firebase */ };
         window.deleteVisitLocal = () => { /* lógica de Firebase */ };
         window.exportToCsv = () => { /* lógica de exportación */ };
+        window.autofillProduct = () => { /* lógica de autocompletado */ };
+        window.addCustomAccessory = () => { /* lógica de accesorios */ };
+        window.removeAccessory = () => { /* lógica de accesorios */ };
+        window.changeView = () => { /* lógica de vistas */ };
+        window.filterVisitsByDate = () => { /* lógica de filtros */ };
+        window.filterVisitsByTecnico = () => { /* lógica de filtros */ };
 
         // 🚨 FUNCIÓN PRINCIPAL DE INICIO (USAMOS DOMContentLoaded para estabilidad)
         document.addEventListener('DOMContentLoaded', () => {
