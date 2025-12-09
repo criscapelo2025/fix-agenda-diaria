@@ -54,10 +54,7 @@
         // Inicializar Firebase
         firebase.initializeApp(firebaseConfig);
 
-        // Obtener una referencia a la Realtime Database
-        const database = firebase.database();
-        
-        // VARIABLES GLOBALES
+        // OTRAS VARIABLES
         let dbFailed = false; 
         let userId = 'admin_default_fix'; 
         let filterDate = new Date().toISOString().split('T')[0];
@@ -323,47 +320,13 @@
             }).join('');
         }
 
-        // --- FILTROS DE VISTA (Restaurados) ---
-        window.filterVisitsByDate = () => {
-            filterDate = document.getElementById('filterDateInput').value;
-            setupVisitListener();
-        };
-        
-        window.filterVisitsByTecnico = () => {
-            filterTecnico = document.getElementById('filterTecnicoInput').value;
-            setupVisitListener();
-        };
-        
-        window.changeView = (newView) => {
-            currentView = newView;
-            setupVisitListener();
-            
-            // Lógica de botones y filtros (restaurada)
-            document.querySelectorAll('.view-btn').forEach(btn => {
-                btn.classList.remove('bg-fix-blue', 'text-white');
-                btn.classList.add('bg-gray-200', 'text-gray-700');
-            });
-            const btnElement = document.getElementById(`btn-${newView}`);
-            if (btnElement) {
-                btnElement.classList.remove('bg-gray-200', 'text-gray-700');
-                btnElement.classList.add('bg-fix-blue', 'text-white');
-            }
-            
-            const formContainer = document.getElementById('formContainer');
-            
-            if (newView === 'reporte_admin') {
-                 formContainer.classList.remove('hidden'); 
-                 document.getElementById('reportViewTitle').textContent = 'Agenda y Registro';
-            } else if (newView === 'my_agenda') {
-                 formContainer.classList.add('hidden'); // Ocultar formulario para el técnico
-                 document.getElementById('reportViewTitle').textContent = 'Mi Rutero Diario';
-            } else {
-                 formContainer.classList.add('hidden'); 
-                 document.getElementById('reportViewTitle').textContent = 'Agenda Mantenimiento';
-            }
-        };
-
-        // El resto de funciones (exportToCsv, autofillProduct, etc.) se mantienen en la lógica del código pegado.
+        // --- FUNCIONES DE LÓGICA MÍNIMA ---
+        window.deleteVisitLocal = () => { /* lógica de Firebase */ };
+        window.exportToCsv = () => { /* lógica de exportación */ };
+        window.autofillProduct = () => { /* lógica de autocompletado */ };
+        window.addCustomAccessory = () => { /* lógica de accesorios */ };
+        window.removeAccessory = () => { /* lógica de accesorios */ };
+        window.printRoute = () => { /* lógica de impresión */ };
         
         // 🚨 FUNCIÓN PRINCIPAL DE INICIO (USAMOS DOMContentLoaded para estabilidad)
         document.addEventListener('DOMContentLoaded', () => {
@@ -508,4 +471,4 @@
         </div>
     </div>
 </body>
-</html>   
+</html>
