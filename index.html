@@ -26,9 +26,15 @@
     <style>
         /* Estilos CSS simplificados */
         .currency-input { text-align: right; font-family: monospace; }
-        /* Ocultar filtro de mapa, ya que lo eliminamos */
-        #filterContainer { display: none !important; }
-        #map { display: none !important; } 
+        .modal { transition: opacity 0.3s ease-out, visibility 0.3s ease-out; }
+        .modal-content { transition: transform 0.3s ease-out; }
+        .modal.hidden { opacity: 0; visibility: hidden; }
+        
+        /* Estilos de Impresión */
+        @media print { 
+            .no-print { display: none !important; } 
+            .grid { display: block; }
+        }
     </style>
     
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
@@ -61,7 +67,7 @@
         let currentView = 'reporte_admin';
         let customAccessories = [];
 
-        // 🛠️ LISTAS CRÍTICAS (Las que deben aparecer)
+        // LISTAS Y DATOS (ESTABLES)
         const LISTA_TECNICOS = [
             "",
             "Juan Carlos Pando",
@@ -83,7 +89,6 @@
             "Home Vega"
         ];
 
-        // 🛠️ ACCESORIOS (Los que deben aparecer)
         const ACCESORIOS_DEFAULT = {
             'Enchufe 110V': 5,
             'Enchufe 220V 20V': 7,
@@ -93,12 +98,10 @@
             'Enchufe chinito': 5,
         };
         
-        // Catálogo de productos (mantenido solo para que las funciones no fallen)
         const CATALOGO_PRODUCTOS = {"112580027": "GBC 75030 KBB CRISTAL COCINA GAS", "915061": "ASP. AXIAL BLIND 100 110V-60HZ"};
         const COSTOS_INSTALACION = {'cocina induccion': 25, 'default': 0};
         
-        
-        // --- FUNCIONES ESENCIALES ---
+        // --- FUNCIONES CORE ---
 
         function showMessage(message, color) {
             const messageBox = document.getElementById('messageBox');
@@ -108,12 +111,42 @@
             messageBox.style.opacity = 1;
             setTimeout(() => { messageBox.style.opacity = 0; }, 8000);
         }
+        
+        function updateInstallationCost() {
+            const numEquipos = document.getElementById('numEquipos').value;
+            const tipoServicio = document.querySelector('[name="tipoServicio"]').value; 
+            let tiposEquipos = [tipoServicio];
+            if (numEquipos > 1) { tiposEquipos = Array(parseInt(numEquipos)).fill(tipoServicio); }
+            const costoInstalacion = COSTOS_INSTALACION['cocina induccion']; // Simplificado
+            document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2);
+            window.updateTotalCobro();
+        }
 
-        // 🚨 FUNCIÓN CRÍTICA CORREGIDA PARA POBLAR MENÚS Y ACCESORIOS 🚨
+        function updateTotalCobro() {
+            const costoInstalacion = parseFloat(document.getElementById('costoInstalacionHidden').value) || 0;
+            const totalAccesorios = 0; // Simplificado
+            const totalCliente = costoInstalacion + totalAccesorios; 
+            if(document.getElementById('totalClienteDisplay')) document.getElementById('totalClienteDisplay').textContent = `$${totalCliente.toFixed(2)}`;
+        }
+        
+        function createAccessoryInputRow(name, price, isCustom = false) {
+             const id = name.replace(/\s/g, '_').toLowerCase() + '_' + Date.now();
+             const div = document.createElement('div');
+             div.className = 'accessory-item grid grid-cols-5 gap-2 items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 mb-2';
+             div.innerHTML = `
+                 <div class="col-span-2 text-sm text-gray-700 font-medium truncate" title="${name}">${name}</div>
+                 <input type="number" step="1" min="0" value="0" name="acc_qty_${id}" oninput="updateTotalCobro()" class="w-full text-center rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm font-bold">
+                 <input type="number" step="0.01" value="${price.toFixed(2)}" name="acc_price_${id}" oninput="updateTotalCobro()" class="w-full currency-input rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm ${isCustom ? 'bg-yellow-50' : 'bg-gray-100'}">
+                 <div class="text-right">${isCustom ? `<button type="button" onclick="removeAccessory(this, '${name}')" class="text-red-500 hover:text-red-700 transition duration-150">X</button>` : ''}</div>
+             `;
+             return div;
+        }
+
+        // 🚨 FUNCIÓN DE LLENADO DE MENÚS (CORRECCIÓN FINAL DE SINCRONIZACIÓN) 🚨
         function renderAccessoryInputs() {
             const container = document.getElementById('accesoriosContainer');
             
-            // 🛠️ 1. POBLAR ACCESORIOS Y LIMPIAR CONTENEDOR
+            // 🛠️ 1. POBLAR ACCESORIOS
             if (container) {
                 container.innerHTML = '';
                 Object.entries(ACCESORIOS_DEFAULT).forEach(([name, price]) => {
@@ -122,8 +155,7 @@
                 customAccessories.forEach(acc => {
                     container.appendChild(createAccessoryInputRow(acc.name, acc.price, true));
                 });
-                // Llamamos la función después de que los inputs existan
-                if (window.updateTotalCobro) window.updateTotalCobro();
+                window.updateTotalCobro();
             }
 
             // 🛠️ 2. POBLAR MENÚ DE TÉCNICOS
@@ -166,37 +198,23 @@
                     filterTecnicoSelect.appendChild(option);
                 });
             }
-            // Forzar el cálculo de costos (para evitar error al cargar el formulario)
-            if (window.updateInstallationCost) window.updateInstallationCost();
+            window.updateInstallationCost();
         }
 
-        // --- INICIALIZACIÓN Y FUNCIONES LIGERAS DE DEMO ---
-
-        function initializeAppLogic() {
-             document.getElementById('userIdDisplay').textContent = `ID Usuario: Conexión Activa`;
-             // Forzar la carga de listas y menús
-             renderAccessoryInputs(); 
-             // Iniciar la carga de la DB (aunque solo se refrescarán las listas de visitas)
-             cargarDatos();
-        }
-        
-        // --- FUNCIONES CORE DE FIREBASE (SIMPLIFICADAS) ---
+        // --- INICIALIZACIÓN DE FIREBASE Y LÓGICA ---
         function cargarDatos() { /* lógica de Firebase */ }
         function setupVisitListener() { /* lógica de Firebase */ }
         function renderVisits() { /* lógica de Firebase */ }
         window.saveVisit = () => { /* lógica de Firebase */ };
-
-        // --- FUNCIONES AUXILIARES (MINIMIZADAS) ---
-        window.updateInstallationCost = () => { /* lógica de cálculo */ };
-        window.updateTotalCobro = () => { /* lógica de cálculo */ };
-        function createAccessoryInputRow(name, price, isCustom) { /* código para dibujar la fila de accesorios */ }
-        window.autofillProduct = () => { /* lógica de autocompletado */ };
+        window.deleteVisitLocal = () => { /* lógica de Firebase */ };
         window.exportToCsv = () => { /* lógica de exportación */ };
 
-        // 🚨 FUNCIÓN PRINCIPAL DE INICIO (ESPERA A QUE EL HTML ESTÉ LISTO)
+        // 🚨 FUNCIÓN PRINCIPAL DE INICIO (USAMOS DOMContentLoaded para estabilidad)
         document.addEventListener('DOMContentLoaded', () => {
-             // La función de inicialización se llama una vez que el HTML está listo
-             initializeAppLogic();
+             // Forzar la carga de listas y menús
+             renderAccessoryInputs(); 
+             // Iniciar la carga de la DB (aunque solo se refrescarán las listas de visitas)
+             cargarDatos();
         });
 
     </script>
@@ -207,7 +225,6 @@
         <header class="mb-8 pb-4 flex flex-col md:flex-row items-start md:items-center justify-between no-print">
             <div class="flex items-center mb-4 md:mb-0">
                 <img src="https://placehold.co/100x40/1e3a8a/ffffff?text=FIX" alt="Logo de FIX" class="h-10 w-auto mr-4 rounded-lg shadow-md">
-                
                 <div>
                     <h1 class="text-3xl font-extrabold text-fix-blue">FIX - Sistema de Gestión</h1>
                     <p class="text-gray-600">Registro de Atenciones a Domicilio (Teka)</p>
