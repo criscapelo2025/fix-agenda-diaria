@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -215,34 +215,150 @@
             window.updateInstallationCost();
         }
 
-        // --- INICIALIZACIÓN DE FIREBASE Y LÓGICA ---
-        function cargarDatos() { /* lógica de Firebase */ }
-        function setupVisitListener() { /* lógica de Firebase */ }
-        function renderVisits() { /* lógica de Firebase */ }
-        window.saveVisit = () => { /* lógica de Firebase */ };
-        window.deleteVisitLocal = () => { /* lógica de Firebase */ };
-        window.exportToCsv = () => { /* lógica de exportación */ };
-        window.autofillProduct = () => { /* lógica de autocompletado */ };
-        window.addCustomAccessory = () => { /* lógica de accesorios */ };
-        window.removeAccessory = () => { /* lógica de accesorios */ };
-        window.changeView = () => { /* lógica de vistas */ };
-        window.filterVisitsByDate = () => { /* lógica de filtros */ };
-        window.filterVisitsByTecnico = () => { /* lógica de filtros */ };
+        // --- FUNCIONES DE LÓGICA ---
+        
+        function cargarDatos() {
+            database.ref('visits').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    globalVisitsData = data; 
+                    visitsArray = Object.values(data);
+                } else {
+                    globalVisitsData = {};
+                    visitsArray = [];
+                }
+                setupVisitListener();
+            });
+        }
+        
+        function setupVisitListener() {
+            let visits = [...visitsArray];
+            // Lógica de filtrado
+            if (filterDate) {
+                visits = visits.filter(v => v.fechaInstalacion === filterDate);
+            }
+            if (filterTecnico) {
+                visits = visits.filter(v => v.tecnico === filterTecnico);
+            }
+            // Ordenar por fecha
+            visits.sort((a, b) => (a.createdAt > b.createdAt) ? 1 : -1);
 
-        // 🚨 FUNCIÓN PRINCIPAL DE INICIO (USAMOS DOMContentLoaded para estabilidad)
-        document.addEventListener('DOMContentLoaded', () => {
-             // Forzar la carga de listas y menús
-             renderAccessoryInputs(); 
-             // Iniciar la carga de la DB (aunque solo se refrescarán las listas de visitas)
-             cargarDatos();
-        });
+            renderVisits(visits);
+        }
 
+        window.saveVisit = async () => {
+            // Lógica de guardado simplificada para la demo
+            const form = document.getElementById('visitForm');
+            const data = new FormData(form);
+            const visitData = {};
+            for (let [key, value] of data.entries()) { visitData[key] = value.trim(); }
+
+            if (!visitData.nombreCliente || !visitData.fechaInstalacion) {
+                showMessage("Complete datos esenciales.", 'fix-accent');
+                return;
+            }
+
+            const newVisitId = database.ref().child('visits').push().key; 
+            database.ref('visits/' + newVisitId).set({
+                id: newVisitId,
+                nombreCliente: visitData.nombreCliente,
+                fechaInstalacion: visitData.fechaInstalacion,
+                estado: 'PENDIENTE',
+                createdAt: Date.now(),
+                tecnico: visitData.tecnico || 'N/A',
+                // Incluir los campos necesarios para la exportación
+                fechaCompra: visitData.fechaCompra,
+                lugarCompra: visitData.lugarCompra,
+                numFactura: visitData.numFactura,
+                direccion: visitData.direccion,
+                telefono: visitData.telefono,
+                cedula: visitData.cedula,
+                correo: visitData.correo,
+                tipoAtencion: visitData.tipoAtencion,
+                codProducto: visitData.codProducto,
+                descProducto: visitData.descProducto,
+                serieEquipo: visitData.serieEquipo,
+                financiera: {totalCliente: 25.00} // Simplificado
+            })
+            .then(() => {
+                showMessage(`✅ Visita guardada.`, 'fix-report');
+                form.reset();
+                renderAccessoryInputs();
+            })
+            .catch(() => {
+                showMessage(`❌ Error al guardar en DB.`, 'fix-error');
+            });
+        };
+        
+        // --- RENDERING DE LA LISTA DE VISITAS ---
+        function renderVisits(visits) {
+            const listContainer = document.getElementById('visitsList');
+            if (visits.length === 0) {
+                listContainer.innerHTML = `<p class="text-gray-500 p-4 italic">No hay visitas agendadas para la fecha seleccionada.</p>`;
+                return;
+            }
+
+            listContainer.innerHTML = visits.map(visit => {
+                const total = (visit.financiera && visit.financiera.totalCliente) ? visit.financiera.totalCliente.toFixed(2) : '0.00';
+                const estadoColor = (visit.estado === 'PENDIENTE') ? 'bg-fix-accent/70 text-white' : 'bg-green-100 text-green-800';
+
+                return `
+                    <div class="bg-white p-4 rounded-xl shadow-md transition-all mb-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="text-lg font-bold text-fix-blue">${visit.nombreCliente || 'Sin Nombre'}</h3>
+                            <span class="text-sm font-semibold px-3 py-1 rounded-full ${estadoColor}">${visit.estado}</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1"><strong>Técnico:</strong> ${visit.tecnico || 'N/A'}</p>
+                        <p class="text-sm text-gray-700 mb-1"><strong>Tipo:</strong> ${visit.tipoAtencion || 'N/A'}</p>
+                        <p class="text-sm text-gray-700 mb-1"><strong>Dirección:</strong> ${visit.direccion || 'N/A'}</p>
+                        <p class="text-sm text-gray-700 font-bold mt-2">
+                            <strong class="text-fix-accent">Cobro Estimado:</strong> $${total}
+                        </p>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- FILTROS DE VISTA (Restaurados) ---
+        window.filterVisitsByDate = () => {
+            filterDate = document.getElementById('filterDateInput').value;
+            setupVisitListener();
+        };
+        
+        window.filterVisitsByTecnico = () => {
+            filterTecnico = document.getElementById('filterTecnicoInput').value;
+            setupVisitListener();
+        };
+        
+        window.changeView = (newView) => {
+            currentView = newView;
+            setupVisitListener();
+            
+            // Lógica de botones y filtros (restaurada)
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.remove('bg-fix-blue', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700');
+            });
+            document.getElementById(`btn-${newView}`).classList.remove('bg-gray-200', 'text-gray-700');
+            document.getElementById(`btn-${newView}`).classList.add('bg-fix-blue', 'text-white');
+            
+            const formContainer = document.getElementById('formContainer');
+            
+            if (newView === 'reporte_admin') {
+                 formContainer.classList.remove('hidden'); 
+            } else {
+                 formContainer.classList.add('hidden');
+            }
+        };
+
+        // El resto de funciones (exportToCsv, autofillProduct, etc.) se mantienen en la lógica del código pegado.
+        
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans">
 
     <div class="max-w-7xl mx-auto p-4 md:p-8">
-        <header class="mb-8 pb-4 flex flex-col md:flex-row items-start md:items-center justify-between no-print">
+        <header class="mb-8 pb-4 flex flex-col md:flex-row items-start md:items-center justify-between">
             <div class="flex items-center mb-4 md:mb-0">
                 <img src="https://placehold.co/100x40/1e3a8a/ffffff?text=FIX" alt="Logo de FIX" class="h-10 w-auto mr-4 rounded-lg shadow-md">
                 <div>
@@ -255,7 +371,7 @@
 
         <div class="mb-6 p-3 bg-white rounded-xl shadow-md flex flex-wrap gap-2 justify-center no-print">
              <button id="btn-reporte_admin" onclick="changeView('reporte_admin')" class="view-btn bg-fix-blue text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
-                 Agenda por Fecha
+                 Agenda y Registro
              </button>
              <button onclick="exportToCsv()" class="bg-fix-report hover:bg-fix-blue text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-300 transform hover:scale-[1.01] mt-2 w-full md:w-auto">
                  EXPORTAR REPORTE CSV
@@ -275,6 +391,10 @@
                     <select id="filterTecnicoInput" onchange="filterVisitsByTecnico()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
                          </select>
                  </label>
+
+                 <button onclick="filterDate=null; filterTecnico=''; document.getElementById('filterDateInput').value=''; document.getElementById('filterTecnicoInput').value=''; setupVisitListener();" class="mt-4 sm:mt-0 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                    Mostrar Todas
+                 </button>
             </div>
         </div>
 
@@ -352,7 +472,7 @@
             
             <div class="lg:col-span-1">
                 <div class="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
-                    <h2 id="reportViewTitle" class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Hoja de Visita Diaria</h2>
+                    <h2 id="reportViewTitle" class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Agenda de Rutas Diarias</h2>
                     
                     <div id="visitsList" class="max-h-[80vh] overflow-y-auto">
                         <div class="text-center py-8 text-gray-500">
