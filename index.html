@@ -25,7 +25,7 @@
         }
     </script>
     <style>
-        /* Estilos generales de la interfaz */
+        /* Estilos CSS (Se mantienen sin cambios) */
         ::-webkit-scrollbar {
             width: 8px;
         }
@@ -535,8 +535,8 @@
 
             // 🛠️ 2. POBLAR MENÚ DE TÉCNICOS
             const tecnicoSelect = document.querySelector('select[name="tecnico"]');
-            if (tecnicoSelect) { // Check if element exists
-                tecnicoSelect.innerHTML = ''; // Clear contents
+            if (tecnicoSelect) { 
+                tecnicoSelect.innerHTML = ''; 
                 LISTA_TECNICOS.forEach(name => {
                     const option = document.createElement('option');
                     option.value = name;
@@ -547,8 +547,8 @@
             
             // 🛠️ 3. POBLAR MENÚ DE LUGAR DE COMPRA
             const lugarCompraSelect = document.querySelector('select[name="lugarCompra"]');
-            if (lugarCompraSelect) { // Check if element exists
-                lugarCompraSelect.innerHTML = ''; // Clear contents
+            if (lugarCompraSelect) { 
+                lugarCompraSelect.innerHTML = ''; 
                  LUGARES_COMPRA.forEach(place => {
                     const option = document.createElement('option');
                     option.value = place;
@@ -559,8 +559,8 @@
             
             // 🛠️ 4. POBLAR MENÚ DE FILTRO DE TÉCNICOS
             const filterTecnicoSelect = document.getElementById('filterTecnicoInput');
-            if (filterTecnicoSelect) { // Check if element exists
-                 filterTecnicoSelect.innerHTML = ''; // Clear contents
+            if (filterTecnicoSelect) { 
+                 filterTecnicoSelect.innerHTML = ''; 
                 const allOption = document.createElement('option');
                 allOption.value = "";
                 allOption.textContent = "TODOS LOS TÉCNICOS";
@@ -1020,3 +1020,296 @@
         <div id="filterContainer" class="mb-6 p-3 bg-white rounded-xl shadow-md hidden border border-fix-report/30 no-print">
             <h3 class="text-lg font-semibold text-gray-800 mb-3">Control de Agenda (Reporte)</h3>
             <div class="flex flex-col sm:flex-row gap-3 items-center">
+                 <label class="flex-grow w-full sm:w-auto">
+                    <span class="text-sm text-gray-700">Filtrar por Fecha de Visita:</span>
+                    <input type="date" id="filterDateInput" onchange="filterVisitsByDate()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                 </label>
+                 
+                 <label class="flex-grow w-full sm:w-auto">
+                    <span class="text-sm text-gray-700">Filtrar por Técnico:</span>
+                    <select id="filterTecnicoInput" onchange="filterVisitsByTecnico()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                         </select>
+                 </label>
+
+                 <button onclick="filterDate=null; filterTecnico=''; document.getElementById('filterDateInput').value=''; document.getElementById('filterTecnicoInput').value=''; setupVisitListener();" class="mt-4 sm:mt-0 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                    Mostrar Todas
+                 </button>
+                 <button onclick="printRoute()" class="mt-4 sm:mt-0 bg-fix-blue hover:bg-fix-light text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                    <span role="img" aria-label="Imprimir">🖨</span> Imprimir Ruta del Día
+                 </button>
+            </div>
+        </div>
+
+        <div id="messageBox" class="p-3 rounded-lg text-white mb-4 opacity-0 transition-opacity duration-300 no-print"></div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div id="formContainer" class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-xl border border-gray-200 h-fit no-print">
+                <h2 class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Registrar Nueva Visita</h2>
+                
+                <form id="visitForm" onsubmit="event.preventDefault(); saveVisit();">
+                    
+                    <div class="mb-6 p-4 border border-fix-blue/30 rounded-lg bg-fix-blue/5">
+                        <h3 class="text-xl font-medium mb-4 text-fix-blue">1. Cliente y Agenda</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Nombre Completo del Cliente*</span>
+                                <input type="text" name="nombreCliente" placeholder="Ej: Juan Pérez" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Cédula o RUC</span>
+                                <input type="text" name="cedula" placeholder="Ej: 1712345678" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block md:col-span-2">
+                                <span class="text-gray-700 font-medium">Dirección de Instalación/Servicio*</span>
+                                <input type="text" name="direccion" placeholder="Ej: Av. Eloy Alfaro y Alemania, Edificio XYZ" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Teléfono / Celular</span>
+                                <input type="tel" name="telefono" placeholder="Ej: 0991234567" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Correo Electrónico</span>
+                                <input type="email" name="correo" placeholder="ejemplo@correo.com" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Tipo de Atención*</span>
+                                <select name="tipoAtencion" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                    <option value="" disabled selected>--- Seleccionar Tipo ---</option>
+                                    <option value="Garantia">Garantía</option>
+                                    <option value="Instalacion">Instalación</option>
+                                    <option value="Visita Tecnica">Visita Técnica</option>
+                                    <option value="Recepcion Equipo">Recepción de Equipo</option>
+                                </select>
+                            </label>
+
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Fecha de Instalación/Intervención*</span>
+                                <input type="date" name="fechaInstalacion" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Técnico Asignado (Opcional)</span>
+                                <select name="tecnico" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                     </select>
+                            </label>
+
+                        </div>
+                    </div>
+
+                    <div class="mb-6 p-4 border border-gray-400/30 rounded-lg bg-gray-50">
+                        <h3 class="text-xl font-medium mb-4 text-gray-800">2. Producto y Servicio</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            
+                            <label class="block">
+                                <span class="text-gray-700">Fecha de Compra</span>
+                                <input type="date" name="fechaCompra" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700">Lugar de Compra</span>
+                                <select name="lugarCompra" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                     </select>
+                            </label>
+
+                            <label class="block">
+                                <span class="text-gray-700">Número de Factura de Compra</span>
+                                <input type="text" name="numFactura" placeholder="Ej: 001-005-00012345" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block">
+                                <span class="text-gray-700">Código del Producto</span>
+                                <input type="text" id="codProducto" name="codProducto" placeholder="Ej: 112580027" oninput="autofillProduct()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+
+                            <label class="block md:col-span-2">
+                                <span class="text-gray-700">Descripción del Producto</span>
+                                <input type="text" id="descProducto" name="descProducto" placeholder="Ej: GBC 75030 KBB CRISTAL COCINA GAS" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700">Serie del Equipo</span>
+                                <input type="text" name="serieEquipo" placeholder="Ej: ZP246000179" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Cantidad de Equipos a Instalar*</span>
+                                <input type="number" id="numEquipos" name="numEquipos" min="1" value="1" oninput="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700">Tipo de Equipo Principal / Servicio*</span>
+                                <select name="tipoServicio" onchange="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                     <option value="cocina induccion">Inst. Cocina Inducción</option>
+                                     <option value="cocina a gas">Inst. Cocina a Gas</option>
+                                     <option value="horno a gas">Inst. Horno a Gas</option>
+                                     <option value="horno electrico">Inst. Horno Eléctrico</option>
+                                     <option value="microondas">Inst. Microondas</option>
+                                     <option value="refrigerador">Inst. Refrigerador</option>
+                                     <option value="lavavajillas">Inst. Lavavajillas</option>
+                                     <option value="triturador">Inst. Triturador</option>
+                                     <option value="fregadero">Inst. Fregadero</option>
+                                     <option value="griferia">Inst. Grifería</option>
+                                     <option value="campana tradicional">Inst. Campana Tradicional</option>
+                                     <option value="campana decorativa">Inst. Campana Decorativa</option>
+                                     <option value="campana isla">Inst. Campana Isla</option>
+                                     <option value="Garantia">Garantía (No aplica costo fijo de inst.)</option>
+                                     <option value="Mantenimiento">Mantenimiento (No aplica costo fijo de inst.)</option>
+                                </select>
+                            </label>
+
+                        </div>
+                    </div>
+
+                    <div class="mb-6 p-4 border border-fix-accent/30 rounded-lg bg-fix-accent/5">
+                        <h3 class="text-xl font-medium mb-4 text-fix-accent">3. Aspectos Financieros y Accesorios</h3>
+                        <p class="text-sm text-gray-600 mb-4 font-semibold">Cálculos automáticos:</p>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 font-bold text-lg text-gray-800">
+                            <div class="p-3 bg-white rounded-lg shadow text-center">
+                                <span class="text-sm font-normal text-gray-600">Costo Instalación</span>
+                                <div id="costoInstalacionDisplay" class="text-fix-blue">$25.00</div>
+                                <input type="hidden" id="costoInstalacionHidden" name="costoInstalacionHidden" value="25.00">
+                            </div>
+                            <div class="p-3 bg-white rounded-lg shadow text-center">
+                                <span class="text-sm font-normal text-gray-600">Total Accesorios</span>
+                                <div id="totalAccesoriosDisplay" class="text-fix-blue">$0.00</div>
+                                <input type="hidden" id="cobroAccesoriosHidden" name="cobroAccesoriosHidden" value="0.00">
+                            </div>
+                            <div class="p-3 bg-fix-accent/20 rounded-lg shadow text-center md:col-span-2">
+                                <span class="text-sm font-normal text-fix-blue">TOTAL COBRO CLIENTE (Inst. + Acc.)</span>
+                                <div id="totalClienteDisplay" class="text-fix-accent text-2xl">$25.00</div>
+                            </div>
+                        </div>
+
+                        <h4 class="text-lg font-medium mt-6 mb-3 text-gray-800 border-t pt-4">Accesorios Utilizados</h4>
+                        <div class="grid grid-cols-5 gap-2 items-center text-xs font-semibold text-gray-600 p-2 bg-gray-100 rounded-t-md border-b">
+                            <div class="col-span-2">ACCESORIO</div>
+                            <div class="text-center">CANT.</div>
+                            <div class="text-right">PRECIO UNIT.</div>
+                            <div></div>
+                        </div>
+                        <div id="accesoriosContainer" class="p-2 border border-gray-300 rounded-b-md mb-4 bg-gray-50">
+                            <p class="text-center text-gray-500">Cargando accesorios...</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-5 gap-2 items-center bg-white p-3 rounded-md border border-dashed border-gray-400">
+                            <input type="text" id="newAccessoryName" placeholder="Nombre Nuevo Accesorio" class="col-span-2 p-2 rounded-md border-gray-300 text-sm">
+                            <div class="text-center text-gray-500">N/A</div>
+                            <input type="number" step="0.01" id="newAccessoryPrice" value="0.00" placeholder="Precio ($)" class="currency-input p-2 rounded-md border-gray-300 text-sm">
+                            <button type="button" onclick="addCustomAccessory()" class="bg-fix-light hover:bg-fix-blue text-white text-sm font-semibold p-2 rounded-md transition duration-200">
+                                Añadir
+                            </button>
+                        </div>
+
+
+                        <h4 class="text-lg font-medium mt-6 mb-3 text-gray-800 border-t pt-4">Notas Financieras (Viático fijo en $0.00)</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            
+                            <label class="block md:col-span-2">
+                                <span class="text-gray-700">Observaciones Financieras/Forma de Pago</span>
+                                <textarea name="observacionesFinancieras" rows="2" placeholder="Detalle de forma de pago, costos adicionales no automáticos, etc." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2"></textarea>
+                            </label>
+                            
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6">
+                        <button type="submit" class="w-full bg-fix-blue hover:bg-fix-light text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-300 transform hover:scale-[1.01]">
+                            <span role="img" aria-label="Guardar">💾</span> Guardar Visita en Agenda
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="lg:col-span-1">
+                <div class="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
+                    <h2 id="reportViewTitle" class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Hoja de Visita Diaria</h2>
+                    
+                    <div class="mb-6 p-2 border border-gray-300 rounded-lg shadow-inner">
+                        <h3 class="text-lg font-semibold mb-2 text-fix-blue">Ruta Optimizada del Día</h3>
+                        <div id="map" style="height: 350px; border-radius: 6px;">
+                            <p class="text-center text-gray-500 py-10">Cargando Mapa...</p>
+                        </div>
+                    </div>
+                    
+                    <div id="visitsList" class="max-h-[80vh] overflow-y-auto">
+                        <div class="text-center py-8 text-gray-500">
+                            Cargando agenda...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    
+    <div id="editModal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-75 hidden no-print" onclick="closeEditModal()">
+        <div class="modal-content bg-white p-6 rounded-xl shadow-2xl max-w-lg w-full transform scale-95" onclick="event.stopPropagation()">
+            <h3 class="text-2xl font-bold mb-4 text-fix-report border-b pb-2">Editar Registro (Admin)</h3>
+            <p class="text-sm text-gray-600 mb-4">Modifique los campos necesarios. Esto sobreescribe los cálculos automáticos del técnico.</p>
+            
+            <form id="editForm" onsubmit="event.preventDefault(); saveEditedVisit();">
+                <input type="hidden" id="edit-visit-id">
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Cliente</span>
+                        <input type="text" id="edit-nombreCliente" class="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Teléfono</span>
+                        <input type="tel" id="edit-telefono" class="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block col-span-2">
+                        <span class="text-gray-700 text-sm">Dirección</span>
+                        <input type="text" id="edit-direccion" class="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Fecha Inst.</span>
+                        <input type="date" id="edit-fechaInstalacion" class="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Cant. Equipos</span>
+                        <input type="number" id="edit-numEquipos" min="1" class="mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                </div>
+                
+                <h4 class="text-lg font-medium mb-3 text-gray-800 border-t pt-4">Ajustes Financieros</h4>
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Costo Instalación</span>
+                        <input type="number" step="0.01" id="edit-costoInstalacion" class="currency-input mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Cobro Accesorios</span>
+                        <input type="number" step="0.01" id="edit-cobroAccesorios" class="currency-input mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">Costo 2da Visita ($12)</span>
+                        <input type="number" step="0.01" id="edit-costoSegundaVisita" class="currency-input mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">No Garantía ($20)</span>
+                        <input type="number" step="0.01" id="edit-costoGarantiaNoAplica" class="currency-input mt-1 block w-full rounded-md border-gray-300 p-2 text-sm">
+                    </label>
+                </div>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" onclick="closeEditModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="bg-fix-report hover:bg-fix-blue text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Guardar Cambios Admin
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
