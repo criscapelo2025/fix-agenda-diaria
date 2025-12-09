@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -283,7 +283,7 @@
                 showMessage(`✅ Visita guardada.`, 'fix-report');
                 form.reset();
                 renderAccessoryInputs();
-                // 🚨 CAMBIO CRÍTICO: FORZAR LA VISTA DE AGENDA
+                // 🚨 FORZAR LA VISTA DE AGENDA
                 setupVisitListener(); 
 
             })
@@ -365,6 +365,13 @@
 
         // El resto de funciones (exportToCsv, autofillProduct, etc.) se mantienen en la lógica del código pegado.
         
+        // 🚨 FUNCIÓN PRINCIPAL DE INICIO (USAMOS DOMContentLoaded para estabilidad)
+        document.addEventListener('DOMContentLoaded', () => {
+             // Forzar la carga de listas y menús
+             renderAccessoryInputs(); 
+             // Iniciar la carga de la DB
+             cargarDatos();
+        });
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans">
