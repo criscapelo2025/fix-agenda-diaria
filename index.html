@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -215,7 +215,7 @@
             window.updateInstallationCost();
         }
 
-        // --- FUNCIONES DE LÓGICA ---
+        // --- FUNCIONES DE LÓGICA (Restauradas) ---
         
         function cargarDatos() {
             database.ref('visits').on('value', (snapshot) => {
@@ -247,7 +247,6 @@
         }
 
         window.saveVisit = async () => {
-            // Lógica de guardado simplificada para la demo
             const form = document.getElementById('visitForm');
             const data = new FormData(form);
             const visitData = {};
@@ -284,6 +283,9 @@
                 showMessage(`✅ Visita guardada.`, 'fix-report');
                 form.reset();
                 renderAccessoryInputs();
+                // 🚨 CAMBIO CRÍTICO: FORZAR LA VISTA DE AGENDA
+                setupVisitListener(); 
+
             })
             .catch(() => {
                 showMessage(`❌ Error al guardar en DB.`, 'fix-error');
@@ -293,6 +295,8 @@
         // --- RENDERING DE LA LISTA DE VISITAS ---
         function renderVisits(visits) {
             const listContainer = document.getElementById('visitsList');
+            if (!listContainer) return; // Si no existe el contenedor, salir
+
             if (visits.length === 0) {
                 listContainer.innerHTML = `<p class="text-gray-500 p-4 italic">No hay visitas agendadas para la fecha seleccionada.</p>`;
                 return;
@@ -339,15 +343,23 @@
                 btn.classList.remove('bg-fix-blue', 'text-white');
                 btn.classList.add('bg-gray-200', 'text-gray-700');
             });
-            document.getElementById(`btn-${newView}`).classList.remove('bg-gray-200', 'text-gray-700');
-            document.getElementById(`btn-${newView}`).classList.add('bg-fix-blue', 'text-white');
+            const btnElement = document.getElementById(`btn-${newView}`);
+            if (btnElement) {
+                btnElement.classList.remove('bg-gray-200', 'text-gray-700');
+                btnElement.classList.add('bg-fix-blue', 'text-white');
+            }
             
             const formContainer = document.getElementById('formContainer');
             
             if (newView === 'reporte_admin') {
                  formContainer.classList.remove('hidden'); 
+                 document.getElementById('reportViewTitle').textContent = 'Agenda y Registro';
+            } else if (newView === 'my_agenda') {
+                 formContainer.classList.add('hidden'); // Ocultar formulario para el técnico
+                 document.getElementById('reportViewTitle').textContent = 'Mi Rutero Diario';
             } else {
-                 formContainer.classList.add('hidden');
+                 formContainer.classList.add('hidden'); 
+                 document.getElementById('reportViewTitle').textContent = 'Agenda Mantenimiento';
             }
         };
 
@@ -372,6 +384,12 @@
         <div class="mb-6 p-3 bg-white rounded-xl shadow-md flex flex-wrap gap-2 justify-center no-print">
              <button id="btn-reporte_admin" onclick="changeView('reporte_admin')" class="view-btn bg-fix-blue text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
                  Agenda y Registro
+             </button>
+             <button id="btn-my_agenda" onclick="changeView('my_agenda')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                 Mi Rutero
+             </button>
+             <button id="btn-mantenimiento" onclick="changeView('mantenimiento')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                 Mantenimiento
              </button>
              <button onclick="exportToCsv()" class="bg-fix-report hover:bg-fix-blue text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-300 transform hover:scale-[1.01] mt-2 w-full md:w-auto">
                  EXPORTAR REPORTE CSV
@@ -451,8 +469,7 @@
                         <h3 class="text-xl font-medium mb-4 text-fix-accent">3. Aspectos Financieros y Accesorios</h3>
                         
                         <div id="accesoriosContainer" class="p-2 border border-gray-300 rounded-b-md mb-4 bg-gray-50">
-                            <p class="text-center text-gray-500">Cargando accesorios...</p>
-                        </div>
+                            </div>
                         
                         <div class="p-3 bg-fix-accent/20 rounded-lg shadow text-center md:col-span-2">
                             <span class="text-sm font-normal text-fix-blue">TOTAL COBRO CLIENTE</span>
