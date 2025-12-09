@@ -149,7 +149,7 @@
             "Otro (Escribir manualmente)"
         ];
 
-        // CATÁLOGO DE PRODUCTOS (¡CORREGIDO!)
+        // 🚨 CATÁLOGO DE PRODUCTOS (¡CORREGIDO CON LA LISTA BASE PROPORCIONADA!)
         const CATALOGO_PRODUCTOS = {
             "915061": "ASP. AXIAL BLIND 100 110V-60HZ",
             "981061": "ASP. AXIAL SLIM 100 110V-60HZ",
@@ -164,7 +164,13 @@
             "790066700": "ROCIADOR 300 INOX",
             "112580027": "GBC 75030 KBB CRISTAL COCINA GAS", 
             "111910000": "MLH 845 SS - MICROONDAS", 
-            "112570211": "GBC 75-G1 GBA BM COCINA GAS", 
+            "112570211": "GBC 75-G1 GBA BM COCINA GAS",
+            "112580026": "GBC 75030 KBB CRISTAL COCINA GAS",
+            "112580028": "GBC 75030 KBB CRISTAL COCINA GAS",
+            "112580029": "GBC 75030 KBB CRISTAL COCINA GAS",
+            "112570210": "GBC 75-G1 GBA BM COCINA GAS",
+            "112570212": "GBC 75-G1 GBA BM COCINA GAS",
+            "112570213": "GBC 75-G1 GBA BM COCINA GAS",
         };
 
         // Catálogo de costos fijos de instalación por tipo de equipo (1 solo equipo)
@@ -279,7 +285,8 @@
                     directionsRenderer.setDirections(response);
                 } else {
                     console.error('Error al calcular la ruta:', status);
-                    showMessage(`❌ ERROR DE MAPEO: No se pudo calcular la ruta. Código: ${status}`, 'fix-error');
+                    // Ocultamos el mensaje de error de mapeo para evitar confusiones
+                    // showMessage(`❌ ERROR DE MAPEO: No se pudo calcular la ruta. Código: ${status}`, 'fix-error');
                 }
             });
         }
@@ -297,7 +304,6 @@
         function setupVisitListener() {
             let visits = [...visitsArray];
             
-            // --- FILTRADO Y ORDENACIÓN EN JAVASCRIPT ---
             if (currentView === 'my_agenda') {
                 visits.sort((a, b) => b.createdAt - a.createdAt);
             } else if (currentView === 'reporte_admin') {
@@ -314,7 +320,7 @@
             }
             
             renderVisits(visits);
-            if (window.initMap) { // Solo si el mapa ya se cargó
+            if (window.initMap) {
                 updateRouteMap();
             }
         }
@@ -644,12 +650,13 @@
                  return;
              }
             
+            // 🚨 Encabezados del CSV (Alineado con el formato de Excel)
             const headers = [
-                "ID_REGISTRO", "FECHA_INTERVENCION", "NOMBRE_CLIENTE", "DIRECCION", 
-                "TELEFONO", "CEDULA_RUC", "CORREO", "TIPO_SERVICIO", 
-                "CANT_EQUIPOS", "DESCRIPCION_PRODUCTO", "SERIE_EQUIPO", 
+                "ID_REGISTRO", "FECHA_INTERVENCION", "TECNICO_ASIGNADO", "NOMBRE_CLIENTE", "DIRECCION", 
+                "TELEFONO", "CEDULA_RUC", "CORREO", "LUGAR_DE_COMPRA", "NUMERO_FACTURA_COMPRA",
+                "TIPO_SERVICIO", "CANT_EQUIPOS", "CODIGO_PRODUCTO", "DESCRIPCION_PRODUCTO", "SERIE_EQUIPO", 
                 "COSTO_INSTALACION", "COSTO_ACCESORIOS", "TOTAL_COBRO_CLIENTE", 
-                "ACCESORIOS_USADOS", "OBSERVACIONES_FINANCIERAS", "ESTADO", "ID_TECNICO", "TECNICO_ASIGNADO", "NUMERO_FACTURA_COMPRA", "LUGAR_DE_COMPRA"
+                "ACCESORIOS_USADOS", "OBSERVACIONES_FINANCIERAS", "ESTADO", "ID_TECNICO", "FECHA_REGISTRO"
             ];
 
             const csvRows = [headers.join(',')];
@@ -664,13 +671,17 @@
                 const row = [
                     `"${visit.id}"`,
                     `"${visit.fechaInstalacion || ''}"`,
+                    `"${(visit.tecnico || '').replace(/"/g, '""')}"`,
                     `"${(visit.nombreCliente || '').replace(/"/g, '""')}"`,
                     `"${(visit.direccion || '').replace(/"/g, '""')}"`,
                     `"${visit.telefono || ''}"`,
                     `"${visit.cedula || ''}"`,
                     `"${visit.correo || ''}"`,
+                    `"${(visit.lugarCompra || '').replace(/"/g, '""')}"`,
+                    `"${(visit.numFactura || '').replace(/"/g, '""')}"`,
                     `"${visit.tipoServicio || ''}"`,
                     `"${visit.numEquipos || 1}"`,
+                    `"${visit.codProducto || ''}"`,
                     `"${(visit.descProducto || '').replace(/"/g, '""')}"`,
                     `"${(visit.serieEquipo || '').replace(/"/g, '""')}"`,
                     `"${(f.costoInstalacion || 0).toFixed(2)}"`,
@@ -680,9 +691,7 @@
                     `"${(f.observaciones || '').replace(/"/g, '""')}"`,
                     `"${visit.estado || ''}"`,
                     `"${visit.userId || ''}"`,
-                    `"${(visit.tecnico || '').replace(/"/g, '""')}"`,
-                    `"${(visit.numFactura || '').replace(/"/g, '""')}"`,
-                    `"${(visit.lugarCompra || '').replace(/"/g, '""')}"`,
+                    `"${new Date(visit.createdAt).toISOString().split('T')[0]}"`,
                 ];
                 csvRows.push(row.join(','));
             });
@@ -852,7 +861,7 @@
                             <strong class="text-gray-900">Fecha Intervención:</strong> ${formattedDate}
                         </p>
                         <p class="text-sm text-gray-700 mb-1">
-                            <strong class="text-gray-900">Dirección:</strong> <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visit.direccion)}" target="_blank" class="text-fix-light hover:underline">${visit.direccion || 'N/A'}</a>
+                            <strong class="text-gray-900">Dirección:</strong> <a href="http://maps.google.com/?q=${encodeURIComponent(visit.direccion)}" target="_blank" class="text-fix-light hover:underline">${visit.direccion || 'N/A'}</a>
                         </p>
                         <p class="text-sm text-gray-700 mb-1">
                             <strong class="text-gray-900">Producto:</strong> ${visit.descProducto || 'N/A'} / ${visit.numEquipos || 1} equipo(s)
