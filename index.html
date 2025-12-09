@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -149,7 +150,7 @@
             "Otro (Escribir manualmente)"
         ];
 
-        // 🚨 CATÁLOGO DE PRODUCTOS (¡CORREGIDO CON LA LISTA BASE PROPORCIONADA!)
+        // 🚨 CATÁLOGO DE PRODUCTOS (¡LIMPIEZA FINAL DE CÓDIGOS!)
         const CATALOGO_PRODUCTOS = {
             "915061": "ASP. AXIAL BLIND 100 110V-60HZ",
             "981061": "ASP. AXIAL SLIM 100 110V-60HZ",
@@ -396,7 +397,7 @@
             renderAccessoryInputs();
             window.updateInstallationCost();
         };
-        
+
         // --- FUNCIÓN CRÍTICA DE ACTUALIZACIÓN DEL TÉCNICO ---
         window.updateVisitStatusAndFinancials = async (visitId, newStatus) => {
             if (dbFailed) {
@@ -413,26 +414,22 @@
             }
 
             // 2. Lógica de Cobro y Accesorios (Simplificada)
-            // Ya que el técnico solo necesita agregar el estado, accesorios y cobro
             
             let accessoriesUsed = [];
             let totalCobro = 0;
             
-            // 🚨 SIMULACIÓN DE MODAL: Aquí se asumiría la recolección de datos del Modal
-            // Para el ejemplo, usaremos un prompt simple para el cobro
+            // SIMULACIÓN DE MODAL: Aquí se asumiría la recolección de datos del Modal
             if (newStatus === 'Completado' || newStatus === 'Garantia No Aplica') {
                 const cobroPrompt = prompt(`Ingrese el MONTO TOTAL COBRADO al cliente (solo números, ej: 45.50).`);
                 totalCobro = parseFloat(cobroPrompt) || currentVisit.financiera.totalCliente || 0;
                 
-                // Mantenemos los accesorios originales o solicitamos una lista simple
                 const accessoriesPrompt = prompt("Ingrese los accesorios usados (ej: Enchufe 220, Manguera 2m). (Opcional)");
                 
                 if (accessoriesPrompt) {
-                     // Lógica simple para manejar accesorios ingresados por texto
                      accessoriesUsed = accessoriesPrompt.split(',').map(name => ({
                          nombre: name.trim(),
                          cantidad: 1,
-                         precioUnitario: 0 // Simplificamos el precio unitario
+                         precioUnitario: 0
                      }));
                 } else {
                      accessoriesUsed = currentVisit.financiera.accesorios || [];
@@ -448,11 +445,9 @@
                 estado: newStatus,
                 financiera: {
                     ...currentVisit.financiera,
-                    // Actualizamos el cobro total con el valor ingresado por el técnico
                     totalCliente: totalCobro,
                     accesorios: accessoriesUsed,
                 },
-                // Si la visita no se realizó, agregamos el motivo (si existe)
                 ...(newStatus === 'No Realizado' && { motivoNoRealizado: currentVisit.motivoNoRealizado })
             };
 
@@ -460,14 +455,13 @@
             database.ref('visits/' + visitId).update(updates)
                 .then(() => {
                     showMessage(`✅ Estado de ${currentVisit.nombreCliente} actualizado a '${newStatus}' y cobro registrado.`, 'fix-report');
-                    // La escucha de Firebase se encargará de refrescar la lista
                 })
                 .catch((error) => {
                     showMessage(`❌ Error al actualizar estado: ${error.message}`, 'fix-error');
                 });
         };
         
-        // --- FUNCIÓN DE AUTOCOMPLETADO (¡CORREGIDA!) ---
+        // --- FUNCIÓN DE AUTOCOMPLETADO (¡CORREGIDA Y FINAL!) ---
         window.autofillProduct = () => {
             const codigo = document.getElementById('codProducto').value.trim();
             const descripcionInput = document.getElementById('descProducto');
@@ -506,17 +500,14 @@
             const formContainer = document.getElementById('formContainer');
             const filterContainer = document.getElementById('filterContainer');
             
-            // 🚨 RESTRICCIÓN DE LA VISTA DEL TÉCNICO: SI NO ESTÁ EN REPORTE ADMIN, ES TÉCNICO
             if (newView === 'reporte_admin') {
-                 // Modo Administrador: Permite ingresar datos y ver filtros
                  formContainer.classList.remove('hidden'); 
                  filterContainer.classList.remove('hidden');
                  document.getElementById('reportViewTitle').textContent = 'Agenda de Rutas Diarias';
 
             } else {
-                 // Modo Técnico (rutero): Solo ve el reporte/agenda
                  formContainer.classList.add('hidden');
-                 filterContainer.classList.remove('hidden'); // Necesita filtros para ver su ruta
+                 filterContainer.classList.remove('hidden');
                  document.getElementById('reportViewTitle').textContent = 'Mi Rutero Diario';
             }
         };
@@ -915,9 +906,8 @@
                      routeOrderIndicator = `<div class="absolute top-2 left-2 bg-fix-blue text-white text-lg font-bold w-8 h-8 rounded-full flex items-center justify-center">${index + 1}</div>`;
                 }
                 
-                // 🚨 CONTROLES PARA EL TÉCNICO (NUEVO)
+                // 🚨 CONTROLES PARA EL TÉCNICO
                 let technicianControls = '';
-                // Asumimos que el técnico usa la vista 'reporte_admin' para su rutero
                 if (currentView !== 'my_agenda') {
                     technicianControls = `
                         <div class="mt-4 pt-4 border-t border-fix-light/30">
@@ -936,7 +926,7 @@
                                     Registrar Servicio y Cobro
                                 </button>
                             </div>
-                            <p class="text-xs text-gray-500 mt-2">Total Cobrado (Actualizado): $${total}</p>
+                            <p class="text-xs text-gray-500 mt-2">Total Cobrado (Estimado): $${total}</p>
                         </div>
                     `;
                 }
