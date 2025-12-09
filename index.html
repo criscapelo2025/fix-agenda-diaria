@@ -293,7 +293,8 @@
         function initializeAppLogic() {
              document.getElementById('userIdDisplay').textContent = `ID Usuario: Conexión Activa`;
              setupViewSelector();
-             renderAccessoryInputs(); // 🚨 LLAMADA PARA POBLAR MENÚS Y ACCESORIOS
+             // 🚨 CAMBIO CRÍTICO: LLAMAMOS renderAccessoryInputs AQUÍ para asegurar que se ejecute después del DOM
+             renderAccessoryInputs(); 
              document.getElementById('filterDateInput').value = filterDate;
              cargarDatos();
         }
@@ -519,21 +520,21 @@
         // 🚨 FUNCIÓN CRÍTICA CORREGIDA PARA POBLAR MENÚS Y ACCESORIOS 🚨
         function renderAccessoryInputs() {
             const container = document.getElementById('accesoriosContainer');
-            if (!container) return; 
-            
             // 🛠️ 1. POBLAR ACCESORIOS Y LIMPIAR CONTENEDOR (SOLUCIÓN AL BUG "CARGANDO...")
-            container.innerHTML = '';
-            Object.entries(ACCESORIOS_DEFAULT).forEach(([name, price]) => {
-                container.appendChild(createAccessoryInputRow(name, price));
-            });
-            customAccessories.forEach(acc => {
-                container.appendChild(createAccessoryInputRow(acc.name, acc.price, true));
-            });
-            window.updateTotalCobro();
-            
+            if (container) {
+                container.innerHTML = '';
+                Object.entries(ACCESORIOS_DEFAULT).forEach(([name, price]) => {
+                    container.appendChild(createAccessoryInputRow(name, price));
+                });
+                customAccessories.forEach(acc => {
+                    container.appendChild(createAccessoryInputRow(acc.name, acc.price, true));
+                });
+                window.updateTotalCobro();
+            }
+
             // 🛠️ 2. POBLAR MENÚ DE TÉCNICOS
             const tecnicoSelect = document.querySelector('select[name="tecnico"]');
-            if (tecnicoSelect.options.length === 0) { 
+            if (tecnicoSelect && tecnicoSelect.options.length === 0) { 
                 LISTA_TECNICOS.forEach(name => {
                     const option = document.createElement('option');
                     option.value = name;
@@ -544,7 +545,7 @@
             
             // 🛠️ 3. POBLAR MENÚ DE LUGAR DE COMPRA
             const lugarCompraSelect = document.querySelector('select[name="lugarCompra"]');
-            if (lugarCompraSelect.options.length === 0) { 
+            if (lugarCompraSelect && lugarCompraSelect.options.length === 0) { 
                  LUGARES_COMPRA.forEach(place => {
                     const option = document.createElement('option');
                     option.value = place;
@@ -555,7 +556,7 @@
             
             // 🛠️ 4. POBLAR MENÚ DE FILTRO DE TÉCNICOS
             const filterTecnicoSelect = document.getElementById('filterTecnicoInput');
-            if (filterTecnicoSelect.options.length === 0) {
+            if (filterTecnicoSelect && filterTecnicoSelect.options.length === 0) {
                 const allOption = document.createElement('option');
                 allOption.value = "";
                 allOption.textContent = "TODOS LOS TÉCNICOS";
