@@ -293,7 +293,7 @@
         function initializeAppLogic() {
              document.getElementById('userIdDisplay').textContent = `ID Usuario: Conexión Activa`;
              setupViewSelector();
-             // 🚨 CAMBIO CRÍTICO: LLAMAMOS renderAccessoryInputs AQUÍ para asegurar que se ejecute después del DOM
+             // 🚨 LLAMADA CRÍTICA AQUÍ, FORZANDO LA CARGA
              renderAccessoryInputs(); 
              document.getElementById('filterDateInput').value = filterDate;
              cargarDatos();
