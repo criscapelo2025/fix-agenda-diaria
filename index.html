@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -95,6 +93,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
 
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=TU_CLAVE_API_DE_GOOGLE_MAPS&callback=initMap"></script>
+
     <script>
         // 🚨 TU OBJETO DE CONFIGURACIÓN FIREBASE (Con tus claves reales)
         const firebaseConfig = {
@@ -109,24 +109,28 @@
         // Inicializar Firebase
         firebase.initializeApp(firebaseConfig);
 
-        // Obtener una referencia a la Realtime Database (¡Solución al error crítico!)
+        // Obtener una referencia a la Realtime Database
         const database = firebase.database();
         
         // VARIABLES GLOBALES AJUSTADAS
-        let dbFailed = false; // El estado inicial es OK, si falla se actualiza en cargarDatos
+        let dbFailed = false; 
         let userId = 'admin_default_fix'; 
         let isAuthReady = true; 
         let filterDate = new Date().toISOString().split('T')[0];
         let filterTecnico = ""; 
-        let globalVisitsData = {}; // Objeto de caché de visitas de Firebase (por ID)
-        let visitsArray = []; // Array de visitas para el filtrado/renderizado
+        let globalVisitsData = {};
+        let visitsArray = [];
         let currentView = 'reporte_admin';
         let customAccessories = [];
 
+        // VARIABLES GLOBALES DEL MAPA
+        let map;
+        let directionsService;
+        let directionsRenderer;
 
-        // LISTADO DE TÉCNICOS (SOLICITADO POR EL USUARIO)
+        // LISTADO DE TÉCNICOS
         const LISTA_TECNICOS = [
-            "", // Opción vacía
+            "",
             "Cristian Capelo",
             "Juan Carlos Pando",
             "Andres Cardenas",
@@ -134,9 +138,9 @@
             "Alan Skykaz"
         ];
         
-        // LISTA DE LUGARES DE COMPRA (SOLICITADO POR EL USUARIO)
+        // LISTA DE LUGARES DE COMPRA
         const LUGARES_COMPRA = [
-            "", // Opción vacía
+            "",
             "COMERCIAL KYWI",
             "COMERCIAL SOLIS",
             "COMO HOGAR",
@@ -145,7 +149,7 @@
             "Otro (Escribir manualmente)"
         ];
 
-        // CATÁLOGO DE PRODUCTOS (Basado en la estructura del archivo BASE.csv)
+        // CATÁLOGO DE PRODUCTOS (¡CORREGIDO!)
         const CATALOGO_PRODUCTOS = {
             "915061": "ASP. AXIAL BLIND 100 110V-60HZ",
             "981061": "ASP. AXIAL SLIM 100 110V-60HZ",
@@ -193,7 +197,6 @@
         
         // --- FUNCIÓN CORE: CARGA DE DATOS DESDE FIREBASE ---
         function cargarDatos() {
-            // Escucha en tiempo real de todo el nodo 'visits'
             database.ref('visits').on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
@@ -204,7 +207,7 @@
                     visitsArray = [];
                 }
                 dbFailed = false;
-                setupVisitListener(); // Renderizar los datos cargados/actualizados
+                setupVisitListener();
             }, (error) => {
                 console.error("Error CRÍTICO al cargar datos:", error);
                 dbFailed = true;
@@ -213,9 +216,72 @@
             });
         }
 
-        // --- FUNCIÓN CORE: GUARDADO DE DATOS EN FIREBASE ---
         function guardarDatos(datos) {
             showMessage("Usando guardado en tiempo real (saveVisit).", 'fix-report');
+        }
+
+        // --- FUNCIÓN DE INICIALIZACIÓN DEL MAPA ---
+        window.initMap = () => {
+            const ecuadorCenter = { lat: -1.8312, lng: -78.1834 }; 
+            
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                suppressMarkers: false,
+                polylineOptions: { strokeColor: '#1e3a8a', strokeWeight: 6 }
+            });
+
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 7,
+                center: ecuadorCenter,
+                gestureHandling: "cooperative"
+            });
+            
+            directionsRenderer.setMap(map);
+            updateRouteMap(); 
+        }
+
+        // --- FUNCIÓN PRINCIPAL DE CÁLCULO Y RENDERIZADO DE RUTA ---
+        function updateRouteMap() {
+            if (!map || visitsArray.length < 2) {
+                 if(map) directionsRenderer.setDirections({ routes: [] });
+                 return;
+            }
+            
+            const visitsToRoute = visitsArray.filter(v => 
+                (v.fechaInstalacion === filterDate || !filterDate) && 
+                (v.tecnico === filterTecnico || !filterTecnico) && 
+                v.direccion
+            );
+            
+            if (visitsToRoute.length < 2) {
+                if (map) directionsRenderer.setDirections({ routes: [] });
+                return;
+            }
+            
+            const origin = visitsToRoute[0].direccion;
+            const destination = visitsToRoute[visitsToRoute.length - 1].direccion;
+            
+            const waypoints = visitsToRoute.slice(1, -1).map(visit => ({
+                location: visit.direccion,
+                stopover: true
+            }));
+
+            const request = {
+                origin: origin,
+                destination: destination,
+                waypoints: waypoints,
+                optimizeWaypoints: true,
+                travelMode: google.maps.TravelMode.DRIVING
+            };
+
+            directionsService.route(request, (response, status) => {
+                if (status === 'OK') {
+                    directionsRenderer.setDirections(response);
+                } else {
+                    console.error('Error al calcular la ruta:', status);
+                    showMessage(`❌ ERROR DE MAPEO: No se pudo calcular la ruta. Código: ${status}`, 'fix-error');
+                }
+            });
         }
 
         // Función de inicialización
@@ -224,8 +290,6 @@
              setupViewSelector();
              renderAccessoryInputs();
              document.getElementById('filterDateInput').value = filterDate;
-             
-             // 🚨 INICIAMOS LA ESCUCHA DE LA BASE DE DATOS
              cargarDatos();
         }
         
@@ -250,6 +314,9 @@
             }
             
             renderVisits(visits);
+            if (window.initMap) { // Solo si el mapa ya se cargó
+                updateRouteMap();
+            }
         }
         
         // --- FUNCIÓN CENTRAL DE GUARDADO (ACTUALIZADA PARA FIREBASE) ---
@@ -287,7 +354,6 @@
                 return;
             }
 
-            // 🚨 1. GENERAR ID ÚNICA DE FIREBASE Y PREPARAR OBJETO
             const newVisitId = database.ref().child('visits').push().key; 
             const newVisit = {
                 id: newVisitId,
@@ -298,11 +364,10 @@
                 telefono: visitData.telefono,
                 fechaInstalacion: visitData.fechaInstalacion,
                 numEquipos: parseInt(visitData.numEquipos) || 1,
-                estado: 'PENDIENTE', // Estado por defecto
+                estado: 'PENDIENTE', 
                 createdAt: timestamp,
                 descProducto: visitData.descProducto,
                 tipoServicio: visitData.tipoServicio,
-                // Datos Financieros detallados
                 financiera: {
                     costoInstalacion: costoInstalacionCalculado,
                     cobroAccesorios: totalAccesoriosCalculado,
@@ -313,7 +378,6 @@
                 ...visitData
             };
             
-            // 🚨 2. SUBIR A LA BASE DE DATOS REALTIME
             database.ref('visits/' + newVisitId).set(newVisit)
                 .then(() => {
                     showMessage(`✅ REGISTRO GUARDADO en Firebase. ID: ${newVisitId.substring(0, 8)}...`, 'fix-report');
@@ -323,14 +387,27 @@
                     console.error("Error al guardar datos:", error);
                 });
 
-            // LIMPIEZA DE FORMULARIO
             form.reset();
             customAccessories = [];
             renderAccessoryInputs();
             window.updateInstallationCost();
         };
 
+        // --- FUNCIÓN DE AUTOCOMPLETADO (¡CORREGIDA!) ---
+        window.autofillProduct = () => {
+            const codigo = document.getElementById('codProducto').value.trim();
+            const descripcionInput = document.getElementById('descProducto');
+            
+            if (CATALOGO_PRODUCTOS[codigo]) {
+                descripcionInput.value = CATALOGO_PRODUCTOS[codigo];
+                showMessage(`✅ Producto encontrado: ${CATALOGO_PRODUCTOS[codigo]}`, 'fix-report');
+            } else {
+                descripcionInput.value = '';
+                showMessage(`⚠️ Código ${codigo} no encontrado en el catálogo.`, 'fix-accent');
+            }
+        };
 
+        // --- Las demás funciones (filtrado, renderizado, etc.) ---
         window.filterVisitsByDate = () => {
             filterDate = document.getElementById('filterDateInput').value;
             setupVisitListener();
@@ -345,7 +422,6 @@
             currentView = newView;
             setupVisitListener();
             
-            // Actualizar botones de vista activa
             document.querySelectorAll('.view-btn').forEach(btn => {
                 btn.classList.remove('bg-fix-blue', 'text-white');
                 btn.classList.add('bg-gray-200', 'text-gray-700');
@@ -353,7 +429,6 @@
             document.getElementById(`btn-${newView}`).classList.remove('bg-gray-200', 'text-gray-700');
             document.getElementById(`btn-${newView}`).classList.add('bg-fix-blue', 'text-white');
             
-            // Ocultar/mostrar formulario y filtros según la vista
             const formContainer = document.getElementById('formContainer');
             const filterContainer = document.getElementById('filterContainer');
             
@@ -364,7 +439,7 @@
             } else {
                  formContainer.classList.add('hidden');
                  filterContainer.classList.remove('hidden');
-                 document.getElementById('reportViewTitle').textContent = newView === 'mantenimiento' ? 'Agenda de Mantenimiento (CRM)' : 'Agenda de Rutas Diarias';
+                 document.getElementById('reportViewTitle').textContent = newView === 'mantenimiento' ? 'Agenda de Mantenimiento' : 'Agenda de Rutas Diarias';
             }
         };
 
@@ -372,17 +447,6 @@
             window.changeView('reporte_admin');
         }
 
-        window.autofillProduct = () => {
-            const codigo = document.getElementById('codProducto').value.trim();
-            const descripcionInput = document.getElementById('descProducto');
-            
-            if (CATALOGO_PRODUCTOS[codigo]) {
-                descripcionInput.value = CATALOGO_PRODUCTOS[codigo];
-            } else {
-                descripcionInput.value = '';
-            }
-        };
-        
         function renderAccessoryInputs() {
             const container = document.getElementById('accesoriosContainer');
             if (!container) return; 
@@ -395,7 +459,6 @@
             });
             window.updateTotalCobro();
             
-            // Llenar el select de técnicos
             const tecnicoSelect = document.querySelector('select[name="tecnico"]');
             if (tecnicoSelect && tecnicoSelect.options.length === 0) {
                 LISTA_TECNICOS.forEach(name => {
@@ -406,7 +469,6 @@
                 });
             }
             
-            // Llenar el select de lugar de compra
             const lugarCompraSelect = document.querySelector('select[name="lugarCompra"]');
             if (lugarCompraSelect && lugarCompraSelect.options.length === 0) {
                  LUGARES_COMPRA.forEach(place => {
@@ -417,7 +479,6 @@
                 });
             }
             
-            // Llenar el select de filtro de técnico (en la sección de filtro)
             const filterTecnicoSelect = document.getElementById('filterTecnicoInput');
             if (filterTecnicoSelect && filterTecnicoSelect.options.length === 0) {
                 const allOption = document.createElement('option');
@@ -444,7 +505,6 @@
                 database.ref('visits/' + visitId).remove()
                 .then(() => {
                      showMessage(`Registro ${visitId.substring(0, 8)}... eliminado de la base de datos.`, 'fix-report');
-                     // La escucha de Firebase actualizará la lista automáticamente
                 })
                 .catch((error) => {
                     showMessage(`ERROR al eliminar registro: ${error.message}`, 'fix-error');
@@ -452,7 +512,6 @@
             }
         };
         
-        // --- Lógica de Costos y Accesorios ---
         function calcularCostoInstalacion(numEquipos, tiposEquipos) {
             numEquipos = parseInt(numEquipos) || 0;
             if (numEquipos === 0) return 0;
@@ -579,14 +638,12 @@
             }
         }
 
-        // --- FUNCIÓN DE EXPORTACIÓN CSV (ACTUALIZADA PARA USAR EL ARRAY DE FIREBASE) ---
         window.exportToCsv = () => {
              if (visitsArray.length === 0) {
                  showMessage("No hay registros para exportar.", 'fix-accent');
                  return;
              }
             
-            // Encabezados del CSV
             const headers = [
                 "ID_REGISTRO", "FECHA_INTERVENCION", "NOMBRE_CLIENTE", "DIRECCION", 
                 "TELEFONO", "CEDULA_RUC", "CORREO", "TIPO_SERVICIO", 
@@ -600,9 +657,8 @@
             visitsArray.forEach(visit => {
                 const f = visit.financiera || {};
                 
-                // Formatear accesorios para CSV
                 const accesoriosCSV = (f.accesorios || [])
-                    .map(a => `${a.nombre} (${a.cantidad}x $${a.precioUnitario})`)
+                    .map(a => `${a.nombre} (${a.cantidad}x)`)
                     .join(' | ');
 
                 const row = [
@@ -636,7 +692,6 @@
             const today = new Date().toISOString().split('T')[0];
             const filename = `Reporte_FIX_Agenda_${today}.csv`;
 
-            // Descargar el archivo
             const link = document.createElement("a");
             if (link.download !== undefined) {
                 const url = URL.createObjectURL(blob);
@@ -652,7 +707,6 @@
             }
         };
         
-        // --- FUNCIÓN DE IMPRESIÓN ---
         window.printRoute = () => {
              const routeList = document.getElementById('visitsList');
              const reportTitle = document.getElementById('reportViewTitle').textContent;
@@ -664,7 +718,6 @@
 
              const originalBody = document.body.innerHTML;
              
-             // Generar el contenido de impresión (usando visitsArray)
              let printableContent = `
                  <div id="print-area" style="padding: 20px;">
                       <h1 style="text-align: center; margin-bottom: 5px; font-size: 24px;">HOJA DE RUTA DIARIA FIX</h1>
@@ -673,7 +726,6 @@
              `;
 
              visitsArray.forEach((visit, index) => {
-                 // Solo imprimimos las visitas que están actualmente filtradas
                  if (visit.fechaInstalacion === filterDate || !filterDate) {
                      const f = visit.financiera || {};
                      const total = (f.costoInstalacion || 0).toFixed(2);
@@ -701,16 +753,13 @@
              
              printableContent += '</div>';
 
-             // Reemplazar el cuerpo con el contenido imprimible y mandar a imprimir
              document.body.innerHTML = printableContent;
              window.print();
              
-             // Volver al contenido original después de imprimir (o cancelar)
              window.location.reload();
         };
 
 
-        // --- FUNCIONES DE DB (SE MANTIENEN DESHABILITADAS POR AHORA) ---
         window.updateVisitStatusAndFinancials = async (visitId) => {
             showMessage("ERROR: Función deshabilitada para esta versión.", 'fix-error');
         };
@@ -721,7 +770,6 @@
             showMessage("ERROR: Función deshabilitada para esta versión.", 'fix-error');
         };
 
-        // --- Lógica de Interfaz de Usuario: Renderizado ---
         
         function showMessage(message, color) {
             const messageBox = document.getElementById('messageBox');
@@ -741,7 +789,6 @@
         }
 
 
-        // Renderiza la lista de visitas
         function renderVisits(visits) {
             const listContainer = document.getElementById('visitsList');
             
@@ -753,12 +800,10 @@
             listContainer.innerHTML = visits.map((visit, index) => {
                 const f = visit.financiera || {};
                 
-                // --- Cálculo Financiero ---
                 const costoBase = (f.costoInstalacion || 0) + (f.cobroAccesorios || 0);
                 const penalizaciones = (f.costoSegundaVisita || 0) + (f.costoGarantiaNoAplica || 0);
                 const total = (costoBase + penalizaciones).toFixed(2);
                 
-                // --- Estilos y Datos ---
                 let estadoColor = 'bg-blue-100 text-blue-800';
                 if (visit.estado === 'Completado') {
                     estadoColor = 'bg-green-100 text-green-800';
@@ -781,19 +826,15 @@
                 const secVisitCostText = f.costoSegundaVisita ? ` + $${f.costoSegundaVisita.toFixed(2)} (2da Visita)` : '';
                 const noGarantiaCostText = f.costoGarantiaNoAplica ? ` + $${f.costoGarantiaNoAplica.toFixed(2)} (No Garantía)` : '';
                 
-                // --- Botón de Borrado ---
                 const deleteButton = `<button onclick="deleteVisitLocal('${visit.id}')" class="w-full bg-red-500 hover:bg-red-600 text-white text-xs font-semibold py-1 rounded mt-2 transition duration-200 flex items-center justify-center">
                     Eliminar Registro DB
                 </button>`;
 
-
-                // --- INDICADOR DE ORDEN DE RUTA ---
                 let routeOrderIndicator = '';
                 if (currentView === 'reporte_admin') {
                      routeOrderIndicator = `<div class="absolute top-2 left-2 bg-fix-blue text-white text-lg font-bold w-8 h-8 rounded-full flex items-center justify-center">${index + 1}</div>`;
                 }
 
-                // --- Retorno Final ---
                 return `
                     <div id="visit-item-${visit.id}" class="bg-white p-4 rounded-xl shadow-md border border-gray-100 hover:border-fix-light transition-all mb-3 relative pl-12 print-route-card">
                         ${routeOrderIndicator}
@@ -836,19 +877,6 @@
                 `;
             }).join('');
         }
-
-        window.copyToClipboard = (text) => {
-            const tempTextArea = document.createElement('textarea');
-            tempTextArea.value = text;
-            document.body.appendChild(tempTextArea);
-            tempTextArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(tempTextArea);
-            showMessage('Mensaje copiado al portapapeles.', 'green-500');
-        };
-        
-        // Inicializar la lógica de la aplicación al cargar la ventana
-        window.onload = initializeAppLogic;
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans">
@@ -1086,6 +1114,14 @@
             <div class="lg:col-span-1">
                 <div class="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
                     <h2 id="reportViewTitle" class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Hoja de Visita Diaria</h2>
+                    
+                    <div class="mb-6 p-2 border border-gray-300 rounded-lg shadow-inner">
+                        <h3 class="text-lg font-semibold mb-2 text-fix-blue">Ruta Optimizada del Día</h3>
+                        <div id="map" style="height: 350px; border-radius: 6px;">
+                            <p class="text-center text-gray-500 py-10">Cargando Mapa...</p>
+                        </div>
+                    </div>
+                    
                     <div id="visitsList" class="max-h-[80vh] overflow-y-auto">
                         <div class="text-center py-8 text-gray-500">
                             Cargando agenda...
