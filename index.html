@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -150,7 +149,7 @@
             "Otro (Escribir manualmente)"
         ];
 
-        // 🚨 CATÁLOGO DE PRODUCTOS (¡LIMPIEZA FINAL DE CÓDIGOS!)
+        // 🚨 CATÁLOGO DE PRODUCTOS (LISTA PEQUEÑA PARA PRUEBAS, DEBE SER CARGADA DESDE /products)
         const CATALOGO_PRODUCTOS = {
             "915061": "ASP. AXIAL BLIND 100 110V-60HZ",
             "981061": "ASP. AXIAL SLIM 100 110V-60HZ",
@@ -354,7 +353,7 @@
                 }
             });
 
-            if (!visitData.nombreCliente || !visitData.direccion || !visitData.fechaInstalacion) {
+            if (!visitData.nombreCliente || !visitData.direccion || !visitData.fechaInstalacion || !visitData.tipoAtencion) {
                 showMessage("Por favor, complete los campos obligatorios.", 'fix-accent');
                 return;
             }
@@ -373,6 +372,7 @@
                 createdAt: timestamp,
                 descProducto: visitData.descProducto,
                 tipoServicio: visitData.tipoServicio,
+                tipoAtencion: visitData.tipoAtencion, // 🚨 NUEVO CAMPO AÑADIDO
                 financiera: {
                     costoInstalacion: costoInstalacionCalculado,
                     cobroAccesorios: totalAccesoriosCalculado,
@@ -461,7 +461,7 @@
                 });
         };
         
-        // --- FUNCIÓN DE AUTOCOMPLETADO (¡CORREGIDA Y FINAL!) ---
+        // --- FUNCIÓN DE AUTOCOMPLETADO ---
         window.autofillProduct = () => {
             const codigo = document.getElementById('codProducto').value.trim();
             const descripcionInput = document.getElementById('descProducto');
@@ -716,7 +716,7 @@
             const headers = [
                 "ID_REGISTRO", "FECHA_INTERVENCION", "TECNICO_ASIGNADO", "NOMBRE_CLIENTE", "DIRECCION", 
                 "TELEFONO", "CEDULA_RUC", "CORREO", "LUGAR_DE_COMPRA", "NUMERO_FACTURA_COMPRA",
-                "TIPO_SERVICIO", "CANT_EQUIPOS", "CODIGO_PRODUCTO", "DESCRIPCION_PRODUCTO", "SERIE_EQUIPO", 
+                "TIPO_ATENCION", "TIPO_SERVICIO", "CANT_EQUIPOS", "CODIGO_PRODUCTO", "DESCRIPCION_PRODUCTO", "SERIE_EQUIPO", 
                 "COSTO_INSTALACION", "COSTO_ACCESORIOS", "TOTAL_COBRO_CLIENTE", 
                 "ACCESORIOS_USADOS", "OBSERVACIONES_FINANCIERAS", "ESTADO", "ID_TECNICO", "FECHA_REGISTRO"
             ];
@@ -741,6 +741,7 @@
                     `"${(visit.correo || '').replace(/"/g, '""')}"`,
                     `"${(visit.lugarCompra || '').replace(/"/g, '""')}"`,
                     `"${(visit.numFactura || '').replace(/"/g, '""')}"`,
+                    `"${(visit.tipoAtencion || '').replace(/"/g, '""')}"`, // 🚨 NUEVO CAMPO AÑADIDO
                     `"${visit.tipoServicio || ''}"`,
                     `"${visit.numEquipos || 1}"`,
                     `"${visit.codProducto || ''}"`,
@@ -945,6 +946,10 @@
                         </p>
 
                         <p class="text-sm text-gray-700 mb-1">
+                            <strong class="text-gray-900">Tipo de Atención:</strong> ${visit.tipoAtencion || 'N/A'}
+                        </p>
+
+                        <p class="text-sm text-gray-700 mb-1">
                             <strong class="text-gray-900">Fecha Intervención:</strong> ${formattedDate}
                         </p>
                         <p class="text-sm text-gray-700 mb-1">
@@ -1063,6 +1068,17 @@
                             <label class="block">
                                 <span class="text-gray-700 font-medium">Correo Electrónico</span>
                                 <input type="email" name="correo" placeholder="ejemplo@correo.com" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                            </label>
+                            
+                            <label class="block">
+                                <span class="text-gray-700 font-medium">Tipo de Atención*</span>
+                                <select name="tipoAtencion" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                                    <option value="" disabled selected>--- Seleccionar Tipo ---</option>
+                                    <option value="Garantia">Garantía</option>
+                                    <option value="Instalacion">Instalación</option>
+                                    <option value="Visita Tecnica">Visita Técnica</option>
+                                    <option value="Recepcion Equipo">Recepción de Equipo</option>
+                                </select>
                             </label>
 
                             <label class="block">
