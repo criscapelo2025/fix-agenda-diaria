@@ -54,7 +54,10 @@
         // Inicializar Firebase
         firebase.initializeApp(firebaseConfig);
 
-        // OTRAS VARIABLES
+        // Obtener una referencia a la Realtime Database
+        const database = firebase.database();
+        
+        // VARIABLES GLOBALES
         let dbFailed = false; 
         let userId = 'admin_default_fix'; 
         let filterDate = new Date().toISOString().split('T')[0];
@@ -156,7 +159,7 @@
              return div;
         }
 
-        // 🚨 FUNCIÓN DE LLENADO DE MENÚS Y ACCESORIOS (CORRECCIÓN FINAL) 🚨
+        // 🚨 FUNCIÓN DE LLENADO DE MENÚS Y ACCESORIOS 🚨
         function renderAccessoryInputs() {
             const container = document.getElementById('accesoriosContainer');
             
@@ -292,7 +295,7 @@
         // --- RENDERING DE LA LISTA DE VISITAS ---
         function renderVisits(visits) {
             const listContainer = document.getElementById('visitsList');
-            if (!listContainer) return; // Si no existe el contenedor, salir
+            if (!listContainer) return; 
 
             if (visits.length === 0) {
                 listContainer.innerHTML = `<p class="text-gray-500 p-4 italic">No hay visitas agendadas para la fecha seleccionada.</p>`;
