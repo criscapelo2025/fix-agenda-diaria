@@ -135,6 +135,17 @@
             const costoInstalacion = COSTOS_INSTALACION['cocina induccion']; // Simplificado
             if(document.getElementById('costoInstalacionHidden')) document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2);
             window.updateTotalCobro();
+            
+            // 🚨 SOLUCIÓN: Cambiar etiqueta según el tipo de servicio
+            const numEquiposLabel = document.getElementById('numEquiposLabel');
+            if (numEquiposLabel) {
+                 if (tipoServicio.includes('Garantia') || tipoServicio.includes('Mantenimiento')) {
+                    numEquiposLabel.textContent = 'Cantidad de Equipos a Revisar*';
+                } else {
+                    numEquiposLabel.textContent = 'Cantidad de Equipos a Instalar*';
+                }
+            }
+
         }
 
         function updateTotalCobro() {
@@ -233,13 +244,23 @@
         
         function setupVisitListener() {
             let visits = [...visitsArray];
+            
             // Lógica de filtrado
-            if (filterDate) {
-                visits = visits.filter(v => v.fechaInstalacion === filterDate);
+            if (currentView === 'my_agenda') {
+                 // 🚨 FILTRO POR TÉCNICO ACTUAL Y FECHA DE HOY 🚨
+                 visits = visits.filter(v => 
+                     v.tecnico === 'Cristian Capelo' && // NOTA: Aquí debe ir el técnico logueado, usamos Capelo como demo
+                     v.fechaInstalacion === filterDate
+                 );
+            } else {
+                if (filterDate) {
+                    visits = visits.filter(v => v.fechaInstalacion === filterDate);
+                }
+                if (filterTecnico) {
+                    visits = visits.filter(v => v.tecnico === filterTecnico);
+                }
             }
-            if (filterTecnico) {
-                visits = visits.filter(v => v.tecnico === filterTecnico);
-            }
+            
             // Ordenar por fecha
             visits.sort((a, b) => (a.createdAt > b.createdAt) ? 1 : -1);
 
@@ -283,16 +304,45 @@
                 showMessage(`✅ Visita guardada.`, 'fix-report');
                 form.reset();
                 renderAccessoryInputs();
-                // 🚨 FORZAR LA VISTA DE AGENDA
                 setupVisitListener(); 
-
             })
             .catch(() => {
                 showMessage(`❌ Error al guardar en DB.`, 'fix-error');
             });
         };
+
+        // 🚨 NUEVA FUNCIÓN: Actualizar estado y cobro del técnico (Punto 1)
+        window.updateVisitStatusAndFinancials = (visitId, newStatus) => {
+             const currentVisit = globalVisitsData[visitId];
+             if (!currentVisit) return;
+             
+             let totalCobro = currentVisit.financiera.totalCliente || 0;
+             let observaciones = '';
+             let accesorios = currentVisit.financiera.accesorios || [];
+
+             if (newStatus === 'Atendido') {
+                 const cobroPrompt = prompt(`(Instalación, Fuera de Garantía, etc.) Ingrese el MONTO TOTAL COBRADO al cliente:`);
+                 totalCobro = parseFloat(cobroPrompt) || totalCobro;
+                 observaciones = 'Servicio completado. Valores registrados.';
+             } else if (newStatus === 'No Atendido') {
+                 observaciones = prompt("Ingrese el motivo por el cual NO se atendió la visita:");
+                 totalCobro = 0;
+             }
+
+             database.ref('visits/' + visitId).update({
+                 estado: newStatus,
+                 observaciones: observaciones,
+                 financiera: { ...currentVisit.financiera, totalCliente: totalCobro, accesorios: accesorios }
+             })
+             .then(() => {
+                 showMessage(`✅ Visita de ${currentVisit.nombreCliente} actualizada a: ${newStatus}`, 'fix-report');
+             })
+             .catch(() => {
+                 showMessage(`❌ Error al actualizar estado.`, 'fix-error');
+             });
+        };
         
-        // --- RENDERING DE LA LISTA DE VISITAS ---
+        // --- RENDERING DE LA LISTA DE VISITAS (Punto 1) ---
         function renderVisits(visits) {
             const listContainer = document.getElementById('visitsList');
             if (!listContainer) return; 
@@ -304,7 +354,35 @@
 
             listContainer.innerHTML = visits.map(visit => {
                 const total = (visit.financiera && visit.financiera.totalCliente) ? visit.financiera.totalCliente.toFixed(2) : '0.00';
-                const estadoColor = (visit.estado === 'PENDIENTE') ? 'bg-fix-accent/70 text-white' : 'bg-green-100 text-green-800';
+                let estadoColor = 'bg-blue-100 text-blue-800';
+                if (visit.estado === 'PENDIENTE') estadoColor = 'bg-fix-accent/70 text-white';
+                if (visit.estado === 'Atendido') estadoColor = 'bg-fix-report text-white';
+                if (visit.estado === 'No Atendido') estadoColor = 'bg-fix-error text-white';
+
+                let controls = '';
+                // 🚨 Mostrar controles interactivos SOLO si es el Rutero del Técnico
+                if (currentView === 'my_agenda' || currentView === 'reporte_admin') {
+                    controls = `
+                        <div class="mt-4 pt-4 border-t border-fix-light/30">
+                            <h4 class="text-base font-semibold text-fix-blue mb-2">GESTIÓN EN CAMPO:</h4>
+                            <div class="grid grid-cols-2 gap-2">
+                                <select 
+                                    class="block w-full rounded-md border-gray-300 focus:ring-fix-light focus:border-fix-light p-2 text-sm"
+                                    onchange="updateVisitStatusAndFinancials('${visit.id}', this.value)"
+                                >
+                                    <option value="" disabled selected>Estado: ${visit.estado}</option>
+                                    <option value="Atendido">✅ Atendido (Finalizar)</option>
+                                    <option value="No Atendido">❌ No Atendido (Motivo)</option>
+                                    <option value="Novedad">⚠️ Novedad / Pendiente</option>
+                                </select>
+                                <button onclick="updateVisitStatusAndFinancials('${visit.id}', 'Atendido')" class="bg-fix-report hover:bg-fix-blue text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-200">
+                                    Registrar Cobro/Accesorios
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+
 
                 return `
                     <div class="bg-white p-4 rounded-xl shadow-md transition-all mb-3">
@@ -318,19 +396,18 @@
                         <p class="text-sm text-gray-700 font-bold mt-2">
                             <strong class="text-fix-accent">Cobro Estimado:</strong> $${total}
                         </p>
+                        ${controls}
                     </div>
                 `;
             }).join('');
         }
 
         // --- FUNCIONES DE LÓGICA MÍNIMA ---
-        window.deleteVisitLocal = () => { /* lógica de Firebase */ };
-        window.exportToCsv = () => { /* lógica de exportación */ };
         window.autofillProduct = () => { /* lógica de autocompletado */ };
         window.addCustomAccessory = () => { /* lógica de accesorios */ };
         window.removeAccessory = () => { /* lógica de accesorios */ };
         window.printRoute = () => { /* lógica de impresión */ };
-        
+
         // 🚨 FUNCIÓN PRINCIPAL DE INICIO (USAMOS DOMContentLoaded para estabilidad)
         document.addEventListener('DOMContentLoaded', () => {
              // Forzar la carga de listas y menús
@@ -433,7 +510,10 @@
                             <label class="block"><span class="text-gray-700">Código del Producto</span><input type="text" id="codProducto" name="codProducto" oninput="autofillProduct()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></label>
                             <label class="block md:col-span-2"><span class="text-gray-700">Descripción del Producto</span><input type="text" id="descProducto" name="descProducto" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></label>
                             <label class="block"><span class="text-gray-700">Serie del Equipo</span><input type="text" name="serieEquipo" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></label>
-                            <label class="block"><span class="text-gray-700 font-medium">Cantidad de Equipos a Instalar*</span><input type="number" id="numEquipos" name="numEquipos" min="1" value="1" oninput="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></label>
+                            <label class="block">
+                                <span id="numEquiposLabel" class="text-gray-700 font-medium">Cantidad de Equipos a Instalar*</span>
+                                <input type="number" id="numEquipos" name="numEquipos" min="1" value="1" oninput="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                            </label>
                             <label class="block"><span class="text-gray-700">Tipo de Equipo Principal / Servicio*</span><select name="tipoServicio" onchange="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"><option value="cocina induccion">Inst. Cocina Inducción</option></select></label>
                         </div>
                     </div>
