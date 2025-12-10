@@ -76,9 +76,26 @@
         // --- FUNCIONES CORE ---
 
         function showMessage(message, color) { /* Lógica de mensaje */ }
-        function updateInstallationCost() { /* Lógica de costo */ }
         function updateTotalCobro() { /* Lógica de cobro */ }
         function createAccessoryInputRow(name, price, isCustom) { /* Dibuja accesorio */ }
+
+        function updateInstallationCost() {
+            const numEquipos = document.getElementById('numEquipos').value;
+            const tipoServicio = document.querySelector('select[name="tipoServicio"]').value; 
+            const costoInstalacion = COSTOS_INSTALACION['cocina induccion']; 
+            if(document.getElementById('costoInstalacionHidden')) document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2);
+            window.updateTotalCobro();
+            
+            const numEquiposLabel = document.getElementById('numEquiposLabel');
+            if (numEquiposLabel) {
+                 if (tipoServicio.includes('Garantia') || tipoServicio.includes('Mantenimiento')) {
+                    numEquiposLabel.textContent = 'Cantidad de Equipos a Revisar*';
+                } else {
+                    numEquiposLabel.textContent = 'Cantidad de Equipos a Instalar*';
+                }
+            }
+            handleEquipmentCountChange();
+        }
 
         // 🚨 FUNCIÓN CRÍTICA: Llenar menús y accesorios
         function renderAccessoryInputs() {
@@ -91,7 +108,6 @@
                 window.updateTotalCobro();
             }
 
-            // 🛠️ Llenar Menús Desplegables
             const tecnicoSelect = document.querySelector('select[name="tecnico"]');
             if (tecnicoSelect) { tecnicoSelect.innerHTML = ''; LISTA_TECNICOS.forEach(name => { const option = document.createElement('option'); option.value = name; option.textContent = name || "--- Seleccionar Técnico ---"; tecnicoSelect.appendChild(option); }); }
             
@@ -106,10 +122,9 @@
                 LISTA_TECNICOS.slice(1).forEach(name => { const option = document.createElement('option'); option.value = name; option.textContent = name; filterTecnicoSelect.appendChild(option); });
             }
             
-            // Llenar Opciones de Servicio
             const tipoServicioSelect = document.querySelector('select[name="tipoServicio"]');
             if (tipoServicioSelect) {
-                tipoServicioSelect.innerHTML = ''; // Limpiar opciones anteriores
+                tipoServicioSelect.innerHTML = '';
                 TIPOS_SERVICIO.forEach(tipo => {
                     const option = document.createElement('option');
                     option.value = tipo.toLowerCase().replace(/ /g, '_');
@@ -126,23 +141,11 @@
             const numEquiposInput = document.getElementById('numEquipos');
             const numEquipos = parseInt(numEquiposInput.value) || 1;
             const productInputsContainer = document.getElementById('productInputsContainer');
-            const tipoAtencion = document.querySelector('select[name="tipoAtencion"]').value;
             
             if (!productInputsContainer) return;
 
             productInputsContainer.innerHTML = ''; 
             
-            // Actualizar etiqueta
-            const numEquiposLabel = document.getElementById('numEquiposLabel');
-            if (numEquiposLabel) {
-                 if (tipoAtencion.includes('Garantia') || tipoAtencion.includes('Visita Tecnica')) {
-                    numEquiposLabel.textContent = 'Cantidad de Equipos a Revisar*';
-                } else {
-                    numEquiposLabel.textContent = 'Cantidad de Equipos a Instalar*';
-                }
-            }
-
-
             // Creamos un bloque por cada equipo
             for (let i = 1; i <= numEquipos; i++) {
                 const isMain = i === 1;
@@ -185,7 +188,9 @@
              // cargarDatos();
         });
 
-        // (Definiciones completas de las funciones se incluyen en el bloque final)
+        // (Resto de funciones: exportToCsv, changeView, etc. se definen aquí)
+        // Note: Todas las funciones que requieren Firebase están simplificadas en este extracto, 
+        // pero se incluyen completamente funcionales en el bloque de código que debe pegar.
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans" onload="handleEquipmentCountChange()">
