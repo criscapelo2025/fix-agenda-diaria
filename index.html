@@ -75,9 +75,29 @@
         
         // --- FUNCIONES CORE ---
 
-        function showMessage(message, color) { /* Lógica de mensaje */ }
-        function updateTotalCobro() { /* Lógica de cobro */ }
-        function createAccessoryInputRow(name, price, isCustom) { /* Dibuja accesorio */ }
+        function showMessage(message, color) {
+            const messageBox = document.getElementById('messageBox');
+            if (!messageBox) return;
+            messageBox.textContent = message;
+            messageBox.className = `p-3 rounded-lg text-white bg-${color} mb-4 transition-opacity duration-300`;
+            messageBox.style.opacity = 1;
+            setTimeout(() => { messageBox.style.opacity = 0; }, 8000);
+        }
+
+        function calcularCostoAccesorios() {
+            let totalAccesorios = 0;
+            const container = document.getElementById('accesoriosContainer');
+            if (!container) return 0;
+            const accessoryItems = container.querySelectorAll('.accessory-item');
+            accessoryItems.forEach(item => {
+                const quantityInput = item.querySelector('input[name^="acc_qty_"]');
+                const priceInput = item.querySelector('input[name^="acc_price_"]');
+                const cantidad = parseInt(quantityInput.value) || 0;
+                const precio = parseFloat(priceInput.value) || 0;
+                totalAccesorios += cantidad * precio;
+            });
+            return totalAccesorios;
+        }
 
         function updateInstallationCost() {
             const numEquipos = document.getElementById('numEquipos').value;
@@ -94,10 +114,32 @@
                     numEquiposLabel.textContent = 'Cantidad de Equipos a Instalar*';
                 }
             }
-            handleEquipmentCountChange();
+            handleEquipmentCountChange(); // 🚨 Disparar la actualización de los inputs
         }
 
-        // 🚨 FUNCIÓN CRÍTICA: Llenar menús y accesorios
+        function updateTotalCobro() {
+            const costoInstalacion = parseFloat(document.getElementById('costoInstalacionHidden').value) || 0;
+            const totalAccesorios = calcularCostoAccesorios(); 
+            if(document.getElementById('cobroAccesoriosHidden')) document.getElementById('cobroAccesoriosHidden').value = totalAccesorios.toFixed(2);
+            const totalCliente = costoInstalacion + totalAccesorios; 
+            if(document.getElementById('totalClienteDisplay')) document.getElementById('totalClienteDisplay').textContent = `$${totalCliente.toFixed(2)}`;
+            if(document.getElementById('totalAccesoriosDisplay')) document.getElementById('totalAccesoriosDisplay').textContent = `$${totalAccesorios.toFixed(2)}`;
+        }
+        
+        function createAccessoryInputRow(name, price, isCustom = false) {
+             const id = name.replace(/\s/g, '_').toLowerCase() + '_' + Date.now();
+             const div = document.createElement('div');
+             div.className = 'accessory-item grid grid-cols-5 gap-2 items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 mb-2';
+             div.innerHTML = `
+                 <div class="col-span-2 text-sm text-gray-700 font-medium truncate" title="${name}">${name}</div>
+                 <input type="number" step="1" min="0" value="0" name="acc_qty_${id}" oninput="updateTotalCobro()" class="w-full text-center rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm font-bold">
+                 <input type="number" step="0.01" value="${price.toFixed(2)}" name="acc_price_${id}" oninput="updateTotalCobro()" class="w-full currency-input rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm ${isCustom ? 'bg-yellow-50' : 'bg-gray-100'}">
+                 <div class="text-right">${isCustom ? `<button type="button" onclick="removeAccessory(this, '${name}')" class="text-red-500 hover:text-red-700 transition duration-150">X</button>` : ''}</div>
+             `;
+             return div;
+        }
+
+        // 🚨 FUNCIÓN CRÍTICA: Llenado de menús y accesorios (Soluciona el bloqueo)
         function renderAccessoryInputs() {
             const container = document.getElementById('accesoriosContainer');
             if (container) {
@@ -108,6 +150,7 @@
                 window.updateTotalCobro();
             }
 
+            // 🛠️ Llenar Menús Desplegables
             const tecnicoSelect = document.querySelector('select[name="tecnico"]');
             if (tecnicoSelect) { tecnicoSelect.innerHTML = ''; LISTA_TECNICOS.forEach(name => { const option = document.createElement('option'); option.value = name; option.textContent = name || "--- Seleccionar Técnico ---"; tecnicoSelect.appendChild(option); }); }
             
@@ -149,12 +192,12 @@
             // Creamos un bloque por cada equipo
             for (let i = 1; i <= numEquipos; i++) {
                 const isMain = i === 1;
-                const fieldTitle = isMain ? 'Equipo Principal' : `Equipo Adicional #${i}`;
+                const fieldTitle = isMain ? 'Principal' : `Adicional #${i}`;
                 
                 const productBlock = document.createElement('div');
                 productBlock.className = 'grid grid-cols-1 md:grid-cols-3 gap-2 border-t pt-2 mt-2 border-gray-300';
                 productBlock.innerHTML = `
-                    <p class="col-span-3 font-semibold text-sm text-fix-blue mt-2">${fieldTitle}</p>
+                    <p class="col-span-3 font-semibold text-sm text-gray-700 mt-2">Equipo ${fieldTitle}</p>
                     <label class="block">
                         <span class="text-xs text-gray-700">Código Producto:</span>
                         <input type="text" name="codProducto_${i}" placeholder="Código" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm" ${isMain ? 'oninput="autofillProduct()"' : ''}>
@@ -188,9 +231,7 @@
              // cargarDatos();
         });
 
-        // (Resto de funciones: exportToCsv, changeView, etc. se definen aquí)
-        // Note: Todas las funciones que requieren Firebase están simplificadas en este extracto, 
-        // pero se incluyen completamente funcionales en el bloque de código que debe pegar.
+        // (Definiciones completas de las funciones se incluyen en el bloque final)
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans" onload="handleEquipmentCountChange()">
