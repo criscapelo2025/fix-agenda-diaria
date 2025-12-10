@@ -39,7 +39,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
 
     <script>
-        // 🚨 CONFIGURACIÓN FIREBASE 🚨
+        // 🚨 TU OBJETO DE CONFIGURACIÓN FIREBASE 🚨
         const firebaseConfig = {
           apiKey: "AIzaSyCiESorKZljYeFHr19c_XPth2qWluz1Dro",
           authDomain: "fix-agenda-app.firebaseapp.com",
@@ -55,13 +55,14 @@
         // VARIABLES GLOBALES
         let filterDate = new Date().toISOString().split('T')[0];
         let currentView = 'reporte_admin';
-        const TECNICO_ACTUAL_DEMO = "Cristian Capelo"; // Usamos un nombre como DEMO para el filtro del Rutero
+        const TECNICO_ACTUAL_DEMO = "Cristian Capelo"; // Usado como DEMO para "Mi Rutero"
 
         // LISTAS Y DATOS (ESTABLES)
         const LISTA_TECNICOS = [ "", "Juan Carlos Pando", "Cristian Capelo", "Allan Skykaz", "Andres Cardenas", "Juani Cardenas" ];
         const LUGARES_COMPRA = [ "", "Comercial Solis", "Comercial Kywi", "Como Hogar", "Sukasa", "Comercial Luna Pazmiño", "Macaofertas", "Mercard", "Home Vega" ];
         const ACCESORIOS_DEFAULT = { 'Enchufe 110V': 5, 'Enchufe 220V 20V': 7, 'Enchufe 220V 50V': 10, 'Manguera c/bridas': 4, 'Ducto 4 pulgadas metro': 5, 'Enchufe chinito': 5 };
         const CATALOGO_PRODUCTOS = {"112580027": "GBC 75030 KBB CRISTAL COCINA GAS", "915061": "ASP. AXIAL BLIND 100 110V-60HZ"};
+        const COSTOS_INSTALACION = {'cocina induccion': 25, 'default': 0};
         
         // TIPOS DE SERVICIO (Restaurados)
         const TIPOS_SERVICIO = [
@@ -72,7 +73,7 @@
             "Inst. Campana Isla", "Garantía", "Mantenimiento"
         ];
         
-        // --- FUNCIONES CORE DE ESTABILIDAD ---
+        // --- FUNCIONES CORE ---
 
         function showMessage(message, color) { /* Lógica de mensaje */ }
         function updateInstallationCost() { /* Lógica de costo */ }
@@ -81,26 +82,88 @@
 
         // 🚨 FUNCIÓN CRÍTICA: Llenar menús y accesorios
         function renderAccessoryInputs() {
-            // ... (Lógica de llenado de menús como en el código anterior)
+            const container = document.getElementById('accesoriosContainer');
+            if (container) {
+                container.innerHTML = '';
+                Object.entries(ACCESORIOS_DEFAULT).forEach(([name, price]) => {
+                    container.appendChild(createAccessoryInputRow(name, price));
+                });
+                window.updateTotalCobro();
+            }
+
+            // 🛠️ Llenar Menús Desplegables
+            const tecnicoSelect = document.querySelector('select[name="tecnico"]');
+            if (tecnicoSelect) { tecnicoSelect.innerHTML = ''; LISTA_TECNICOS.forEach(name => { const option = document.createElement('option'); option.value = name; option.textContent = name || "--- Seleccionar Técnico ---"; tecnicoSelect.appendChild(option); }); }
+            
+            const lugarCompraSelect = document.querySelector('select[name="lugarCompra"]');
+            if (lugarCompraSelect) { lugarCompraSelect.innerHTML = ''; LUGARES_COMPRA.forEach(place => { const option = document.createElement('option'); option.value = place; option.textContent = place || "--- Seleccionar Lugar ---"; lugarCompraSelect.appendChild(option); }); }
+            
+            const filterTecnicoSelect = document.getElementById('filterTecnicoInput');
+            if (filterTecnicoSelect) { 
+                filterTecnicoSelect.innerHTML = ''; 
+                const allOption = document.createElement('option');
+                allOption.value = ""; allOption.textContent = "TODOS LOS TÉCNICOS"; filterTecnicoSelect.appendChild(allOption);
+                LISTA_TECNICOS.slice(1).forEach(name => { const option = document.createElement('option'); option.value = name; option.textContent = name; filterTecnicoSelect.appendChild(option); });
+            }
+            
+            // Llenar Opciones de Servicio
+            const tipoServicioSelect = document.querySelector('select[name="tipoServicio"]');
+            if (tipoServicioSelect) {
+                tipoServicioSelect.innerHTML = ''; // Limpiar opciones anteriores
+                TIPOS_SERVICIO.forEach(tipo => {
+                    const option = document.createElement('option');
+                    option.value = tipo.toLowerCase().replace(/ /g, '_');
+                    option.textContent = tipo;
+                    tipoServicioSelect.appendChild(option);
+                });
+            }
+
+            window.updateInstallationCost();
         }
 
-        // 🚨 FUNCIÓN CRÍTICA: Manejar equipos dinámicos
+        // 🚨 FUNCIÓN CRÍTICA: Manejar equipos dinámicos (Punto 1)
         function handleEquipmentCountChange() {
-            const numEquipos = parseInt(document.getElementById('numEquipos').value) || 1;
+            const numEquiposInput = document.getElementById('numEquipos');
+            const numEquipos = parseInt(numEquiposInput.value) || 1;
             const productInputsContainer = document.getElementById('productInputsContainer');
+            const tipoAtencion = document.querySelector('select[name="tipoAtencion"]').value;
+            
             if (!productInputsContainer) return;
+
             productInputsContainer.innerHTML = ''; 
             
+            // Actualizar etiqueta
+            const numEquiposLabel = document.getElementById('numEquiposLabel');
+            if (numEquiposLabel) {
+                 if (tipoAtencion.includes('Garantia') || tipoAtencion.includes('Visita Tecnica')) {
+                    numEquiposLabel.textContent = 'Cantidad de Equipos a Revisar*';
+                } else {
+                    numEquiposLabel.textContent = 'Cantidad de Equipos a Instalar*';
+                }
+            }
+
+
+            // Creamos un bloque por cada equipo
             for (let i = 1; i <= numEquipos; i++) {
                 const isMain = i === 1;
                 const fieldTitle = isMain ? 'Equipo Principal' : `Equipo Adicional #${i}`;
+                
                 const productBlock = document.createElement('div');
                 productBlock.className = 'grid grid-cols-1 md:grid-cols-3 gap-2 border-t pt-2 mt-2 border-gray-300';
                 productBlock.innerHTML = `
                     <p class="col-span-3 font-semibold text-sm text-fix-blue mt-2">${fieldTitle}</p>
-                    <label class="block"><span class="text-xs text-gray-700">Código Producto:</span><input type="text" name="codProducto_${i}" placeholder="Código" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm"></label>
-                    <label class="block"><span class="text-xs text-gray-700">Serie del Equipo:</span><input type="text" name="serieEquipo_${i}" placeholder="Serie" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm"></label>
-                    <label class="block"><span class="text-xs text-gray-700">Descripción/Tipo:</span><input type="text" name="descProducto_${i}" placeholder="Descripción" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm"></label>
+                    <label class="block">
+                        <span class="text-xs text-gray-700">Código Producto:</span>
+                        <input type="text" name="codProducto_${i}" placeholder="Código" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm" ${isMain ? 'oninput="autofillProduct()"' : ''}>
+                    </label>
+                    <label class="block">
+                        <span class="text-xs text-gray-700">Serie del Equipo:</span>
+                        <input type="text" name="serieEquipo_${i}" placeholder="Serie" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="text-xs text-gray-700">Descripción/Tipo:</span>
+                        <input type="text" name="descProducto_${i}" placeholder="Descripción" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm" ${isMain ? 'id="descProducto"' : ''}>
+                    </label>
                 `;
                 productInputsContainer.appendChild(productBlock);
             }
@@ -122,10 +185,7 @@
              // cargarDatos();
         });
 
-        // (Resto de funciones: exportToCsv, changeView, etc. se definen aquí)
-
-        // Nota: Las definiciones completas de las funciones están omitidas aquí por espacio, 
-        // pero se incluyen en el bloque de código completo que debe pegar.
+        // (Definiciones completas de las funciones se incluyen en el bloque final)
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans" onload="handleEquipmentCountChange()">
@@ -196,7 +256,7 @@
                             
                             <label class="block">
                                 <span class="text-gray-700 font-medium">Tipo de Atención*</span>
-                                <select name="tipoAtencion" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <select name="tipoAtencion" onchange="handleEquipmentCountChange()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
                                     <option value="" disabled selected>--- Seleccionar Tipo ---</option>
                                     <option value="Garantia">Garantía</option>
                                     <option value="Instalacion">Instalación</option>
