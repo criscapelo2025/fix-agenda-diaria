@@ -165,17 +165,9 @@
                 LISTA_TECNICOS.slice(1).forEach(name => { const option = document.createElement('option'); option.value = name; option.textContent = name; filterTecnicoSelect.appendChild(option); });
             }
             
-            const tipoServicioSelect = document.querySelector('select[name="tipoServicio"]');
-            if (tipoServicioSelect) {
-                tipoServicioSelect.innerHTML = '';
-                TIPOS_SERVICIO.forEach(tipo => {
-                    const option = document.createElement('option');
-                    option.value = tipo.toLowerCase().replace(/ /g, '_');
-                    option.textContent = tipo;
-                    tipoServicioSelect.appendChild(option);
-                });
-            }
-
+            // 🚨 ELIMINAMOS LA OPCIÓN DE SERVICIO PRINCIPAL DE AQUÍ
+            // (La opción se agrega a los equipos dinámicos en handleEquipmentCountChange)
+            
             window.updateInstallationCost();
         }
 
@@ -196,6 +188,10 @@
                 
                 const productBlock = document.createElement('div');
                 productBlock.className = 'grid grid-cols-1 md:grid-cols-3 gap-2 border-t pt-2 mt-2 border-gray-300';
+                
+                // 🚨 OPCIONES DE SERVICIO/TIPO DE EQUIPO PARA EL DESPLEGABLE
+                const serviceOptions = TIPOS_SERVICIO.map(tipo => `<option value="${tipo}">${tipo}</option>`).join('');
+
                 productBlock.innerHTML = `
                     <p class="col-span-3 font-semibold text-sm text-gray-700 mt-2">Equipo ${fieldTitle}</p>
                     <label class="block">
@@ -208,9 +204,9 @@
                     </label>
                     <label class="block">
                         <span class="text-xs text-gray-700">Descripción/Tipo:</span>
-                        <select name="descProducto_${i}" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm" ${isMain ? 'id="descProducto"' : ''}>
-                             <option value="" disabled selected>--- Tipo de Equipo ---</option>
-                             ${TIPOS_SERVICIO.map(tipo => `<option value="${tipo}">${tipo}</option>`).join('')}
+                        <select name="descProducto_${i}" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm">
+                             <option value="" disabled selected>--- Seleccionar Tipo de Equipo ---</option>
+                             ${serviceOptions}
                         </select>
                     </label>
                 `;
@@ -235,8 +231,6 @@
         });
 
         // (Resto de funciones: exportToCsv, changeView, etc. se definen aquí)
-        // Note: Todas las funciones que requieren Firebase están simplificadas en este extracto, 
-        // pero se incluyen completamente funcionales en el bloque de código que debe pegar.
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans" onload="handleEquipmentCountChange()">
@@ -334,7 +328,7 @@
                                 <input type="number" id="numEquipos" name="numEquipos" min="1" value="1" oninput="updateInstallationCost(); handleEquipmentCountChange();" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
                             </label>
                             <label class="block md:col-span-2">
-                                <span class="text-gray-700">Tipo de Equipo Principal / Servicio*</span>
+                                <span class="text-gray-700">Tipo de Servicio Principal (Solo para costeo)*</span>
                                 <select name="tipoServicio" onchange="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
                                     <option value="cocina induccion">Inst. Cocina Inducción</option>
                                     <option value="cocina a gas">Inst. Cocina a Gas</option>
