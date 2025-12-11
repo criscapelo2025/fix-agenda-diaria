@@ -65,9 +65,8 @@
         const LUGARES_COMPRA = [ "", "Comercial Solis", "Comercial Kywi", "Como Hogar", "Sukasa", "Comercial Luna Pazmiño", "Macaofertas", "Mercard", "Home Vega" ];
         const ACCESORIOS_DEFAULT = { 'Enchufe 110V': 5, 'Enchufe 220V 20V': 7, 'Enchufe 220V 50V': 10, 'Manguera c/bridas': 4, 'Ducto 4 pulgadas metro': 5, 'Enchufe chinito': 5 };
         const CATALOGO_PRODUCTOS = {"112580027": "GBC 75030 KBB CRISTAL COCINA GAS", "915061": "ASP. AXIAL BLIND 100 110V-60HZ"};
-        // El costo fijo por instalación de inducción se elimina, el costo viene del input 'costoEquipo_i'
         
-        // TIPOS DE SERVICIO (Usados en los selects de cada equipo)
+        // TIPOS DE SERVICIO
         const TIPOS_SERVICIO = [
             "Inst. Cocina Inducción", "Inst. Cocina a Gas", "Inst. Horno a Gas", 
             "Inst. Horno Eléctrico", "Inst. Microondas", "Inst. Refrigerador",
@@ -96,7 +95,6 @@
             setTimeout(() => { messageBox.style.opacity = 0; }, 8000);
         }
 
-        // Calcula solo el costo de accesorios (se usa en updateTotalCobro)
         function calcularCostoAccesorios() {
             let totalAccesorios = 0;
             const container = document.getElementById('accesoriosContainer');
@@ -111,8 +109,7 @@
             });
             return totalAccesorios;
         }
-
-        // Obtiene la suma de costos de instalación de TODOS los equipos
+        
         function getInstallationCostTotal() {
              let totalInstalacion = 0;
              const productInputsContainer = document.getElementById('productInputsContainer');
@@ -125,22 +122,17 @@
              return totalInstalacion;
         }
 
-
-        // Actualiza el costo de instalación (principalmente para re-generar los inputs)
         function updateInstallationCost() {
-            // El costo de instalación ya no se calcula aquí, solo aseguramos que el campo
-            // oculto contenga el total sumado de los equipos.
             const totalInstalacion = getInstallationCostTotal();
             if(document.getElementById('costoInstalacionHidden')) document.getElementById('costoInstalacionHidden').value = totalInstalacion.toFixed(2);
             
             window.updateTotalCobro();
             
-            handleEquipmentCountChange(true); // Re-dibuja para asegurar labels correctos
+            handleEquipmentCountChange(true); 
         }
 
-        // Calcula el total a cobrar al cliente (Instalación TOTAL + Accesorios)
         function updateTotalCobro() {
-            const costoInstalacion = getInstallationCostTotal(); // Ahora suma todos los costos individuales
+            const costoInstalacion = getInstallationCostTotal(); 
             const totalAccesorios = calcularCostoAccesorios(); 
             
             if(document.getElementById('costoInstalacionHidden')) document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2);
@@ -193,7 +185,6 @@
             window.updateInstallationCost();
         }
 
-        // Modificada para re-generar inputs y actualizar etiquetas
         function handleEquipmentCountChange(isUpdate = false) {
             const numEquiposInput = document.getElementById('numEquipos');
             const numEquipos = parseInt(numEquiposInput.value) || 1;
@@ -202,7 +193,6 @@
             
             if (!productInputsContainer) return;
 
-            // Almacenar valores actuales antes de borrar (si es una actualización)
             let currentValues = {};
             if (isUpdate) {
                 productInputsContainer.querySelectorAll('input, select').forEach(element => {
@@ -274,7 +264,7 @@
             }
 
             if (isUpdate) {
-                 window.updateInstallationCost(); // Forzar recálculo del total después de restaurar valores
+                 window.updateInstallationCost(); 
             }
         }
         
@@ -323,6 +313,21 @@
             } else if (currentView === 'inventario') {
                 calculateCurrentStock();
                 return;
+            } else if (currentView === 'reporte_teka') {
+                const startDate = document.getElementById('reporteTekaStartDate').value;
+                const endDate = document.getElementById('reporteTekaEndDate').value;
+                
+                visits = visits.filter(v => v.estado === 'Atendido' && v.equipos && v.equipos.length > 0);
+
+                if (startDate) {
+                    visits = visits.filter(v => v.fechaInstalacion >= startDate);
+                }
+                if (endDate) {
+                    visits = visits.filter(v => v.fechaInstalacion <= endDate);
+                }
+                
+                renderReporteTeka(visits);
+                return;
             }
             
             visits.sort((a, b) => {
@@ -356,6 +361,12 @@
                 const costoEquipo = parseFloat(visitData[`costoEquipo_${i}`]) || 0;
                 totalInstalacionCost += costoEquipo;
 
+                // Validación crítica
+                if (!visitData[`descProducto_${i}`]) {
+                    showMessage(`Seleccione el Tipo/Descripción para el Equipo #${i}.`, 'fix-error');
+                    return;
+                }
+
                 equipos.push({
                     codProducto: visitData[`codProducto_${i}`] || '',
                     serieEquipo: visitData[`serieEquipo_${i}`] || '',
@@ -363,12 +374,6 @@
                     costoBase: costoEquipo,
                     isPrincipal: i === 1
                 });
-
-                // Validación crítica
-                if (!visitData[`descProducto_${i}`]) {
-                    showMessage(`Seleccione el Tipo/Descripción para el Equipo #${i}.`, 'fix-error');
-                    return;
-                }
             }
 
             const newVisitRef = database.ref('visits').push(); 
@@ -401,7 +406,7 @@
                 showMessage(`✅ Visita guardada.`, 'fix-report');
                 form.reset();
                 renderAccessoryInputs();
-                handleEquipmentCountChange(); // Resetear inputs de equipos
+                handleEquipmentCountChange(); 
                 setupVisitListener(); 
             })
             .catch(() => {
@@ -665,7 +670,7 @@
                 })
                 .map(v => ({
                     id: v.id,
-                    type: `INGRESO (Servicio - ${v.formaPago || 'N/A'})`, // Incluir forma de pago
+                    type: `INGRESO (Servicio - ${v.formaPago || 'N/A'})`, 
                     monto: v.financiera.totalCliente,
                     concepto: `Servicio a ${v.nombreCliente} (Técnico: ${v.tecnico})`,
                     date: v.attendedDate ? v.attendedDate.split('T')[0] : 'N/A',
@@ -895,6 +900,135 @@
             }).join('');
         }
 
+        // --- FUNCIONES DE REPORTE TEKA ---
+
+        const REPORTE_TEKA_COLUMNS = [
+            { label: "FECHA DE COMPRA", key: "fechaCompra" },
+            { label: "LUGAR DE COMPRA", key: "lugarCompra" },
+            { label: "NÚMERO DE FACTURA DE COMPRA", key: "numFactura" },
+            { label: "CÓDIGO DEL PRODUCTO", key: "codProducto" }, // Del equipo individual
+            { label: "DESCRIPCIÓN DEL PRODUCTO", key: "descProducto" }, // Del equipo individual
+            { label: "SERIE DEL EQUIPO", key: "serieEquipo" }, // Del equipo individual
+            { label: "GARANTÍA DEL EQUIPO", key: "fixed", value: "SAP" }, 
+            { label: "TÉCNICO", key: "fixed", value: "CAPELO" }, 
+            { label: "CIUDAD", key: "fixed", value: "CUENCA" }, 
+            { label: "FECHA DE INSTALACIÓN", key: "fechaInstalacion" },
+            { label: "NOMBRE DEL CLIENTE", key: "nombreCliente" },
+            { label: "DIRECCIÓN DE INSTALACIÓN", key: "direccion" },
+            { label: "CELULAR DEL CLIENTE", key: "telefono" },
+            { label: "PRECIO DE INSTALACIÓN", key: "costoBase" }, // Costo individual del equipo
+            { label: "CÓMO LLEGÓ LA INFORMACIÓN", key: "fixed", value: "CLIENTE FINAL" }, 
+            { label: "TÉCNICO QUE ATENDIÓ", key: "fixed", value: "CAPELO" }, 
+            { label: "VIÁTICO", key: "fixed", value: "" }, 
+            { label: "CONCEPTO", key: "fixed", value: "ACEITE DE VIÁTICO" }, 
+            { label: "FACTURA NÚMERO", key: "numFactura" },
+            { label: "CÉDULA O RUC", key: "cedula" },
+            { label: "CORREO DEL CLIENTE", key: "correo" }
+        ];
+
+        function renderReporteTeka(visits) {
+            const tableHeader = document.getElementById('tekaReporteHeader');
+            const tableBody = document.getElementById('tekaReporteBody');
+            if (!tableHeader || !tableBody) return;
+
+            tableHeader.innerHTML = REPORTE_TEKA_COLUMNS.map(col => 
+                `<th class="px-3 py-3 text-left text-xs font-bold text-fix-blue uppercase tracking-wider">${col.label}</th>`
+            ).join('');
+
+            if (visits.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="21" class="text-center py-4 text-gray-500">No hay servicios **ATENDIDOS** en este periodo para generar el reporte TEKA.</td></tr>';
+                return;
+            }
+            
+            let rowsHTML = '';
+            
+            visits.forEach(visit => {
+                (visit.equipos || []).forEach(equipo => {
+                    let rowCells = '';
+                    
+                    REPORTE_TEKA_COLUMNS.forEach(col => {
+                        let cellValue = '';
+
+                        if (col.key === 'fixed') {
+                            cellValue = col.value;
+                        } else if (col.key === 'costoBase') {
+                            cellValue = (equipo.costoBase || 0).toFixed(2);
+                        } else if (col.key === 'codProducto' || col.key === 'descProducto' || col.key === 'serieEquipo') {
+                            cellValue = equipo[col.key] || '';
+                        } else {
+                            cellValue = visit[col.key] || '';
+                        }
+                        
+                        rowCells += `<td class="px-3 py-2 whitespace-nowrap text-xs text-gray-800">${cellValue}</td>`;
+                    });
+
+                    rowsHTML += `<tr class="hover:bg-gray-50">${rowCells}</tr>`;
+                });
+            });
+
+            tableBody.innerHTML = rowsHTML;
+        }
+
+        window.exportTekaReportToCsv = () => {
+            let visits = [...visitsArray].filter(v => v.estado === 'Atendido' && v.equipos && v.equipos.length > 0);
+            
+            const startDate = document.getElementById('reporteTekaStartDate').value;
+            const endDate = document.getElementById('reporteTekaEndDate').value;
+            if (startDate) {
+                visits = visits.filter(v => v.fechaInstalacion >= startDate);
+            }
+            if (endDate) {
+                visits = visits.filter(v => v.fechaInstalacion <= endDate);
+            }
+
+            if (visits.length === 0) {
+                alert("No hay datos para exportar en el rango de fechas seleccionado.");
+                return;
+            }
+
+            const header = REPORTE_TEKA_COLUMNS.map(col => `"${col.label}"`).join(';') + '\n';
+            let csvContent = header;
+
+            visits.forEach(visit => {
+                (visit.equipos || []).forEach(equipo => {
+                    const rowData = REPORTE_TEKA_COLUMNS.map(col => {
+                        let cellValue = '';
+
+                        if (col.key === 'fixed') {
+                            cellValue = col.value;
+                        } else if (col.key === 'costoBase') {
+                            cellValue = (equipo.costoBase || 0).toFixed(2);
+                        } else if (col.key === 'codProducto' || col.key === 'descProducto' || col.key === 'serieEquipo') {
+                            cellValue = equipo[col.key] || '';
+                        } else {
+                            cellValue = visit[col.key] || '';
+                        }
+                        
+                        cellValue = String(cellValue).replace(/"/g, '""').replace(/;/g, ',');
+                        
+                        return `"${cellValue}"`;
+                    }).join(';');
+                    
+                    csvContent += rowData + '\n';
+                });
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            const date = new Date().toISOString().split('T')[0];
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Reporte_TEKA_${startDate || 'Inicio'}_${endDate || date}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showMessage("✅ Reporte TEKA descargado con éxito.", 'fix-report');
+        };
+
+
         // --- RENDERING DE LA LISTA DE VISITAS ---
         function renderVisits(visits) {
             const listContainer = document.getElementById('visitsList');
@@ -976,12 +1110,14 @@
             const filterContainer = document.getElementById('filterContainer');
             const contabilidadView = document.getElementById('contabilidadView');
             const inventarioView = document.getElementById('inventarioView');
+            const reporteTekaView = document.getElementById('reporteTekaView');
             const listContainerParent = document.getElementById('listContainerParent');
 
             if(formContainer) formContainer.classList.add('hidden');
             if(filterContainer) filterContainer.classList.add('hidden');
             if(contabilidadView) contabilidadView.classList.add('hidden');
             if(inventarioView) inventarioView.classList.add('hidden');
+            if(reporteTekaView) reporteTekaView.classList.add('hidden');
             if(listContainerParent) listContainerParent.classList.add('hidden'); 
 
             // Desactivar todos los botones
@@ -1017,6 +1153,10 @@
             } else if (newView === 'inventario') {
                  if(inventarioView) inventarioView.classList.remove('hidden');
                  loadInventarioData();
+
+            } else if (newView === 'reporte_teka') {
+                 if(reporteTekaView) reporteTekaView.classList.remove('hidden');
+                 setupVisitListener();
             }
         };
 
@@ -1057,6 +1197,9 @@
              </button>
              <button id="btn-my_agenda" onclick="changeView('my_agenda')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
                  Mi Rutero
+             </button>
+             <button id="btn-reporte_teka" onclick="changeView('reporte_teka')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                 📋 Reporte TEKA (SAP)
              </button>
              <button id="btn-inventario" onclick="changeView('inventario')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
                  📦 Inventario
@@ -1225,6 +1368,42 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+        <div id="reporteTekaView" class="hidden">
+            <h2 class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">📋 Reporte de Servicios ATENDIDOS (Formato TEKA)</h2>
+            <p class="mb-4 text-sm text-gray-600">Este reporte incluye **SOLO** las visitas marcadas como **'Atendido'** y genera los campos fijos ('SAP', 'Capello', 'Cuenca') según el formato requerido. Utilice el filtro de fecha para generar el reporte mensual.</p>
+
+            <div class="mb-6 p-3 bg-white rounded-xl shadow-md border border-fix-report/30 no-print">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Control de Periodo</h3>
+                <div class="flex flex-col sm:flex-row gap-3 items-center">
+                     <label class="flex-grow w-full sm:w-auto">
+                        <span class="text-sm text-gray-700">Filtrar por Fecha de Visita (Inicio):</span>
+                        <input type="date" id="reporteTekaStartDate" onchange="setupVisitListener()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                     </label>
+                     <label class="flex-grow w-full sm:w-auto">
+                        <span class="text-sm text-gray-700">Filtrar por Fecha de Visita (Fin):</span>
+                        <input type="date" id="reporteTekaEndDate" onchange="setupVisitListener()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-fix-light focus:ring-fix-light p-2">
+                     </label>
+                     <button onclick="exportTekaReportToCsv()" class="mt-4 sm:mt-0 bg-fix-report hover:bg-fix-blue text-white font-bold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                         DESCARGAR REPORTE TEKA CSV
+                     </button>
+                </div>
+            </div>
+
+
+            <div class="mb-6 p-4 bg-white rounded-xl shadow-md border border-gray-200">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50 sticky top-0">
+                            <tr id="tekaReporteHeader">
+                                </tr>
+                        </thead>
+                        <tbody id="tekaReporteBody" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="21" class="text-center py-4 text-gray-500">Filtrando y generando reporte...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
