@@ -1,3 +1,19 @@
+¡Absolutamente! Es la forma más segura de evitar errores de copiado/pegado.
+
+Aquí tienes el código completo y actualizado de tu archivo index.html. Incluye:
+
+Múltiples Equipos Dinámicos en el formulario.
+
+Filtro "Mi Rutero" y la Vista Admin.
+
+El Modal de Reporte del Técnico (Cobro/Accesorios).
+
+La nueva vista "Contabilidad (Ingresos/Egresos)" con registro de egresos manual y consolidación de ingresos automática.
+
+Instrucción: Borra todo el contenido de tu archivo index.html y pega el código siguiente.
+
+HTML
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -104,20 +120,20 @@
 
         function updateInstallationCost() {
             const tipoServicio = document.querySelector('select[name="tipoServicio"]').value; 
-            const costoInstalacion = COSTOS_INSTALACION['cocina induccion']; // Debería basarse en tipoServicio, pero por ahora se mantiene constante
+            const costoInstalacion = COSTOS_INSTALACION['cocina induccion']; 
             
             if(document.getElementById('costoInstalacionHidden')) document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2);
             window.updateTotalCobro();
             
             const numEquiposLabel = document.getElementById('numEquiposLabel');
             if (numEquiposLabel) {
-                 if (tipoServicio.includes('Garantia') || tipoServicio.includes('Mantenimiento')) {
+                 if (tipoServicio.includes('garantia') || tipoServicio.includes('mantenimiento')) {
                     numEquiposLabel.textContent = 'Cantidad de Equipos a Revisar*';
                 } else {
                     numEquiposLabel.textContent = 'Cantidad de Equipos a Instalar*';
                 }
             }
-            handleEquipmentCountChange(); // 🚨 Disparar la actualización de los inputs
+            handleEquipmentCountChange(); 
         }
 
         function updateTotalCobro() {
@@ -142,7 +158,6 @@
             return div;
         }
 
-        // 🚨 FUNCIÓN CRÍTICA: Llenado de menús y accesorios
         function renderAccessoryInputs() {
             const container = document.getElementById('accesoriosContainer');
             if (container) {
@@ -183,7 +198,6 @@
             window.updateInstallationCost();
         }
 
-        // 🚨 FUNCIÓN CRÍTICA: Manejar equipos dinámicos
         function handleEquipmentCountChange() {
             const numEquiposInput = document.getElementById('numEquipos');
             const numEquipos = parseInt(numEquiposInput.value) || 1;
@@ -193,7 +207,6 @@
 
             productInputsContainer.innerHTML = ''; 
             
-            // Creamos un bloque por cada equipo
             for (let i = 1; i <= numEquipos; i++) {
                 const isMain = i === 1;
                 const fieldTitle = isMain ? 'Principal' : `Adicional #${i}`;
@@ -201,7 +214,6 @@
                 const productBlock = document.createElement('div');
                 productBlock.className = 'grid grid-cols-1 md:grid-cols-4 gap-2 border-t pt-2 mt-2 border-gray-300';
                 
-                // 🚨 OPCIONES DE SERVICIO/TIPO DE EQUIPO PARA EL DESPLEGABLE
                 const serviceOptions = TIPOS_SERVICIO.map(tipo => `<option value="${tipo}">${tipo}</option>`).join('');
 
                 productBlock.innerHTML = `
@@ -240,7 +252,6 @@
             database.ref('visits').on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
-                    // Mapear los objetos de Firebase a un array con el ID incluido
                     visitsArray = Object.keys(data).map(key => ({ ...data[key], id: key }));
                     globalVisitsData = data;
                 } else {
@@ -254,19 +265,16 @@
         function setupVisitListener() {
             let visits = [...visitsArray];
             
-            // 🚨 LÓGICA DE FILTRADO POR VISTA (PUNTO 1)
+            // 🚨 LÓGICA DE FILTRADO POR VISTA 
             if (currentView === 'my_agenda') {
-                 // Filtro Rutero: por Técnico DEMO y Fecha de Hoy
                  visits = visits.filter(v => 
-                     (v.tecnico === TECNICO_ACTUAL_DEMO || !v.tecnico) && // Muestra las no asignadas a nadie o las de mi tecnico
+                     (v.tecnico === TECNICO_ACTUAL_DEMO || !v.tecnico) && 
                      v.fechaInstalacion === filterDate
                  );
-                 // Ocultar formulario para el técnico
                  const formContainer = document.getElementById('formContainer');
                  if(formContainer) formContainer.classList.add('hidden');
                  
             } else if (currentView === 'reporte_admin') {
-                // Filtro Admin
                 const formContainer = document.getElementById('formContainer');
                 if(formContainer) formContainer.classList.remove('hidden');
                 
@@ -276,11 +284,13 @@
                 if (filterTecnico) {
                     visits = visits.filter(v => v.tecnico === filterTecnico);
                 }
-            } else { // Mantenimiento
+            } else if (currentView === 'mantenimiento') { 
                  visits = visits.filter(v => v.tipoAtencion && v.tipoAtencion.includes('mantenimiento'));
+            } else if (currentView === 'contabilidad') {
+                // No renderiza visitas, la lista se usa para ingresos
             }
             
-            // Ordenar por estado (PENDIENTE primero) y luego por fecha
+            // Ordenar por estado (PENDIENTE primero)
             visits.sort((a, b) => {
                 const statusOrder = { 'PENDIENTE': 1, 'Novedad': 2, 'No Atendido': 3, 'Atendido': 4 };
                 const aStatus = statusOrder[a.estado] || 5;
@@ -290,7 +300,9 @@
                 return (a.createdAt > b.createdAt) ? 1 : -1;
             });
 
-            renderVisits(visits);
+            if (currentView !== 'contabilidad') {
+                renderVisits(visits);
+            }
         }
 
         window.saveVisit = async () => {
@@ -304,7 +316,6 @@
                 return;
             }
 
-            // 🚨 Lógica para recolectar todos los equipos dinámicos
             const equipos = [];
             const numEquipos = parseInt(visitData.numEquipos) || 1;
             let totalInstalacionCost = 0;
@@ -332,7 +343,6 @@
                 estado: 'PENDIENTE',
                 createdAt: Date.now(),
                 tecnico: visitData.tecnico || 'N/A',
-                // Incluir los campos necesarios
                 fechaCompra: visitData.fechaCompra,
                 lugarCompra: visitData.lugarCompra,
                 numFactura: visitData.numFactura,
@@ -342,7 +352,6 @@
                 correo: visitData.correo,
                 tipoAtencion: visitData.tipoAtencion,
                 numEquipos: numEquipos,
-                // Almacenar todos los equipos
                 equipos: equipos,
                 financiera: {
                     totalCliente: totalInstalacionCost, 
@@ -361,33 +370,23 @@
             });
         };
 
-        // --- FUNCIONES DE MODAL DEL TÉCNICO (NUEVO) ---
+        // --- FUNCIONES DE MODAL DEL TÉCNICO ---
 
-        // Función para abrir el modal de edición/cobro
         window.openEditModal = (visitId) => {
             const visit = visitsArray.find(v => v.id === visitId);
             if (!visit) {
                 showMessage('Error: Visita no encontrada.', 'fix-error');
                 return;
             }
-            if (visit.estado === 'Atendido') {
-                 // Si ya está atendido, se abre en modo solo-vista o se permite edición limitada
-                 // Por simplicidad, alertamos y no abrimos
-                 // showMessage('Esta visita ya fue marcada como ATENDIDA. No se permite edición.', 'fix-accent');
-                 // return;
-            }
 
-            // 1. Mostrar el Modal
             const modal = document.getElementById('editModal');
             modal.classList.remove('invisible', 'opacity-0');
             
-            // 2. Llenar los datos de la visita
             document.getElementById('modalVisitId').value = visit.id;
             document.getElementById('modalClientName').textContent = visit.nombreCliente || 'N/A';
             document.getElementById('modalCurrentStatus').value = visit.estado || 'PENDIENTE';
             document.getElementById('modalObservaciones').value = visit.observacionesTecnico || '';
             
-            // 3. Inicializar los valores financieros
             const costoInstalacion = (visit.financiera && visit.financiera.costoInstalacion) || 0;
             const totalCliente = (visit.financiera && visit.financiera.totalCliente) || costoInstalacion;
             
@@ -395,7 +394,6 @@
             document.getElementById('modalCostoInstalacionHidden').value = costoInstalacion.toFixed(2);
             document.getElementById('modalTotalCobro').value = totalCliente.toFixed(2);
             
-            // 4. Cargar accesorios y actualizar totales del modal
             renderModalAccessoryInputs(visit.accesoriosVendidos);
         };
 
@@ -405,7 +403,6 @@
             document.getElementById('editVisitForm').reset();
         };
 
-        // Función de renderizado de accesorios específica para el modal
         function renderModalAccessoryInputs(accesoriosPrevios = []) {
             const container = document.getElementById('modalAccesoriosContainer');
             if (!container) return;
@@ -413,7 +410,7 @@
             container.innerHTML = '';
             
             const prevMap = {};
-            if (accesoriosPrevios.length > 0) {
+            if (accesoriosPrevios && accesoriosPrevios.length > 0) {
                 accesoriosPrevios.forEach(acc => { prevMap[acc.nombre] = acc; });
             }
 
@@ -435,7 +432,6 @@
             updateModalTotalCobro();
         }
 
-        // Lógica de cálculo del cobro para el modal
         function updateModalTotalCobro() {
             let totalAccesorios = 0;
             const container = document.getElementById('modalAccesoriosContainer');
@@ -456,12 +452,15 @@
             document.getElementById('modalTotalAccesoriosDisplay').textContent = `$${totalAccesorios.toFixed(2)}`;
             document.getElementById('modalCobroAccesoriosHidden').value = totalAccesorios.toFixed(2);
             
-            // Actualizar el campo de cobro total sugerido, pero NO FORZARLO
             const totalCobroInput = document.getElementById('modalTotalCobro');
-            totalCobroInput.value = totalClienteEstimado.toFixed(2);
+            // Suggest the new total, don't force it if the user manually entered a higher amount
+            if (parseFloat(totalCobroInput.value) < totalClienteEstimado) {
+                 totalCobroInput.value = totalClienteEstimado.toFixed(2);
+            } else if (totalCobroInput.value === "" || totalCobroInput.value === "0.00") {
+                totalCobroInput.value = totalClienteEstimado.toFixed(2);
+            }
         }
 
-        // Función final de guardado del reporte del técnico
         window.saveTechnicianReport = () => {
             const form = document.getElementById('editVisitForm');
             const data = new FormData(form);
@@ -478,7 +477,6 @@
                 return;
             }
 
-            // Recolectar accesorios vendidos
             const accesoriosVendidos = [];
             const accessoryItems = document.getElementById('modalAccesoriosContainer').querySelectorAll('.accessory-item');
             accessoryItems.forEach(item => {
@@ -511,7 +509,8 @@
             .then(() => {
                 showMessage(`✅ Reporte de servicio de ${document.getElementById('modalClientName').textContent} guardado.`, 'fix-report');
                 closeEditModal();
-                setupVisitListener(); // Refrescar la lista
+                setupVisitListener(); 
+                // No es necesario llamar a loadContabilidadData() aquí, ya que se refresca con setupVisitListener
             })
             .catch((error) => {
                 console.error("Error al guardar el reporte del técnico: ", error);
@@ -519,22 +518,19 @@
             });
         };
 
-        // Función para cambiar el estado RÁPIDO (No Atendido / Novedad)
         window.changeVisitQuickStatus = (selectElement, visitId) => {
             const newStatus = selectElement.value;
             const currentVisit = visitsArray.find(v => v.id === visitId);
 
             if (newStatus === 'Atendido') {
-                // Si eligen ATENDIDO, abrimos el modal para completar el reporte
                 openEditModal(visitId);
-                selectElement.value = currentVisit.estado || 'PENDIENTE'; // Volvemos al estado anterior en el select
+                selectElement.value = currentVisit.estado || 'PENDIENTE';
                 return;
             }
             
-            // Lógica para No Atendido o Novedad
             const observaciones = prompt(`Ingrese el motivo para cambiar el estado a "${newStatus}":`);
             if (!observaciones) {
-                selectElement.value = currentVisit.estado || 'PENDIENTE'; // Vuelve al estado anterior si cancela
+                selectElement.value = currentVisit.estado || 'PENDIENTE';
                 return;
             }
 
@@ -550,6 +546,124 @@
             .catch(() => {
                 showMessage(`❌ Error al actualizar estado.`, 'fix-error');
             });
+        }
+        
+        // --- FUNCIONES DE CONTABILIDAD (NUEVO) ---
+
+        let egresosArray = [];
+        let contabilidadStartDate = null;
+        let contabilidadEndDate = null;
+
+        function loadContabilidadData() {
+            database.ref('egresos').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    egresosArray = Object.keys(data).map(key => ({ ...data[key], id: key }));
+                } else {
+                    egresosArray = [];
+                }
+                filterContabilidad(); // Filtrar y renderizar al cargar
+            });
+        }
+
+        window.saveEgreso = () => {
+            const form = document.getElementById('egresoForm');
+            const data = new FormData(form);
+            const egresoData = {};
+            for (let [key, value] of data.entries()) { egresoData[key] = value.trim(); }
+
+            const newEgresoRef = database.ref('egresos').push(); 
+            newEgresoRef.set({
+                id: newEgresoRef.key,
+                type: 'EGRESO',
+                monto: parseFloat(egresoData.montoEgreso),
+                concepto: egresoData.conceptoEgreso,
+                date: new Date().toISOString(),
+                timestamp: Date.now()
+            })
+            .then(() => {
+                showMessage(`✅ Egreso de $${egresoData.montoEgreso} registrado.`, 'fix-report');
+                form.reset();
+            })
+            .catch(() => {
+                showMessage(`❌ Error al registrar egreso.`, 'fix-error');
+            });
+        };
+
+        window.filterContabilidad = () => {
+            contabilidadStartDate = document.getElementById('contabilidadStartDate').value;
+            contabilidadEndDate = document.getElementById('contabilidadEndDate').value;
+            
+            let startTimestamp = contabilidadStartDate ? new Date(contabilidadStartDate).getTime() : 0;
+            let endTimestamp = contabilidadEndDate ? new Date(contabilidadEndDate).getTime() + (24 * 60 * 60 * 1000) : Infinity;
+
+            // 1. Recolectar Ingresos (Visitas ATENDIDAS)
+            let filteredIngresos = visitsArray
+                .filter(v => v.estado === 'Atendido' && v.financiera && v.financiera.totalCliente > 0)
+                .filter(v => {
+                    const date = v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt;
+                    return date >= startTimestamp && date <= endTimestamp;
+                })
+                .map(v => ({
+                    id: v.id,
+                    type: 'INGRESO',
+                    monto: v.financiera.totalCliente,
+                    concepto: `Servicio a ${v.nombreCliente} (Técnico: ${v.tecnico})`,
+                    date: v.attendedDate ? v.attendedDate.split('T')[0] : 'N/A',
+                    timestamp: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt
+                }));
+
+            // 2. Recolectar Egresos
+            let filteredEgresos = egresosArray
+                .filter(e => e.timestamp >= startTimestamp && e.timestamp <= endTimestamp)
+                .map(e => ({
+                    id: e.id,
+                    type: 'EGRESO',
+                    monto: e.monto,
+                    concepto: e.concepto,
+                    date: e.date.split('T')[0],
+                    timestamp: e.timestamp
+                }));
+
+            // 3. Consolidar, calcular totales y renderizar
+            const allMovimientos = [...filteredIngresos, ...filteredEgresos];
+            allMovimientos.sort((a, b) => b.timestamp - a.timestamp); 
+
+            let totalIngresos = filteredIngresos.reduce((sum, mov) => sum + mov.monto, 0);
+            let totalEgresos = filteredEgresos.reduce((sum, mov) => sum + mov.monto, 0);
+            let balance = totalIngresos - totalEgresos;
+
+            document.getElementById('totalIngresosDisplay').textContent = `$${totalIngresos.toFixed(2)}`;
+            document.getElementById('totalEgresosDisplay').textContent = `$${totalEgresos.toFixed(2)}`;
+            document.getElementById('balanceDisplay').textContent = `$${balance.toFixed(2)}`;
+            document.getElementById('balanceDisplay').className = `text-xl font-bold ${balance >= 0 ? 'text-fix-report' : 'text-fix-error'}`;
+
+            renderContabilidadTable(allMovimientos);
+        };
+
+        function renderContabilidadTable(movimientos) {
+            const tbody = document.getElementById('contabilidadTableBody');
+            if (!tbody) return;
+
+            if (movimientos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No hay movimientos en el rango de fechas seleccionado.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = movimientos.map(mov => {
+                const date = new Date(mov.timestamp).toLocaleDateString();
+                const color = mov.type === 'INGRESO' ? 'text-fix-report' : 'text-fix-accent';
+                const sign = mov.type === 'INGRESO' ? '+' : '-';
+
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">${date}</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-sm font-medium ${color}">${mov.type}</td>
+                        <td class="px-3 py-3 text-sm text-gray-500">${mov.concepto}</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-right text-sm font-bold ${color}">${sign} $${mov.monto.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
         }
         
         // --- RENDERING DE LA LISTA DE VISITAS ---
@@ -572,7 +686,6 @@
 
 
                 let controls = '';
-                // 🚨 Mostrar controles interactivos SOLO si es el Rutero del Técnico o la Vista Admin 🚨
                 if (currentView === 'my_agenda' || currentView === 'reporte_admin') {
                     controls = `
                         <div class="mt-4 pt-4 border-t border-fix-light/30">
@@ -627,31 +740,49 @@
         
         window.changeView = (newView) => {
             currentView = newView;
-            setupVisitListener();
             
-            // Lógica de botones y filtros (restaurada)
+            // Ocultar todos los contenedores de vista
+            const formContainer = document.getElementById('formContainer');
+            const filterContainer = document.getElementById('filterContainer');
+            const contabilidadView = document.getElementById('contabilidadView');
+            const listContainerParent = document.getElementById('listContainerParent');
+
+            if(formContainer) formContainer.classList.add('hidden');
+            if(filterContainer) filterContainer.classList.add('hidden');
+            if(contabilidadView) contabilidadView.classList.add('hidden');
+            if(listContainerParent) listContainerParent.classList.add('hidden'); // Oculta la lista de visitas
+
+            // Desactivar todos los botones
             document.querySelectorAll('.view-btn').forEach(btn => {
                 btn.classList.remove('bg-fix-blue', 'text-white');
                 btn.classList.add('bg-gray-200', 'text-gray-700');
             });
+
             const btnElement = document.getElementById(`btn-${newView}`);
             if (btnElement) {
                 btnElement.classList.remove('bg-gray-200', 'text-gray-700');
                 btnElement.classList.add('bg-fix-blue', 'text-white');
             }
-            
-            const formContainer = document.getElementById('formContainer');
-            
+
+            // Lógica para mostrar la vista correcta
             if (newView === 'reporte_admin') {
-                 formContainer.classList.remove('hidden'); 
+                 if(formContainer) formContainer.classList.remove('hidden'); 
+                 if(filterContainer) filterContainer.classList.remove('hidden');
+                 if(listContainerParent) listContainerParent.classList.remove('hidden');
                  document.getElementById('reportViewTitle').textContent = 'Agenda y Registro';
-            } else if (newView === 'my_agenda') {
-                 formContainer.classList.add('hidden'); // Ocultar formulario para el técnico
-                 document.getElementById('reportViewTitle').textContent = `Mi Rutero (Técnico: ${TECNICO_ACTUAL_DEMO})`;
-            } else {
-                 formContainer.classList.add('hidden'); 
-                 document.getElementById('reportViewTitle').textContent = 'Agenda Mantenimiento';
-            }
+                 setupVisitListener();
+                 
+            } else if (newView === 'my_agenda' || newView === 'mantenimiento') {
+                 if(filterContainer) filterContainer.classList.remove('hidden');
+                 if(listContainerParent) listContainerParent.classList.remove('hidden');
+                 document.getElementById('reportViewTitle').textContent = newView === 'my_agenda' ? `Mi Rutero (Técnico: ${TECNICO_ACTUAL_DEMO})` : 'Agenda Mantenimiento';
+                 setupVisitListener();
+                 
+            } else if (newView === 'contabilidad') {
+                 if(contabilidadView) contabilidadView.classList.remove('hidden');
+                 loadContabilidadData();
+                 
+            } 
         };
 
         // --- FUNCIONES DE LÓGICA MÍNIMA (Faltantes) ---
@@ -664,11 +795,10 @@
         
         // 🚨 FUNCIÓN PRINCIPAL DE INICIO
         document.addEventListener('DOMContentLoaded', () => {
-             // Forzar la carga de listas y menús
              renderAccessoryInputs(); 
-             handleEquipmentCountChange(); // Dibuja el primer equipo
-             // Iniciar la carga de la DB
+             handleEquipmentCountChange();
              cargarDatos();
+             loadContabilidadData();
         });
     </script>
 </head>
@@ -691,6 +821,9 @@
              </button>
              <button id="btn-my_agenda" onclick="changeView('my_agenda')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
                  Mi Rutero
+             </button>
+             <button id="btn-contabilidad" onclick="changeView('contabilidad')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                 💰 Contabilidad
              </button>
              <button id="btn-mantenimiento" onclick="changeView('mantenimiento')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
                  Mantenimiento
@@ -719,7 +852,73 @@
                  </button>
             </div>
         </div>
+        
+        <div id="contabilidadView" class="hidden">
+            <div class="mb-6 p-4 bg-white rounded-xl shadow-md border border-fix-blue/30">
+                <h3 class="text-2xl font-bold text-fix-blue mb-4">Módulo de Contabilidad</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-1 bg-fix-blue text-white p-4 rounded-lg shadow-lg">
+                        <h4 class="text-lg font-semibold border-b border-fix-light pb-2 mb-3">RESUMEN DEL PERIODO</h4>
+                        <div class="space-y-2">
+                            <p class="flex justify-between font-medium"><span>Ingresos Totales (Atenciones):</span> <span id="totalIngresosDisplay" class="font-bold text-lg text-fix-report">$0.00</span></p>
+                            <p class="flex justify-between font-medium"><span>Egresos Registrados:</span> <span id="totalEgresosDisplay" class="font-bold text-lg text-fix-accent">$0.00</span></p>
+                            <div class="h-px bg-fix-light my-3"></div>
+                            <p class="flex justify-between text-xl font-bold"><span>BALANCE:</span> <span id="balanceDisplay" class="text-fix-light">$0.00</span></p>
+                        </div>
+                    </div>
 
+                    <div class="md:col-span-1 bg-gray-100 p-4 rounded-lg shadow-md border border-gray-300">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Filtrar Movimientos</h4>
+                        <label class="block mb-2">
+                            <span class="text-sm text-gray-700">Fecha de Inicio:</span>
+                            <input type="date" id="contabilidadStartDate" onchange="filterContabilidad()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                        </label>
+                        <label class="block">
+                            <span class="text-sm text-gray-700">Fecha de Fin:</span>
+                            <input type="date" id="contabilidadEndDate" onchange="filterContabilidad()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                        </label>
+                    </div>
+
+                    <div class="md:col-span-1 bg-gray-100 p-4 rounded-lg shadow-md border border-gray-300">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Registrar Nuevo Egreso</h4>
+                        <form id="egresoForm" onsubmit="event.preventDefault(); saveEgreso();">
+                            <label class="block mb-2">
+                                <span class="text-sm text-gray-700">Monto ($)*:</span>
+                                <input type="number" step="0.01" min="0.01" name="montoEgreso" required class="mt-1 block w-full rounded-md shadow-sm p-2 text-base currency-input">
+                            </label>
+                            <label class="block mb-4">
+                                <span class="text-sm text-gray-700">Concepto/Descripción*:</span>
+                                <textarea name="conceptoEgreso" required rows="2" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm"></textarea>
+                            </label>
+                            <button type="submit" class="w-full bg-fix-accent hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-md transition duration-200">
+                                REGISTRAR EGRESO
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="mb-6 p-4 bg-white rounded-xl shadow-md border border-gray-200">
+                <h4 class="text-xl font-semibold text-gray-800 mb-3">Detalle de Movimientos</h4>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
+                                <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contabilidadTableBody" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="4" class="text-center py-4 text-gray-500">Cargando movimientos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
         <div id="messageBox" class="p-3 rounded-lg text-white mb-4 opacity-0 transition-opacity duration-300 no-print"></div>
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -769,7 +968,7 @@
                             <label class="block md:col-span-2">
                                 <span class="text-gray-700">Tipo de Servicio Principal (Solo para costeo)*</span>
                                 <select name="tipoServicio" onchange="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                                    </select>
+                                </select>
                             </label>
                         </div>
 
@@ -812,7 +1011,7 @@
                 </form>
             </div>
             
-            <div class="lg:col-span-1">
+            <div id="listContainerParent" class="lg:col-span-1">
                 <div class="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
                     <h2 id="reportViewTitle" class="text-2xl font-semibold mb-6 text-gray-800 border-b pb-2">Agenda de Rutas Diarias</h2>
                     
