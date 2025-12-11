@@ -276,7 +276,52 @@
             // Forzamos el recálculo de costos después de reconstruir el DOM.
             window.updateInstallationCost();
         }
-        
+
+        // 🆕 FUNCIÓN PARA GENERAR EL ENLACE DE WHATSAPP CON LA ENCUESTA
+        function generateWhatsAppLink(visit) {
+            // Limpia el número de teléfono (remueve caracteres no numéricos)
+            const phone = visit.telefono ? visit.telefono.replace(/[^0-9]/g, '') : '';
+            if (!phone) return '#'; 
+            
+            const tecnicoName = visit.tecnico || 'asignado';
+            const clientName = visit.nombreCliente || 'Estimado Cliente';
+            
+            // Calcular fecha aproximada de 6 meses
+            const dateInSixMonths = new Date(Date.now());
+            dateInSixMonths.setMonth(dateInSixMonths.getMonth() + 6);
+            const maintenanceDate = dateInSixMonths.toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' });
+
+            // Texto de la encuesta
+            const message = `
+¡Hola ${clientName}!
+
+Le escribe FIX para darle seguimiento a su servicio de instalación de ${visit.numEquipos} equipo(s) con el técnico ${tecnicoName}.
+
+Queremos conocer su opinión:
+1. ¿Qué le pareció la atención y el servicio de nuestro técnico? (Responda con: Excelente / Bueno / Regular)
+2. ¿Tiene algún comentario o sugerencia que podamos aplicar para mejorar nuestro servicio?
+
+3. *OPCIONAL:* ¿Desea que agendemos una visita de MANTENIMIENTO PREVENTIVO para sus equipos en 6 meses (aprox. ${maintenanceDate}) para mantener su calidad?
+
+*Responda con un "SÍ" o "NO" solo para la pregunta 3.* ¡Gracias por su tiempo!
+    `.trim();
+
+            // Lógica simple para intentar agregar el código de país (asumiendo Ecuador 593)
+            let fullPhone = phone;
+            // Si el número tiene 10 dígitos y empieza con 0 (ej: 099xxxxxxx)
+            if (phone.length === 10 && phone.startsWith('0')) {
+                fullPhone = '593' + phone.substring(1); 
+            } 
+            // Si el número tiene 9 dígitos (ej: 99xxxxxxx)
+            else if (phone.length === 9) { 
+                fullPhone = '593' + phone;
+            }
+
+            // Usar wa.me con el texto codificado
+            return `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
+        }
+
+
         // --- LÓGICA DE FIREBASE Y VISTAS ---
 
         function cargarDatos() {
@@ -1066,7 +1111,22 @@
 
 
                 let controls = '';
+                let whatsappButton = '';
+
                 if (currentView === 'my_agenda' || currentView === 'reporte_admin') {
+                    
+                    if (visit.estado === 'Atendido' && visit.telefono) {
+                        const whatsappLink = generateWhatsAppLink(visit);
+                        whatsappButton = `
+                            <a href="${whatsappLink}" target="_blank" class="block w-full text-center bg-green-500 hover:bg-green-600 text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-200 mt-2">
+                                💬 Enviar Encuesta WhatsApp (Mantenimiento)
+                            </a>
+                        `;
+                    } else if (visit.estado === 'Atendido' && !visit.telefono) {
+                        whatsappButton = `<p class="text-xs text-red-500 mt-2">⚠️ No se puede enviar WhatsApp: Falta número de teléfono.</p>`;
+                    }
+
+
                     controls = `
                         <div class="mt-4 pt-4 border-t border-fix-light/30">
                             <h4 class="text-base font-semibold text-fix-blue mb-2">GESTIÓN EN CAMPO:</h4>
@@ -1084,6 +1144,7 @@
                                     Registrar Cobro/Accesorios
                                 </button>
                             </div>
+                            ${whatsappButton} 
                             <p class="text-xs text-gray-500 mt-2">Cobro Actual: $${total}</p>
                         </div>
                     `;
