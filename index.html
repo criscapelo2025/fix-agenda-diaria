@@ -57,6 +57,7 @@
         let currentView = 'reporte_admin';
         let globalVisitsData = {}; // Objeto para almacenar datos de Firebase
         let visitsArray = []; // Array de datos
+        let filterTecnico = "";
         const TECNICO_ACTUAL_DEMO = "Cristian Capelo"; // Usado como DEMO para "Mi Rutero"
 
         // LISTAS Y DATOS (ESTABLES)
@@ -75,7 +76,7 @@
             "Inst. Campana Isla", "Garantía", "Mantenimiento"
         ];
         
-        // --- FUNCIONES CORE ---
+        // --- FUNCIONES CORE Y UTILITARIAS ---
 
         function showMessage(message, color) {
             const messageBox = document.getElementById('messageBox');
@@ -102,9 +103,9 @@
         }
 
         function updateInstallationCost() {
-            const numEquipos = document.getElementById('numEquipos').value;
             const tipoServicio = document.querySelector('select[name="tipoServicio"]').value; 
-            const costoInstalacion = COSTOS_INSTALACION['cocina induccion']; 
+            const costoInstalacion = COSTOS_INSTALACION['cocina induccion']; // Debería basarse en tipoServicio, pero por ahora se mantiene constante
+            
             if(document.getElementById('costoInstalacionHidden')) document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2);
             window.updateTotalCobro();
             
@@ -129,19 +130,19 @@
         }
         
         function createAccessoryInputRow(name, price, isCustom = false) {
-             const id = name.replace(/\s/g, '_').toLowerCase() + '_' + Date.now();
-             const div = document.createElement('div');
-             div.className = 'accessory-item grid grid-cols-5 gap-2 items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 mb-2';
-             div.innerHTML = `
-                 <div class="col-span-2 text-sm text-gray-700 font-medium truncate" title="${name}">${name}</div>
-                 <input type="number" step="1" min="0" value="0" name="acc_qty_${id}" oninput="updateTotalCobro()" class="w-full text-center rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm font-bold">
-                 <input type="number" step="0.01" value="${price.toFixed(2)}" name="acc_price_${id}" oninput="updateTotalCobro()" class="w-full currency-input rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm ${isCustom ? 'bg-yellow-50' : 'bg-gray-100'}">
-                 <div class="text-right">${isCustom ? `<button type="button" onclick="removeAccessory(this, '${name}')" class="text-red-500 hover:text-red-700 transition duration-150">X</button>` : ''}</div>
-             `;
-             return div;
+            const id = name.replace(/\s/g, '_').toLowerCase() + '_' + Date.now();
+            const div = document.createElement('div');
+            div.className = 'accessory-item grid grid-cols-5 gap-2 items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 mb-2';
+            div.innerHTML = `
+                <div class="col-span-2 text-sm text-gray-700 font-medium truncate" title="${name}">${name}</div>
+                <input type="number" step="1" min="0" value="0" name="acc_qty_${id}" oninput="updateTotalCobro()" class="w-full text-center rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm font-bold">
+                <input type="number" step="0.01" value="${price.toFixed(2)}" name="acc_price_${id}" oninput="updateTotalCobro()" class="w-full currency-input rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm ${isCustom ? 'bg-yellow-50' : 'bg-gray-100'}">
+                <div class="text-right">${isCustom ? `<button type="button" onclick="removeAccessory(this, '${name}')" class="text-red-500 hover:text-red-700 transition duration-150">X</button>` : ''}</div>
+            `;
+            return div;
         }
 
-        // 🚨 FUNCIÓN CRÍTICA: Llenado de menús y accesorios (Soluciona el bloqueo)
+        // 🚨 FUNCIÓN CRÍTICA: Llenado de menús y accesorios
         function renderAccessoryInputs() {
             const container = document.getElementById('accesoriosContainer');
             if (container) {
@@ -182,7 +183,7 @@
             window.updateInstallationCost();
         }
 
-        // 🚨 FUNCIÓN CRÍTICA: Manejar equipos dinámicos (Punto 1)
+        // 🚨 FUNCIÓN CRÍTICA: Manejar equipos dinámicos
         function handleEquipmentCountChange() {
             const numEquiposInput = document.getElementById('numEquipos');
             const numEquipos = parseInt(numEquiposInput.value) || 1;
@@ -219,15 +220,15 @@
                     <label class="block">
                         <span class="text-xs text-gray-700">Descripción/Tipo:</span>
                         <select name="descProducto_${i}" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm">
-                             <option value="" disabled selected>--- Seleccionar Tipo de Equipo ---</option>
-                             ${serviceOptions}
+                            <option value="" disabled selected>--- Seleccionar Tipo de Equipo ---</option>
+                            ${serviceOptions}
                         </select>
                     </label>
                     
                     <label class="block">
-                         <span class="text-xs text-gray-700">Costo Base:</span>
-                         <input type="number" name="costoEquipo_${i}" placeholder="Costo ($)" value="0.00" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm">
-                     </label>
+                          <span class="text-xs text-gray-700">Costo Base:</span>
+                          <input type="number" name="costoEquipo_${i}" placeholder="Costo ($)" value="0.00" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm">
+                    </label>
                 `;
                 productInputsContainer.appendChild(productBlock);
             }
@@ -239,8 +240,9 @@
             database.ref('visits').on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
-                    globalVisitsData = data; 
-                    visitsArray = Object.values(data);
+                    // Mapear los objetos de Firebase a un array con el ID incluido
+                    visitsArray = Object.keys(data).map(key => ({ ...data[key], id: key }));
+                    globalVisitsData = data;
                 } else {
                     globalVisitsData = {};
                     visitsArray = [];
@@ -256,7 +258,7 @@
             if (currentView === 'my_agenda') {
                  // Filtro Rutero: por Técnico DEMO y Fecha de Hoy
                  visits = visits.filter(v => 
-                     v.tecnico === TECNICO_ACTUAL_DEMO &&
+                     (v.tecnico === TECNICO_ACTUAL_DEMO || !v.tecnico) && // Muestra las no asignadas a nadie o las de mi tecnico
                      v.fechaInstalacion === filterDate
                  );
                  // Ocultar formulario para el técnico
@@ -275,11 +277,18 @@
                     visits = visits.filter(v => v.tecnico === filterTecnico);
                 }
             } else { // Mantenimiento
-                 visits = visits.filter(v => v.tipoAtencion && v.tipoAtencion.includes('Mantenimiento'));
+                 visits = visits.filter(v => v.tipoAtencion && v.tipoAtencion.includes('mantenimiento'));
             }
             
-            // Ordenar por fecha
-            visits.sort((a, b) => (a.createdAt > b.createdAt) ? 1 : -1);
+            // Ordenar por estado (PENDIENTE primero) y luego por fecha
+            visits.sort((a, b) => {
+                const statusOrder = { 'PENDIENTE': 1, 'Novedad': 2, 'No Atendido': 3, 'Atendido': 4 };
+                const aStatus = statusOrder[a.estado] || 5;
+                const bStatus = statusOrder[b.estado] || 5;
+
+                if (aStatus !== bStatus) return aStatus - bStatus;
+                return (a.createdAt > b.createdAt) ? 1 : -1;
+            });
 
             renderVisits(visits);
         }
@@ -313,8 +322,10 @@
                 });
             }
 
-            const newVisitId = database.ref().child('visits').push().key; 
-            database.ref('visits/' + newVisitId).set({
+            const newVisitRef = database.ref('visits').push(); 
+            const newVisitId = newVisitRef.key;
+
+            newVisitRef.set({
                 id: newVisitId,
                 nombreCliente: visitData.nombreCliente,
                 fechaInstalacion: visitData.fechaInstalacion,
@@ -331,14 +342,10 @@
                 correo: visitData.correo,
                 tipoAtencion: visitData.tipoAtencion,
                 numEquipos: numEquipos,
-                // Datos del primer equipo para compatibilidad con exportación antigua
-                codProducto: equipos[0].codProducto,
-                descProducto: equipos[0].descProducto,
-                serieEquipo: equipos[0].serieEquipo,
                 // Almacenar todos los equipos
                 equipos: equipos,
                 financiera: {
-                    totalCliente: totalInstalacionCost, // Aquí debe ir el total de todos los equipos
+                    totalCliente: totalInstalacionCost, 
                     costoInstalacion: totalInstalacionCost,
                     cobroAccesorios: 0.00
                 }
@@ -354,35 +361,196 @@
             });
         };
 
-        // 🚨 FUNCIÓN: Actualizar estado y cobro del técnico (Punto 1)
-        window.updateVisitStatusAndFinancials = (visitId, newStatus) => {
-             const currentVisit = globalVisitsData[visitId];
-             if (!currentVisit) return;
-             
-             let totalCobro = currentVisit.financiera.totalCliente || 0;
-             let observaciones = '';
+        // --- FUNCIONES DE MODAL DEL TÉCNICO (NUEVO) ---
 
-             if (newStatus === 'Atendido') {
-                 const cobroPrompt = prompt(`(Instalación, Fuera de Garantía, etc.) Ingrese el MONTO TOTAL COBRADO al cliente:`);
-                 totalCobro = parseFloat(cobroPrompt) || totalCobro;
-                 observaciones = 'Servicio completado. Valores registrados.';
-             } else if (newStatus === 'No Atendido') {
-                 observaciones = prompt("Ingrese el motivo por el cual NO se atendió la visita:");
-                 totalCobro = 0;
-             }
+        // Función para abrir el modal de edición/cobro
+        window.openEditModal = (visitId) => {
+            const visit = visitsArray.find(v => v.id === visitId);
+            if (!visit) {
+                showMessage('Error: Visita no encontrada.', 'fix-error');
+                return;
+            }
+            if (visit.estado === 'Atendido') {
+                 // Si ya está atendido, se abre en modo solo-vista o se permite edición limitada
+                 // Por simplicidad, alertamos y no abrimos
+                 // showMessage('Esta visita ya fue marcada como ATENDIDA. No se permite edición.', 'fix-accent');
+                 // return;
+            }
 
-             database.ref('visits/' + visitId).update({
-                 estado: newStatus,
-                 observaciones: observaciones,
-                 financiera: { ...currentVisit.financiera, totalCliente: totalCobro }
-             })
-             .then(() => {
-                 showMessage(`✅ Visita de ${currentVisit.nombreCliente} actualizada a: ${newStatus}`, 'fix-report');
-             })
-             .catch(() => {
-                 showMessage(`❌ Error al actualizar estado.`, 'fix-error');
-             });
+            // 1. Mostrar el Modal
+            const modal = document.getElementById('editModal');
+            modal.classList.remove('invisible', 'opacity-0');
+            
+            // 2. Llenar los datos de la visita
+            document.getElementById('modalVisitId').value = visit.id;
+            document.getElementById('modalClientName').textContent = visit.nombreCliente || 'N/A';
+            document.getElementById('modalCurrentStatus').value = visit.estado || 'PENDIENTE';
+            document.getElementById('modalObservaciones').value = visit.observacionesTecnico || '';
+            
+            // 3. Inicializar los valores financieros
+            const costoInstalacion = (visit.financiera && visit.financiera.costoInstalacion) || 0;
+            const totalCliente = (visit.financiera && visit.financiera.totalCliente) || costoInstalacion;
+            
+            document.getElementById('modalCostoInstalacion').value = costoInstalacion.toFixed(2);
+            document.getElementById('modalCostoInstalacionHidden').value = costoInstalacion.toFixed(2);
+            document.getElementById('modalTotalCobro').value = totalCliente.toFixed(2);
+            
+            // 4. Cargar accesorios y actualizar totales del modal
+            renderModalAccessoryInputs(visit.accesoriosVendidos);
         };
+
+        window.closeEditModal = () => {
+            const modal = document.getElementById('editModal');
+            modal.classList.add('invisible', 'opacity-0');
+            document.getElementById('editVisitForm').reset();
+        };
+
+        // Función de renderizado de accesorios específica para el modal
+        function renderModalAccessoryInputs(accesoriosPrevios = []) {
+            const container = document.getElementById('modalAccesoriosContainer');
+            if (!container) return;
+
+            container.innerHTML = '';
+            
+            const prevMap = {};
+            if (accesoriosPrevios.length > 0) {
+                accesoriosPrevios.forEach(acc => { prevMap[acc.nombre] = acc; });
+            }
+
+            Object.entries(ACCESORIOS_DEFAULT).forEach(([name, price]) => {
+                const id = name.replace(/\s/g, '_').toLowerCase();
+                const valorPrevio = prevMap[name];
+                const cantidad = valorPrevio ? valorPrevio.cantidad : 0;
+                
+                const div = document.createElement('div');
+                div.className = 'accessory-item grid grid-cols-5 gap-2 items-center p-2 bg-white rounded-md shadow-sm border border-gray-200 mb-2';
+                div.innerHTML = `
+                    <div class="col-span-2 text-sm text-gray-700 font-medium truncate" title="${name}">${name}</div>
+                    <input type="number" step="1" min="0" value="${cantidad}" name="acc_qty_${id}" oninput="updateModalTotalCobro()" class="w-full text-center rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm font-bold">
+                    <input type="number" step="0.01" value="${price.toFixed(2)}" name="acc_price_${id}" oninput="updateModalTotalCobro()" class="w-full currency-input rounded-md border-gray-300 focus:ring-fix-light p-1 text-sm bg-gray-100">
+                    <div class="text-right"></div>
+                `; 
+                container.appendChild(div);
+            });
+            updateModalTotalCobro();
+        }
+
+        // Lógica de cálculo del cobro para el modal
+        function updateModalTotalCobro() {
+            let totalAccesorios = 0;
+            const container = document.getElementById('modalAccesoriosContainer');
+            if (!container) return;
+
+            const accessoryItems = container.querySelectorAll('.accessory-item');
+            accessoryItems.forEach(item => {
+                const quantityInput = item.querySelector('input[name^="acc_qty_"]');
+                const priceInput = item.querySelector('input[name^="acc_price_"]');
+                const cantidad = parseInt(quantityInput.value) || 0;
+                const precio = parseFloat(priceInput.value) || 0;
+                totalAccesorios += cantidad * precio;
+            });
+
+            const costoInstalacion = parseFloat(document.getElementById('modalCostoInstalacionHidden').value) || 0;
+            const totalClienteEstimado = costoInstalacion + totalAccesorios;
+
+            document.getElementById('modalTotalAccesoriosDisplay').textContent = `$${totalAccesorios.toFixed(2)}`;
+            document.getElementById('modalCobroAccesoriosHidden').value = totalAccesorios.toFixed(2);
+            
+            // Actualizar el campo de cobro total sugerido, pero NO FORZARLO
+            const totalCobroInput = document.getElementById('modalTotalCobro');
+            totalCobroInput.value = totalClienteEstimado.toFixed(2);
+        }
+
+        // Función final de guardado del reporte del técnico
+        window.saveTechnicianReport = () => {
+            const form = document.getElementById('editVisitForm');
+            const data = new FormData(form);
+            const reportData = {};
+            for (let [key, value] of data.entries()) { reportData[key] = value.trim(); }
+
+            const visitId = reportData.visitId;
+            const totalCobro = parseFloat(reportData.totalCobro) || 0.00;
+            const accesoriosCobro = parseFloat(reportData.cobroAccesoriosHidden) || 0.00;
+            const observaciones = reportData.observaciones;
+
+            if (!observaciones) {
+                alert('Debe ingresar las Observaciones Finales para el reporte.');
+                return;
+            }
+
+            // Recolectar accesorios vendidos
+            const accesoriosVendidos = [];
+            const accessoryItems = document.getElementById('modalAccesoriosContainer').querySelectorAll('.accessory-item');
+            accessoryItems.forEach(item => {
+                const nameElement = item.querySelector('div.col-span-2');
+                const qtyInput = item.querySelector('input[name^="acc_qty_"]');
+                const priceInput = item.querySelector('input[name^="acc_price_"]');
+                
+                const cantidad = parseInt(qtyInput.value) || 0;
+                
+                if (cantidad > 0) {
+                    accesoriosVendidos.push({
+                        nombre: nameElement.textContent,
+                        cantidad: cantidad,
+                        precio: parseFloat(priceInput.value) || 0,
+                    });
+                }
+            });
+
+            database.ref('visits/' + visitId).update({
+                estado: 'Atendido',
+                observacionesTecnico: observaciones,
+                attendedDate: new Date().toISOString(),
+                financiera: {
+                    ...globalVisitsData[visitId].financiera,
+                    totalCliente: totalCobro,
+                    cobroAccesorios: accesoriosCobro
+                },
+                accesoriosVendidos: accesoriosVendidos
+            })
+            .then(() => {
+                showMessage(`✅ Reporte de servicio de ${document.getElementById('modalClientName').textContent} guardado.`, 'fix-report');
+                closeEditModal();
+                setupVisitListener(); // Refrescar la lista
+            })
+            .catch((error) => {
+                console.error("Error al guardar el reporte del técnico: ", error);
+                showMessage(`❌ Error al guardar el reporte.`, 'fix-error');
+            });
+        };
+
+        // Función para cambiar el estado RÁPIDO (No Atendido / Novedad)
+        window.changeVisitQuickStatus = (selectElement, visitId) => {
+            const newStatus = selectElement.value;
+            const currentVisit = visitsArray.find(v => v.id === visitId);
+
+            if (newStatus === 'Atendido') {
+                // Si eligen ATENDIDO, abrimos el modal para completar el reporte
+                openEditModal(visitId);
+                selectElement.value = currentVisit.estado || 'PENDIENTE'; // Volvemos al estado anterior en el select
+                return;
+            }
+            
+            // Lógica para No Atendido o Novedad
+            const observaciones = prompt(`Ingrese el motivo para cambiar el estado a "${newStatus}":`);
+            if (!observaciones) {
+                selectElement.value = currentVisit.estado || 'PENDIENTE'; // Vuelve al estado anterior si cancela
+                return;
+            }
+
+            database.ref('visits/' + visitId).update({
+                estado: newStatus,
+                observacionesTecnico: observaciones,
+                attendedDate: new Date().toISOString(),
+            })
+            .then(() => {
+                showMessage(`✅ Visita de ${currentVisit.nombreCliente} actualizada a: ${newStatus}`, 'fix-report');
+                setupVisitListener();
+            })
+            .catch(() => {
+                showMessage(`❌ Error al actualizar estado.`, 'fix-error');
+            });
+        }
         
         // --- RENDERING DE LA LISTA DE VISITAS ---
         function renderVisits(visits) {
@@ -400,6 +568,8 @@
                 if (visit.estado === 'PENDIENTE') estadoColor = 'bg-fix-accent/70 text-white';
                 if (visit.estado === 'Atendido') estadoColor = 'bg-fix-report text-white';
                 if (visit.estado === 'No Atendido') estadoColor = 'bg-fix-error text-white';
+                if (visit.estado === 'Novedad') estadoColor = 'bg-yellow-500 text-white';
+
 
                 let controls = '';
                 // 🚨 Mostrar controles interactivos SOLO si es el Rutero del Técnico o la Vista Admin 🚨
@@ -410,14 +580,14 @@
                             <div class="grid grid-cols-2 gap-2">
                                 <select 
                                     class="block w-full rounded-md border-gray-300 focus:ring-fix-light focus:border-fix-light p-2 text-sm"
-                                    onchange="updateVisitStatusAndFinancials('${visit.id}', this.value)"
+                                    onchange="changeVisitQuickStatus(this, '${visit.id}')"
                                 >
                                     <option value="" disabled selected>Estado: ${visit.estado}</option>
                                     <option value="Atendido">✅ Atendido</option>
                                     <option value="No Atendido">❌ No Atendido</option>
                                     <option value="Novedad">⚠️ Novedad / Pendiente</option>
                                 </select>
-                                <button onclick="updateVisitStatusAndFinancials('${visit.id}', 'Atendido')" class="bg-fix-report hover:bg-fix-blue text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-200">
+                                <button onclick="openEditModal('${visit.id}')" class="bg-fix-report hover:bg-fix-blue text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-200" ${visit.estado === 'Atendido' ? '' : ''}>
                                     Registrar Cobro/Accesorios
                                 </button>
                             </div>
@@ -444,7 +614,7 @@
             }).join('');
         }
 
-        // --- FILTROS DE VISTA (Restaurados) ---
+        // --- FUNCIONES DE FILTROS DE VISTA ---
         window.filterVisitsByDate = () => {
             filterDate = document.getElementById('filterDateInput').value;
             setupVisitListener();
@@ -484,15 +654,15 @@
             }
         };
 
-        // --- FUNCIONES DE LÓGICA MÍNIMA ---
-        window.deleteVisitLocal = () => { /* lógica de Firebase */ };
-        window.exportToCsv = () => { /* lógica de exportación */ };
+        // --- FUNCIONES DE LÓGICA MÍNIMA (Faltantes) ---
+        window.deleteVisitLocal = () => { showMessage("Funcionalidad de borrado pendiente.", 'fix-accent'); };
+        window.exportToCsv = () => { showMessage("Funcionalidad de exportación pendiente.", 'fix-accent'); };
         window.autofillProduct = () => { /* lógica de autocompletado */ };
-        window.addCustomAccessory = () => { /* lógica de accesorios */ };
+        window.addCustomAccessory = () => { showMessage("Funcionalidad de agregar accesorios personalizada pendiente.", 'fix-accent'); };
         window.removeAccessory = () => { /* lógica de accesorios */ };
-        window.printRoute = () => { /* lógica de impresión */ };
+        window.printRoute = () => { window.print(); };
         
-        // 🚨 FUNCIÓN PRINCIPAL DE INICIO (USAMOS DOMContentLoaded para estabilidad)
+        // 🚨 FUNCIÓN PRINCIPAL DE INICIO
         document.addEventListener('DOMContentLoaded', () => {
              // Forzar la carga de listas y menús
              renderAccessoryInputs(); 
@@ -599,18 +769,7 @@
                             <label class="block md:col-span-2">
                                 <span class="text-gray-700">Tipo de Servicio Principal (Solo para costeo)*</span>
                                 <select name="tipoServicio" onchange="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                                    <option value="cocina induccion">Inst. Cocina Inducción</option>
-                                    <option value="cocina a gas">Inst. Cocina a Gas</option>
-                                    <option value="horno a gas">Inst. Horno a Gas</option>
-                                    <option value="horno electrico">Inst. Horno Eléctrico</option>
-                                    <option value="microondas">Inst. Microondas</option>
-                                    <option value="refrigerador">Inst. Refrigerador</option>
-                                    <option value="lavavajillas">Inst. Lavavajillas</option>
-                                    <option value="campana tradicional">Inst. Campana Tradicional</option>
-                                    <option value="campana decorativa">Inst. Campana Decorativa</option>
-                                    <option value="campana isla">Inst. Campana Isla</option>
-                                    <option value="Garantia">Garantía</option>
-                                </select>
+                                    </select>
                             </label>
                         </div>
 
@@ -622,11 +781,23 @@
                     <div class="mb-6 p-4 border border-fix-accent/30 rounded-lg bg-fix-accent/5">
                         <h3 class="text-xl font-medium mb-4 text-fix-accent">3. Aspectos Financieros y Accesorios</h3>
                         
+                        <div class="grid grid-cols-5 gap-2 text-xs font-bold text-gray-600 mb-2 border-b pb-1">
+                            <span class="col-span-2">Accesorio</span>
+                            <span class="text-center">Cant.</span>
+                            <span class="text-right">Precio ($)</span>
+                            <span class="text-right"></span>
+                        </div>
+
                         <div id="accesoriosContainer" class="p-2 border border-gray-300 rounded-b-md mb-4 bg-gray-50">
                             </div>
                         
-                        <div class="p-3 bg-fix-accent/20 rounded-lg shadow text-center md:col-span-2">
-                            <span class="text-sm font-normal text-fix-blue">TOTAL COBRO CLIENTE</span>
+                        <div class="flex justify-between mt-3 pt-2 border-t text-sm font-bold">
+                            <span>Subtotal Accesorios:</span>
+                            <span id="totalAccesoriosDisplay" class="text-fix-accent">$0.00</span>
+                        </div>
+
+                        <div class="p-3 bg-fix-accent/20 rounded-lg shadow text-center mt-4">
+                            <span class="text-sm font-normal text-fix-blue">TOTAL COBRO ESTIMADO</span>
                             <div id="totalClienteDisplay" class="text-fix-accent text-2xl">$25.00</div>
                             <input type="hidden" id="costoInstalacionHidden" name="costoInstalacionHidden" value="25.00">
                             <input type="hidden" id="cobroAccesoriosHidden" name="cobroAccesoriosHidden" value="0.00">
@@ -654,5 +825,68 @@
             </div>
         </div>
     </div>
-</body>
+
+    <div id="editModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 invisible opacity-0">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[90vh]">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-fix-blue">✅ Registro de Servicio Completado</h3>
+                <button type="button" onclick="closeEditModal()" class="text-gray-500 hover:text-gray-900 font-bold text-2xl">&times;</button>
+            </div>
+            
+            <form id="editVisitForm" class="p-6" onsubmit="event.preventDefault(); saveTechnicianReport()">
+                <input type="hidden" id="modalVisitId" name="visitId">
+                <input type="hidden" id="modalCurrentStatus" name="currentStatus">
+
+                <div class="mb-4">
+                    <p class="text-sm font-semibold text-gray-700">Cliente:</p>
+                    <h4 id="modalClientName" class="text-lg font-bold text-fix-accent mb-2"></h4>
+                </div>
+
+                <div class="mb-6 p-3 border border-fix-accent/30 rounded-lg bg-fix-accent/5">
+                    <h4 class="text-base font-medium mb-3 text-fix-accent">Accesorios y Repuestos</h4>
+                    
+                    <div class="grid grid-cols-5 gap-2 text-xs font-bold text-gray-600 mb-2 border-b pb-1">
+                        <span class="col-span-2">Accesorio</span>
+                        <span class="text-center">Cant.</span>
+                        <span class="text-right">Precio ($)</span>
+                        <span class="text-right"></span>
+                    </div>
+                    
+                    <div id="modalAccesoriosContainer">
+                        </div>
+                    
+                    <div class="flex justify-between mt-3 pt-2 border-t text-sm font-bold">
+                        <span>Subtotal Accesorios:</span>
+                        <span id="modalTotalAccesoriosDisplay" class="text-fix-accent">$0.00</span>
+                        <input type="hidden" id="modalCobroAccesoriosHidden" name="cobroAccesoriosHidden">
+                    </div>
+                </div>
+
+                <div class="mb-6 p-3 border border-fix-blue/30 rounded-lg bg-fix-blue/5">
+                    <h4 class="text-base font-medium mb-3 text-fix-blue">Cobro y Observaciones del Servicio</h4>
+                    
+                    <label class="block mb-3">
+                        <span class="text-sm text-gray-700 font-medium">Costo Base de Instalación/Servicio:</span>
+                        <input type="number" step="0.01" id="modalCostoInstalacion" name="costoInstalacion" readonly class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm bg-gray-100 font-bold currency-input">
+                        <input type="hidden" id="modalCostoInstalacionHidden" name="costoInstalacionHidden">
+                    </label>
+
+                    <label class="block mb-3">
+                        <span class="text-sm text-gray-700 font-medium">MONTO TOTAL COBRADO AL CLIENTE (Incluye Accesorios):</span>
+                        <input type="number" step="0.01" id="modalTotalCobro" name="totalCobro" required class="mt-1 block w-full rounded-md shadow-sm p-2 text-lg border-fix-accent ring-fix-accent font-bold text-fix-blue currency-input">
+                    </label>
+
+                    <label class="block">
+                        <span class="text-sm text-gray-700 font-medium">Observaciones Finales (Requerido):</span>
+                        <textarea id="modalObservaciones" name="observaciones" rows="3" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm"></textarea>
+                    </label>
+                </div>
+
+                <button type="submit" class="w-full bg-fix-report hover:bg-fix-blue text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-300">
+                    FINALIZAR SERVICIO Y GUARDAR REPORTE
+                </button>
+            </form>
+        </div>
+    </div>
+    </body>
 </html>
