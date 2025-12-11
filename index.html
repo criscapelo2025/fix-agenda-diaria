@@ -1,19 +1,3 @@
-¡Absolutamente! Es la forma más segura de evitar errores de copiado/pegado.
-
-Aquí tienes el código completo y actualizado de tu archivo index.html. Incluye:
-
-Múltiples Equipos Dinámicos en el formulario.
-
-Filtro "Mi Rutero" y la Vista Admin.
-
-El Modal de Reporte del Técnico (Cobro/Accesorios).
-
-La nueva vista "Contabilidad (Ingresos/Egresos)" con registro de egresos manual y consolidación de ingresos automática.
-
-Instrucción: Borra todo el contenido de tu archivo index.html y pega el código siguiente.
-
-HTML
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -83,7 +67,7 @@ HTML
         const CATALOGO_PRODUCTOS = {"112580027": "GBC 75030 KBB CRISTAL COCINA GAS", "915061": "ASP. AXIAL BLIND 100 110V-60HZ"};
         const COSTOS_INSTALACION = {'cocina induccion': 25, 'default': 0};
         
-        // TIPOS DE SERVICIO (Restaurados)
+        // TIPOS DE SERVICIO
         const TIPOS_SERVICIO = [
             "Inst. Cocina Inducción", "Inst. Cocina a Gas", "Inst. Horno a Gas", 
             "Inst. Horno Eléctrico", "Inst. Microondas", "Inst. Refrigerador",
@@ -91,6 +75,15 @@ HTML
             "Inst. Grifería", "Inst. Campana Tradicional", "Inst. Campana Decorativa",
             "Inst. Campana Isla", "Garantía", "Mantenimiento"
         ];
+        
+        // VARIABLES GLOBALES DE CONTABILIDAD
+        let egresosArray = [];
+        let contabilidadStartDate = null;
+        let contabilidadEndDate = null;
+
+        // VARIABLES GLOBALES DE INVENTARIO
+        let inventarioStocks = {}; // Stock total y costo promedio por accesorio
+        let inventarioMovs = []; // Historial de movimientos de inventario (compras/consumos)
         
         // --- FUNCIONES CORE Y UTILITARIAS ---
 
@@ -265,7 +258,6 @@ HTML
         function setupVisitListener() {
             let visits = [...visitsArray];
             
-            // 🚨 LÓGICA DE FILTRADO POR VISTA 
             if (currentView === 'my_agenda') {
                  visits = visits.filter(v => 
                      (v.tecnico === TECNICO_ACTUAL_DEMO || !v.tecnico) && 
@@ -287,10 +279,13 @@ HTML
             } else if (currentView === 'mantenimiento') { 
                  visits = visits.filter(v => v.tipoAtencion && v.tipoAtencion.includes('mantenimiento'));
             } else if (currentView === 'contabilidad') {
-                // No renderiza visitas, la lista se usa para ingresos
+                filterContabilidad();
+                return;
+            } else if (currentView === 'inventario') {
+                calculateCurrentStock();
+                return;
             }
             
-            // Ordenar por estado (PENDIENTE primero)
             visits.sort((a, b) => {
                 const statusOrder = { 'PENDIENTE': 1, 'Novedad': 2, 'No Atendido': 3, 'Atendido': 4 };
                 const aStatus = statusOrder[a.estado] || 5;
@@ -300,9 +295,7 @@ HTML
                 return (a.createdAt > b.createdAt) ? 1 : -1;
             });
 
-            if (currentView !== 'contabilidad') {
-                renderVisits(visits);
-            }
+            renderVisits(visits);
         }
 
         window.saveVisit = async () => {
@@ -394,6 +387,10 @@ HTML
             document.getElementById('modalCostoInstalacionHidden').value = costoInstalacion.toFixed(2);
             document.getElementById('modalTotalCobro').value = totalCliente.toFixed(2);
             
+            // Cargar Forma de Pago previa o vacía
+            const formaPagoSelect = document.getElementById('modalFormaPago');
+            formaPagoSelect.value = visit.formaPago || '';
+
             renderModalAccessoryInputs(visit.accesoriosVendidos);
         };
 
@@ -453,7 +450,6 @@ HTML
             document.getElementById('modalCobroAccesoriosHidden').value = totalAccesorios.toFixed(2);
             
             const totalCobroInput = document.getElementById('modalTotalCobro');
-            // Suggest the new total, don't force it if the user manually entered a higher amount
             if (parseFloat(totalCobroInput.value) < totalClienteEstimado) {
                  totalCobroInput.value = totalClienteEstimado.toFixed(2);
             } else if (totalCobroInput.value === "" || totalCobroInput.value === "0.00") {
@@ -474,6 +470,10 @@ HTML
 
             if (!observaciones) {
                 alert('Debe ingresar las Observaciones Finales para el reporte.');
+                return;
+            }
+            if (!reportData.formaPago) {
+                alert('Debe seleccionar la Forma de Pago.');
                 return;
             }
 
@@ -499,6 +499,7 @@ HTML
                 estado: 'Atendido',
                 observacionesTecnico: observaciones,
                 attendedDate: new Date().toISOString(),
+                formaPago: reportData.formaPago, // 🚨 Campo Forma de Pago
                 financiera: {
                     ...globalVisitsData[visitId].financiera,
                     totalCliente: totalCobro,
@@ -510,7 +511,6 @@ HTML
                 showMessage(`✅ Reporte de servicio de ${document.getElementById('modalClientName').textContent} guardado.`, 'fix-report');
                 closeEditModal();
                 setupVisitListener(); 
-                // No es necesario llamar a loadContabilidadData() aquí, ya que se refresca con setupVisitListener
             })
             .catch((error) => {
                 console.error("Error al guardar el reporte del técnico: ", error);
@@ -548,11 +548,19 @@ HTML
             });
         }
         
-        // --- FUNCIONES DE CONTABILIDAD (NUEVO) ---
+        // --- FUNCIONES DE CONTABILIDAD ---
 
-        let egresosArray = [];
-        let contabilidadStartDate = null;
-        let contabilidadEndDate = null;
+        // Toggle de formularios de Ingreso/Egreso
+        window.toggleManualForm = (type) => {
+            document.querySelectorAll('.manual-form').forEach(form => {
+                form.classList.add('hidden');
+            });
+            if (type === 'EGRESO') {
+                document.getElementById('egresoForm').classList.remove('hidden');
+            } else if (type === 'INGRESO_MANUAL') {
+                document.getElementById('ingresoManualForm').classList.remove('hidden');
+            }
+        };
 
         function loadContabilidadData() {
             database.ref('egresos').on('value', (snapshot) => {
@@ -562,31 +570,37 @@ HTML
                 } else {
                     egresosArray = [];
                 }
-                filterContabilidad(); // Filtrar y renderizar al cargar
+                filterContabilidad(); 
             });
         }
 
-        window.saveEgreso = () => {
-            const form = document.getElementById('egresoForm');
+        window.saveManualMovement = (type) => {
+            const formId = type === 'EGRESO' ? 'egresoForm' : 'ingresoManualForm';
+            const form = document.getElementById(formId);
             const data = new FormData(form);
-            const egresoData = {};
-            for (let [key, value] of data.entries()) { egresoData[key] = value.trim(); }
+            const movData = {};
+            for (let [key, value] of data.entries()) { movData[key] = value.trim(); }
 
-            const newEgresoRef = database.ref('egresos').push(); 
-            newEgresoRef.set({
-                id: newEgresoRef.key,
-                type: 'EGRESO',
-                monto: parseFloat(egresoData.montoEgreso),
-                concepto: egresoData.conceptoEgreso,
+            const montoKey = type === 'EGRESO' ? 'montoEgreso' : 'montoIngreso';
+            const conceptoKey = type === 'EGRESO' ? 'conceptoEgreso' : 'conceptoIngreso';
+
+            const newMovRef = database.ref('egresos').push(); 
+            newMovRef.set({
+                id: newMovRef.key,
+                type: type,
+                monto: parseFloat(movData[montoKey]),
+                concepto: movData[conceptoKey],
                 date: new Date().toISOString(),
                 timestamp: Date.now()
             })
             .then(() => {
-                showMessage(`✅ Egreso de $${egresoData.montoEgreso} registrado.`, 'fix-report');
+                const msg = type === 'EGRESO' ? `Egreso de $${movData[montoKey]} registrado.` : `Ingreso manual de $${movData[montoKey]} registrado.`;
+                const color = type === 'EGRESO' ? 'fix-accent' : 'fix-report';
+                showMessage(`✅ ${msg}`, color);
                 form.reset();
             })
             .catch(() => {
-                showMessage(`❌ Error al registrar egreso.`, 'fix-error');
+                showMessage(`❌ Error al registrar movimiento.`, 'fix-error');
             });
         };
 
@@ -606,30 +620,46 @@ HTML
                 })
                 .map(v => ({
                     id: v.id,
-                    type: 'INGRESO',
+                    type: `INGRESO (Servicio - ${v.formaPago || 'N/A'})`, // Incluir forma de pago
                     monto: v.financiera.totalCliente,
                     concepto: `Servicio a ${v.nombreCliente} (Técnico: ${v.tecnico})`,
                     date: v.attendedDate ? v.attendedDate.split('T')[0] : 'N/A',
                     timestamp: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt
                 }));
 
-            // 2. Recolectar Egresos
-            let filteredEgresos = egresosArray
-                .filter(e => e.timestamp >= startTimestamp && e.timestamp <= endTimestamp)
+            // 2. Recolectar Egresos y Ingresos Manuales
+            let manualMovs = egresosArray
+                .filter(e => e.timestamp >= startTimestamp && e.timestamp <= endTimestamp);
+                
+            let filteredEgresos = manualMovs
+                .filter(e => e.type === 'EGRESO')
                 .map(e => ({
                     id: e.id,
-                    type: 'EGRESO',
+                    type: e.type,
+                    monto: e.monto,
+                    concepto: e.concepto,
+                    date: e.date.split('T')[0],
+                    timestamp: e.timestamp
+                }));
+                
+            let filteredIngresosManuales = manualMovs
+                .filter(e => e.type === 'INGRESO_MANUAL')
+                .map(e => ({
+                    id: e.id,
+                    type: 'INGRESO (Manual)', 
                     monto: e.monto,
                     concepto: e.concepto,
                     date: e.date.split('T')[0],
                     timestamp: e.timestamp
                 }));
 
+
             // 3. Consolidar, calcular totales y renderizar
-            const allMovimientos = [...filteredIngresos, ...filteredEgresos];
+            const allMovimientos = [...filteredIngresos, ...filteredIngresosManuales, ...filteredEgresos]; 
             allMovimientos.sort((a, b) => b.timestamp - a.timestamp); 
 
             let totalIngresos = filteredIngresos.reduce((sum, mov) => sum + mov.monto, 0);
+            totalIngresos += filteredIngresosManuales.reduce((sum, mov) => sum + mov.monto, 0);
             let totalEgresos = filteredEgresos.reduce((sum, mov) => sum + mov.monto, 0);
             let balance = totalIngresos - totalEgresos;
 
@@ -639,6 +669,42 @@ HTML
             document.getElementById('balanceDisplay').className = `text-xl font-bold ${balance >= 0 ? 'text-fix-report' : 'text-fix-error'}`;
 
             renderContabilidadTable(allMovimientos);
+        };
+
+        window.registerCierreCaja = () => {
+            const totalIngresos = parseFloat(document.getElementById('totalIngresosDisplay').textContent.replace('$', '')) || 0;
+            const totalEgresos = parseFloat(document.getElementById('totalEgresosDisplay').textContent.replace('$', '')) || 0;
+            const balance = totalIngresos - totalEgresos;
+
+            if (balance === 0 && totalIngresos === 0) {
+                alert("No hay movimientos en el rango seleccionado para cerrar la caja.");
+                return;
+            }
+
+            const rangeMsg = `Desde ${contabilidadStartDate || 'Inicio'} hasta ${contabilidadEndDate || 'Hoy'}`;
+            const confirmation = confirm(`¿Confirmar Cierre de Caja? Balance a registrar: $${balance.toFixed(2)}.\n\nRango: ${rangeMsg}\n\nEste movimiento se registrará y NO podrá deshacerse.`);
+
+            if (!confirmation) return;
+
+            const newCierreRef = database.ref('cierre_caja').push(); 
+            newCierreRef.set({
+                id: newCierreRef.key,
+                type: 'CIERRE_CAJA',
+                monto: balance,
+                ingresos: totalIngresos,
+                egresos: totalEgresos,
+                concepto: `Cierre de Caja del periodo: ${rangeMsg}`,
+                dateStart: contabilidadStartDate || 'N/A',
+                dateEnd: contabilidadEndDate || new Date().toISOString().split('T')[0],
+                timestamp: Date.now()
+            })
+            .then(() => {
+                showMessage(`✅ Cierre de Caja ($${balance.toFixed(2)}) registrado con éxito.`, 'fix-report');
+            })
+            .catch((error) => {
+                console.error("Error al registrar cierre de caja: ", error);
+                showMessage(`❌ Error al registrar cierre de caja.`, 'fix-error');
+            });
         };
 
         function renderContabilidadTable(movimientos) {
@@ -652,8 +718,8 @@ HTML
 
             tbody.innerHTML = movimientos.map(mov => {
                 const date = new Date(mov.timestamp).toLocaleDateString();
-                const color = mov.type === 'INGRESO' ? 'text-fix-report' : 'text-fix-accent';
-                const sign = mov.type === 'INGRESO' ? '+' : '-';
+                const color = mov.type.includes('INGRESO') ? 'text-fix-report' : 'text-fix-accent';
+                const sign = mov.type.includes('INGRESO') ? '+' : '-';
 
                 return `
                     <tr class="hover:bg-gray-50">
@@ -666,6 +732,122 @@ HTML
             }).join('');
         }
         
+        // --- FUNCIONES DE INVENTARIO ---
+
+        function loadInventarioData() {
+            database.ref('inventario').on('value', (snapshot) => {
+                inventarioMovs = [];
+                const data = snapshot.val();
+                if (data) {
+                    inventarioMovs = Object.values(data);
+                }
+                calculateCurrentStock();
+            });
+        }
+
+        function calculateCurrentStock() {
+            let stocks = {};
+            
+            // 1. Inicializar todos los accesorios DEFAULT
+            Object.keys(ACCESORIOS_DEFAULT).forEach(name => {
+                stocks[name] = { stock: 0, costoTotal: 0, costoUnitario: 0 };
+            });
+
+            // 2. Procesar movimientos de COMPRA (Añadir stock y costo)
+            inventarioMovs.filter(m => m.type === 'COMPRA').forEach(mov => {
+                const name = mov.accesorio;
+                const cantidad = mov.cantidad;
+                const costoTotal = mov.costoTotal || 0;
+
+                if (stocks[name]) {
+                    stocks[name].stock += cantidad;
+                    stocks[name].costoTotal += costoTotal;
+                }
+            });
+            
+            // 3. Procesar CONSUMO (Restar stock de las visitas Atendidas)
+            visitsArray.filter(v => v.estado === 'Atendido' && v.accesoriosVendidos).forEach(visit => {
+                visit.accesoriosVendidos.forEach(acc => {
+                    const name = acc.nombre;
+                    const cantidad = acc.cantidad;
+
+                    if (stocks[name]) {
+                        stocks[name].stock -= cantidad;
+                    }
+                });
+            });
+
+            // 4. Calcular costo unitario y guardar
+            Object.keys(stocks).forEach(name => {
+                if (stocks[name].stock > 0 && stocks[name].costoTotal > 0) {
+                     stocks[name].costoUnitario = stocks[name].costoTotal / stocks[name].stock;
+                }
+            });
+
+            inventarioStocks = stocks;
+            renderInventarioTable();
+            populateAccesorioSelect(); 
+        }
+
+        window.saveCompraInventario = () => {
+            const form = document.getElementById('compraForm');
+            const data = new FormData(form);
+            const compraData = {};
+            for (let [key, value] of data.entries()) { compraData[key] = value.trim(); }
+
+            const newCompraRef = database.ref('inventario').push(); 
+            newCompraRef.set({
+                id: newCompraRef.key,
+                type: 'COMPRA',
+                accesorio: compraData.accesorio,
+                cantidad: parseInt(compraData.cantidad),
+                costoTotal: parseFloat(compraData.costoTotal) || 0,
+                date: new Date().toISOString(),
+                timestamp: Date.now()
+            })
+            .then(() => {
+                showMessage(`✅ Compra de ${compraData.cantidad} ${compraData.accesorio} registrada.`, 'fix-blue');
+                form.reset();
+            })
+            .catch(() => {
+                showMessage(`❌ Error al registrar compra.`, 'fix-error');
+            });
+        };
+
+        function populateAccesorioSelect() {
+            const select = document.getElementById('accesorioCompraSelect');
+            if (!select) return;
+            select.innerHTML = '';
+            Object.keys(ACCESORIOS_DEFAULT).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+        }
+
+        function renderInventarioTable() {
+            const tbody = document.getElementById('inventarioTableBody');
+            if (!tbody) return;
+
+            const data = Object.keys(inventarioStocks).map(key => ({ name: key, ...inventarioStocks[key] }));
+            data.sort((a, b) => b.stock - a.stock);
+
+            tbody.innerHTML = data.map(item => {
+                const stockColor = item.stock <= 5 ? 'text-fix-error font-bold' : 'text-gray-900';
+                const valorTotal = item.stock * item.costoUnitario;
+
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-3 text-sm text-gray-900">${item.name}</td>
+                        <td class="px-3 py-3 text-center text-sm ${stockColor}">${item.stock.toFixed(0)}</td>
+                        <td class="px-3 py-3 text-right text-sm text-gray-700">$${item.costoUnitario.toFixed(2)}</td>
+                        <td class="px-3 py-3 whitespace-nowrap text-right text-sm font-bold text-fix-report">$${valorTotal.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
         // --- RENDERING DE LA LISTA DE VISITAS ---
         function renderVisits(visits) {
             const listContainer = document.getElementById('visitsList');
@@ -718,6 +900,7 @@ HTML
                         <p class="text-xs text-gray-500 mt-1"><strong>Técnico:</strong> ${visit.tecnico || 'N/A'}</p>
                         <p class="text-sm text-gray-700 mb-1"><strong>Tipo:</strong> ${visit.tipoAtencion || 'N/A'} (${visit.numEquipos || 1} equipos)</p>
                         <p class="text-sm text-gray-700 mb-1"><strong>Dirección:</strong> ${visit.direccion || 'N/A'}</p>
+                        ${visit.formaPago ? `<p class="text-sm text-gray-700 mb-1"><strong>Pago:</strong> ${visit.formaPago}</p>` : ''} 
                         <p class="text-sm text-gray-700 font-bold mt-2">
                             <strong class="text-fix-accent">Cobro Estimado:</strong> $${total}
                         </p>
@@ -745,12 +928,14 @@ HTML
             const formContainer = document.getElementById('formContainer');
             const filterContainer = document.getElementById('filterContainer');
             const contabilidadView = document.getElementById('contabilidadView');
+            const inventarioView = document.getElementById('inventarioView');
             const listContainerParent = document.getElementById('listContainerParent');
 
             if(formContainer) formContainer.classList.add('hidden');
             if(filterContainer) filterContainer.classList.add('hidden');
             if(contabilidadView) contabilidadView.classList.add('hidden');
-            if(listContainerParent) listContainerParent.classList.add('hidden'); // Oculta la lista de visitas
+            if(inventarioView) inventarioView.classList.add('hidden');
+            if(listContainerParent) listContainerParent.classList.add('hidden'); 
 
             // Desactivar todos los botones
             document.querySelectorAll('.view-btn').forEach(btn => {
@@ -782,7 +967,10 @@ HTML
                  if(contabilidadView) contabilidadView.classList.remove('hidden');
                  loadContabilidadData();
                  
-            } 
+            } else if (newView === 'inventario') {
+                 if(inventarioView) inventarioView.classList.remove('hidden');
+                 loadInventarioData();
+            }
         };
 
         // --- FUNCIONES DE LÓGICA MÍNIMA (Faltantes) ---
@@ -799,6 +987,7 @@ HTML
              handleEquipmentCountChange();
              cargarDatos();
              loadContabilidadData();
+             loadInventarioData();
         });
     </script>
 </head>
@@ -821,6 +1010,9 @@ HTML
              </button>
              <button id="btn-my_agenda" onclick="changeView('my_agenda')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
                  Mi Rutero
+             </button>
+             <button id="btn-inventario" onclick="changeView('inventario')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                 📦 Inventario
              </button>
              <button id="btn-contabilidad" onclick="changeView('contabilidad')" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
                  💰 Contabilidad
@@ -866,6 +1058,9 @@ HTML
                             <div class="h-px bg-fix-light my-3"></div>
                             <p class="flex justify-between text-xl font-bold"><span>BALANCE:</span> <span id="balanceDisplay" class="text-fix-light">$0.00</span></p>
                         </div>
+                        <button onclick="registerCierreCaja()" class="w-full mt-4 bg-fix-light hover:bg-fix-report text-white font-bold py-2 px-4 rounded-md transition duration-200 text-sm">
+                            CIERRE DE CAJA (Registrar Balance)
+                        </button>
                     </div>
 
                     <div class="md:col-span-1 bg-gray-100 p-4 rounded-lg shadow-md border border-gray-300">
@@ -881,18 +1076,41 @@ HTML
                     </div>
 
                     <div class="md:col-span-1 bg-gray-100 p-4 rounded-lg shadow-md border border-gray-300">
-                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Registrar Nuevo Egreso</h4>
-                        <form id="egresoForm" onsubmit="event.preventDefault(); saveEgreso();">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Registro Manual de Movimiento</h4>
+                        
+                        <label class="block mb-3">
+                            <span class="text-sm text-gray-700">Tipo de Movimiento:</span>
+                            <select id="tipoMovimientoSelector" onchange="toggleManualForm(this.value)" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="EGRESO" selected>Gasto / Egreso</option>
+                                <option value="INGRESO_MANUAL">Ingreso Manual</option>
+                            </select>
+                        </label>
+
+                        <form id="egresoForm" onsubmit="event.preventDefault(); saveManualMovement('EGRESO');" class="manual-form">
                             <label class="block mb-2">
-                                <span class="text-sm text-gray-700">Monto ($)*:</span>
+                                <span class="text-sm text-gray-700">Monto del Egreso ($)*:</span>
                                 <input type="number" step="0.01" min="0.01" name="montoEgreso" required class="mt-1 block w-full rounded-md shadow-sm p-2 text-base currency-input">
                             </label>
                             <label class="block mb-4">
-                                <span class="text-sm text-gray-700">Concepto/Descripción*:</span>
+                                <span class="text-sm text-gray-700">Concepto de Egreso*:</span>
                                 <textarea name="conceptoEgreso" required rows="2" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm"></textarea>
                             </label>
                             <button type="submit" class="w-full bg-fix-accent hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-md transition duration-200">
                                 REGISTRAR EGRESO
+                            </button>
+                        </form>
+                        
+                        <form id="ingresoManualForm" onsubmit="event.preventDefault(); saveManualMovement('INGRESO_MANUAL');" class="manual-form hidden">
+                            <label class="block mb-2">
+                                <span class="text-sm text-gray-700">Monto del Ingreso ($)*:</span>
+                                <input type="number" step="0.01" min="0.01" name="montoIngreso" required class="mt-1 block w-full rounded-md shadow-sm p-2 text-base currency-input bg-fix-report/10">
+                            </label>
+                            <label class="block mb-4">
+                                <span class="text-sm text-gray-700">Fuente/Concepto de Ingreso*:</span>
+                                <textarea name="conceptoIngreso" required rows="2" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm"></textarea>
+                            </label>
+                            <button type="submit" class="w-full bg-fix-report hover:bg-fix-blue text-white font-bold py-2 px-4 rounded-md transition duration-200">
+                                REGISTRAR INGRESO
                             </button>
                         </form>
                     </div>
@@ -916,6 +1134,50 @@ HTML
                             <tr><td colspan="4" class="text-center py-4 text-gray-500">Cargando movimientos...</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+        <div id="inventarioView" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="md:col-span-1 bg-white p-4 rounded-xl shadow-md border border-fix-blue/30">
+                    <h3 class="text-xl font-bold text-fix-blue mb-4">Registro de Compra (Entrada)</h3>
+                    <form id="compraForm" onsubmit="event.preventDefault(); saveCompraInventario();">
+                        <label class="block mb-2">
+                            <span class="text-sm text-gray-700">Accesorio Comprado*:</span>
+                            <select name="accesorio" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm" id="accesorioCompraSelect">
+                                </select>
+                        </label>
+                        <label class="block mb-2">
+                            <span class="text-sm text-gray-700">Cantidad Comprada*:</span>
+                            <input type="number" step="1" min="1" name="cantidad" required class="mt-1 block w-full rounded-md shadow-sm p-2 text-base">
+                        </label>
+                        <label class="block mb-4">
+                            <span class="text-sm text-gray-700">Costo Total de la Compra ($):</span>
+                            <input type="number" step="0.01" min="0" name="costoTotal" class="mt-1 block w-full rounded-md shadow-sm p-2 text-base currency-input">
+                        </label>
+                        <button type="submit" class="w-full bg-fix-blue hover:bg-fix-light text-white font-bold py-2 px-4 rounded-md transition duration-200">
+                            REGISTRAR COMPRA
+                        </button>
+                    </form>
+                </div>
+
+                <div class="md:col-span-2 bg-white p-4 rounded-xl shadow-md border border-fix-report/30">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Stock Actual de Accesorios (Valoración)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Accesorio</th>
+                                    <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                                    <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Costo Unitario ($)</th>
+                                    <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Total ($)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventarioTableBody" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="4" class="text-center py-4 text-gray-500">Cargando inventario...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1068,6 +1330,16 @@ HTML
                         <span class="text-sm text-gray-700 font-medium">Costo Base de Instalación/Servicio:</span>
                         <input type="number" step="0.01" id="modalCostoInstalacion" name="costoInstalacion" readonly class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm bg-gray-100 font-bold currency-input">
                         <input type="hidden" id="modalCostoInstalacionHidden" name="costoInstalacionHidden">
+                    </label>
+
+                    <label class="block mb-3">
+                        <span class="text-sm text-gray-700 font-medium">Forma de Pago*:</span>
+                        <select id="modalFormaPago" name="formaPago" required class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm border-gray-300 focus:ring-fix-light">
+                            <option value="" disabled selected>--- Seleccionar ---</option>
+                            <option value="EFECTIVO">💰 Efectivo</option>
+                            <option value="TRANSFERENCIA">🏦 Transferencia</option>
+                            <option value="CHEQUE">📝 Cheque</option>
+                        </select>
                     </label>
 
                     <label class="block mb-3">
