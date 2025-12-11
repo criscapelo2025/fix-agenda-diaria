@@ -65,9 +65,9 @@
         const LUGARES_COMPRA = [ "", "Comercial Solis", "Comercial Kywi", "Como Hogar", "Sukasa", "Comercial Luna Pazmiño", "Macaofertas", "Mercard", "Home Vega" ];
         const ACCESORIOS_DEFAULT = { 'Enchufe 110V': 5, 'Enchufe 220V 20V': 7, 'Enchufe 220V 50V': 10, 'Manguera c/bridas': 4, 'Ducto 4 pulgadas metro': 5, 'Enchufe chinito': 5 };
         const CATALOGO_PRODUCTOS = {"112580027": "GBC 75030 KBB CRISTAL COCINA GAS", "915061": "ASP. AXIAL BLIND 100 110V-60HZ"};
-        const COSTOS_INSTALACION = {'cocina induccion': 25, 'default': 0};
+        // El costo fijo por instalación de inducción se elimina, el costo viene del input 'costoEquipo_i'
         
-        // TIPOS DE SERVICIO
+        // TIPOS DE SERVICIO (Usados en los selects de cada equipo)
         const TIPOS_SERVICIO = [
             "Inst. Cocina Inducción", "Inst. Cocina a Gas", "Inst. Horno a Gas", 
             "Inst. Horno Eléctrico", "Inst. Microondas", "Inst. Refrigerador",
@@ -82,8 +82,8 @@
         let contabilidadEndDate = null;
 
         // VARIABLES GLOBALES DE INVENTARIO
-        let inventarioStocks = {}; // Stock total y costo promedio por accesorio
-        let inventarioMovs = []; // Historial de movimientos de inventario (compras/consumos)
+        let inventarioStocks = {}; 
+        let inventarioMovs = []; 
         
         // --- FUNCIONES CORE Y UTILITARIAS ---
 
@@ -96,6 +96,7 @@
             setTimeout(() => { messageBox.style.opacity = 0; }, 8000);
         }
 
+        // Calcula solo el costo de accesorios (se usa en updateTotalCobro)
         function calcularCostoAccesorios() {
             let totalAccesorios = 0;
             const container = document.getElementById('accesoriosContainer');
@@ -111,29 +112,42 @@
             return totalAccesorios;
         }
 
-        function updateInstallationCost() {
-            const tipoServicio = document.querySelector('select[name="tipoServicio"]').value; 
-            const costoInstalacion = COSTOS_INSTALACION['cocina induccion']; 
-            
-            if(document.getElementById('costoInstalacionHidden')) document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2);
-            window.updateTotalCobro();
-            
-            const numEquiposLabel = document.getElementById('numEquiposLabel');
-            if (numEquiposLabel) {
-                 if (tipoServicio.includes('garantia') || tipoServicio.includes('mantenimiento')) {
-                    numEquiposLabel.textContent = 'Cantidad de Equipos a Revisar*';
-                } else {
-                    numEquiposLabel.textContent = 'Cantidad de Equipos a Instalar*';
-                }
-            }
-            handleEquipmentCountChange(); 
+        // Obtiene la suma de costos de instalación de TODOS los equipos
+        function getInstallationCostTotal() {
+             let totalInstalacion = 0;
+             const productInputsContainer = document.getElementById('productInputsContainer');
+             if (!productInputsContainer) return 0;
+
+             // Iterar sobre todos los inputs de costoEquipo_
+             productInputsContainer.querySelectorAll('input[name^="costoEquipo_"]').forEach(input => {
+                totalInstalacion += parseFloat(input.value) || 0;
+             });
+             return totalInstalacion;
         }
 
+
+        // Actualiza el costo de instalación (principalmente para re-generar los inputs)
+        function updateInstallationCost() {
+            // El costo de instalación ya no se calcula aquí, solo aseguramos que el campo
+            // oculto contenga el total sumado de los equipos.
+            const totalInstalacion = getInstallationCostTotal();
+            if(document.getElementById('costoInstalacionHidden')) document.getElementById('costoInstalacionHidden').value = totalInstalacion.toFixed(2);
+            
+            window.updateTotalCobro();
+            
+            handleEquipmentCountChange(true); // Re-dibuja para asegurar labels correctos
+        }
+
+        // Calcula el total a cobrar al cliente (Instalación TOTAL + Accesorios)
         function updateTotalCobro() {
-            const costoInstalacion = parseFloat(document.getElementById('costoInstalacionHidden').value) || 0;
+            const costoInstalacion = getInstallationCostTotal(); // Ahora suma todos los costos individuales
             const totalAccesorios = calcularCostoAccesorios(); 
+            
+            if(document.getElementById('costoInstalacionHidden')) document.getElementById('costoInstalacionHidden').value = costoInstalacion.toFixed(2);
             if(document.getElementById('cobroAccesoriosHidden')) document.getElementById('cobroAccesoriosHidden').value = totalAccesorios.toFixed(2);
+            
             const totalCliente = costoInstalacion + totalAccesorios; 
+            
             if(document.getElementById('totalClienteDisplay')) document.getElementById('totalClienteDisplay').textContent = `$${totalCliente.toFixed(2)}`;
             if(document.getElementById('totalAccesoriosDisplay')) document.getElementById('totalAccesoriosDisplay').textContent = `$${totalAccesorios.toFixed(2)}`;
         }
@@ -161,7 +175,7 @@
                 window.updateTotalCobro();
             }
 
-            // 🛠️ Llenar Menús Desplegables
+            // 🛠️ Llenar Menús Desplegables (Técnico, Lugar Compra)
             const tecnicoSelect = document.querySelector('select[name="tecnico"]');
             if (tecnicoSelect) { tecnicoSelect.innerHTML = ''; LISTA_TECNICOS.forEach(name => { const option = document.createElement('option'); option.value = name; option.textContent = name || "--- Seleccionar Técnico ---"; tecnicoSelect.appendChild(option); }); }
             
@@ -176,42 +190,62 @@
                 LISTA_TECNICOS.slice(1).forEach(name => { const option = document.createElement('option'); option.value = name; option.textContent = name; filterTecnicoSelect.appendChild(option); });
             }
             
-            // 🛠️ Llenar Tipo de Servicio Principal
-            const tipoServicioSelect = document.querySelector('select[name="tipoServicio"]');
-            if (tipoServicioSelect) {
-                tipoServicioSelect.innerHTML = '';
-                TIPOS_SERVICIO.forEach(tipo => {
-                    const option = document.createElement('option');
-                    option.value = tipo.toLowerCase().replace(/ /g, '_');
-                    option.textContent = tipo;
-                    tipoServicioSelect.appendChild(option);
-                });
-            }
-
             window.updateInstallationCost();
         }
 
-        function handleEquipmentCountChange() {
+        // Modificada para re-generar inputs y actualizar etiquetas
+        function handleEquipmentCountChange(isUpdate = false) {
             const numEquiposInput = document.getElementById('numEquipos');
             const numEquipos = parseInt(numEquiposInput.value) || 1;
             const productInputsContainer = document.getElementById('productInputsContainer');
+            const tipoAtencion = document.querySelector('select[name="tipoAtencion"]').value; 
             
             if (!productInputsContainer) return;
 
+            // Almacenar valores actuales antes de borrar (si es una actualización)
+            let currentValues = {};
+            if (isUpdate) {
+                productInputsContainer.querySelectorAll('input, select').forEach(element => {
+                    currentValues[element.name] = element.value;
+                });
+            }
+
             productInputsContainer.innerHTML = ''; 
             
+            // Actualizar etiqueta principal
+            const numEquiposLabel = document.getElementById('numEquiposLabel');
+            if (numEquiposLabel) {
+                 if (tipoAtencion.includes('garantia') || tipoAtencion.includes('mantenimiento') || tipoAtencion.includes('visita_tecnica')) {
+                    numEquiposLabel.textContent = 'Cantidad de Equipos a Revisar/Servicio*';
+                } else {
+                    numEquiposLabel.textContent = 'Cantidad de Equipos a Instalar*';
+                }
+            }
+
+
             for (let i = 1; i <= numEquipos; i++) {
                 const isMain = i === 1;
                 const fieldTitle = isMain ? 'Principal' : `Adicional #${i}`;
                 
                 const productBlock = document.createElement('div');
-                productBlock.className = 'grid grid-cols-1 md:grid-cols-4 gap-2 border-t pt-2 mt-2 border-gray-300';
+                productBlock.className = 'grid grid-cols-1 md:grid-cols-4 gap-4 border-t pt-4 mt-4 border-gray-300';
                 
-                const serviceOptions = TIPOS_SERVICIO.map(tipo => `<option value="${tipo}">${tipo}</option>`).join('');
+                const serviceOptions = TIPOS_SERVICIO.map(tipo => {
+                    const value = tipo.toLowerCase().replace(/ /g, '_');
+                    return `<option value="${value}">${tipo}</option>`;
+                }).join('');
 
                 productBlock.innerHTML = `
-                    <p class="col-span-4 font-semibold text-sm text-gray-700 mt-2">Equipo ${fieldTitle}</p>
+                    <p class="col-span-4 font-semibold text-base text-fix-blue mt-2">Equipo ${fieldTitle}</p>
                     
+                    <label class="block">
+                        <span class="text-xs text-gray-700">Tipo de Equipo/Servicio (Obligatorio)*:</span>
+                        <select name="descProducto_${i}" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm" required>
+                            <option value="" disabled selected>--- Seleccionar Tipo de Equipo ---</option>
+                            ${serviceOptions}
+                        </select>
+                    </label>
+
                     <label class="block">
                         <span class="text-xs text-gray-700">Código Producto:</span>
                         <input type="text" name="codProducto_${i}" placeholder="Código" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm" ${isMain ? 'oninput="autofillProduct()"' : ''}>
@@ -223,19 +257,24 @@
                     </label>
                     
                     <label class="block">
-                        <span class="text-xs text-gray-700">Descripción/Tipo:</span>
-                        <select name="descProducto_${i}" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm">
-                            <option value="" disabled selected>--- Seleccionar Tipo de Equipo ---</option>
-                            ${serviceOptions}
-                        </select>
-                    </label>
-                    
-                    <label class="block">
-                          <span class="text-xs text-gray-700">Costo Base:</span>
-                          <input type="number" name="costoEquipo_${i}" placeholder="Costo ($)" value="0.00" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm">
+                          <span class="text-xs text-gray-700">Costo Base Instalación/Servicio ($)*:</span>
+                          <input type="number" step="0.01" min="0" name="costoEquipo_${i}" placeholder="0.00" oninput="updateInstallationCost()" value="0.00" class="mt-1 block w-full rounded-md shadow-sm p-2 text-sm font-bold bg-yellow-50" required>
                     </label>
                 `;
                 productInputsContainer.appendChild(productBlock);
+
+                // Restaurar valores
+                if (isUpdate) {
+                    productBlock.querySelectorAll('input, select').forEach(element => {
+                        if (currentValues[element.name]) {
+                            element.value = currentValues[element.name];
+                        }
+                    });
+                }
+            }
+
+            if (isUpdate) {
+                 window.updateInstallationCost(); // Forzar recálculo del total después de restaurar valores
             }
         }
         
@@ -324,6 +363,12 @@
                     costoBase: costoEquipo,
                     isPrincipal: i === 1
                 });
+
+                // Validación crítica
+                if (!visitData[`descProducto_${i}`]) {
+                    showMessage(`Seleccione el Tipo/Descripción para el Equipo #${i}.`, 'fix-error');
+                    return;
+                }
             }
 
             const newVisitRef = database.ref('visits').push(); 
@@ -356,6 +401,7 @@
                 showMessage(`✅ Visita guardada.`, 'fix-report');
                 form.reset();
                 renderAccessoryInputs();
+                handleEquipmentCountChange(); // Resetear inputs de equipos
                 setupVisitListener(); 
             })
             .catch(() => {
@@ -387,7 +433,6 @@
             document.getElementById('modalCostoInstalacionHidden').value = costoInstalacion.toFixed(2);
             document.getElementById('modalTotalCobro').value = totalCliente.toFixed(2);
             
-            // Cargar Forma de Pago previa o vacía
             const formaPagoSelect = document.getElementById('modalFormaPago');
             formaPagoSelect.value = visit.formaPago || '';
 
@@ -499,7 +544,7 @@
                 estado: 'Atendido',
                 observacionesTecnico: observaciones,
                 attendedDate: new Date().toISOString(),
-                formaPago: reportData.formaPago, // 🚨 Campo Forma de Pago
+                formaPago: reportData.formaPago, 
                 financiera: {
                     ...globalVisitsData[visitId].financiera,
                     totalCliente: totalCobro,
@@ -781,6 +826,8 @@
             Object.keys(stocks).forEach(name => {
                 if (stocks[name].stock > 0 && stocks[name].costoTotal > 0) {
                      stocks[name].costoUnitario = stocks[name].costoTotal / stocks[name].stock;
+                } else if (stocks[name].stock <= 0) {
+                     stocks[name].costoUnitario = 0; // Stock agotado
                 }
             });
 
@@ -1047,7 +1094,7 @@
         
         <div id="contabilidadView" class="hidden">
             <div class="mb-6 p-4 bg-white rounded-xl shadow-md border border-fix-blue/30">
-                <h3 class="text-2xl font-bold text-fix-blue mb-4">Módulo de Contabilidad</h3>
+                <h3 class="text-2xl font-bold text-fix-blue mb-4">Módulo de Contabilidad (Admin)</h3>
                 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="md:col-span-1 bg-fix-blue text-white p-4 rounded-lg shadow-lg">
@@ -1225,14 +1272,10 @@
 
                             <label class="block">
                                 <span id="numEquiposLabel" class="text-gray-700 font-medium">Cantidad de Equipos a Instalar*</span>
-                                <input type="number" id="numEquipos" name="numEquipos" min="1" value="1" oninput="updateInstallationCost(); handleEquipmentCountChange();" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <input type="number" id="numEquipos" name="numEquipos" min="1" value="1" oninput="updateInstallationCost();" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
                             </label>
-                            <label class="block md:col-span-2">
-                                <span class="text-gray-700">Tipo de Servicio Principal (Solo para costeo)*</span>
-                                <select name="tipoServicio" onchange="updateInstallationCost()" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                                </select>
-                            </label>
-                        </div>
+                           
+                            </div>
 
                         <div id="productInputsContainer">
                             </div>
@@ -1259,8 +1302,8 @@
 
                         <div class="p-3 bg-fix-accent/20 rounded-lg shadow text-center mt-4">
                             <span class="text-sm font-normal text-fix-blue">TOTAL COBRO ESTIMADO</span>
-                            <div id="totalClienteDisplay" class="text-fix-accent text-2xl">$25.00</div>
-                            <input type="hidden" id="costoInstalacionHidden" name="costoInstalacionHidden" value="25.00">
+                            <div id="totalClienteDisplay" class="text-fix-accent text-2xl">$0.00</div>
+                            <input type="hidden" id="costoInstalacionHidden" name="costoInstalacionHidden" value="0.00">
                             <input type="hidden" id="cobroAccesoriosHidden" name="cobroAccesoriosHidden" value="0.00">
                         </div>
                     </div>
