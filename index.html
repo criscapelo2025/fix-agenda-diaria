@@ -330,6 +330,24 @@ Queremos conocer su opinión:
             return `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
         }
 
+        // 🚨 NUEVA FUNCIÓN: ELIMINAR VISITA
+        window.deleteVisit = (visitId, clientName) => {
+            if (!confirm(`¿Está seguro de que desea ELIMINAR PERMANENTEMENTE la visita de ${clientName}? Esta acción no se puede deshacer.`)) {
+                return;
+            }
+
+            database.ref('visits/' + visitId).remove()
+                .then(() => {
+                    showMessage(`✅ Visita de ${clientName} eliminada correctamente.`, 'fix-error');
+                    // setupVisitListener() se ejecutará automáticamente gracias al listener 'on("value")' de cargarDatos, pero lo forzamos por si acaso.
+                    setupVisitListener(); 
+                })
+                .catch((error) => {
+                    console.error("Error al eliminar la visita: ", error);
+                    showMessage(`❌ Error al eliminar la visita.`, 'fix-error');
+                });
+        };
+
 
         // --- LÓGICA DE FIREBASE Y VISTAS ---
 
@@ -1226,6 +1244,9 @@ Queremos conocer su opinión:
                                 ${isTechnicianView ? 'Registrar Servicio' : 'Registrar Cobro/Accesorios'}
                             </button>
                         </div>
+                        ${!isTechnicianView ? `<button onclick="deleteVisit('${visit.id}', '${visit.nombreCliente}')" class="block w-full text-center bg-fix-error hover:bg-red-700 text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-200 mt-2">
+                            🗑️ ELIMINAR VISITA (Admin)
+                        </button>` : ''}
                         ${whatsappButton} 
                         <p class="text-xs text-gray-500 mt-2">Cobro Estimado: $${total}</p>
                     </div>
@@ -1353,7 +1374,7 @@ Queremos conocer su opinión:
         }
         
         // --- FUNCIONES DE LÓGICA MÍNIMA (Faltantes) ---
-        window.deleteVisitLocal = () => { showMessage("Funcionalidad de borrado pendiente.", 'fix-accent'); };
+        // window.deleteVisitLocal ya fue reemplazada por window.deleteVisit
         window.exportToCsv = () => { showMessage("Funcionalidad de exportación pendiente.", 'fix-accent'); };
         window.autofillProduct = () => { /* lógica de autocompletado */ };
         window.addCustomAccessory = () => { showMessage("Funcionalidad de agregar accesorios personalizada pendiente.", 'fix-accent'); };
