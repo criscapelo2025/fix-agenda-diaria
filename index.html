@@ -24,6 +24,7 @@
         }
     </script>
     <style>
+
         /* Estilos CSS simplificados */
         .currency-input { text-align: right; font-family: monospace; }
         .modal { transition: opacity 0.3s ease-out, visibility 0.3s ease-out; }
@@ -38,6 +39,22 @@
         body.technician-view #listContainerParent { grid-column: 1 / -1 !important; }
         body.technician-view { background-color: #f0f4f8; }
         
+    /* Soporte para el nuevo sistema de técnicos */
+        body.technician-mode .admin-only { display: none !important; }
+        body.technician-mode .main-grid { grid-template-columns: 1fr !important; }
+
+        .admin-table thead th {
+            position: sticky;
+            top: 0;
+            background: #1e293b;
+            color: #ffffff;
+            z-index: 100;
+            padding: 1.5rem;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+        }
+    
     </style>
     
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
@@ -56,6 +73,96 @@
 
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
+
+      / --- VARIABLE PARA EL TÉCNICO DETECTADO ---
+let currentTechUser = null; 
+
+/**
+ * Función Maestra: Detecta si el usuario es Admin o Técnico mediante la URL
+ * Ejemplo de uso: index.html?tech=Andres Cardenas
+ */
+function detectUserIdentity() {
+    const params = new URLSearchParams(window.location.search);
+    const techName = params.get('tech');
+    
+    // Verificamos si el nombre en la URL coincide con nuestra lista oficial
+    if (techName && LISTA_TECNICOS.includes(techName)) {
+        currentTechUser = techName;
+        
+        // Activamos visualmente el modo técnico (el estilo que pegamos en el Bloque 1)
+        document.body.classList.add('technician-mode');
+        
+        // Actualizamos el sello de identidad en la cabecera
+        // Nota: Asegúrate de tener un elemento con id="userDisplayLabel" en tu HTML
+        const label = document.getElementById('userDisplayLabel');
+        if (label) {
+            label.textContent = "Ruta Asignada: " + techName;
+        }
+        
+        // Si tienes una función para cambiar de vista, la activamos para ir a la ruta
+        if (typeof changeMasterView === 'function') {
+            changeMasterView('agenda_view'); 
+        }
+    } else {
+        // Modo Administrador por defecto
+        const label = document.getElementById('userDisplayLabel');
+        if (label) label.textContent = "Panel de Administración Central";
+    }
+}
+
+// Vinculamos la detección al inicio de la aplicación
+document.addEventListener('DOMContentLoaded', () => {
+    detectUserIdentity();
+});  
+
+/**
+ * Guarda el reporte del técnico en Firebase.
+ * Actualiza: Estado, Tipo de Servicio, Accesorios y Motivo.
+ */
+window.closeVisitByTech = (id) => {
+    // 1. Capturamos los valores de los selectores y el texto
+    const status = document.getElementById(`status_${id}`).value;
+    const type = document.getElementById(`type_${id}`).value;
+    const reason = document.getElementById(`reason_${id}`).value;
+    
+    const usedAccessories = [];
+    
+    // 2. Recorremos los inputs de accesorios para este ID específico
+    document.querySelectorAll(`.acc-${id}`).forEach(input => {
+        const qty = parseInt(input.value) || 0;
+        if (qty > 0) {
+            usedAccessories.push({
+                nombre: input.dataset.name,
+                cantidad: qty,
+                precio: parseFloat(input.dataset.price)
+            });
+        }
+    });
+
+    // 3. Validación de seguridad: Obliga a elegir SI o NO
+    if (status === 'PENDIENTE') {
+        alert("⚠️ Por favor, indica si la visita fue Atendida o No Atendida antes de guardar.");
+        return;
+    }
+
+    // 4. Actualización en la base de datos (Firebase)
+    database.ref('visits/' + id).update({
+        estado: status === 'SI' ? 'Atendido' : 'No Atendido',
+        tipoAtencion: type,
+        razonNoAtencion: status === 'NO' ? reason : '',
+        accesoriosVendidos: usedAccessories,
+        attendedDate: new Date().toISOString()
+    })
+    .then(() => {
+        alert("✅ Reporte guardado con éxito.");
+        // Refrescamos la lista para que el técnico vea el cambio
+        if (typeof renderUIAgenda === 'function') renderUIAgenda();
+    })
+    .catch((error) => {
+        console.error("Error al guardar:", error);
+        alert("❌ Error de conexión. Inténtalo de nuevo.");
+    });
+};
         
         // VARIABLES GLOBALES
         let filterDate = new Date().toISOString().split('T')[0];
@@ -69,11 +176,31 @@
         let activeTechnician = ""; // Se llenará desde la URL si view=tecnico
         // -------------------------------------------------
 
-        // LISTAS Y DATOS (ESTABLES)
-        const LISTA_TECNICOS = [ "", "Juan Carlos Pando", "Cristian Capelo", "Allan Skykaz", "Andres Cardenas", "Juani Cardenas" ];
-        const LUGARES_COMPRA = [ "", "Comercial Solis", "Comercial Kywi", "Como Hogar", "Sukasa", "Comercial Luna Pazmiño", "Macaofertas", "Mercard", "Home Vega" ];
-        const ACCESORIOS_DEFAULT = { 'Enchufe 110V': 5, 'Enchufe 220V 20V': 7, 'Enchufe 220V 50V': 10, 'Manguera c/bridas': 4, 'Ducto 4 pulgadas metro': 5, 'Enchufe chinito': 5 };
-        const CATALOGO_PRODUCTOS = {"112580027": "GBC 75030 KBB CRISTAL COCINA GAS", "915061": "ASP. AXIAL BLIND 100 110V-60HZ"};
+       // --- LISTA MAESTRA DE PERSONAL TÉCNICO (5 Integrantes Oficiales) ---
+const LISTA_TECNICOS = [ 
+    "", 
+    "Andres Cardenas", 
+    "Cristian Capelo", 
+    "Juan Carlos Pando", 
+    "Allan Skykaz",
+    "Juana Cardenas" 
+];
+
+// --- LUGARES DE COMPRA / CANALES DE VENTA ---
+const LUGARES_COMPRA = [ 
+    "", "Comercial Solis", "Comercial Kywi", "Como Hogar", "Sukasa", 
+    "Comercial Luna Pazmiño", "Macaofertas", "Mercard", "Home Vega", "Teka Directo" 
+];
+
+// --- PRECIO ENCHUFE 220V 20V @ $7.00 SEGÚN REQUERIMIENTO ---
+const ACCESORIOS_DEFAULT = { 
+    'Enchufe 110V': 5.00, 
+    'Enchufe 220V 20V': 7.00, 
+    'Enchufe 220V 50V': 10.00, 
+    'Manguera c/bridas': 4.00, 
+    'Ducto 4 pulgadas metro': 5.00, 
+    'Enchufe chinito': 5.00 
+};
         
         // TIPOS DE SERVICIO (Usados en los selects de cada equipo)
         const TIPOS_SERVICIO = [
@@ -1196,85 +1323,96 @@ Queremos conocer su opinión:
 
 
         // --- RENDERING DE LA LISTA DE VISITAS ---
-        function renderVisits(visits) {
-            const listContainer = document.getElementById('visitsList');
-            if (!listContainer) return; 
+function renderVisits(visits) {
+    const listContainer = document.getElementById('visitsList');
+    if (!listContainer) return; 
 
-            if (visits.length === 0) {
-                listContainer.innerHTML = `<p class="text-gray-500 p-4 italic">No hay visitas agendadas para la fecha seleccionada.</p>`;
-                return;
-            }
+    if (visits.length === 0) {
+        listContainer.innerHTML = `<p class="text-gray-500 p-10 italic uppercase font-black text-center text-4xl">No hay visitas agendadas.</p>`;
+        return;
+    }
 
-            listContainer.innerHTML = visits.map(visit => {
-                const total = (visit.financiera && visit.financiera.totalCliente) ? visit.financiera.totalCliente.toFixed(2) : '0.00';
-                let estadoColor = 'bg-blue-100 text-blue-800';
-                if (visit.estado === 'PENDIENTE') estadoColor = 'bg-fix-accent/70 text-white';
-                if (visit.estado === 'Atendido') estadoColor = 'bg-fix-report text-white';
-                if (visit.estado === 'No Atendido') estadoColor = 'bg-fix-error text-white';
-                if (visit.estado === 'Novedad') estadoColor = 'bg-yellow-500 text-white';
+    listContainer.innerHTML = visits.map(visit => {
+        const total = (visit.financiera && visit.financiera.totalCliente) ? visit.financiera.totalCliente.toFixed(2) : '0.00';
+        
+        let estadoColor = 'bg-slate-100 text-slate-400';
+        if (visit.estado === 'PENDIENTE') estadoColor = 'bg-fix-accent text-white';
+        if (visit.estado === 'Atendido') estadoColor = 'bg-fix-report text-white';
+        if (visit.estado === 'No Atendido') estadoColor = 'bg-fix-error text-white';
 
-
-                let whatsappButton = '';
-                if (visit.estado === 'Atendido' && visit.telefono && !isTechnicianView) { // Solo Admin ve el botón de encuesta
-                    const whatsappLink = generateWhatsAppLink(visit);
-                    whatsappButton = `
-                        <a href="${whatsappLink}" target="_blank" class="block w-full text-center bg-green-500 hover:bg-green-600 text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-200 mt-2">
-                            💬 Enviar Encuesta WhatsApp (Mantenimiento)
-                        </a>
-                    `;
-                } else if (visit.estado === 'Atendido' && !visit.telefono && !isTechnicianView) {
-                     whatsappButton = `<p class="text-xs text-red-500 mt-2">⚠️ No se puede enviar WhatsApp: Falta número de teléfono.</p>`;
-                }
-                
-                // Controles del técnico/admin
-                const controls = `
-                    <div class="mt-4 pt-4 border-t border-fix-light/30">
-                        <h4 class="text-base font-semibold text-fix-blue mb-2">${isTechnicianView ? 'REPORTAR SERVICIO:' : 'GESTIÓN EN CAMPO:'}</h4>
-                        <div class="grid grid-cols-2 gap-2">
-                            <select 
-                                class="block w-full rounded-md border-gray-300 focus:ring-fix-light focus:border-fix-light p-2 text-sm"
-                                onchange="changeVisitQuickStatus(this, '${visit.id}')"
-                            >
-                                <option value="" disabled selected>Estado: ${visit.estado}</option>
-                                <option value="Atendido">✅ Atendido</option>
-                                <option value="No Atendido">❌ No Atendido</option>
-                                <option value="Novedad">⚠️ Novedad / Pendiente</option>
-                            </select>
-                            <button onclick="openEditModal('${visit.id}')" class="bg-fix-report hover:bg-fix-blue text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-200" ${visit.estado === 'Atendido' ? '' : ''}>
-                                ${isTechnicianView ? 'Registrar Servicio' : 'Registrar Cobro/Accesorios'}
-                            </button>
-                        </div>
-                        ${!isTechnicianView ? `<button onclick="deleteVisit('${visit.id}', '${visit.nombreCliente}')" class="block w-full text-center bg-fix-error hover:bg-red-700 text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-200 mt-2">
-                            🗑️ ELIMINAR VISITA (Admin)
-                        </button>` : ''}
-                        ${whatsappButton} 
-                        <p class="text-xs text-gray-500 mt-2">Cobro Estimado: $${total}</p>
-                    </div>
-                `;
-                
-                // Mostrar solo el cobro estimado si no es Admin
-                const cobroDisplay = !isTechnicianView ? `<p class="text-sm text-gray-700 font-bold mt-2"><strong class="text-fix-accent">Cobro Estimado:</strong> $${total}</p>` : '';
-
-
-                return `
-                    <div class="bg-white p-4 rounded-xl shadow-md transition-all mb-3">
-                        <div class="flex justify-between items-center mb-2">
-                            <h3 class="text-lg font-bold text-fix-blue">${visit.nombreCliente || 'Sin Nombre'}</h3>
-                            <span class="text-sm font-semibold px-3 py-1 rounded-full ${estadoColor}">${visit.estado}</span>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-1"><strong>Técnico:</strong> ${visit.tecnico || 'N/A'}</p>
-                        <p class="text-sm text-gray-700 mb-1"><strong>Tipo:</strong> ${visit.tipoAtencion || 'N/A'} (${visit.numEquipos || 1} equipos)</p>
-                        <p class="text-sm text-gray-700 mb-1"><strong>Dirección:</strong> ${visit.direccion || 'N/A'}</p>
-                        ${visit.telefono ? `<p class="text-sm text-gray-700 mb-1"><strong>Teléfono:</strong> ${visit.telefono}</p>` : ''} 
-                        ${visit.formaPago ? `<p class="text-sm text-gray-700 mb-1"><strong>Pago:</strong> ${visit.formaPago}</p>` : ''} 
-                        
-                        ${cobroDisplay}
-                        
-                        ${controls}
-                    </div>
-                `;
-            }).join('');
+        let adminButtons = '';
+        if (!currentTechUser) {
+            const whatsappLink = typeof generateWhatsAppLink === 'function' ? generateWhatsAppLink(visit) : '#';
+            adminButtons = `
+                <div class="flex flex-col gap-4 mt-6 admin-only">
+                    <a href="${whatsappLink}" target="_blank" class="bg-green-500 text-white p-6 rounded-[2rem] shadow-lg hover:scale-105 transition-all flex items-center justify-center gap-4 font-black text-2xl italic uppercase">
+                        📲 Enviar Encuesta
+                    </a>
+                    <button onclick="deleteVisit('${visit.id}', '${visit.nombreCliente}')" class="bg-fix-error/10 text-fix-error p-4 rounded-[2rem] font-black text-xl uppercase italic hover:bg-fix-error hover:text-white transition-all">
+                        🗑️ Eliminar Visita
+                    </button>
+                    <p class="text-right font-mono font-black text-slate-400 text-2xl mt-4 italic border-t pt-4">Cobro Estimado: $${total}</p>
+                </div>`;
         }
+
+        return `
+            <div class="bg-white p-14 rounded-[6rem] shadow-premium border-l-[35px] ${visit.estado === 'Atendido' ? 'border-fix-report' : 'border-fix-accent'} mb-16 group relative overflow-hidden transition-all">
+                
+                <div class="flex justify-between items-start mb-8">
+                    <div>
+                        <h3 class="font-black text-fix-blue text-7xl leading-none uppercase mb-4 italic tracking-tighter">${visit.nombreCliente}</h3>
+                        <span class="text-[22px] font-black text-slate-400 uppercase italic">Técnico: ${visit.tecnico || 'SIN ASIGNAR'}</span>
+                        <p class="text-3xl font-black text-slate-600 mt-6 uppercase italic border-l-8 border-fix-accent pl-6">${visit.direccion}</p>
+                    </div>
+                    <div class="flex flex-col items-end gap-4">
+                        <span class="text-[14px] font-black uppercase ${estadoColor} px-8 py-3 rounded-[2.5rem] italic shadow-md">${visit.estado}</span>
+                        <span class="text-[12px] font-black text-slate-300 uppercase italic">${visit.tipoAtencion || 'SERVICIO'}</span>
+                    </div>
+                </div>
+
+                <!-- PANEL TÉCNICO (BOTONES DE CELULAR) -->
+                <div class="mt-8 p-10 bg-slate-100 rounded-[4rem] border-4 border-white shadow-inner no-print">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10">
+                        <div class="flex flex-col">
+                            <span class="text-[10px] font-black text-slate-400 mb-2 uppercase italic ml-4 text-center">¿Se atendió?</span>
+                            <select id="status_${visit.id}" class="p-6 bg-white rounded-3xl border-none font-black text-3xl shadow-sm text-fix-blue">
+                                <option value="PENDIENTE">ELIJA...</option>
+                                <option value="SI" ${visit.estado === 'Atendido' ? 'selected' : ''}>SÍ (ATENDIDO)</option>
+                                <option value="NO" ${visit.estado === 'No Atendido' ? 'selected' : ''}>NO (FALLIDO)</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-[10px] font-black text-slate-400 mb-2 uppercase italic ml-4 text-center">Tipo Servicio</span>
+                            <select id="type_${visit.id}" class="p-6 bg-white rounded-3xl border-none font-black text-3xl shadow-sm">
+                                ${TIPOS_SERVICIO.map(t => `<option value="${t}" ${visit.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <span class="text-[10px] font-black text-slate-400 mb-4 block uppercase tracking-widest italic text-center">Insumos (Enchufe 20V a $7.00)</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10">
+                        ${Object.entries(ACCESORIOS_DEFAULT).map(([nombre, precio]) => `
+                            <div class="flex items-center justify-between p-4 bg-white rounded-3xl border-2 border-slate-100">
+                                <span class="text-[12px] font-black uppercase text-slate-500">${nombre}</span>
+                                <input type="number" min="0" value="0" 
+                                    data-name="${nombre}" data-price="${precio}" 
+                                    class="acc-${visit.id} w-24 text-center bg-slate-50 rounded-2xl p-4 text-4xl font-black text-fix-blue shadow-inner font-mono border-r-8 border-slate-200">
+                            </div>`).join('')}
+                    </div>
+
+                    <textarea id="reason_${visit.id}" placeholder="Notas adicionales o motivo de no atención..." 
+                        class="w-full bg-white p-8 rounded-[3rem] border-none font-black italic text-2xl mb-8 shadow-inner uppercase text-slate-700 h-40"></textarea>
+                    
+                    <button onclick="closeVisitByTech('${visit.id}')" 
+                        class="w-full bg-fix-blue text-white font-black py-10 rounded-[4rem] text-5xl shadow-xl active:scale-95 italic border-b-[20px] border-fix-blue/50 uppercase">
+                        💾 Guardar Reporte Final
+                    </button>
+                </div>
+
+                ${adminButtons}
+            </div>`;
+    }).join('');
+}
 
         // --- FUNCIONES DE FILTROS DE VISTA ---
         window.filterVisitsByDate = () => {
