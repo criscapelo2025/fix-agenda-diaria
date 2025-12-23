@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -40,7 +40,7 @@
         body.technician-mode .admin-only { display: none !important; }
         body.technician-mode .main-grid { grid-template-columns: 1fr !important; }
         
-        /* Estilos de tablas pegajosas para reportes largos */
+        /* Estilos de tablas */
         .admin-table thead th {
             position: sticky;
             top: 0;
@@ -50,7 +50,10 @@
             padding: 1rem;
             text-transform: uppercase;
             font-size: 0.75rem;
+            letter-spacing: 0.1em;
         }
+        
+        .row-hover:hover { background-color: #f8fafc; }
     </style>
     
     <!-- FIREBASE SDK -->
@@ -58,7 +61,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
 
     <script>
-        // --- CONFIGURACIÓN FIREBASE (RESTAURADA) ---
+        // --- CONFIGURACIÓN FIREBASE ---
         const firebaseConfig = {
           apiKey: "AIzaSyCiESorKZljYeFHr19c_XPth2qWluz1Dro",
           authDomain: "fix-agenda-app.firebaseapp.com",
@@ -70,9 +73,9 @@
 
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
-        const apiKey = ""; // Espacio para Gemini IA
+        const apiKey = ""; // API Gemini
 
-        // --- VARIABLES GLOBALES Y MAESTROS ---
+        // --- VARIABLES GLOBALES ---
         let visitsArray = [];      
         let egresosArray = [];     
         let inventarioMovs = [];   
@@ -82,38 +85,16 @@
         const LISTA_TECNICOS = ["", "Andres Cardenas", "Cristian Capelo", "Juan Carlos Pando", "Allan Skykaz", "Juana Cardenas"];
         const LUGARES_COMPRA = ["", "COMERCIAL KYWI", "COMERCIAL SOLIS", "COMO HOGAR", "SUKASA", "LUNA PAZMIÑO", "Macaofertas", "Home Vega", "Mercard", "Teka Directo", "Otro"];
         const ACCESORIOS_DEFAULT = { 
-            'Enchufe 110V': 5.00, 
-            'Enchufe 220V 20V': 7.00, // PRECIO REQUERIDO $7.00
-            'Enchufe 220V 50V': 10.00, 
-            'Manguera c/bridas': 4.00, 
-            'Ducto 4 pulgadas metro': 5.00, 
-            'Enchufe chinito': 5.00,
-            'Abrazadera': 1.00,
-            'Teflon': 1.50
+            'Enchufe 110V': 5.00, 'Enchufe 220V 20V': 7.00, 'Enchufe 220V 50V': 10.00, 
+            'Manguera c/bridas': 4.00, 'Ducto 4 pulgadas metro': 5.00, 'Enchufe chinito': 5.00, 'Abrazadera': 1.00, 'Teflon': 1.50
         };
         const TIPOS_SERVICIO = ["Instalación", "Garantía", "Mantenimiento", "Reparación", "Visita Técnica"];
 
-        // --- FUNCIONES DE IDENTIDAD Y NAVEGACIÓN ---
-        function detectUserIdentity() {
-            const params = new URLSearchParams(window.location.search);
-            const techName = params.get('tech');
-            if (techName && LISTA_TECNICOS.includes(techName)) {
-                currentTechUser = techName;
-                document.body.classList.add('technician-mode');
-                document.getElementById('userDisplayLabel').textContent = "Ruta Asignada: " + techName;
-                changeMasterView('agenda_view');
-            } else {
-                document.getElementById('userDisplayLabel').textContent = "Administración FIX Central";
-            }
-        }
-
+        // --- FUNCIONES DE NAVEGACIÓN ---
         window.changeMasterView = (view) => {
             currentView = view;
             const panels = ['formContainer', 'contabilidadView', 'inventarioView', 'reporteTekaView', 'agendaContainer'];
-            panels.forEach(p => {
-                const el = document.getElementById(p);
-                if(el) el.classList.add('hidden');
-            });
+            panels.forEach(p => document.getElementById(p)?.classList.add('hidden'));
             
             if(view === 'reporte_admin') {
                 document.getElementById('formContainer').classList.remove('hidden');
@@ -130,30 +111,39 @@
                 document.getElementById('reporteTekaView').classList.remove('hidden');
                 renderReporteTeka();
             }
-            
-            // Actualizar botones de navegación
+
+            // Estilo botones
             document.querySelectorAll('.view-btn').forEach(btn => {
                 btn.classList.remove('bg-fix-blue', 'text-white');
                 btn.classList.add('bg-gray-100', 'text-gray-500');
             });
+            const activeBtn = document.querySelector(`[onclick="changeMasterView('${view}')"]`);
+            if(activeBtn) {
+                activeBtn.classList.add('bg-fix-blue', 'text-white');
+                activeBtn.classList.remove('bg-gray-100', 'text-gray-500');
+            }
         };
 
-        // --- GESTIÓN DE DATOS (FIREBASE SYNC) ---
+        // --- SYNC FIREBASE ---
         function startSync() {
             database.ref('visits').on('value', snap => {
                 const data = snap.val();
                 visitsArray = data ? Object.values(data) : [];
                 renderUIAgenda();
+                if(currentView === 'reporte_teka') renderReporteTeka();
+                if(currentView === 'contabilidad') processFinancialBalance();
             });
             database.ref('egresos').on('value', snap => {
                 egresosArray = snap.val() ? Object.values(snap.val()) : [];
+                if(currentView === 'contabilidad') processFinancialBalance();
             });
             database.ref('inventarioMovs').on('value', snap => {
                 inventarioMovs = snap.val() ? Object.values(snap.val()) : [];
+                if(currentView === 'inventario') recalculateInventoryStock();
             });
         }
 
-        // --- RENDERIZADO DE AGENDA (PARA TÉCNICOS Y ADMIN) ---
+        // --- RENDERIZADO RUTA (AGENDA) ---
         function renderUIAgenda() {
             const list = document.getElementById('visitsList');
             if(!list) return;
@@ -169,67 +159,55 @@
                         <div>
                             <h3 class="font-black text-fix-blue text-5xl leading-none uppercase mb-2 italic tracking-tighter">${v.nombreCliente}</h3>
                             <span class="text-lg font-black text-slate-300 uppercase italic tracking-widest">${v.tecnico || 'SIN ASIGNAR'}</span>
-                            <p class="text-2xl font-black text-slate-500 mt-4 uppercase">${v.direccion}</p>
+                            <p class="text-2xl font-black text-slate-500 mt-4 uppercase italic border-l-4 border-fix-accent pl-4">${v.direccion}</p>
                             <p class="text-xl font-bold text-slate-400 mt-1 font-mono">${v.telefono || ''}</p>
                         </div>
                         <div class="flex flex-col items-end gap-3">
-                            <span class="text-[12px] font-black uppercase bg-slate-100 px-6 py-2 rounded-full text-slate-400 italic">${v.estado}</span>
-                            ${!currentTechUser ? `<button onclick="deleteVisit('${v.id}')" class="text-fix-error font-black text-xs uppercase italic hover:underline">Eliminar</button>` : ''}
+                            <span class="text-[12px] font-black uppercase ${v.estado === 'Atendido' ? 'bg-fix-report text-white' : 'bg-fix-accent text-white'} px-6 py-2 rounded-full italic shadow-md">${v.estado}</span>
+                            ${!currentTechUser ? `<button onclick="deleteVisit('${v.id}')" class="text-fix-error font-black text-xs uppercase italic hover:underline">Eliminar Visita</button>` : ''}
                         </div>
                     </div>
 
-                    <!-- PANEL DE REPORTE PARA EL TÉCNICO -->
                     <div class="mt-8 p-10 bg-slate-50 rounded-[3.5rem] border-4 border-white shadow-inner no-print">
-                        <span class="text-[10px] font-black text-fix-blue uppercase mb-6 block italic tracking-[0.3em]">Gestión de Reporte Técnico</span>
-                        
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                             <div class="flex flex-col">
-                                <span class="text-[10px] font-black text-slate-400 mb-2 uppercase italic">¿Se atendió la visita?</span>
+                                <span class="text-[10px] font-black text-slate-400 mb-2 uppercase italic ml-4">¿Se atendió?</span>
                                 <select id="status_${v.id}" class="p-5 bg-white rounded-3xl border-none font-black text-2xl shadow-sm text-fix-blue">
-                                    <option value="PENDIENTE">ELIJA OPCIÓN...</option>
+                                    <option value="PENDIENTE">ELIJA...</option>
                                     <option value="SI" ${v.estado === 'Atendido' ? 'selected' : ''}>SÍ (ATENDIDO)</option>
                                     <option value="NO" ${v.estado === 'No Atendido' ? 'selected' : ''}>NO (FALLIDO)</option>
                                 </select>
                             </div>
                             <div class="flex flex-col">
-                                <span class="text-[10px] font-black text-slate-400 mb-2 uppercase italic">Tipo de Servicio Realizado</span>
+                                <span class="text-[10px] font-black text-slate-400 mb-2 uppercase italic ml-4">Tipo Servicio</span>
                                 <select id="type_${v.id}" class="p-5 bg-white rounded-3xl border-none font-black text-2xl shadow-sm">
                                     ${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}
                                 </select>
                             </div>
                         </div>
 
-                        <span class="text-[10px] font-black text-slate-400 mb-4 block uppercase tracking-widest italic">Insumos y Accesorios ($7.00 Enchufe 20V)</span>
+                        <span class="text-[10px] font-black text-slate-400 mb-4 block uppercase tracking-widest italic text-center">Insumos y Accesorios ($7.00 Enchufe 220V)</span>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                             ${Object.entries(ACCESORIOS_DEFAULT).map(([nombre, precio]) => `
                                 <div class="flex items-center justify-between p-4 bg-white rounded-3xl border-2 border-slate-100 shadow-sm">
                                     <span class="text-[12px] font-black uppercase text-slate-500 italic">${nombre}</span>
-                                    <input type="number" min="0" value="0" 
-                                        data-name="${nombre}" 
-                                        data-price="${precio}" 
-                                        class="acc-${v.id} w-20 text-center bg-slate-50 rounded-2xl p-4 text-3xl font-black text-fix-blue outline-none">
-                                </div>
-                            `).join('')}
+                                    <input type="number" min="0" value="0" data-name="${nombre}" data-price="${precio}" class="acc-${v.id} w-20 text-center bg-slate-50 rounded-2xl p-4 text-3xl font-black text-fix-blue outline-none border-b-4 border-slate-200">
+                                </div>`).join('')}
                         </div>
 
-                        <textarea id="reason_${v.id}" placeholder="Detalles de la visita o motivo si no se atendió..." 
-                            class="w-full bg-white p-8 rounded-[3rem] border-none font-black italic text-2xl mb-8 shadow-inner uppercase text-slate-600 h-40"></textarea>
+                        <textarea id="reason_${v.id}" placeholder="Detalles de visita o motivo de no atención..." class="w-full bg-white p-8 rounded-[3rem] border-none font-black italic text-2xl mb-8 shadow-inner uppercase text-slate-600 h-40"></textarea>
                         
-                        <button onclick="closeVisitByTech('${v.id}')" 
-                            class="w-full bg-fix-blue text-white font-black py-10 rounded-[4rem] text-4xl shadow-xl active:scale-95 italic border-b-[15px] border-fix-blue/50 uppercase tracking-tighter">
-                            💾 GUARDAR REPORTE FINAL
-                        </button>
+                        <button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-blue text-white font-black py-10 rounded-[4rem] text-4xl shadow-xl active:scale-95 italic border-b-[15px] border-fix-blue/50 uppercase">💾 GUARDAR REPORTE</button>
                     </div>
                 </div>`).join('');
         }
 
-        // --- REGISTRO DE VISITAS (ADMIN - FORMULARIO COMPLETO) ---
+        // --- REGISTRO DE VISITAS (ADMIN) ---
         window.expandEquipmentUI = () => {
             const count = parseInt(document.getElementById('numEquipos').value) || 1;
             const container = document.getElementById('productInputsContainer');
             if(!container) return;
             container.innerHTML = '';
-            
             for(let i=1; i<=count; i++) {
                 container.innerHTML += `
                     <div class="p-8 bg-slate-50 rounded-[3.5rem] border-4 border-white mb-6 grid grid-cols-1 md:grid-cols-4 gap-6 relative shadow-md">
@@ -237,10 +215,10 @@
                             <span class="bg-fix-blue text-white w-10 h-10 rounded-xl flex items-center justify-center font-black italic text-lg shadow-lg">#${i}</span>
                             <span class="text-xs font-black text-slate-300 uppercase tracking-[0.4em] italic">Datos del Equipo</span>
                         </div>
-                        <div class="flex flex-col"><span class="text-[10px] font-black text-slate-400 mb-1 uppercase italic ml-2">Servicio*</span><select name="descProducto_${i}" class="p-4 bg-white rounded-2xl border-none font-bold text-sm shadow-sm" required><option value="">ELEGIR...</option>${TIPOS_SERVICIO.map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>
-                        <div class="flex flex-col"><span class="text-[10px] font-black text-slate-400 mb-1 uppercase italic ml-2">Código</span><input type="text" name="codProducto_${i}" placeholder="Ejem: 915..." class="p-4 bg-white rounded-2xl border-none font-black text-sm shadow-sm uppercase"></div>
-                        <div class="flex flex-col"><span class="text-[10px] font-black text-slate-400 mb-1 uppercase italic ml-2">Serie</span><input type="text" name="serieEquipo_${i}" placeholder="S/N" class="p-4 bg-white rounded-2xl border-none font-black text-sm shadow-sm uppercase"></div>
-                        <div class="flex flex-col"><span class="text-[10px] font-black text-slate-400 mb-1 uppercase italic text-right mr-2">Costo ($)*</span><input type="number" name="costoEquipo_${i}" step="0.01" value="25.00" oninput="calculateFinancials()" class="p-4 bg-yellow-50 rounded-2xl border-none font-black text-2xl text-right text-fix-blue italic shadow-inner"></div>
+                        <div class="flex flex-col"><span class="text-[10px] font-black text-slate-400 mb-1 uppercase ml-2">Servicio*</span><select name="descProducto_${i}" class="p-4 bg-white rounded-2xl border-none font-bold text-sm shadow-sm" required><option value="">ELEGIR...</option>${TIPOS_SERVICIO.map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>
+                        <div class="flex flex-col"><span class="text-[10px] font-black text-slate-400 mb-1 uppercase ml-2">Código</span><input type="text" name="codProducto_${i}" placeholder="Ejem: 915..." class="p-4 bg-white rounded-2xl border-none font-black text-sm shadow-sm uppercase"></div>
+                        <div class="flex flex-col"><span class="text-[10px] font-black text-slate-400 mb-1 uppercase ml-2">Serie</span><input type="text" name="serieEquipo_${i}" placeholder="S/N" class="p-4 bg-white rounded-2xl border-none font-black text-sm shadow-sm uppercase"></div>
+                        <div class="flex flex-col"><span class="text-[10px] font-black text-slate-400 mb-1 uppercase text-right mr-2">Costo ($)*</span><input type="number" name="costoEquipo_${i}" step="0.01" value="25.00" oninput="calculateFinancials()" class="p-4 bg-yellow-50 rounded-2xl border-none font-black text-2xl text-right text-fix-blue italic shadow-inner tracking-tighter"></div>
                     </div>`;
             }
             calculateFinancials();
@@ -249,14 +227,8 @@
         window.calculateFinancials = () => {
             let totalInstalacion = 0;
             document.querySelectorAll('input[name^="costoEquipo_"]').forEach(i => totalInstalacion += parseFloat(i.value) || 0);
-            
             let totalAccesorios = 0;
-            document.querySelectorAll('.form-acc-qty').forEach(i => {
-                const qty = parseInt(i.value) || 0;
-                const price = parseFloat(i.dataset.price) || 0;
-                totalAccesorios += qty * price;
-            });
-
+            document.querySelectorAll('.form-acc-qty').forEach(i => totalAccesorios += (parseInt(i.value) || 0) * (parseFloat(i.dataset.price) || 0));
             document.getElementById('displayCostoInstalacion').textContent = `$${totalInstalacion.toFixed(2)}`;
             document.getElementById('displayTotalAccesorios').textContent = `$${totalAccesorios.toFixed(2)}`;
             document.getElementById('displayTotalFinal').textContent = `$${(totalInstalacion + totalAccesorios).toFixed(2)}`;
@@ -267,114 +239,125 @@
             const data = Object.fromEntries(new FormData(form));
             const equipos = [];
             const numEq = parseInt(data.numEquipos) || 1;
-            
             for(let i=1; i<=numEq; i++) {
                 if(!data[`descProducto_${i}`]) { showMessage("Falta el tipo de servicio en equipo #" + i, "fix-error"); return; }
-                equipos.push({
-                    descProducto: data[`descProducto_${i}`],
-                    codProducto: data[`codProducto_${i}`] || 'S/C',
-                    serieEquipo: (data[`serieEquipo_${i}`] || 'S/N').toUpperCase(),
-                    costoBase: parseFloat(data[`costoEquipo_${i}`]) || 0
-                });
+                equipos.push({ descProducto: data[`descProducto_${i}`], codProducto: data[`codProducto_${i}`] || 'S/C', serieEquipo: (data[`serieEquipo_${i}`] || 'S/N').toUpperCase(), costoBase: parseFloat(data[`costoEquipo_${i}`]) || 0 });
             }
-
             const ref = database.ref('visits').push();
-            ref.set({
-                id: ref.key,
-                nombreCliente: data.nombreCliente.toUpperCase(),
-                telefono: data.telefono || 'N/A',
-                direccion: data.direccion.toUpperCase(),
-                fechaInstalacion: data.fechaInstalacion,
-                lugarCompra: data.lugarCompra || 'OTRO',
-                tecnico: data.tecnico || 'SIN ASIGNAR',
-                tipoAtencion: data.tipoAtencion,
-                estado: 'PENDIENTE',
-                createdAt: Date.now(),
-                equipos: equipos,
-                financiera: {
-                    totalCliente: parseFloat(document.getElementById('displayTotalFinal').textContent.replace('$','')),
-                    formaPago: 'PENDIENTE'
-                }
-            }).then(() => {
-                showMessage("✅ Visita Agendada Correctamente", "fix-report");
-                form.reset();
-                document.getElementById('filterDateInput').value = data.fechaInstalacion;
-                expandEquipmentUI();
-                renderInsumosAdmin();
-            });
+            ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), telefono: data.telefono || 'N/A', direccion: data.direccion.toUpperCase(), fechaInstalacion: data.fechaInstalacion, lugarCompra: data.lugarCompra || 'OTRO', tecnico: data.tecnico || 'SIN ASIGNAR', tipoAtencion: data.tipoAtencion, estado: 'PENDIENTE', createdAt: Date.now(), equipos: equipos, financiera: { totalCliente: parseFloat(document.getElementById('displayTotalFinal').textContent.replace('$','')), formaPago: 'PENDIENTE' } })
+            .then(() => { showMessage("✅ Agendado con éxito", "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
         };
 
-        // --- CIERRE DE VISITA (LOGICA TÉCNICA) ---
         window.closeVisitByTech = (id) => {
-            const status = document.getElementById(`status_${id}`).value;
-            const type = document.getElementById(`type_${id}`).value;
-            const reason = document.getElementById(`reason_${id}`).value;
+            const s = document.getElementById(`status_${id}`).value;
+            const t = document.getElementById(`type_${id}`).value;
+            const r = document.getElementById(`reason_${id}`).value;
             const accs = [];
-            
             document.querySelectorAll(`.acc-${id}`).forEach(i => {
                 const qty = parseInt(i.value) || 0;
                 if(qty > 0) accs.push({ nombre: i.dataset.name, cantidad: qty, precio: parseFloat(i.dataset.price) });
             });
-
-            if(status === 'PENDIENTE') return showMessage("⚠️ Por favor, indique si atendió la visita.", "fix-accent");
-
-            database.ref('visits/' + id).update({
-                estado: status === 'SI' ? 'Atendido' : 'No Atendido',
-                tipoAtencion: type,
-                razonNoAtencion: status === 'NO' ? reason : '',
-                accesoriosVendidos: accs,
-                attendedDate: new Date().toISOString()
-            }).then(() => {
-                showMessage("✅ Reporte Guardado con Éxito", "fix-report");
-            });
+            if(s === 'PENDIENTE') return showMessage("⚠️ Elija SI o NO", "fix-accent");
+            database.ref('visits/' + id).update({ estado: s === 'SI' ? 'Atendido' : 'No Atendido', tipoAtencion: t, razonNoAtencion: r, accesoriosVendidos: accs, attendedDate: new Date().toISOString() })
+            .then(() => showMessage("✅ Reporte Guardado", "fix-report"));
         };
 
-        // --- REPORTES Y CONTABILIDAD (RESTAURADOS) ---
+        // --- CAJA Y GASTOS (OPCIONES COMPLETAS) ---
+        window.saveManualEgreso = () => {
+            const c = document.getElementById('egConcepto').value;
+            const m = parseFloat(document.getElementById('egMonto').value);
+            if(!c || !m) return showMessage("Llene concepto y monto", "fix-error");
+            database.ref('egresos').push({ concepto: c.toUpperCase(), monto: m, fecha: Date.now(), type: 'EGRESO' })
+            .then(() => { showMessage("✅ Gasto registrado", "fix-report"); document.getElementById('egConcepto').value = ''; document.getElementById('egMonto').value = ''; });
+        };
+
         window.processFinancialBalance = () => {
             const s = document.getElementById('contabilidadStartDate').value;
             const e = document.getElementById('contabilidadEndDate').value;
             const start = s ? new Date(s).getTime() : 0;
             const end = e ? new Date(e).getTime() + 86400000 : Infinity;
-            
-            const ingresos = visitsArray.filter(v => v.estado === 'Atendido' && v.financiera).map(v => ({
-                id: v.id, monto: v.financiera.totalCliente, type: 'INGRESO', concepto: `VISITA: ${v.nombreCliente}`, 
-                fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt
-            }));
-
+            const ingresos = visitsArray.filter(v => v.estado === 'Atendido' && v.financiera).map(v => ({ monto: v.financiera.totalCliente, type: 'INGRESO', concepto: `VISITA: ${v.nombreCliente}`, fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt }));
             const todos = [...ingresos, ...egresosArray].filter(m => m.fecha >= start && m.fecha <= end).sort((a,b) => b.fecha - a.fecha);
-            
             let tIn = 0; let tOut = 0;
             document.getElementById('contabilidadTableBody').innerHTML = todos.map(m => {
                 if(m.type === 'INGRESO') tIn += m.monto; else tOut += m.monto;
-                return `<tr class="border-b"><td class="p-5 text-xs font-mono font-black italic">${new Date(m.fecha).toLocaleDateString()}</td><td class="p-5"><span class="${m.type==='INGRESO'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'} px-4 py-1 rounded-full font-black text-[10px] uppercase italic">${m.type}</span></td><td class="p-5 text-sm font-bold uppercase italic">${m.concepto}</td><td class="p-5 text-sm text-right font-black italic">$${m.monto.toFixed(2)}</td></tr>`;
+                return `<tr class="border-b row-hover transition-all"><td class="p-5 font-mono text-xs italic font-black">${new Date(m.fecha).toLocaleDateString()}</td><td class="p-5"><span class="${m.type==='INGRESO'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'} px-4 py-1 rounded-full font-black text-[10px] uppercase italic">${m.type}</span></td><td class="p-5 text-sm font-bold uppercase italic">${m.concepto}</td><td class="p-5 text-sm text-right font-black italic">$${m.monto.toFixed(2)}</td></tr>`;
             }).join('');
-
             document.getElementById('totalIngresosDisplay').textContent = `$${tIn.toFixed(2)}`;
             document.getElementById('totalEgresosDisplay').textContent = `$${tOut.toFixed(2)}`;
             document.getElementById('balanceNetoDisplay').textContent = `$${(tIn - tOut).toFixed(2)}`;
         };
 
+        // --- INVENTARIO (OPCIONES COMPLETAS) ---
+        window.saveFacturaCompra = () => {
+            const a = document.getElementById('invAccesorioSelect').value;
+            const q = parseInt(document.getElementById('invCantidad').value);
+            const c = parseFloat(document.getElementById('invCostoTotal').value);
+            if(!q || !c) return showMessage("Llene cantidad y costo", "fix-error");
+            database.ref('inventarioMovs').push({ accesorio: a, cantidad: q, costoTotal: c, fecha: Date.now(), type: 'COMPRA' })
+            .then(() => { showMessage("✅ Stock Cargado", "fix-report"); document.getElementById('invCantidad').value = ''; document.getElementById('invCostoTotal').value = ''; recalculateInventoryStock(); });
+        };
+
+        window.recalculateInventoryStock = () => {
+            let stockMap = {};
+            Object.keys(ACCESORIOS_DEFAULT).forEach(n => stockMap[n] = { qty: 0, valor: 0 });
+            inventarioMovs.filter(m => m.type === 'COMPRA').forEach(m => { if(stockMap[m.accesorio]) { stockMap[m.accesorio].qty += m.cantidad; stockMap[m.accesorio].valor += m.costoTotal; } });
+            visitsArray.filter(v => v.estado === 'Atendido' && v.accesoriosVendidos).forEach(v => { v.accesoriosVendidos.forEach(item => { if(stockMap[item.nombre]) stockMap[item.nombre].qty -= item.cantidad; }); });
+            document.getElementById('inventarioTableBody').innerHTML = Object.entries(stockMap).map(([n, d]) => `
+                <tr class="border-b row-hover">
+                    <td class="p-8 font-black uppercase italic text-2xl">${n}</td>
+                    <td class="p-8 text-center"><span class="bg-fix-blue text-white px-8 py-3 rounded-2xl font-black text-3xl">${d.qty}</span></td>
+                    <td class="p-8 text-right font-black text-2xl italic">$${d.valor.toFixed(2)}</td>
+                </tr>`).join('');
+        };
+
+        // --- REPORTE MAESTRO TEKA (ORDEN EXACTO) ---
         function renderReporteTeka() {
             const body = document.getElementById('tekaReporteBody');
             const atended = visitsArray.filter(v => v.estado === 'Atendido');
-            
             body.innerHTML = atended.flatMap(v => (v.equipos || []).map(eq => `
-                <tr class="border-b">
+                <tr class="border-b row-hover">
                     <td class="p-4 border font-mono text-[11px]">${v.fechaInstalacion}</td>
-                    <td class="p-4 border font-black uppercase text-xs italic">${v.lugarCompra || 'OTRO'}</td>
-                    <td class="p-4 border font-black uppercase text-xs">${eq.codProducto}</td>
-                    <td class="p-4 border font-black uppercase text-xs text-fix-blue italic">${eq.descProducto}</td>
-                    <td class="p-4 border font-mono text-xs italic">${eq.serieEquipo}</td>
-                    <td class="p-4 border font-black uppercase text-xs italic">${v.nombreCliente}</td>
-                    <td class="p-4 border text-right font-black italic">$${(eq.costoBase || 0).toFixed(2)}</td>
+                    <td class="p-4 border font-black uppercase text-[11px] italic">${v.lugarCompra || 'OTRO'}</td>
+                    <td class="p-4 border font-black uppercase text-[11px]">${eq.codProducto}</td>
+                    <td class="p-4 border font-black uppercase text-[11px] text-fix-blue italic">${eq.descProducto}</td>
+                    <td class="p-4 border font-mono text-[11px] italic">${eq.serieEquipo}</td>
+                    <td class="p-4 border font-black uppercase text-[11px] italic">${v.nombreCliente}</td>
+                    <td class="p-4 border text-right font-black italic text-[11px]">$${(eq.costoBase || 0).toFixed(2)}</td>
                 </tr>`)).join('');
         }
 
+        // --- IA GEMINI (ASISTENTE NOTAS) ---
+        async function callGemini(prompt) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            try {
+                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                const data = await response.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text;
+            } catch (e) { return "Error: IA no disponible."; }
+        }
+
+        window.improveNotesIA = async () => {
+            const notes = document.getElementById('obsInputGeneral').value;
+            if(!notes) return showMessage("Escriba notas para mejorar", "fix-accent");
+            toggleAIModal(true, "Refinando redacción técnica...");
+            const res = await callGemini(`Mejora la redacción técnica de estas notas de instalación, que suene profesional y claro: "${notes}"`);
+            document.getElementById('aiContent').textContent = res;
+            document.getElementById('aiApplyBtn').classList.remove('hidden');
+        };
+
+        function toggleAIModal(show, text = "") {
+            const m = document.getElementById('aiModal');
+            if(!m) return;
+            if(show) { m.classList.remove('hidden'); document.getElementById('aiContent').textContent = text; }
+            else { m.classList.add('hidden'); }
+        }
+
+        window.applyAI = () => { document.getElementById('obsInputGeneral').value = document.getElementById('aiContent').textContent; toggleAIModal(false); };
+
         // --- UTILIDADES ---
         function renderInsumosAdmin() {
-            const container = document.getElementById('accesoriosContainerAdmin');
-            if(!container) return;
-            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => `
+            document.getElementById('accesoriosContainerAdmin').innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => `
                 <div class="flex items-center justify-between p-10 bg-white rounded-[3.5rem] border-4 border-slate-50 shadow-sm transition-all hover:scale-95">
                     <span class="text-[14px] font-black text-slate-400 uppercase italic">${n}</span>
                     <div class="flex items-center gap-6">
@@ -384,12 +367,13 @@
                 </div>`).join('');
         }
 
+        window.deleteVisit = (id) => { if(confirm("¿ELIMINAR ESTA VISITA?")) database.ref('visits/' + id).remove().then(() => showMessage("🗑️ Eliminada", "fix-error")); };
+
         function showMessage(msg, color) {
             const box = document.getElementById('messageBox');
-            box.textContent = msg;
-            box.style.opacity = '1';
-            box.className = `fixed bottom-32 left-1/2 -translate-x-1/2 p-20 rounded-[5rem] shadow-premium text-white font-black uppercase text-2xl bg-${color} z-[9999] transition-opacity duration-500`;
-            setTimeout(() => { box.style.opacity = '0'; }, 6000);
+            box.textContent = msg; box.style.opacity = '1';
+            box.className = `fixed bottom-32 left-1/2 -translate-x-1/2 p-16 rounded-[5rem] shadow-premium text-white font-black uppercase text-2xl bg-${color} z-[9999] transition-opacity duration-500`;
+            setTimeout(() => { box.style.opacity = '0'; }, 5000);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -397,16 +381,20 @@
             document.getElementById('filterDateInput').value = hoy;
             document.getElementById('inputFecha').value = hoy;
             
-            detectUserIdentity();
+            const params = new URLSearchParams(window.location.search);
+            const tech = params.get('tech');
+            if(tech && LISTA_TECNICOS.includes(tech)) {
+                currentTechUser = tech; document.body.classList.add('technician-mode');
+                document.getElementById('userDisplayLabel').textContent = "Ruta: " + tech;
+                changeMasterView('agenda_view');
+            } else { document.getElementById('userDisplayLabel').textContent = "Administración FIX Central"; }
+            
             startSync();
+            LISTA_TECNICOS.forEach(t => document.getElementById('selectTecnico').add(new Option(t || "--- TÉCNICO ---", t)));
+            LUGARES_COMPRA.forEach(l => document.getElementById('selectLugar').add(new Option(l || "--- LUGAR COMPRA ---", l)));
+            document.getElementById('invAccesorioSelect').innerHTML = Object.keys(ACCESORIOS_DEFAULT).map(k => `<option value="${k}">${k}</option>`).join('');
             
-            // Llenar selects de técnicos y lugares
-            LISTA_TECNICOS.forEach(t => document.getElementById('selectTecnico').add(new Option(t || "--- SELECCIONAR TÉCNICO ---", t)));
-            const lugSelect = document.getElementById('selectLugar');
-            LUGARES_COMPRA.forEach(l => lugSelect.add(new Option(l || "--- SELECCIONAR LUGAR ---", l)));
-            
-            renderInsumosAdmin();
-            expandEquipmentUI();
+            renderInsumosAdmin(); expandEquipmentUI();
         });
     </script>
 </head>
@@ -415,128 +403,132 @@
 
     <div class="max-w-[2800px] mx-auto">
         
-        <!-- CABECERA PRINCIPAL -->
         <header class="mb-14 flex flex-col xl:flex-row justify-between items-center gap-10 no-print">
             <div class="flex items-center">
-                <div class="bg-fix-blue p-8 rounded-[3.5rem] shadow-premium mr-10">
-                    <span class="text-7xl font-black text-white italic tracking-tighter">FIX</span>
-                </div>
-                <div>
-                    <h1 class="text-7xl font-black uppercase italic tracking-tighter text-slate-800">Control de Gestión</h1>
-                    <span id="userDisplayLabel" class="text-2xl font-black text-slate-400 uppercase italic tracking-[0.3em]">Cargando...</span>
-                </div>
+                <div class="bg-fix-blue p-8 rounded-[3.5rem] shadow-premium mr-10"><span class="text-7xl font-black text-white italic tracking-tighter">FIX</span></div>
+                <div><h1 class="text-7xl font-black uppercase italic tracking-tighter text-slate-800">Control Maestro</h1><span id="userDisplayLabel" class="text-2xl font-black text-slate-400 uppercase italic tracking-[0.3em]">Cargando...</span></div>
             </div>
 
-            <!-- NAVEGACIÓN ADMINISTRATIVA -->
             <nav id="adminNav" class="flex bg-white p-4 rounded-[10rem] shadow-premium border-[12px] border-slate-50 gap-6 admin-only">
-                <button onclick="changeMasterView('reporte_admin')" class="view-btn py-6 px-12 rounded-[5rem] font-black text-xl uppercase bg-fix-blue text-white italic shadow-lg">Agenda Diaria</button>
+                <button onclick="changeMasterView('reporte_admin')" class="view-btn py-6 px-12 rounded-[5rem] font-black text-xl uppercase bg-fix-blue text-white italic shadow-lg">Agenda</button>
                 <button onclick="changeMasterView('reporte_teka')" class="view-btn py-6 px-12 rounded-[5rem] font-black text-xl uppercase bg-gray-100 text-gray-500 italic">Reporte Teka</button>
-                <button onclick="changeMasterView('inventario')" class="view-btn py-6 px-12 rounded-[5rem] font-black text-xl uppercase bg-gray-100 text-gray-500 italic text-[14px]">Stock</button>
-                <button onclick="changeMasterView('contabilidad')" class="view-btn py-6 px-12 rounded-[5rem] font-black text-xl uppercase bg-gray-100 text-gray-500 italic text-[14px]">Caja</button>
+                <button onclick="changeMasterView('inventario')" class="view-btn py-6 px-12 rounded-[5rem] font-black text-xl uppercase bg-gray-100 text-gray-500 italic">Stock</button>
+                <button onclick="changeMasterView('contabilidad')" class="view-btn py-6 px-12 rounded-[5rem] font-black text-xl uppercase bg-gray-100 text-gray-500 italic">Caja / Gastos</button>
             </nav>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-14 main-grid">
             
-            <!-- COLUMNA REGISTRO (ADMIN) -->
             <div id="formContainer" class="lg:col-span-2 space-y-14 admin-only no-print">
-                
-                <!-- FILTRO Y HERRAMIENTAS -->
                 <div class="bg-white p-12 rounded-[6rem] shadow-premium border-[18px] border-white flex flex-wrap gap-10 items-center">
-                    <div class="flex flex-col flex-grow">
-                        <span class="text-xs font-black uppercase text-slate-400 mb-2 ml-4 italic">Visualizar Fecha</span>
-                        <input type="date" id="filterDateInput" onchange="renderUIAgenda()" class="bg-slate-50 p-10 rounded-[4rem] text-4xl font-black italic text-fix-blue outline-none border-none shadow-inner">
-                    </div>
-                    <button onclick="window.print()" class="bg-black text-white px-16 py-10 rounded-[4rem] font-black text-2xl uppercase italic shadow-xl active:scale-95 transition-all">🖨️ Imprimir Ruta</button>
+                    <div class="flex flex-col flex-grow"><span class="text-xs font-black uppercase text-slate-400 mb-2 ml-4 italic tracking-widest">Visualizar Fecha</span><input type="date" id="filterDateInput" onchange="renderUIAgenda()" class="bg-slate-50 p-10 rounded-[4rem] text-4xl font-black italic text-fix-blue outline-none border-none shadow-inner"></div>
+                    <button onclick="window.print()" class="bg-black text-white px-16 py-10 rounded-[4rem] font-black text-2xl uppercase italic shadow-xl">🖨️ Imprimir Ruta</button>
                 </div>
 
-                <!-- FORMULARIO MAESTRO (TOTALMENTE RESTAURADO) -->
-                <div class="bg-white p-16 rounded-[10rem] shadow-premium border-[20px] border-slate-50 relative overflow-hidden">
+                <div class="bg-white p-16 rounded-[10rem] shadow-premium border-[20px] border-slate-50">
                     <form id="visitForm" onsubmit="event.preventDefault(); saveVisit();">
-                        <h2 class="text-7xl font-black mb-16 italic uppercase underline decoration-fix-blue decoration-8 underline-offset-8">Nueva Visita</h2>
-                        
+                        <h2 class="text-7xl font-black mb-16 italic uppercase text-fix-blue underline decoration-8 underline-offset-8 decoration-slate-100">Registro de Caso</h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-14">
-                            <input type="text" name="nombreCliente" placeholder="NOMBRE COMPLETO DEL CLIENTE*" required class="p-10 bg-slate-50 rounded-[4rem] font-black text-3xl uppercase outline-none shadow-inner">
-                            <input type="tel" name="telefono" placeholder="NÚMERO DE TELÉFONO*" class="p-10 bg-slate-50 rounded-[4rem] font-black text-3xl outline-none shadow-inner">
-                            <input type="text" name="direccion" placeholder="DIRECCIÓN EXACTA / CIUDAD / BARRIO*" required class="md:col-span-2 p-10 bg-slate-50 rounded-[4rem] font-black text-3xl uppercase outline-none shadow-inner">
-                            
-                            <select name="tecnico" id="selectTecnico" class="p-10 bg-slate-50 rounded-[4rem] font-black text-2xl outline-none shadow-inner uppercase"></select>
-                            <select name="lugarCompra" id="selectLugar" class="p-10 bg-slate-50 rounded-[4rem] font-black text-2xl outline-none shadow-inner uppercase"></select>
-                            
-                            <input type="date" name="fechaInstalacion" id="inputFecha" required class="p-10 bg-slate-50 rounded-[4rem] font-black text-3xl outline-none shadow-inner">
-                            
-                            <div class="bg-slate-50 p-10 rounded-[4rem] flex items-center justify-between shadow-inner">
-                                <span class="font-black text-2xl ml-6 uppercase italic text-slate-400 tracking-tighter">Equipos:</span>
-                                <input type="number" id="numEquipos" name="numEquipos" value="1" min="1" oninput="expandEquipmentUI()" class="w-24 text-center font-black text-7xl text-fix-blue bg-transparent border-none outline-none italic">
-                            </div>
+                            <input type="text" name="nombreCliente" placeholder="NOMBRE DEL CLIENTE*" required class="p-10 bg-slate-50 rounded-[4rem] font-black text-3xl uppercase outline-none shadow-inner">
+                            <input type="tel" name="telefono" placeholder="TELÉFONO*" class="p-10 bg-slate-50 rounded-[4rem] font-black text-3xl outline-none shadow-inner">
+                            <input type="text" name="direccion" placeholder="DIRECCIÓN COMPLETA*" required class="md:col-span-2 p-10 bg-slate-50 rounded-[4rem] font-black text-3xl uppercase outline-none shadow-inner">
+                            <select name="tecnico" id="selectTecnico" class="p-10 bg-slate-50 rounded-[4rem] font-black text-2xl shadow-inner outline-none"></select>
+                            <select name="lugarCompra" id="selectLugar" class="p-10 bg-slate-50 rounded-[4rem] font-black text-2xl shadow-inner outline-none"></select>
+                            <input type="date" name="fechaInstalacion" id="inputFecha" required class="p-10 bg-slate-50 rounded-[4rem] font-black text-3xl shadow-inner">
+                            <div class="bg-slate-50 p-10 rounded-[4rem] flex items-center justify-between shadow-inner"><span class="font-black text-2xl uppercase italic text-slate-300">N° Equipos:</span><input type="number" id="numEquipos" name="numEquipos" value="1" min="1" oninput="expandEquipmentUI()" class="w-24 text-center font-black text-7xl text-fix-blue bg-transparent border-none outline-none italic"></div>
                         </div>
 
-                        <!-- SECCIÓN DINÁMICA DE EQUIPOS -->
                         <div id="productInputsContainer" class="space-y-10"></div>
 
-                        <!-- SECCIÓN DE INSUMOS (ADMIN) -->
-                        <h3 class="text-4xl font-black text-slate-300 uppercase italic mt-16 mb-10 tracking-[0.2em] text-center border-t-4 pt-10 border-slate-50">Accesorios Sugeridos</h3>
-                        <div id="accesoriosContainerAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-10"></div>
-
-                        <!-- TOTALES DINÁMICOS -->
-                        <div class="mt-20 grid grid-cols-1 xl:grid-cols-3 gap-12 border-t-8 pt-20 border-slate-50">
-                            <div class="bg-slate-50 p-14 rounded-[5rem] text-center italic shadow-inner"><span class="block text-slate-400 text-sm font-black uppercase mb-4">Mano de Obra</span><span id="displayCostoInstalacion" class="text-8xl font-black text-fix-blue tracking-tighter">$0.00</span></div>
-                            <div class="bg-slate-50 p-14 rounded-[5rem] text-center italic shadow-inner"><span class="block text-slate-400 text-sm font-black uppercase mb-4">Insumos</span><span id="displayTotalAccesorios" class="text-8xl font-black text-fix-blue tracking-tighter">$0.00</span></div>
-                            <div class="bg-fix-accent p-14 rounded-[5rem] text-center italic shadow-2xl scale-110"><span class="block text-white text-sm font-black uppercase mb-4">Cobro Total</span><span id="displayTotalFinal" class="text-9xl font-black text-white tracking-tighter">$0.00</span></div>
+                        <div class="bg-slate-50 p-10 rounded-[5rem] mb-12 shadow-inner border-4 border-white">
+                            <div class="flex justify-between items-center mb-6"><h3 class="text-3xl font-black text-slate-400 uppercase italic">Observaciones del Caso</h3><button type="button" onclick="improveNotesIA()" class="bg-fix-ai text-white px-8 py-3 rounded-full font-black text-xs shadow-lg flex items-center gap-3">✨ MEJORAR CON IA</button></div>
+                            <textarea id="obsInputGeneral" name="tipoAtencion" placeholder="Notas internas o requerimientos especiales..." class="w-full bg-white p-8 rounded-[4rem] border-none font-black italic text-3xl uppercase shadow-inner h-60 text-fix-blue"></textarea>
                         </div>
 
-                        <button type="submit" class="w-full bg-fix-blue text-white py-16 rounded-[10rem] mt-24 text-6xl font-black italic uppercase shadow-xl hover:scale-95 transition-all border-b-[30px] border-blue-900/50">💾 GUARDAR Y AGENDAR</button>
+                        <div id="accesoriosContainerAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-10"></div>
+
+                        <div class="mt-20 grid grid-cols-1 xl:grid-cols-3 gap-12 border-t-8 pt-20 border-slate-50">
+                            <div class="bg-slate-50 p-14 rounded-[5rem] text-center shadow-inner"><span class="block text-slate-400 font-black uppercase mb-4 italic">Servicio</span><span id="displayCostoInstalacion" class="text-8xl font-black text-fix-blue tracking-tighter">$0.00</span></div>
+                            <div class="bg-slate-50 p-14 rounded-[5rem] text-center shadow-inner"><span class="block text-slate-400 font-black uppercase mb-4 italic">Insumos</span><span id="displayTotalAccesorios" class="text-8xl font-black text-fix-blue tracking-tighter">$0.00</span></div>
+                            <div class="bg-fix-accent p-14 rounded-[5rem] text-center shadow-2xl scale-110"><span class="block text-white font-black uppercase mb-4 italic">Total Cobro</span><span id="displayTotalFinal" class="text-9xl font-black text-white tracking-tighter">$0.00</span></div>
+                        </div>
+
+                        <button type="submit" class="w-full bg-fix-blue text-white py-16 rounded-[10rem] mt-24 text-6xl font-black italic uppercase shadow-xl border-b-[30px] border-blue-900/50">💾 REGISTRAR Y AGENDAR</button>
                     </form>
                 </div>
             </div>
 
-            <!-- COLUMNA AGENDA (LISTA VISUAL) -->
             <div id="agendaContainer" class="lg:col-span-1">
-                <h2 class="text-9xl font-black uppercase italic mb-10 border-b-[20px] border-fix-blue text-slate-800 tracking-tighter underline underline-offset-8">Ruta</h2>
+                <h2 class="text-9xl font-black uppercase italic mb-10 border-b-[20px] border-fix-blue text-slate-800 tracking-tighter">Ruta</h2>
                 <div id="visitsList" class="space-y-12"></div>
             </div>
 
-            <!-- VISTA REPORTES TEKA -->
             <div id="reporteTekaView" class="hidden lg:col-span-3 bg-white p-16 rounded-[8rem] border-[25px] border-white shadow-premium">
-                <h2 class="text-8xl font-black uppercase italic mb-12 underline decoration-fix-blue decoration-8">Reporte Teka</h2>
+                <h2 class="text-8xl font-black uppercase italic mb-12 underline decoration-fix-blue decoration-8">Reporte Teka Oficial</h2>
                 <div class="overflow-x-auto">
                     <table class="w-full border-collapse">
                         <thead>
                             <tr class="bg-slate-950 text-white text-[10px] italic uppercase font-black">
-                                <th class="p-4 border">Fecha</th>
-                                <th class="p-4 border">Lugar</th>
-                                <th class="p-4 border">Código</th>
-                                <th class="p-4 border">Descripción</th>
-                                <th class="p-4 border">Serie</th>
-                                <th class="p-4 border">Cliente</th>
-                                <th class="p-4 border text-right">Costo</th>
+                                <th class="p-6 border">Fecha</th>
+                                <th class="p-6 border">Lugar</th>
+                                <th class="p-6 border">Código</th>
+                                <th class="p-6 border">Descripción</th>
+                                <th class="p-6 border">Serie</th>
+                                <th class="p-6 border">Cliente</th>
+                                <th class="p-6 border text-right">Costo</th>
                             </tr>
                         </thead>
-                        <tbody id="tekaReporteBody"></tbody>
+                        <tbody id="tekaReporteBody" class="font-black"></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- VISTA CONTABILIDAD -->
+            <div id="inventarioView" class="hidden lg:col-span-3 bg-white p-16 rounded-[8rem] border-[25px] border-white shadow-premium">
+                <h2 class="text-8xl font-black mb-12 italic uppercase">Inventario Stock</h2>
+                <div class="bg-slate-100 p-12 rounded-[5rem] mb-12 flex flex-wrap gap-8 items-center border-4 border-white shadow-inner">
+                    <select id="invAccesorioSelect" class="flex-grow p-8 rounded-[3rem] font-black uppercase italic text-2xl outline-none shadow-sm"></select>
+                    <input type="number" id="invCantidad" placeholder="CANT" class="w-48 p-8 rounded-[3rem] text-center font-black text-2xl outline-none">
+                    <input type="number" id="invCostoTotal" placeholder="COSTO FACTURA" class="w-60 p-8 rounded-[3rem] text-right font-black text-2xl outline-none">
+                    <button onclick="saveFacturaCompra()" class="bg-fix-report text-white px-16 py-8 rounded-[3rem] font-black text-2xl italic uppercase shadow-xl hover:scale-95 transition-all">📥 CARGAR STOCK</button>
+                </div>
+                <table class="w-full text-left admin-table"><thead><tr><th class="p-8">Insumo</th><th class="p-8 text-center">Stock Real</th><th class="p-8 text-right">Valor Inventario</th></tr></thead><tbody id="inventarioTableBody"></tbody></table>
+            </div>
+
             <div id="contabilidadView" class="hidden lg:col-span-3 bg-white p-16 rounded-[8rem] border-[25px] border-white shadow-premium">
-                <h2 class="text-8xl font-black uppercase italic mb-12">Libro de Caja</h2>
+                <h2 class="text-8xl font-black mb-12 italic uppercase">Flujo de Caja</h2>
                 <div class="grid grid-cols-1 xl:grid-cols-3 gap-10 mb-16">
-                    <div class="p-16 bg-green-50 rounded-[5rem] text-center italic"><span class="text-3xl font-black text-green-900 uppercase">Ingresos</span><div id="totalIngresosDisplay" class="text-9xl font-black text-green-950">$0.00</div></div>
-                    <div class="p-16 bg-red-50 rounded-[5rem] text-center italic"><span class="text-3xl font-black text-red-900 uppercase">Egresos</span><div id="totalEgresosDisplay" class="text-9xl font-black text-red-950">$0.00</div></div>
-                    <div class="p-16 bg-slate-950 rounded-[5rem] text-center italic shadow-2xl"><span class="text-3xl font-black text-slate-400 uppercase">Balance</span><div id="balanceNetoDisplay" class="text-9xl font-black text-white">$0.00</div></div>
+                    <div class="p-16 bg-green-50 rounded-[5rem] text-center italic shadow-inner"><span class="text-3xl font-black text-green-900 uppercase italic">Ingresos (Servicios)</span><div id="totalIngresosDisplay" class="text-9xl font-black text-green-950 tracking-tighter">$0.00</div></div>
+                    <div class="p-16 bg-red-50 rounded-[5rem] text-center italic shadow-inner"><span class="text-3xl font-black text-red-900 uppercase italic">Egresos (Gastos)</span><div id="totalEgresosDisplay" class="text-9xl font-black text-red-950 tracking-tighter">$0.00</div></div>
+                    <div class="p-16 bg-slate-950 rounded-[5rem] text-center shadow-2xl"><span class="text-3xl font-black text-slate-400 uppercase italic">Balance Neto</span><div id="balanceNetoDisplay" class="text-9xl font-black text-white tracking-tighter">$0.00</div></div>
+                </div>
+                <div class="bg-red-50 p-10 rounded-[5rem] mb-16 border-4 border-white shadow-inner flex flex-wrap gap-8 items-center">
+                    <input type="text" id="egConcepto" placeholder="DESCRIPCIÓN DEL GASTO (EJ: GASOLINA, COMIDA...)" class="flex-grow p-8 rounded-[3rem] font-black uppercase italic text-2xl outline-none">
+                    <input type="number" id="egMonto" placeholder="0.00" class="w-60 p-8 rounded-[3rem] text-right font-black text-2xl outline-none">
+                    <button onclick="saveManualEgreso()" class="bg-fix-error text-white px-16 py-8 rounded-[3rem] font-black text-2xl italic uppercase shadow-xl hover:scale-95 transition-all">💸 REGISTRAR GASTO</button>
                 </div>
                 <div class="flex gap-6 mb-12 no-print">
-                    <input type="date" id="contabilidadStartDate" class="p-8 bg-slate-100 rounded-[3rem] font-black text-2xl">
-                    <input type="date" id="contabilidadEndDate" class="p-8 bg-slate-100 rounded-[3rem] font-black text-2xl">
-                    <button onclick="processFinancialBalance()" class="bg-fix-blue text-white px-12 rounded-[3rem] font-black text-xl italic uppercase shadow-lg">Filtrar Caja</button>
+                    <input type="date" id="contabilidadStartDate" class="p-8 bg-slate-100 rounded-[3rem] font-black text-2xl italic outline-none">
+                    <input type="date" id="contabilidadEndDate" class="p-8 bg-slate-100 rounded-[3rem] font-black text-2xl italic outline-none">
+                    <button onclick="processFinancialBalance()" class="bg-fix-blue text-white px-12 rounded-[3rem] font-black text-xl italic shadow-lg uppercase tracking-widest">FILTRAR FECHAS</button>
                 </div>
-                <table class="w-full text-left admin-table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th class="text-right">Monto</th></tr></thead><tbody id="contabilidadTableBody" class="font-black text-2xl uppercase italic"></tbody></table>
+                <table class="w-full text-left admin-table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th class="text-right">Monto</th></tr></thead><tbody id="contabilidadTableBody" class="font-black"></tbody></table>
             </div>
 
         </div>
     </div>
+
+    <!-- MODAL IA -->
+    <div id="aiModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-8 z-[10000]">
+        <div class="bg-white w-full max-w-4xl rounded-[5rem] p-16 shadow-ai-glow border-[15px] border-fix-ai/10">
+            <h3 class="text-5xl font-black italic uppercase text-fix-ai mb-8 flex items-center gap-6">✨ Asistente de Redacción</h3>
+            <div id="aiContent" class="bg-slate-50 p-12 rounded-[3rem] min-h-[300px] text-3xl font-bold italic text-slate-700 leading-relaxed mb-10 shadow-inner uppercase">Generando sugerencia técnica...</div>
+            <div class="flex gap-6">
+                <button id="aiApplyBtn" onclick="applyAI()" class="flex-grow bg-fix-ai text-white py-8 rounded-full font-black text-3xl uppercase italic shadow-xl hidden">APLICAR CAMBIOS</button>
+                <button onclick="toggleAIModal(false)" class="px-12 bg-slate-100 text-slate-400 rounded-full font-black text-2xl uppercase italic">CERRAR</button>
+            </div>
+        </div>
+    </div>
     
-    <!-- SISTEMA DE MENSAJES -->
     <div id="messageBox" class="opacity-0 fixed transition-opacity duration-500 pointer-events-none"></div>
 
 </body>
