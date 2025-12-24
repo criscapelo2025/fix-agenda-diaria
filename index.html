@@ -5,14 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FIX - GESTIÓN</title>
     
-    <!-- CONFIGURACIÓN DE APLICACIÓN MÓVIL (PWA) -->
+    <!-- CONFIGURACIÓN DE APLICACIÓN (PWA) PARA MÓVIL Y COMPUTADORA -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="FIX">
+    <meta name="apple-mobile-web-app-title" content="FIX GESTIÓN">
     <meta name="theme-color" content="#1e3a8a">
     
-    <!-- ICONO DE LA APP (SVG Dinámico para el inicio del móvil) -->
+    <!-- ICONO DE LA APP (SVG Dinámico) -->
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231e3a8a'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black' font-size='40' fill='white' font-style='italic'>FIX</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231e3a8a'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black' font-size='40' fill='white' font-style='italic'>FIX</text></svg>">
 
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -106,7 +107,7 @@
         let currentTechUser = null; 
         let ruteroFilterTech = ""; 
 
-        // --- FUNCIONES MAESTRAS (EXPLICITAMENTE GLOBALES) ---
+        // --- FUNCIONES MAESTRAS GLOBALES ---
 
         window.sendWA = function(id) {
             const v = visitsArray.find(item => item.id === id);
@@ -195,7 +196,9 @@
                     <td class="border-r font-black text-fix-blue cursor-pointer" onclick="toggleDetail('${v.id}')">${v.nombreCliente}</td>
                     ${!currentTechUser ? `<td class="border-r text-slate-400 italic">${v.tecnico || 'S/A'}</td>` : ''}
                     <td class="border-r text-center font-mono text-fix-accent text-[8px] font-black">${v.esMantenimiento ? 'MANT.' : (v.equipos || []).length + ' EQ.'}</td>
-                    <td class="border-r text-center"><a href="${maps}" target="_blank" onclick="event.stopPropagation();" class="bg-fix-light text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-md">📍 VER</a></td>
+                    <td class="border-r text-center">
+                        <a href="${maps}" target="_blank" onclick="event.stopPropagation();" class="bg-fix-light text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-md">📍 VER</a>
+                    </td>
                     <td class="text-center">
                         <div class="flex flex-col gap-1 items-center">
                             <a href="tel:${v.telefono}" onclick="event.stopPropagation();" class="bg-slate-50 p-2 rounded-lg border border-slate-200 shadow-sm text-lg">📞</a>
@@ -217,19 +220,26 @@
                                     <select id="status_${v.id}" class="p-3 bg-slate-50 rounded-xl font-black text-sm border-none shadow-inner text-fix-blue"><option value="PENDIENTE">¿ATENDIÓ?</option><option value="SI" ${v.estado === 'Atendido' ? 'selected' : ''}>SÍ</option><option value="NO" ${v.estado === 'No Atendido' ? 'selected' : ''}>NO</option></select>
                                     <select id="type_${v.id}" class="p-3 bg-slate-50 rounded-xl font-black text-sm border-none shadow-inner">${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
                                 </div>
+                                <div class="mb-4">
+                                    <span class="text-[10px] font-black text-slate-300 ml-1 uppercase italic font-mono">Cobro Cliente</span>
+                                    <select id="payment_${v.id}" class="w-full p-3 bg-yellow-50 rounded-xl font-black text-sm border-none shadow-inner text-fix-blue">
+                                        <option value="EFECTIVO" ${v.financiera?.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option>
+                                        <option value="TRANSFERENCIA" ${v.financiera?.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option>
+                                    </select>
+                                </div>
                                 <div class="grid grid-cols-1 gap-1 mb-4">
                                     ${Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => `<div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-100"><span class="text-[11px] font-black uppercase text-slate-500">${n}</span><input type="number" min="0" value="0" data-name="${n}" data-price="${p}" class="acc-${v.id} w-16 text-center bg-white rounded-lg p-1 text-md font-black text-fix-blue shadow-inner outline-none"></div>`).join('')}
                                     <div class="mt-2 p-3 bg-blue-50 rounded-xl border border-blue-100">
-                                        <span class="text-[9px] font-black text-blue-400 uppercase italic ml-1">Adicional</span>
+                                        <span class="text-[9px] font-black text-blue-400 uppercase italic ml-1 tracking-widest font-mono">Adicional Manual</span>
                                         <div class="grid grid-cols-2 gap-3 mt-2">
-                                            <input type="text" id="customDesc_${v.id}" placeholder="Nota..." class="p-3 bg-white rounded-xl text-[11px] font-bold uppercase shadow-inner border-none outline-none">
+                                            <input type="text" id="customDesc_${v.id}" placeholder="Motivo..." class="p-3 bg-white rounded-xl text-[11px] font-bold uppercase shadow-inner border-none outline-none">
                                             <input type="number" id="customPrice_${v.id}" placeholder="$" class="p-3 bg-white rounded-xl text-[11px] font-black text-blue-700 shadow-inner border-none outline-none text-right">
                                         </div>
                                     </div>
                                 </div>
-                                <textarea id="reason_${v.id}" placeholder="Notas..." class="w-full bg-slate-50 p-4 rounded-2xl text-sm mb-4 h-24 font-bold shadow-inner border-none outline-none"></textarea>
+                                <textarea id="reason_${v.id}" placeholder="Notas adicionales..." class="w-full bg-slate-50 p-4 rounded-2xl text-sm mb-4 h-24 font-bold shadow-inner border-none outline-none uppercase italic"></textarea>
                                 <button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-report text-white font-black py-5 rounded-2xl text-md uppercase shadow active:scale-95 transition-all mb-4 tracking-widest italic">💾 GUARDAR REPORTE</button>
-                                ${v.estado === 'Atendido' ? `<button onclick="sendWA('${v.id}')" class="w-full bg-green-500 text-white font-black py-4 rounded-2xl text-[12px] uppercase shadow-md active:scale-95 flex items-center justify-center gap-2">📲 ENCUESTA WHATSAPP</button>` : ''}
+                                ${v.estado === 'Atendido' ? `<button onclick="sendWA('${v.id}')" class="w-full bg-green-500 text-white font-black py-4 rounded-2xl text-[12px] uppercase shadow-md active:scale-95 flex items-center justify-center gap-2">📲 ENVIAR ENCUESTA AL CLIENTE</button>` : ''}
                             </div>
                         </div>
                     </td>
@@ -252,7 +262,7 @@
             const manuales = movementsArray.map(m => ({ id: m.id, monto: m.monto, type: m.type, concepto: `MANUAL: ${m.concepto}`, fecha: m.fecha }));
             const todos = [...ingresosCaja, ...manuales].sort((a,b) => b.fecha - a.fecha);
             const tb = document.getElementById('contabilidadTableBody');
-            if(tb) tb.innerHTML = todos.map(m => `<tr class="border-b row-hover transition-all"><td class="p-4 text-[9px] font-black italic">${new Date(m.fecha).toLocaleDateString()}</td><td class="p-4 text-[9px] uppercase font-bold tracking-tight ${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type} - ${m.concepto}</td><td class="p-4 text-right text-[10px] font-black italic">$${m.monto.toFixed(2)}</td><td class="text-center p-4">${m.concepto.includes('MANUAL') ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error">🗑️</button>` : ''}</td></tr>`).join('');
+            if(tb) tb.innerHTML = todos.map(m => `<tr class="border-b row-hover transition-all"><td class="p-4 text-[9px] font-black italic">${new Date(m.fecha).toLocaleDateString()}</td><td class="p-4 text-[9px] uppercase font-bold tracking-tight ${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type} - ${m.concepto}</td><td class="p-4 text-right text-[10px] font-black italic">$${m.monto.toFixed(2)}</td><td class="text-center p-4">${m.id && m.concepto.includes('MANUAL') ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error">🗑️</button>` : ''}</td></tr>`).join('');
             let tIn = 0, tOut = 0; todos.forEach(m => m.type === 'INGRESO' ? tIn += m.monto : tOut += m.monto);
             if(document.getElementById('totalIngresosDisplay')) {
                 document.getElementById('totalIngresosDisplay').textContent = `$${tIn.toFixed(2)}`;
@@ -303,7 +313,7 @@
             const v = visitsArray.find(item => item.id === id);
             const mo = v.esMantenimiento ? (v.financiera?.totalCliente || 0) : (v.equipos || []).reduce((acc, eq) => acc + (eq.costoBase || 0), 0);
             database.ref('visits/' + id).update({ estado: s === 'SI' ? 'Atendido' : 'No Atendido', tipoAtencion: document.getElementById(`type_${id}`).value, razonNoAtencion: document.getElementById(`reason_${id}`).value, accesoriosVendidos: accs, attendedDate: new Date().toISOString(), 'financiera/totalCliente': (mo + totalAccs + cp), 'financiera/formaPago': pay })
-            .then(() => { showMessage("✅ Guardado con éxito", "fix-report"); renderRutero(); });
+            .then(() => { showMessage("✅ Guardado", "fix-report"); renderRutero(); });
         };
 
         window.saveManualMovement = function() {
@@ -378,6 +388,12 @@
             if(tb) tb.innerHTML = Object.entries(stock).map(([n, d]) => `<tr class="border-b"><td class="p-6 font-black uppercase text-sm">${n}</td><td class="p-6 text-center"><span class="${d.qty < 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'} px-6 py-2 rounded-full font-black text-xl">${d.qty}</span></td><td class="p-6 text-right font-mono font-bold italic">$${d.totalCost.toFixed(2)}</td></tr>`).join('');
         }
 
+        function saveFacturaCompra() {
+            const item = document.getElementById('invAccesorioSelect').value; const qty = parseInt(document.getElementById('invCantidad').value); const cost = parseFloat(document.getElementById('invCostoTotal').value);
+            if(!item || !qty || !cost) return showMessage("Datos incompletos", "fix-accent");
+            database.ref('inventory_movs').push({ item, qty, cost, fecha: Date.now() }).then(() => { showMessage("✅ Stock actualizado", "fix-report"); });
+        }
+
         function showMessage(msg, color) { const box = document.getElementById('messageBox'); if(!box) return; box.textContent = msg; box.style.opacity = '1'; box.className = `fixed bottom-32 left-1/2 -translate-x-1/2 p-10 rounded-full shadow-premium text-white font-black uppercase text-xs bg-${color} z-[9999] transition-opacity duration-500`; setTimeout(() => { box.style.opacity = '0'; }, 3000); }
 
         window.updateRuteroFilter = (val) => { ruteroFilterTech = val; renderRutero(); }
@@ -422,7 +438,6 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-10 main-grid">
             
-            <!-- REGISTRO -->
             <div id="formContainer" class="lg:col-span-2 space-y-10 admin-only no-print">
                 <div class="bg-white p-8 rounded-[3rem] shadow-premium border-[8px] border-white">
                     <input type="date" id="filterDateInput" onchange="renderUIAgenda(); renderRutero();" class="bg-slate-50 p-4 rounded-2xl text-3xl font-black italic text-fix-blue outline-none border-none shadow-inner w-full text-center">
