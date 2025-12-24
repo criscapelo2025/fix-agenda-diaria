@@ -31,9 +31,17 @@
         .currency-input { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; }
         @media print { .no-print { display: none !important; } }
         
+        /* ESTILOS PARA MODO TÉCNICO (MÓVIL) */
         body.technician-mode .admin-only { display: none !important; }
         body.technician-mode .main-grid { grid-template-columns: 1fr !important; }
         
+        /* Reducción de cabecera en modo técnico */
+        body.technician-mode header { margin-bottom: 1rem !important; padding: 0.5rem !important; flex-direction: row !important; justify-content: flex-start !important; gap: 0.5rem !important; }
+        body.technician-mode .logo-container { padding: 0.5rem !important; border-radius: 1rem !important; margin-right: 0.5rem !important; }
+        body.technician-mode .logo-text { font-size: 1.5rem !important; }
+        body.technician-mode .main-title { font-size: 1.2rem !important; }
+        body.technician-mode .user-label { font-size: 0.7rem !important; }
+
         .admin-table thead th {
             position: sticky;
             top: 0;
@@ -138,14 +146,16 @@
         function renderRutero() {
             const list = document.getElementById('ruteroListBody');
             if(!list) return;
-            const filterDate = document.getElementById('filterDateInput').value;
+            
+            // Usamos el selector de fecha del rutero si existe, sino el global
+            const filterDate = document.getElementById('filterDateInputRutero').value || document.getElementById('filterDateInput').value;
             let techToFilter = currentTechUser || ruteroFilterTech;
             
             let filtered = visitsArray.filter(v => v.fechaInstalacion === filterDate);
             if(techToFilter) filtered = filtered.filter(v => v.tecnico === techToFilter);
 
             if(filtered.length === 0) {
-                list.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-slate-300 italic font-black uppercase tracking-tighter">Sin servicios asignados</td></tr>';
+                list.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-slate-300 italic font-black uppercase tracking-tighter">Sin servicios para esta fecha</td></tr>';
                 return;
             }
 
@@ -191,7 +201,6 @@
                                 <p><span class="text-slate-400">TELÉFONO:</span> ${v.telefono}</p>
                                 ${v.numFactura ? `<p><span class="text-slate-400">FACTURA:</span> ${v.numFactura}</p>` : ''}
                             </div>
-                            <!-- FORMULARIO TÉCNICO -->
                             <div class="bg-white p-3 rounded-xl border-2 border-fix-blue/10 shadow-sm">
                                 <p class="text-fix-blue mb-2 text-center border-b pb-1 font-black text-[9px] uppercase italic">Reporte de Cierre</p>
                                 <div class="grid grid-cols-2 gap-2 mb-2">
@@ -205,11 +214,8 @@
                                         <option value="TRANSFERENCIA" ${v.financiera?.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option>
                                     </select>
                                 </div>
-                                <div class="grid grid-cols-2 gap-1 mb-3">
-                                    ${Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => `<div class="flex items-center justify-between p-1 bg-slate-50 rounded border border-white"><span class="text-[8px] uppercase font-black text-slate-400">${n}</span><input type="number" min="0" value="0" data-name="${n}" data-price="${p}" class="acc-${v.id} w-8 text-center text-[9px] font-black rounded border-none shadow-inner outline-none"></div>`).join('')}
-                                </div>
-                                <textarea id="reason_${v.id}" placeholder="Observaciones técnicas..." class="w-full bg-slate-50 p-2 rounded text-[9px] mb-2 uppercase h-12 shadow-inner border-none outline-none font-bold">${v.razonNoAtencion || ''}</textarea>
-                                <button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-report text-white font-black py-2 rounded text-xs uppercase shadow active:scale-95 transition-all">✅ FINALIZAR Y GUARDAR</button>
+                                <textarea id="reason_${v.id}" placeholder="Notas..." class="w-full bg-slate-50 p-2 rounded text-[9px] mb-2 uppercase h-12 shadow-inner border-none outline-none font-bold">${v.razonNoAtencion || ''}</textarea>
+                                <button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-report text-white font-black py-2 rounded text-xs uppercase shadow active:scale-95 transition-all">💾 GUARDAR REPORTE</button>
                             </div>
                         </div>
                     </td>
@@ -461,9 +467,12 @@
             .then(() => { document.getElementById('egConcepto').value = ''; document.getElementById('egMonto').value = ''; showMessage("✅ Gasto registrado", "fix-report"); });
         };
 
+        window.updateRuteroFilter = (val) => { ruteroFilterTech = val; renderRutero(); }
+
         document.addEventListener('DOMContentLoaded', () => {
             const hoy = new Date().toISOString().split('T')[0];
             document.getElementById('filterDateInput').value = hoy;
+            document.getElementById('filterDateInputRutero').value = hoy;
             document.getElementById('inputEmision').value = hoy;
             const params = new URLSearchParams(window.location.search);
             const tech = params.get('tech');
@@ -494,8 +503,8 @@
         
         <header class="mb-14 flex flex-col xl:flex-row justify-between items-center gap-10 no-print">
             <div class="flex items-center">
-                <div class="bg-fix-blue p-8 rounded-[1.5rem] shadow-premium mr-10"><span class="text-7xl font-black text-white italic tracking-tighter">FIX</span></div>
-                <div><h1 class="text-6xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><span id="userDisplayLabel" class="text-xs font-black text-slate-400 uppercase italic tracking-[0.2em]">Cargando...</span></div>
+                <div class="bg-fix-blue p-8 rounded-[1.5rem] shadow-premium mr-10 logo-container transition-all"><span class="text-7xl font-black text-white italic tracking-tighter logo-text">FIX</span></div>
+                <div><h1 class="text-6xl font-black uppercase italic text-slate-800 tracking-tighter leading-none main-title">Gestión</h1><span id="userDisplayLabel" class="text-xs font-black text-slate-400 uppercase italic tracking-[0.2em] user-label">Cargando...</span></div>
             </div>
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-3 rounded-full shadow-premium border-[6px] border-slate-50 gap-4 admin-only">
                 <button onclick="changeMasterView('reporte_admin')" class="view-btn py-3 px-8 rounded-full font-black text-[10px] uppercase bg-fix-blue text-white italic shadow-md">Registro</button>
@@ -509,9 +518,10 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-10 main-grid">
             
+            <!-- FORM CONTAINER GLOBAL (Para Admin) -->
             <div id="formContainer" class="lg:col-span-2 space-y-10 admin-only no-print">
                 <div class="bg-white p-8 rounded-[3rem] shadow-premium border-[8px] border-white">
-                    <span class="text-[10px] font-black uppercase text-slate-400 mb-2 ml-4 block italic">Fecha del Trabajo Actual</span>
+                    <span class="text-[10px] font-black uppercase text-slate-400 mb-2 ml-4 block italic">Selector de Fecha (Admin)</span>
                     <input type="date" id="filterDateInput" onchange="renderUIAgenda(); renderRutero();" class="bg-slate-50 p-4 rounded-2xl text-3xl font-black italic text-fix-blue outline-none border-none shadow-inner w-full">
                 </div>
 
@@ -564,16 +574,42 @@
                 </div>
             </div>
 
+            <!-- AGENDA TÉCNICA (COMPLETAR DATOS) -->
             <div id="agendaContainer" class="lg:col-span-1 admin-only"><h2 class="text-3xl font-black uppercase italic mb-6 border-b-[6px] border-fix-blue text-slate-800 tracking-tighter">Completar Datos</h2><div id="visitsList" class="space-y-4"></div></div>
 
-            <div id="ruteroView" class="hidden lg:col-span-3 bg-white p-8 rounded-[4rem] shadow-premium">
-                <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                    <h2 class="text-5xl font-black uppercase italic text-slate-800 underline decoration-4 decoration-fix-blue tracking-tighter">Hoja de Ruta Optimizada</h2>
-                    <select id="ruteroTechFilter" onchange="updateRuteroFilter(this.value)" class="p-4 bg-slate-100 rounded-2xl font-black text-sm admin-only shadow-inner text-fix-blue outline-none border-none"></select>
+            <!-- RUTERO LOGÍSTICO (Vista para técnicos) -->
+            <div id="ruteroView" class="hidden lg:col-span-3 bg-white p-6 md:p-8 rounded-[3rem] md:rounded-[4rem] shadow-premium">
+                <div class="flex flex-col gap-4 mb-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <h2 class="text-xl font-bold uppercase italic text-slate-400 tracking-tighter">Hoja de Ruta</h2>
+                        <select id="ruteroTechFilter" onchange="updateRuteroFilter(this.value)" class="p-3 bg-slate-100 rounded-xl font-black text-[10px] admin-only shadow-inner text-fix-blue outline-none border-none"></select>
+                    </div>
+                    
+                    <!-- SELECTOR DE FECHA PARA TÉCNICOS -->
+                    <div class="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 flex items-center justify-between shadow-sm">
+                        <span class="text-[9px] font-black uppercase text-slate-400 italic">Elegir Fecha:</span>
+                        <input type="date" id="filterDateInputRutero" onchange="renderRutero();" class="bg-white p-2 rounded-xl text-lg font-black italic text-fix-blue outline-none shadow-inner">
+                    </div>
                 </div>
-                <div class="overflow-x-auto w-full border-4 border-slate-50 rounded-[2.5rem] shadow-inner"><table class="w-full border-collapse rutero-table"><thead><tr><th class="border-r">Hora</th><th class="border-r text-left">Cliente</th><th class="border-r">Técnico</th><th class="border-r text-center">Tipo</th><th class="border-r text-center">Mapa</th><th class="text-center">Tel.</th></tr></thead><tbody id="ruteroListBody"></tbody></table></div>
+
+                <div class="overflow-x-auto w-full border-4 border-slate-50 rounded-[2.5rem] shadow-inner">
+                    <table class="w-full border-collapse rutero-table">
+                        <thead>
+                            <tr>
+                                <th class="border-r">Hora</th>
+                                <th class="border-r text-left">Cliente</th>
+                                <th class="border-r">Técnico</th>
+                                <th class="border-r text-center">Tipo</th>
+                                <th class="border-r text-center">Mapa</th>
+                                <th class="text-center">Tel.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ruteroListBody"></tbody>
+                    </table>
+                </div>
             </div>
 
+            <!-- REPORTES -->
             <div id="reporteTekaView" class="hidden lg:col-span-3 bg-white p-6 rounded-[3rem] shadow-premium overflow-hidden">
                 <div class="flex justify-between items-center mb-6"><h2 class="text-3xl font-black uppercase italic underline decoration-4 tracking-tighter">Reporte Maestro</h2><button onclick="downloadCSV('teka')" class="bg-fix-report text-white px-8 py-3 rounded-full font-black text-xs shadow-xl uppercase italic">📊 Descargar Excel</button></div>
                 <div class="overflow-x-auto w-full"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-950 text-white font-black text-[7px] uppercase"><th>Compra</th><th>Lugar</th><th>Factura</th><th>Código</th><th>Descripción</th><th>Serie</th><th>Garantía</th><th>Técnico</th><th>Ciudad</th><th>Atención</th><th>Cliente</th><th>Dirección</th><th>Teléfono</th><th>Precio</th><th>Origen</th><th>Atendió</th><th>Viático</th><th>Factura 2</th><th>Cédula</th><th>Email</th></tr></thead><tbody id="tekaReporteBody"></tbody></table></div>
@@ -584,6 +620,7 @@
                 <div class="overflow-x-auto w-full"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-950 text-white font-black text-[7px] uppercase"><th>Cliente</th><th>Dirección</th><th>Teléfono</th><th>Precio</th><th>Forma Pago</th><th>Estado</th><th>Notas</th></tr></thead><tbody id="mantenimientoReporteBody"></tbody></table></div>
             </div>
 
+            <!-- CONTABILIDAD -->
             <div id="contabilidadView" class="hidden lg:col-span-3 bg-white p-10 rounded-[4rem] shadow-premium">
                 <div class="grid grid-cols-3 gap-6 mb-10 text-center uppercase italic font-black">
                     <div class="p-6 bg-green-50 rounded-3xl shadow-inner"><span class="text-xs text-green-900">Ingresos</span><div id="totalIngresosDisplay" class="text-6xl font-black text-green-950">$0.00</div></div>
