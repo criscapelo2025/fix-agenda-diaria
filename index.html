@@ -31,60 +31,36 @@
         .currency-input { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; }
         @media print { .no-print { display: none !important; } }
         
-        /* ESTILOS PARA MODO TÉCNICO (MÓVIL) */
+        /* MODO TÉCNICO MÓVIL OPTIMIZADO */
         body.technician-mode .admin-only { display: none !important; }
         body.technician-mode .main-grid { grid-template-columns: 1fr !important; }
         
-        /* Reducción de cabecera en modo técnico */
-        body.technician-mode header { margin-bottom: 1rem !important; padding: 0.5rem !important; flex-direction: row !important; justify-content: flex-start !important; gap: 0.5rem !important; }
-        body.technician-mode .logo-container { padding: 0.5rem !important; border-radius: 1rem !important; margin-right: 0.5rem !important; }
-        body.technician-mode .logo-text { font-size: 1.5rem !important; }
-        body.technician-mode .main-title { font-size: 1.2rem !important; }
-        body.technician-mode .user-label { font-size: 0.7rem !important; }
+        body.technician-mode header { margin-bottom: 0.5rem !important; padding: 0.5rem !important; flex-direction: row !important; justify-content: flex-start !important; gap: 0.5rem !important; }
+        body.technician-mode .logo-container { padding: 0.4rem !important; border-radius: 0.8rem !important; margin-right: 0.4rem !important; }
+        body.technician-mode .logo-text { font-size: 1.2rem !important; }
+        body.technician-mode .main-title { font-size: 1rem !important; }
+        body.technician-mode .user-label { font-size: 0.6rem !important; }
+
+        /* Letras grandes para facilitar lectura en ruta */
+        body.technician-mode .rutero-table td { font-size: 16px !important; padding: 16px 8px !important; font-weight: 800; text-transform: uppercase; }
+        body.technician-mode .time-badge { font-size: 15px !important; padding: 6px 12px !important; }
 
         .admin-table thead th {
-            position: sticky;
-            top: 0;
-            background: #1e293b;
-            color: #ffffff;
-            z-index: 10;
-            padding: 0.75rem;
-            text-transform: uppercase;
-            font-size: 0.55rem;
-            letter-spacing: 0.05em;
+            position: sticky; top: 0; background: #1e293b; color: #ffffff; z-index: 10;
+            padding: 0.75rem; text-transform: uppercase; font-size: 0.55rem; letter-spacing: 0.05em;
         }
 
-        .rutero-table td {
-            font-size: 10px;
-            padding: 8px 8px !important;
-            text-transform: uppercase;
-            font-weight: 700;
-            line-height: 1.2;
-        }
-        .rutero-table th {
-            font-size: 9px;
-            padding: 8px !important;
-            background: #f8fafc;
-            color: #64748b;
-        }
+        .rutero-table td { font-size: 10px; padding: 8px 8px !important; text-transform: uppercase; font-weight: 700; line-height: 1.2; }
+        .rutero-table th { font-size: 9px; padding: 8px !important; background: #f8fafc; color: #64748b; }
         
         .row-hover:hover { background-color: #f1f5f9; }
-        .detail-row { background-color: #f8fafc; border-left: 8px solid #1e3a8a; }
+        .detail-row { background-color: #f8fafc; border-left: 12px solid #1e3a8a; }
         html { scroll-behavior: smooth; }
-
         .report-cell { font-size: 8px; line-height: 1.1; padding: 4px !important; white-space: nowrap; border: 1px solid #e2e8f0; }
         
-        .time-badge {
-            background: #1e3a8a;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-        }
+        .time-badge { background: #1e3a8a; color: white; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px; }
     </style>
     
-    <!-- FIREBASE SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
 
@@ -107,11 +83,17 @@
         const LUGARES_COMPRA = ["", "COMERCIAL KYWI", "COMERCIAL SOLIS", "COMO HOGAR", "SUKASA", "LUNA PAZMIÑO", "Macaofertas", "Home Vega", "Mercard", "Teka Directo", "Otro"];
         const TIPOS_SERVICIO = ["Instalación", "Garantía", "Fuera de Garantía", "Mantenimiento", "Reparación", "Visita Técnica"];
         const TIPOS_EQUIPO = ["Cocina Inducción", "Cocina a Gas", "Horno Eléctrico", "Horno a Gas", "Campana Tradicional", "Campana Decorativa", "Microondas", "Refrigerador", "Lavavajillas", "Triturador", "Fregadero/Grifería"];
-        const ACCESORIOS_DEFAULT = { 'Enchufe 110V': 5.00, 'Enchufe 220V 20V': 7.00, 'Enchufe 220V 50V': 10.00, 'Manguera c/bridas': 4.00, 'Ducto 4 pulgadas metro': 5.00, 'Enchufe chinito': 5.00 };
+        
+        const ACCESORIOS_DEFAULT = { 
+            'Enchufe 110V': 5.00, 'Enchufe 220V 20V': 7.00, 'Enchufe 220V 50V': 10.00, 
+            'Manguera c/bridas': 4.00, 'Ducto 4 pulgadas metro': 5.00, 'Enchufe chinito': 5.00,
+            'Segunda visita': 12.00, 'Visita fuera de garantía': 20.00
+        };
 
         // --- VARIABLES GLOBALES ---
         let visitsArray = [];      
-        let egresosArray = [];     
+        let movementsArray = [];     
+        let inventarioMovs = [];   
         let currentView = 'reporte_admin';
         let currentTechUser = null; 
         let ruteroFilterTech = ""; 
@@ -142,80 +124,132 @@
             return `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
         }
 
+        // --- WHATSAPP ---
+        function sendWA(id) {
+            const v = visitsArray.find(item => item.id === id);
+            if(!v || !v.telefono) return showMessage("⚠️ Teléfono inválido", "fix-error");
+            const msg = `¡Hola ${v.nombreCliente.split(' ')[0]}! Soy del equipo técnico de *FIX*.\n\nTe confirmo que el servicio de *${v.tipoAtencion || 'Asistencia'}* fue finalizado con éxito.\n\n¿Cómo calificarías nuestra atención hoy? ⭐⭐⭐⭐⭐\n\nRecuerda que en 6 meses te contactaremos para tu mantenimiento preventivo sugerido. 🛠️`;
+            const phone = v.telefono.replace(/\D/g, '');
+            const finalP = phone.startsWith('593') ? phone : '593' + (phone.startsWith('0') ? phone.substring(1) : phone);
+            window.open(`https://wa.me/${finalP}?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+
+        // --- NAVEGACIÓN Y VISTAS (CORREGIDO) ---
+        function changeMasterView(view) {
+            currentView = view;
+            const p = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventarioView'];
+            p.forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
+            
+            if(view === 'reporte_admin') { 
+                document.getElementById('formContainer')?.classList.remove('hidden'); 
+                document.getElementById('agendaContainer')?.classList.remove('hidden'); 
+            }
+            else if(view === 'reporte_teka') { 
+                document.getElementById('reporteTekaView')?.classList.remove('hidden'); 
+                renderReporteTeka(); 
+            }
+            else { 
+                document.getElementById(view + 'View')?.classList.remove('hidden'); 
+            }
+            
+            if(view === 'rutero') renderRutero();
+            if(view === 'inventario') renderInventario();
+            if(view === 'contabilidad') processFinancialBalance();
+            
+            document.querySelectorAll('.view-btn').forEach(btn => { 
+                btn.classList.remove('bg-fix-blue', 'text-white'); 
+                btn.classList.add('bg-gray-100', 'text-gray-500'); 
+            });
+            const act = document.querySelector(`[onclick*="'${view}'"]`);
+            if(act) { 
+                act.classList.add('bg-fix-blue', 'text-white'); 
+                act.classList.remove('bg-gray-100', 'text-gray-500'); 
+            }
+        }
+
         // --- RENDERIZADO RUTERO ---
         function renderRutero() {
             const list = document.getElementById('ruteroListBody');
-            if(!list) return;
+            const header = document.getElementById('ruteroHeaderRow');
+            if(!list || !header) return;
             
-            // Usamos el selector de fecha del rutero si existe, sino el global
-            const filterDate = document.getElementById('filterDateInputRutero').value || document.getElementById('filterDateInput').value;
-            let techToFilter = currentTechUser || ruteroFilterTech;
+            const date = document.getElementById('filterDateInputRutero').value || document.getElementById('filterDateInput').value;
+            let tech = currentTechUser || ruteroFilterTech;
             
-            let filtered = visitsArray.filter(v => v.fechaInstalacion === filterDate);
-            if(techToFilter) filtered = filtered.filter(v => v.tecnico === techToFilter);
+            header.innerHTML = `<th class="border-r">Hora</th><th class="border-r text-left">Cliente</th>${!currentTechUser ? '<th class="border-r">Técnico</th>' : ''}<th class="border-r text-center">Tipo</th><th class="border-r text-center">Mapa</th><th class="text-center">Tel.</th>`;
+
+            let filtered = visitsArray.filter(v => v.fechaInstalacion === date);
+            if(tech) filtered = filtered.filter(v => v.tecnico === tech);
 
             if(filtered.length === 0) {
-                list.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-slate-300 italic font-black uppercase tracking-tighter">Sin servicios para esta fecha</td></tr>';
+                list.innerHTML = `<tr><td colspan="${currentTechUser ? 5 : 6}" class="p-10 text-center text-slate-300 italic font-black uppercase tracking-tighter">Sin servicios para esta fecha</td></tr>`;
                 return;
             }
 
-            let currentPos = { lat: -2.900, lng: -79.005 }; 
+            let curPos = { lat: -2.900, lng: -79.005 }; 
             let sorted = [];
             let pool = [...filtered];
 
             while(pool.length > 0) {
-                pool.sort((a,b) => getDistance(currentPos, getCoords(a.direccion)) - getDistance(currentPos, getCoords(b.direccion)));
+                pool.sort((a,b) => getDistance(curPos, getCoords(a.direccion)) - getDistance(curPos, getCoords(b.direccion)));
                 const next = pool.shift();
                 sorted.push(next);
-                const nextCoords = getCoords(next.direccion);
-                if(nextCoords) currentPos = nextCoords;
+                const coords = getCoords(next.direccion);
+                if(coords) curPos = coords;
             }
 
-            let startTime = 9 * 60; 
+            let start = 9 * 60; 
 
             list.innerHTML = sorted.map(v => {
-                const duration = calculateDuration(v);
-                const timeStr = formatMinutes(startTime);
-                startTime += duration + 15; 
-
-                const mapsUrl = v.direccion.includes('http') ? v.direccion : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.direccion)}`;
+                const dur = calculateDuration(v);
+                const time = formatMinutes(start);
+                start += dur + 15; 
+                const maps = v.direccion.includes('http') ? v.direccion : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.direccion)}`;
 
                 return `
-                <tr class="border-b row-hover">
-                    <td class="border-r"><span class="time-badge">${timeStr}</span></td>
+                <tr class="border-b row-hover transition-all">
+                    <td class="border-r"><span class="time-badge">${time}</span></td>
                     <td class="border-r font-black text-fix-blue cursor-pointer" onclick="toggleDetail('${v.id}')">${v.nombreCliente}</td>
-                    <td class="border-r text-slate-400 italic">${v.tecnico || 'S/A'}</td>
-                    <td class="border-r text-center font-mono text-fix-accent text-[8px]">${v.esMantenimiento ? 'MANT.' : (v.equipos || []).length + ' EQ.'}</td>
-                    <td class="border-r text-center">
-                        <a href="${mapsUrl}" target="_blank" onclick="event.stopPropagation();" class="bg-fix-light text-white px-2 py-1 rounded text-[8px] font-black uppercase tracking-tighter">📍 MAPA</a>
-                    </td>
-                    <td class="text-center"><a href="tel:${v.telefono}" onclick="event.stopPropagation();" class="bg-slate-100 p-2 rounded inline-block shadow-sm">📞</a></td>
+                    ${!currentTechUser ? `<td class="border-r text-slate-400 italic">${v.tecnico || 'S/A'}</td>` : ''}
+                    <td class="border-r text-center font-mono text-fix-accent text-[8px] font-black">${v.esMantenimiento ? 'MANT.' : (v.equipos || []).length + ' EQ.'}</td>
+                    <td class="border-r text-center"><a href="${maps}" target="_blank" onclick="event.stopPropagation();" class="bg-fix-light text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-md">📍 VER</a></td>
+                    <td class="text-center"><a href="tel:${v.telefono}" onclick="event.stopPropagation();" class="bg-slate-100 p-3 rounded-lg inline-block shadow-sm">📞</a></td>
                 </tr>
                 <tr id="detail-${v.id}" class="hidden detail-row">
-                    <td colspan="6" class="p-4 bg-slate-50">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-[10px] mb-4 uppercase">
-                            <div class="space-y-1 font-bold">
+                    <td colspan="${currentTechUser ? 5 : 6}" class="p-6 bg-slate-50">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-[14px] mb-4 uppercase font-bold">
+                            <div class="space-y-2">
                                 <p><span class="text-slate-400">CALLE:</span> ${v.callePrincipal || 'N/A'}</p>
-                                <p><span class="text-slate-400">EMAIL:</span> ${v.email || 'N/A'}</p>
-                                <p><span class="text-slate-400">DURACIÓN:</span> ${duration} MIN</p>
+                                <p><span class="text-slate-400">DURACIÓN:</span> ${dur} MINUTOS</p>
                                 <p><span class="text-slate-400">TELÉFONO:</span> ${v.telefono}</p>
                                 ${v.numFactura ? `<p><span class="text-slate-400">FACTURA:</span> ${v.numFactura}</p>` : ''}
                             </div>
-                            <div class="bg-white p-3 rounded-xl border-2 border-fix-blue/10 shadow-sm">
-                                <p class="text-fix-blue mb-2 text-center border-b pb-1 font-black text-[9px] uppercase italic">Reporte de Cierre</p>
-                                <div class="grid grid-cols-2 gap-2 mb-2">
-                                    <select id="status_${v.id}" class="p-2 bg-slate-50 rounded font-black text-xs border-none shadow-inner"><option value="PENDIENTE">¿ATENDIÓ?</option><option value="SI" ${v.estado === 'Atendido' ? 'selected' : ''}>SÍ</option><option value="NO" ${v.estado === 'No Atendido' ? 'selected' : ''}>NO</option></select>
-                                    <select id="type_${v.id}" class="p-2 bg-slate-50 rounded font-black text-xs border-none shadow-inner">${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
+                            <div class="bg-white p-5 rounded-2xl border-2 border-fix-blue/10 shadow-sm">
+                                <p class="text-fix-blue mb-4 text-center border-b pb-2 font-black text-[12px] uppercase italic">Reporte de Cierre</p>
+                                <div class="grid grid-cols-2 gap-3 mb-4">
+                                    <select id="status_${v.id}" class="p-3 bg-slate-50 rounded-xl font-black text-sm border-none shadow-inner text-fix-blue"><option value="PENDIENTE">¿ATENDIÓ?</option><option value="SI" ${v.estado === 'Atendido' ? 'selected' : ''}>SÍ</option><option value="NO" ${v.estado === 'No Atendido' ? 'selected' : ''}>NO</option></select>
+                                    <select id="type_${v.id}" class="p-3 bg-slate-50 rounded-xl font-black text-sm border-none shadow-inner">${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
                                 </div>
-                                <div class="mb-3">
-                                    <span class="text-[8px] font-black text-slate-300 ml-1 uppercase">Pago</span>
-                                    <select id="payment_${v.id}" class="w-full p-2 bg-yellow-50 rounded font-black text-xs border-none shadow-inner text-fix-blue">
+                                <div class="mb-4">
+                                    <span class="text-[10px] font-black text-slate-300 ml-1 uppercase italic">Pago</span>
+                                    <select id="payment_${v.id}" class="w-full p-3 bg-yellow-50 rounded-xl font-black text-sm border-none shadow-inner text-fix-blue">
                                         <option value="EFECTIVO" ${v.financiera?.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option>
                                         <option value="TRANSFERENCIA" ${v.financiera?.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option>
                                     </select>
                                 </div>
-                                <textarea id="reason_${v.id}" placeholder="Notas..." class="w-full bg-slate-50 p-2 rounded text-[9px] mb-2 uppercase h-12 shadow-inner border-none outline-none font-bold">${v.razonNoAtencion || ''}</textarea>
-                                <button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-report text-white font-black py-2 rounded text-xs uppercase shadow active:scale-95 transition-all">💾 GUARDAR REPORTE</button>
+                                <div class="grid grid-cols-1 gap-1 mb-4">
+                                    ${Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => `<div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-100"><span class="text-[11px] font-black uppercase text-slate-500">${n}</span><input type="number" min="0" value="0" data-name="${n}" data-price="${p}" class="acc-${v.id} w-16 text-center bg-white rounded-lg p-1 text-md font-black text-fix-blue shadow-inner outline-none"></div>`).join('')}
+                                    <div class="mt-2 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                        <span class="text-[9px] font-black text-blue-400 uppercase italic ml-1">Otro Adicional</span>
+                                        <div class="grid grid-cols-2 gap-3 mt-2">
+                                            <input type="text" id="customDesc_${v.id}" placeholder="Descripción..." class="p-3 bg-white rounded-xl text-[11px] font-bold uppercase shadow-inner border-none outline-none">
+                                            <input type="number" id="customPrice_${v.id}" placeholder="Valor $" class="p-3 bg-white rounded-xl text-[11px] font-black text-blue-700 shadow-inner border-none outline-none text-right">
+                                        </div>
+                                    </div>
+                                </div>
+                                <textarea id="reason_${v.id}" placeholder="Notas..." class="w-full bg-slate-50 p-4 rounded-2xl text-sm mb-4 uppercase h-24 shadow-inner border-none outline-none font-bold">${v.razonNoAtencion || ''}</textarea>
+                                <button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-report text-white font-black py-5 rounded-2xl text-md uppercase shadow active:scale-95 transition-all mb-4">💾 GUARDAR REPORTE</button>
+                                ${v.estado === 'Atendido' ? `<button onclick="sendWA('${v.id}')" class="w-full bg-green-500 text-white font-black py-4 rounded-2xl text-[12px] uppercase shadow-md active:scale-95 flex items-center justify-center gap-2">📲 ENVIAR ENCUESTA AL CLIENTE</button>` : ''}
                             </div>
                         </div>
                     </td>
@@ -224,274 +258,177 @@
         }
 
         // --- CORE ADMIN ---
-        window.toggleDetail = (id) => document.getElementById(`detail-${id}`)?.classList.toggle('hidden');
+        function toggleDetail(id) { document.getElementById(`detail-${id}`)?.classList.toggle('hidden'); }
 
-        window.calculateFinancials = () => {
-            let moTotalVal = 0; document.querySelectorAll('input[name^="costoEquipo_"]').forEach(i => moTotalVal += parseFloat(i.value) || 0);
-            let accTotalVal = 0; document.querySelectorAll('.form-acc-qty').forEach(i => accTotalVal += (parseInt(i.value) || 0) * (parseFloat(i.dataset.price) || 0));
-            document.getElementById('displayCostoInstalacion').textContent = `$${moTotalVal.toFixed(2)}`;
-            document.getElementById('displayTotalAccesorios').textContent = `$${accTotalVal.toFixed(2)}`;
-            document.getElementById('displayTotalFinal').textContent = `$${(moTotalVal + accTotalVal).toFixed(2)}`;
-        };
+        function calculateFinancials() {
+            let mo = 0; document.querySelectorAll('input[name^="costoEquipo_"]').forEach(i => mo += parseFloat(i.value) || 0);
+            let acc = 0; document.querySelectorAll('.form-acc-qty').forEach(i => acc += (parseInt(i.value) || 0) * (parseFloat(i.dataset.price) || 0));
+            document.getElementById('displayCostoInstalacion').textContent = `$${mo.toFixed(2)}`;
+            document.getElementById('displayTotalAccesorios').textContent = `$${acc.toFixed(2)}`;
+            document.getElementById('displayTotalFinal').textContent = `$${(mo + acc).toFixed(2)}`;
+        }
 
-        window.saveVisit = () => {
+        function saveVisit() {
             const form = document.getElementById('visitForm');
             const data = Object.fromEntries(new FormData(form));
-            const eqs = []; const numEq = parseInt(data.numEquipos) || 1;
-            const fechaInstalacion = document.getElementById('filterDateInput').value;
-
-            for(let i=1; i<=numEq; i++) {
-                eqs.push({ descProducto: data[`descProducto_${i}`], codProducto: "", serieEquipo: "", costoBase: parseFloat(data[`costoEquipo_${i}`]) || 0 });
-            }
-
+            const eqs = []; const count = parseInt(data.numEquipos) || 1;
+            const date = document.getElementById('filterDateInput').value;
+            for(let i=1; i<=count; i++) eqs.push({ descProducto: data[`descProducto_${i}`], codProducto: "", serieEquipo: "", costoBase: parseFloat(data[`costoEquipo_${i}`]) || 0 });
             const ref = database.ref('visits').push();
-            ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), cedula: data.cedula || '', email: data.email || '', telefono: data.telefono || '', direccion: data.direccion, callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', fechaInstalacion: fechaInstalacion, fechaEmision: data.fechaEmision || fechaInstalacion, lugarCompra: data.lugarCompra || '', tecnico: data.tecnico || '', tipoAtencion: "Pendiente", estado: 'PENDIENTE', createdAt: Date.now(), equipos: eqs, financiera: { totalCliente: parseFloat(document.getElementById('displayTotalFinal').textContent.replace('$','')), formaPago: 'PENDIENTE' }, esMantenimiento: false })
+            ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), cedula: data.cedula || '', email: data.email || '', telefono: data.telefono || '', direccion: data.direccion, callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', fechaInstalacion: date, fechaEmision: data.fechaEmision || date, lugarCompra: data.lugarCompra || '', tecnico: data.tecnico || '', tipoAtencion: "Pendiente", estado: 'PENDIENTE', createdAt: Date.now(), equipos: eqs, financiera: { totalCliente: parseFloat(document.getElementById('displayTotalFinal').textContent.replace('$','')), formaPago: 'PENDIENTE' }, esMantenimiento: false })
             .then(() => { showMessage("✅ Agendado", "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
-        };
+        }
 
-        window.saveMantenimiento = () => {
+        function saveMantenimiento() {
             const form = document.getElementById('maintForm');
             const data = Object.fromEntries(new FormData(form));
-            const fechaInstalacion = document.getElementById('filterDateInput').value;
-
             const ref = database.ref('visits').push();
-            ref.set({ 
-                id: ref.key, 
-                nombreCliente: data.mNombre.toUpperCase(), 
-                telefono: data.mTelefono || '', 
-                direccion: data.mDireccion, 
-                callePrincipal: data.mCalle.toUpperCase(),
-                tecnico: data.mTecnico || '',
-                numEquipos: parseInt(data.mNumEquipos) || 1,
-                tipoAtencion: "Mantenimiento", 
-                estado: 'PENDIENTE', 
-                createdAt: Date.now(), 
-                fechaInstalacion: fechaInstalacion,
-                mantenimientoObs: data.mObs.toUpperCase(),
-                esMantenimiento: true,
-                financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago } 
-            })
-            .then(() => { showMessage("✅ Mantenimiento Agendado", "fix-report"); form.reset(); });
-        };
+            ref.set({ id: ref.key, nombreCliente: data.mNombre.toUpperCase(), telefono: data.mTelefono || '', direccion: data.mDireccion, callePrincipal: data.mCalle.toUpperCase(), tecnico: data.mTecnico || '', numEquipos: parseInt(data.mNumEquipos) || 1, tipoAtencion: "Mantenimiento", estado: 'PENDIENTE', createdAt: Date.now(), fechaInstalacion: document.getElementById('filterDateInput').value, mantenimientoObs: data.mObs.toUpperCase(), esMantenimiento: true, financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago } })
+            .then(() => { showMessage("✅ Mantenimiento Guardado", "fix-report"); form.reset(); });
+        }
 
-        window.closeVisitByTech = (id) => {
+        function closeVisitByTech(id) {
             const s = document.getElementById(`status_${id}`).value;
             const t = document.getElementById(`type_${id}`).value;
             const pay = document.getElementById(`payment_${id}`).value;
             const r = document.getElementById(`reason_${id}`).value;
+            const cp = parseFloat(document.getElementById(`customPrice_${id}`).value) || 0;
+            const cd = document.getElementById(`customDesc_${id}`).value;
             const accs = []; let totalAccs = 0;
             document.querySelectorAll(`.acc-${id}`).forEach(i => {
                 const q = parseInt(i.value) || 0;
                 if(q > 0) { const p = parseFloat(i.dataset.price); accs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); totalAccs += q * p; }
             });
+            if(cp > 0) accs.push({ nombre: cd.toUpperCase() || 'ADICIONAL', cantidad: 1, precio: cp });
             if(s === 'PENDIENTE') return showMessage("⚠️ Seleccione estado", "fix-accent");
-            const visit = visitsArray.find(v => v.id === id);
-            const mo = visit.esMantenimiento ? (visit.financiera?.totalCliente || 0) : (visit.equipos || []).reduce((acc, eq) => acc + (eq.costoBase || 0), 0);
-            database.ref('visits/' + id).update({ estado: s === 'SI' ? 'Atendido' : 'No Atendido', tipoAtencion: t, razonNoAtencion: r, accesoriosVendidos: accs, attendedDate: new Date().toISOString(), 'financiera/totalCliente': (mo + totalAccs), 'financiera/formaPago': pay })
-            .then(() => showMessage("✅ Guardado con éxito", "fix-report"));
-        };
+            const v = visitsArray.find(item => item.id === id);
+            const mo = v.esMantenimiento ? (v.financiera?.totalCliente || 0) : (v.equipos || []).reduce((acc, eq) => acc + (eq.costoBase || 0), 0);
+            database.ref('visits/' + id).update({ estado: s === 'SI' ? 'Atendido' : 'No Atendido', tipoAtencion: t, razonNoAtencion: r, accesoriosVendidos: accs, attendedDate: new Date().toISOString(), 'financiera/totalCliente': (mo + totalAccs + cp), 'financiera/formaPago': pay })
+            .then(() => { showMessage("✅ Guardado", "fix-report"); renderRutero(); });
+        }
 
-        window.saveAdminEq = (id) => {
-            const visit = visitsArray.find(v => v.id === id);
-            if(!visit) return;
-            const newEqs = visit.equipos.map((e, i) => ({
-                ...e,
-                codProducto: document.getElementById(`admin_cod_${id}_${i}`).value.toUpperCase(),
-                serieEquipo: document.getElementById(`admin_ser_${id}_${i}`).value.toUpperCase()
-            }));
-            database.ref('visits/' + id).update({ equipos: newEqs }).then(() => showMessage("✅ Datos actualizados", "fix-report"));
-        };
+        // --- LÓGICA FINANCIERA ---
+        function processFinancialBalance() {
+            const ingresosCaja = visitsArray.filter(v => v.estado === 'Atendido' && v.financiera).map(v => {
+                const count = v.esMantenimiento ? 1 : (v.equipos || []).length;
+                const tipo = v.tipoAtencion || "";
+                const accVal = (v.accesoriosVendidos || []).reduce((sum, a) => sum + (a.cantidad * a.precio), 0);
+                const moVal = v.esMantenimiento ? (v.financiera.totalCliente || 0) : (v.equipos || []).reduce((sum, e) => sum + (e.costoBase || 0), 0);
+                
+                let finalMonto = 0;
+                let nota = "";
+                
+                if(tipo.includes("Garantía")) { finalMonto = 0; nota = "(Garantía)"; } 
+                else if (count >= 2) { finalMonto = accVal; nota = `(Solo Insumos ${count}eq)`; } 
+                else { finalMonto = moVal + accVal; nota = ""; }
 
-        window.clearVisitDetails = (id, field) => {
-            const updateObj = {};
-            if(field === 'tecnico') updateObj.tecnico = "";
-            if(field === 'fecha') updateObj.fechaInstalacion = "";
-            database.ref('visits/' + id).update(updateObj).then(() => showMessage("✅ Registro limpiado", "fix-report"));
-        };
+                return { id: v.id, monto: finalMonto, type: 'INGRESO', concepto: `TÉCNICO: ${v.nombreCliente} ${nota}`, fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt };
+            });
 
-        window.deleteVisit = (id) => { if(confirm("¿Eliminar?")) database.ref('visits/' + id).remove().then(() => showMessage("🗑️ Borrado", "fix-error")); };
-
-        window.processFinancialBalance = function() {
-            const ingresos = visitsArray.filter(v => v.estado === 'Atendido' && v.financiera).map(v => ({ id: v.id, monto: v.financiera.totalCliente, type: 'INGRESO', concepto: `VENTA: ${v.nombreCliente}`, fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt }));
-            const egres = egresosArray.map(e => ({ id: e.id, monto: e.monto, type: 'EGRESO', concepto: e.concepto, fecha: e.fecha }));
-            const todos = [...ingresos, ...egres].sort((a,b) => b.fecha - a.fecha);
+            const manuales = movementsArray.map(m => ({ id: m.id, monto: m.monto, type: m.type, concepto: `MANUAL: ${m.concepto}`, fecha: m.fecha }));
+            const todos = [...ingresosCaja, ...manuales].sort((a,b) => b.fecha - a.fecha);
+            
             const tb = document.getElementById('contabilidadTableBody');
-            if(tb) tb.innerHTML = todos.map(m => `<tr class="border-b row-hover"><td class="p-4 text-[9px] font-black italic">${new Date(m.fecha).toLocaleDateString()}</td><td class="p-4 text-[9px] uppercase font-bold tracking-tight">${m.concepto}</td><td class="p-4 text-right text-[10px] font-black italic">$${m.monto.toFixed(2)}</td><td class="text-center p-4">${m.type === 'EGRESO' ? `<button onclick="database.ref('egresos').child('${m.id}').remove()" class="text-fix-error">🗑️</button>` : ''}</td></tr>`).join('');
-            let tIn = 0, tOut = 0; todos.forEach(m => m.type === 'INGRESO' ? tIn += m.monto : tOut += m.monto);
-            const inDisp = document.getElementById('totalIngresosDisplay');
-            const outDisp = document.getElementById('totalEgresosDisplay');
-            const netDisp = document.getElementById('balanceNetoDisplay');
-            if(inDisp) inDisp.textContent = `$${tIn.toFixed(2)}`;
-            if(outDisp) outDisp.textContent = `$${tOut.toFixed(2)}`;
-            if(netDisp) netDisp.textContent = `$${(tIn - tOut).toFixed(2)}`;
-        };
+            if(tb) tb.innerHTML = todos.map(m => `<tr class="border-b row-hover transition-all"><td class="p-4 text-[9px] font-black italic">${new Date(m.fecha).toLocaleDateString()}</td><td class="p-4 text-[9px] uppercase font-bold tracking-tight ${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type} - ${m.concepto}</td><td class="p-4 text-right text-[10px] font-black italic">$${m.monto.toFixed(2)}</td><td class="text-center p-4">${m.id && m.concepto.includes('MANUAL') ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error">🗑️</button>` : ''}</td></tr>`).join('');
+            
+            let tIn = 0, tOut = 0; 
+            todos.forEach(m => m.type === 'INGRESO' ? tIn += m.monto : tOut += m.monto);
+            
+            if(document.getElementById('totalIngresosDisplay')) {
+                document.getElementById('totalIngresosDisplay').textContent = `$${tIn.toFixed(2)}`;
+                document.getElementById('totalEgresosDisplay').textContent = `$${tOut.toFixed(2)}`;
+                document.getElementById('balanceNetoDisplay').textContent = `$${(tIn - tOut).toFixed(2)}`;
+            }
+        }
 
-        window.changeMasterView = (view) => {
-            currentView = view;
-            const panels = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'reporteMantenimientoView'];
-            panels.forEach(p => document.getElementById(p)?.classList.add('hidden'));
-            if(view === 'reporte_admin') { document.getElementById('formContainer')?.classList.remove('hidden'); document.getElementById('agendaContainer')?.classList.remove('hidden'); }
-            else if(view === 'agenda_view') { document.getElementById('agendaContainer')?.classList.remove('hidden'); }
-            else if(view === 'reporte_teka') { document.getElementById('reporteTekaView')?.classList.remove('hidden'); renderReporteTeka(); }
-            else if(view === 'reporte_mantenimiento') { document.getElementById('reporteMantenimientoView')?.classList.remove('hidden'); renderReporteMantenimiento(); }
-            else { document.getElementById(view + 'View')?.classList.remove('hidden'); }
-            if(view === 'rutero') renderRutero();
-            if(view === 'contabilidad') window.processFinancialBalance();
-            document.querySelectorAll('.view-btn').forEach(btn => { btn.classList.remove('bg-fix-blue', 'text-white'); btn.classList.add('bg-gray-100', 'text-gray-500'); });
-            const activeBtn = document.querySelector(`[onclick*="'${view}'"]`);
-            if(activeBtn) { activeBtn.classList.add('bg-fix-blue', 'text-white'); activeBtn.classList.remove('bg-gray-100', 'text-gray-500'); }
-        };
+        function saveManualMovement() {
+            const c = document.getElementById('movConcepto').value; 
+            const m = parseFloat(document.getElementById('movMonto').value);
+            const t = document.getElementById('movType').value;
+            if(!c || !m) return showMessage("⚠️ Datos incompletos", "fix-accent");
+            const ref = database.ref('movements').push();
+            ref.set({ id: ref.key, concepto: c.toUpperCase(), monto: m, fecha: Date.now(), type: t })
+            .then(() => { showMessage(`✅ ${t} Registrado`, "fix-report"); document.getElementById('movConcepto').value=''; document.getElementById('movMonto').value=''; });
+        }
 
         function startSync() {
             database.ref('visits').on('value', snap => {
-                const data = snap.val();
-                visitsArray = data ? Object.entries(data).map(([id, val]) => ({...val, id})) : [];
-                renderUIAgenda(); 
-                if(currentView === 'rutero') renderRutero();
-                if(currentView === 'reporte_teka') renderReporteTeka();
-                if(currentView === 'reporte_mantenimiento') renderReporteMantenimiento();
-                if(currentView === 'contabilidad') window.processFinancialBalance();
+                visitsArray = snap.val() ? Object.entries(snap.val()).map(([id, val]) => ({...val, id})) : [];
+                renderUIAgenda(); if(currentView === 'rutero') renderRutero();
+                if(currentView === 'contabilidad') processFinancialBalance();
             });
-            database.ref('egresos').on('value', snap => { 
-                const data = snap.val();
-                egresosArray = data ? Object.entries(data).map(([id, val]) => ({...val, id})) : []; 
-                if(currentView === 'contabilidad') window.processFinancialBalance(); 
+            database.ref('movements').on('value', snap => { 
+                movementsArray = snap.val() ? Object.entries(snap.val()).map(([id, val]) => ({...val, id})) : []; 
+                if(currentView === 'contabilidad') processFinancialBalance(); 
             });
+            database.ref('inventory_movs').on('value', snap => { inventarioMovs = snap.val() ? Object.values(snap.val()) : []; });
         }
 
         function renderUIAgenda() {
-            const list = document.getElementById('visitsList');
-            if(!list) return;
+            const list = document.getElementById('visitsList'); if(!list) return;
             const df = document.getElementById('filterDateInput').value;
             let filtered = visitsArray.filter(v => v.fechaInstalacion === df);
-            list.innerHTML = filtered.map(v => `
-                <div class="bg-white p-4 rounded-3xl shadow-md border-l-[10px] ${v.estado === 'Atendido' ? 'border-fix-report' : 'border-fix-accent'} mb-4">
-                    <div class="flex justify-between items-start mb-2">
-                        <p class="font-black text-fix-blue text-sm uppercase italic tracking-tighter">${v.nombreCliente}</p>
-                        <div class="flex gap-2">
-                             <button onclick="clearVisitDetails('${v.id}', 'tecnico')" class="bg-slate-100 p-1 text-[8px] rounded font-bold border border-slate-200">SIN TÉCNICO</button>
-                             <button onclick="clearVisitDetails('${v.id}', 'fecha')" class="bg-slate-100 p-1 text-[8px] rounded font-bold border border-slate-200">SIN FECHA</button>
-                             <button onclick="deleteVisit('${v.id}')" class="text-fix-error text-[10px]">🗑️</button>
-                        </div>
-                    </div>
-                    <div class="space-y-2">
-                        ${v.esMantenimiento ? `<p class="text-[9px] font-bold text-slate-500 uppercase italic">TIPO: MANTENIMIENTO | PRECIO: $${v.financiera?.totalCliente}</p>` :
-                        (v.equipos || []).map((e, i) => `
-                            <div class="bg-slate-50 p-2 rounded grid grid-cols-2 gap-2 border border-white">
-                                <p class="col-span-2 text-[8px] font-black text-slate-400 uppercase italic">${e.descProducto}</p>
-                                <input type="text" id="admin_cod_${v.id}_${i}" value="${e.codProducto || ''}" placeholder="CÓDIGO" class="p-1 text-[8px] font-bold uppercase rounded border-none shadow-inner outline-none">
-                                <input type="text" id="admin_ser_${v.id}_${i}" value="${e.serieEquipo || ''}" placeholder="SERIE" class="p-1 text-[8px] font-bold uppercase rounded border-none shadow-inner outline-none">
-                            </div>
-                        `).join('')}
-                    </div>
-                    ${!v.esMantenimiento ? `<button onclick="saveAdminEq('${v.id}')" class="w-full mt-2 bg-fix-blue text-white text-[8px] py-1 rounded font-black uppercase shadow-md active:scale-95 transition-transform">Guardar Datos Admin</button>` : ''}
-                </div>`).join('');
+            list.innerHTML = filtered.map(v => `<div class="bg-white p-4 rounded-3xl shadow-md border-l-[10px] ${v.estado === 'Atendido' ? 'border-fix-report' : 'border-fix-accent'} mb-4"><div class="flex justify-between items-start mb-2"><p class="font-black text-fix-blue text-sm uppercase italic tracking-tighter">${v.nombreCliente}</p><div class="flex gap-2"><button onclick="database.ref('visits/'+v.id).remove()" class="text-fix-error text-[10px]">🗑️</button></div></div><div class="space-y-1">${v.esMantenimiento ? '<p class="text-[9px] font-bold text-slate-400 uppercase italic">MANTENIMIENTO</p>' : (v.equipos || []).map((e, i) => `<div class="bg-slate-50 p-2 rounded grid grid-cols-1 border border-white"><p class="text-[8px] font-black text-slate-400 uppercase italic">${e.descProducto}</p></div>`).join('')}</div></div>`).join('');
         }
 
-        window.expandEquipmentUI = () => {
-            const count = parseInt(document.getElementById('numEquipos').value) || 1;
-            let automaticPrice = 25.00;
-            if (count === 2) automaticPrice = 20.00;
-            else if (count >= 3) automaticPrice = 15.00;
-            const container = document.getElementById('productInputsContainer');
-            if(!container) return; container.innerHTML = '';
-            for(let i=1; i<=count; i++) {
-                container.innerHTML += `<div class="p-4 bg-slate-50 rounded-2xl border-2 border-white mb-2 grid grid-cols-1 md:grid-cols-2 gap-2"><select name="descProducto_${i}" class="p-2 bg-white rounded font-bold text-xs shadow-sm outline-none" required><option value="">ELEGIR EQUIPO...</option>${TIPOS_EQUIPO.map(t => `<option value="${t}">${t}</option>`).join('')}</select><input type="number" name="costoEquipo_${i}" step="0.01" value="${automaticPrice.toFixed(2)}" oninput="calculateFinancials()" class="p-2 bg-yellow-50 rounded font-black text-right text-fix-blue border-none shadow-inner outline-none"></div>`;
-            }
+        function expandEquipmentUI() {
+            const c = parseInt(document.getElementById('numEquipos').value) || 1;
+            let p = 25.00; if (c === 2) p = 20.00; else if (c >= 3) p = 15.00;
+            const container = document.getElementById('productInputsContainer'); if(!container) return; container.innerHTML = '';
+            for(let i=1; i<=c; i++) container.innerHTML += `<div class="p-4 bg-slate-50 rounded-2xl border-2 border-white mb-2 grid grid-cols-1 md:grid-cols-2 gap-2"><select name="descProducto_${i}" class="p-2 bg-white rounded font-bold text-xs shadow-sm outline-none" required><option value="">ELEGIR EQUIPO...</option>${TIPOS_EQUIPO.map(t => `<option value="${t}">${t}</option>`).join('')}</select><input type="number" name="costoEquipo_${i}" step="0.01" value="${p.toFixed(2)}" oninput="calculateFinancials()" class="p-2 bg-yellow-50 rounded font-black text-right text-fix-blue border-none shadow-inner outline-none"></div>`;
             calculateFinancials();
-        };
+        }
 
-        window.renderInsumosAdmin = function() {
-            const container = document.getElementById('accesoriosContainerAdmin');
-            if(!container) return;
+        function renderInsumosAdmin() {
+            const container = document.getElementById('accesoriosContainerAdmin'); if(!container) return;
             container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => `<div class="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-100 shadow-sm"><span class="text-[9px] font-black text-slate-400 uppercase">${n}</span><input type="number" min="0" value="0" data-price="${p}" data-name="${n}" oninput="calculateFinancials()" class="form-acc-qty w-10 text-center bg-slate-50 rounded p-1 text-xs font-black outline-none border-none shadow-inner"></div>`).join('');
-        };
+        }
 
-        window.downloadCSV = (type) => {
-            let data = [];
-            let filename = "Reporte_FIX.csv";
-            if(type === 'teka') {
-                filename = "Reporte_Maestro_FIX.csv";
-                data = visitsArray.filter(v => !v.esMantenimiento).flatMap(v => (v.equipos || []).map(eq => ({ "FECHA COMPRA": v.fechaEmision || "", "LUGAR": v.lugarCompra || "", "FACTURA": v.numFactura || "", "CÓDIGO": eq.codProducto || "", "DESCRIPCIÓN": eq.descProducto || "", "SERIE": eq.serieEquipo || "", "GARANTÍA": "SAP", "TÉCNICO": "capelo", "CIUDAD": "Cuenca", "FECHA ATENCIÓN": v.attendedDate ? new Date(v.attendedDate).toLocaleDateString() : v.fechaInstalacion, "NOMBRE CLIENTE": v.nombreCliente || "", "DIRECCIÓN": v.callePrincipal || "", "CELULAR": v.telefono || "", "PRECIO": (eq.costoBase || 0).toFixed(2), "ORIGEN": "cliente final", "TÉCNICO QUE ATENDIÓ": "capelo", "VIÁTICO": "", "FACTURA2": v.numFactura || "", "CÉDULA": v.cedula || "", "CORREO": v.email || "" })));
-            } else if(type === 'mantenimiento') {
-                filename = "Reporte_Mantenimientos_FIX.csv";
-                data = visitsArray.filter(v => v.esMantenimiento).map(v => ({ "CLIENTE": v.nombreCliente, "DIRECCIÓN": v.callePrincipal || v.direccion, "TELÉFONO": v.telefono, "PRECIO": (v.financiera?.totalCliente || 0).toFixed(2), "FORMA PAGO": v.financiera?.formaPago || "", "ESTADO": v.estado, "NOTAS": v.mantenimientoObs || "" }));
-            }
+        function renderInventario() {
+            const stock = {}; Object.keys(ACCESORIOS_DEFAULT).forEach(k => stock[k] = { qty: 0, totalCost: 0 });
+            inventarioMovs.forEach(m => { if(stock[m.item]) { stock[m.item].qty += m.qty; stock[m.item].totalCost += m.cost; } });
+            visitsArray.forEach(v => { if(v.accesoriosVendidos) v.accesoriosVendidos.forEach(a => { if(stock[a.nombre]) stock[a.nombre].qty -= a.cantidad; }); });
+            const tb = document.getElementById('inventarioTableBody');
+            if(tb) tb.innerHTML = Object.entries(stock).map(([n, d]) => `<tr class="border-b"><td class="p-6 font-black uppercase text-sm">${n}</td><td class="p-6 text-center"><span class="${d.qty < 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'} px-6 py-2 rounded-full font-black text-xl">${d.qty}</span></td><td class="p-6 text-right font-mono font-bold italic">$${d.totalCost.toFixed(2)}</td></tr>`).join('');
+        }
+
+        function downloadCSV(type) {
+            let data = []; let filename = "Reporte.csv";
+            if(type === 'teka') data = visitsArray.filter(v => !v.esMantenimiento).flatMap(v => (v.equipos || []).map(eq => ({ "FECHA COMPRA": v.fechaEmision || "", "LUGAR": v.lugarCompra || "", "FACTURA": v.numFactura || "", "CÓDIGO": eq.codProducto || "", "DESCRIPCIÓN": eq.descProducto || "", "SERIE": eq.serieEquipo || "", "GARANTÍA": "SAP", "TÉCNICO": "capelo", "CIUDAD": "Cuenca", "FECHA ATENCIÓN": v.attendedDate ? new Date(v.attendedDate).toLocaleDateString() : v.fechaInstalacion, "NOMBRE CLIENTE": v.nombreCliente || "", "DIRECCIÓN": v.callePrincipal || "", "CELULAR": v.telefono || "", "PRECIO": (eq.costoBase || 0).toFixed(2), "ORIGEN": "cliente final", "TÉCNICO QUE ATENDIÓ": "capelo", "VIÁTICO": "", "FACTURA2": v.numFactura || "", "CÉDULA": v.cedula || "", "CORREO": v.email || "" })));
             if(data.length === 0) return;
-            const headers = Object.keys(data[0]).join(",");
-            const rows = data.map(obj => Object.values(obj).join(",")).join("\n");
-            const link = document.createElement("a");
-            link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + headers + "\n" + rows)); link.setAttribute("download", filename);
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        };
+            const headers = Object.keys(data[0]).join(","); const rows = data.map(obj => Object.values(obj).join(",")).join("\n");
+            const link = document.createElement("a"); link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8," + headers + "\n" + rows)); link.setAttribute("download", filename); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
 
         function renderReporteTeka() {
-            const body = document.getElementById('tekaReporteBody');
-            if(!body) return;
-            const regularVisits = visitsArray.filter(v => !v.esMantenimiento);
-            body.innerHTML = regularVisits.flatMap(v => (v.equipos || []).map(eq => `
-                <tr class="border-b row-hover">
-                    <td class="border report-cell font-bold">${v.fechaEmision || ''}</td><td class="border report-cell">${v.lugarCompra || ''}</td><td class="border report-cell">${v.numFactura || ''}</td><td class="border report-cell">${eq.codProducto || ''}</td><td class="border report-cell font-black uppercase text-fix-blue tracking-tighter">${eq.descProducto || ''}</td><td class="border report-cell">${eq.serieEquipo || ''}</td><td class="border report-cell font-black">SAP</td><td class="border report-cell">capelo</td><td class="border report-cell font-black">Cuenca</td><td class="border report-cell font-black">${v.fechaInstalacion}</td><td class="border report-cell font-black uppercase italic">${v.nombreCliente || ''}</td><td class="border report-cell text-[7px] break-words max-w-[80px] font-black">${v.callePrincipal || ''}</td><td class="border report-cell">${v.telefono || ''}</td><td class="border report-cell font-black text-right">$${(eq.costoBase || 0).toFixed(2)}</td><td class="border report-cell">cliente final</td><td class="border report-cell">capelo</td><td class="border report-cell"></td><td class="border report-cell">${v.numFactura || ''}</td><td class="border report-cell font-black">${v.cedula || ''}</td><td class="border report-cell">${v.email || ''}</td>
-                </tr>`)).join('');
+            const body = document.getElementById('tekaReporteBody'); if(!body) return;
+            body.innerHTML = visitsArray.filter(v => !v.esMantenimiento).flatMap(v => (v.equipos || []).map(eq => `<tr class="border-b row-hover"><td class="border report-cell font-bold">${v.fechaEmision || ''}</td><td class="border report-cell">${v.lugarCompra || ''}</td><td class="border report-cell font-black">${v.numFactura || ''}</td><td class="border report-cell">${eq.codProducto || ''}</td><td class="border report-cell font-black uppercase text-fix-blue tracking-tighter">${eq.descProducto || ''}</td><td class="border report-cell">${eq.serieEquipo || ''}</td><td class="border report-cell font-black">SAP</td><td class="border report-cell">capelo</td><td class="border report-cell font-black">Cuenca</td><td class="border report-cell font-black">${v.fechaInstalacion}</td><td class="border report-cell font-black uppercase italic">${v.nombreCliente || ''}</td><td class="border report-cell text-[7px] break-words max-w-[80px] font-black">${v.callePrincipal || ''}</td><td class="border report-cell">${v.telefono || ''}</td><td class="border report-cell font-black text-right">$${(eq.costoBase || 0).toFixed(2)}</td><td class="border report-cell">cliente final</td><td class="border report-cell">capelo</td><td class="border report-cell"></td><td class="border report-cell font-black">${v.numFactura || ''}</td><td class="border report-cell font-black">${v.cedula || ''}</td><td class="border report-cell">${v.email || ''}</td></tr>`)).join('');
         }
 
-        function renderReporteMantenimiento() {
-            const body = document.getElementById('mantenimientoReporteBody');
-            if(!body) return;
-            const maintVisits = visitsArray.filter(v => v.esMantenimiento);
-            body.innerHTML = maintVisits.map(v => `
-                <tr class="border-b row-hover">
-                    <td class="border report-cell font-black uppercase">${v.nombreCliente}</td>
-                    <td class="border report-cell text-[7px] font-black">${v.callePrincipal || ''}</td>
-                    <td class="border report-cell">${v.telefono}</td>
-                    <td class="border report-cell font-black text-right">$${(v.financiera?.totalCliente || 0).toFixed(2)}</td>
-                    <td class="border report-cell">${v.financiera?.formaPago || ''}</td>
-                    <td class="border report-cell font-bold text-fix-accent">${v.estado}</td>
-                    <td class="border report-cell italic text-[7px]">${v.mantenimientoObs || ''}</td>
-                </tr>`).join('');
+        function saveAdminEq(id) { const v = visitsArray.find(item => item.id === id); if(!v) return; const newEqs = v.equipos.map((e, i) => ({ ...e, codProducto: document.getElementById(`admin_cod_${id}_${i}`).value.toUpperCase(), serieEquipo: document.getElementById(`admin_ser_${id}_${i}`).value.toUpperCase() })); database.ref('visits/' + id).update({ equipos: newEqs }).then(() => showMessage("✅ Actualizado", "fix-report")); }
+
+        function saveFacturaCompra() {
+            const item = document.getElementById('invAccesorioSelect').value;
+            const qty = parseInt(document.getElementById('invCantidad').value);
+            const cost = parseFloat(document.getElementById('invCostoTotal').value);
+            if(!item || !qty || !cost) return showMessage("Datos incompletos", "fix-accent");
+            database.ref('inventory_movs').push({ item, qty, cost, fecha: Date.now() }).then(() => { showMessage("✅ Stock actualizado", "fix-report"); });
         }
-
-        function showMessage(msg, color) {
-            const box = document.getElementById('messageBox'); if(!box) return;
-            box.textContent = msg; box.style.opacity = '1';
-            box.className = `fixed bottom-32 left-1/2 -translate-x-1/2 p-10 rounded-full shadow-premium text-white font-black uppercase text-xs bg-${color} z-[9999] transition-opacity duration-500`;
-            setTimeout(() => { box.style.opacity = '0'; }, 3000);
-        }
-
-        window.saveManualEgreso = () => {
-            const c = document.getElementById('egConcepto').value;
-            const m = parseFloat(document.getElementById('egMonto').value);
-            if(!c || !m) return;
-            const ref = database.ref('egresos').push();
-            ref.set({ id: ref.key, concepto: c.toUpperCase(), monto: m, fecha: Date.now(), type: 'EGRESO' })
-            .then(() => { document.getElementById('egConcepto').value = ''; document.getElementById('egMonto').value = ''; showMessage("✅ Gasto registrado", "fix-report"); });
-        };
-
-        window.updateRuteroFilter = (val) => { ruteroFilterTech = val; renderRutero(); }
 
         document.addEventListener('DOMContentLoaded', () => {
             const hoy = new Date().toISOString().split('T')[0];
             document.getElementById('filterDateInput').value = hoy;
             document.getElementById('filterDateInputRutero').value = hoy;
             document.getElementById('inputEmision').value = hoy;
-            const params = new URLSearchParams(window.location.search);
-            const tech = params.get('tech');
-            if(tech && LISTA_TECNICOS.includes(tech)) {
-                currentTechUser = tech; document.body.classList.add('technician-mode');
-                document.getElementById('userDisplayLabel').textContent = "RUTA: " + tech.toUpperCase();
-                changeMasterView('rutero'); 
-            } else { document.getElementById('userDisplayLabel').textContent = "ADMIN CENTRAL FIX"; }
+            const p = new URLSearchParams(window.location.search);
+            const t = p.get('tech');
+            if(t && LISTA_TECNICOS.includes(t)) { currentTechUser = t; document.body.classList.add('technician-mode'); document.getElementById('userDisplayLabel').textContent = "RUTA: " + t.toUpperCase(); changeMasterView('rutero'); } 
             startSync();
-            
-            const selTec = document.getElementById('selectTecnico');
-            const selTecM = document.getElementById('selectTecnicoMaint');
-            LISTA_TECNICOS.forEach(t => {
-                if(selTec) selTec.add(new Option(t || "--- TÉCNICO ---", t));
-                if(selTecM) selTecM.add(new Option(t || "--- TÉCNICO ---", t));
-            });
-            
-            LUGARES_COMPRA.forEach(l => { if(document.getElementById('selectLugar')) document.getElementById('selectLugar').add(new Option(l || "--- LUGAR COMPRA ---", l)); });
-            LISTA_TECNICOS.forEach(t => { if(document.getElementById('ruteroTechFilter')) document.getElementById('ruteroTechFilter').add(new Option(t || "TODOS LOS TÉCNICOS", t)); });
+            const selTec = document.getElementById('selectTecnico'); const selTecM = document.getElementById('selectTecnicoMaint');
+            LISTA_TECNICOS.forEach(item => { if(selTec) selTec.add(new Option(item || "--- TÉCNICO ---", item)); if(selTecM) selTecM.add(new Option(item || "--- TÉCNICO ---", item)); });
+            LUGARES_COMPRA.forEach(item => { if(document.getElementById('selectLugar')) document.getElementById('selectLugar').add(new Option(item || "--- LUGAR COMPRA ---", item)); });
+            LISTA_TECNICOS.forEach(item => { if(document.getElementById('ruteroTechFilter')) document.getElementById('ruteroTechFilter').add(new Option(item || "TODOS LOS TÉCNICOS", t)); });
+            const invSelect = document.getElementById('invAccesorioSelect'); if(invSelect) invSelect.innerHTML = Object.keys(ACCESORIOS_DEFAULT).map(k => `<option value="${k}">${k}</option>`).join('');
             renderInsumosAdmin(); expandEquipmentUI();
         });
     </script>
@@ -501,134 +438,143 @@
 
     <div class="max-w-[2800px] mx-auto">
         
-        <header class="mb-14 flex flex-col xl:flex-row justify-between items-center gap-10 no-print">
+        <header class="mb-14 flex flex-col xl:flex-row justify-between items-center gap-10 no-print transition-all">
             <div class="flex items-center">
-                <div class="bg-fix-blue p-8 rounded-[1.5rem] shadow-premium mr-10 logo-container transition-all"><span class="text-7xl font-black text-white italic tracking-tighter logo-text">FIX</span></div>
-                <div><h1 class="text-6xl font-black uppercase italic text-slate-800 tracking-tighter leading-none main-title">Gestión</h1><span id="userDisplayLabel" class="text-xs font-black text-slate-400 uppercase italic tracking-[0.2em] user-label">Cargando...</span></div>
+                <div class="bg-fix-blue p-8 rounded-[1.5rem] shadow-premium mr-10 logo-container"><span class="text-7xl font-black text-white italic tracking-tighter logo-text">FIX</span></div>
+                <div><h1 class="text-6xl font-black uppercase italic text-slate-800 tracking-tighter leading-none main-title">Gestión</h1><span id="userDisplayLabel" class="text-xs font-black text-slate-400 uppercase italic user-label tracking-widest">ADMIN CENTRAL FIX</span></div>
             </div>
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-3 rounded-full shadow-premium border-[6px] border-slate-50 gap-4 admin-only">
                 <button onclick="changeMasterView('reporte_admin')" class="view-btn py-3 px-8 rounded-full font-black text-[10px] uppercase bg-fix-blue text-white italic shadow-md">Registro</button>
                 <button onclick="changeMasterView('mantenimiento')" class="view-btn py-3 px-8 rounded-full font-black text-[10px] uppercase bg-gray-100 text-gray-500 italic">Mantenimientos</button>
+                <button onclick="changeMasterView('inventario')" class="view-btn py-3 px-8 rounded-full font-black text-[10px] uppercase bg-gray-100 text-gray-500 italic">Stock</button>
                 <button onclick="changeMasterView('rutero')" class="view-btn py-3 px-8 rounded-full font-black text-[10px] uppercase bg-gray-100 text-gray-500 italic">Logística</button>
                 <button onclick="changeMasterView('reporte_teka')" class="view-btn py-3 px-8 rounded-full font-black text-[10px] uppercase bg-gray-100 text-gray-500 italic">Maestro</button>
-                <button onclick="changeMasterView('reporte_mantenimiento')" class="view-btn py-3 px-8 rounded-full font-black text-[10px] uppercase bg-gray-100 text-gray-500 italic">Reporte Mant.</button>
                 <button onclick="changeMasterView('contabilidad')" class="view-btn py-3 px-8 rounded-full font-black text-[10px] uppercase bg-gray-100 text-gray-500 italic">Caja</button>
             </nav>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-10 main-grid">
             
-            <!-- FORM CONTAINER GLOBAL (Para Admin) -->
+            <!-- REGISTRO -->
             <div id="formContainer" class="lg:col-span-2 space-y-10 admin-only no-print">
                 <div class="bg-white p-8 rounded-[3rem] shadow-premium border-[8px] border-white">
-                    <span class="text-[10px] font-black uppercase text-slate-400 mb-2 ml-4 block italic">Selector de Fecha (Admin)</span>
-                    <input type="date" id="filterDateInput" onchange="renderUIAgenda(); renderRutero();" class="bg-slate-50 p-4 rounded-2xl text-3xl font-black italic text-fix-blue outline-none border-none shadow-inner w-full">
+                    <input type="date" id="filterDateInput" onchange="renderUIAgenda(); renderRutero();" class="bg-slate-50 p-4 rounded-2xl text-3xl font-black italic text-fix-blue outline-none border-none shadow-inner w-full text-center">
                 </div>
-
                 <div class="bg-white p-10 rounded-[5rem] shadow-premium border-[15px] border-slate-50">
                     <form id="visitForm" onsubmit="event.preventDefault(); saveVisit();">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 tracking-tighter">
-                            <input type="text" name="nombreCliente" placeholder="NOMBRE COMPLETO*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl uppercase shadow-inner outline-none">
-                            <input type="text" name="callePrincipal" placeholder="CALLE PRINCIPAL (PARA REPORTE)*" required class="p-6 bg-yellow-50 rounded-2xl font-black text-xl uppercase shadow-inner outline-none">
-                            <input type="text" name="cedula" placeholder="CÉDULA / RUC*" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
-                            <input type="email" name="email" placeholder="CORREO ELECTRÓNICO*" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
-                            <input type="tel" name="telefono" placeholder="TELÉFONO*" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
-                            <input type="text" name="direccion" placeholder="ENLACE GOOGLE MAPS (GPS)*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
-                            <input type="text" name="numFactura" placeholder="N° FACTURA*" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
+                            <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl uppercase shadow-inner outline-none">
+                            <input type="text" name="callePrincipal" placeholder="CALLE (REPORTE)*" required class="p-6 bg-yellow-50 rounded-2xl font-black text-xl uppercase shadow-inner outline-none">
+                            <input type="text" name="cedula" placeholder="CÉDULA*" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none text-center">
+                            <input type="email" name="email" placeholder="EMAIL*" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
+                            <input type="tel" name="telefono" placeholder="TELÉFONO*" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none text-center">
+                            <input type="text" name="direccion" placeholder="LINK GPS*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
+                            <input type="text" name="numFactura" placeholder="N° FACTURA*" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none text-center">
                             <select name="tecnico" id="selectTecnico" class="p-6 bg-slate-50 rounded-2xl font-black text-lg outline-none"></select>
                             <select id="selectLugar" name="lugarCompra" class="p-6 bg-slate-50 rounded-2xl font-black text-lg outline-none"></select>
-                            <div class="flex flex-col"><span class="text-[9px] font-black text-slate-300 ml-2 uppercase">Emisión Factura</span><input type="date" name="fechaEmision" id="inputEmision" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl outline-none shadow-inner"></div>
+                            <div class="flex flex-col"><span class="text-[9px] font-black text-slate-300 ml-2 uppercase italic text-center">Emisión Factura</span><input type="date" name="fechaEmision" id="inputEmision" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl outline-none shadow-inner text-center"></div>
                             <div class="bg-slate-50 p-6 rounded-2xl flex items-center justify-between shadow-inner font-black italic text-slate-300 uppercase">Equipos: <input type="number" id="numEquipos" name="numEquipos" value="1" min="1" oninput="expandEquipmentUI()" class="w-16 text-center text-4xl text-fix-blue bg-transparent outline-none"></div>
                             <input type="hidden" name="fechaInstalacion" id="inputFecha">
                         </div>
                         <div id="productInputsContainer" class="space-y-4"></div>
                         <div id="accesoriosContainerAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6"></div>
-                        <div class="mt-10 grid grid-cols-3 gap-4 text-center">
-                            <div class="bg-slate-50 p-6 rounded-3xl shadow-inner font-black italic uppercase text-[8px] tracking-widest text-slate-400">M.O.<br><span id="displayCostoInstalacion" class="text-3xl text-fix-blue">$0.00</span></div>
-                            <div class="bg-slate-50 p-6 rounded-3xl shadow-inner font-black italic uppercase text-[8px] tracking-widest text-slate-400">Insumos<br><span id="displayTotalAccesorios" class="text-3xl text-fix-blue">$0.00</span></div>
-                            <div class="bg-fix-accent p-6 rounded-3xl shadow-2xl font-black italic uppercase text-[8px] tracking-widest text-white scale-105">Total Final<br><span id="displayTotalFinal" class="text-4xl">$0.00</span></div>
+                        <div class="mt-10 grid grid-cols-3 gap-4 text-center font-black">
+                            <div class="bg-slate-50 p-6 rounded-3xl shadow-inner italic uppercase text-[8px] text-slate-400 tracking-widest">M.O.<br><span id="displayCostoInstalacion" class="text-3xl text-fix-blue tracking-tighter">$0.00</span></div>
+                            <div class="bg-slate-50 p-6 rounded-3xl shadow-inner italic uppercase text-[8px] text-slate-400 tracking-widest">Insumos<br><span id="displayTotalAccesorios" class="text-3xl text-fix-blue tracking-tighter">$0.00</span></div>
+                            <div class="bg-fix-accent p-6 rounded-3xl shadow-2xl font-black italic uppercase text-[8px] text-white scale-105 tracking-widest">Total Final<br><span id="displayTotalFinal" class="text-4xl tracking-tighter">$0.00</span></div>
                         </div>
                         <button type="submit" class="w-full bg-fix-blue text-white py-8 rounded-[4rem] mt-10 text-3xl font-black uppercase italic shadow-xl tracking-tighter" onclick="document.getElementById('inputFecha').value = document.getElementById('filterDateInput').value">🚀 AGENDAR VISITA</button>
                     </form>
                 </div>
             </div>
 
-            <!-- REGISTRO MANTENIMIENTO -->
+            <!-- MANTENIMIENTO -->
             <div id="mantenimientoView" class="hidden lg:col-span-2 space-y-10 admin-only no-print">
                 <div class="bg-white p-12 rounded-[5rem] shadow-premium border-[15px] border-slate-50">
-                    <h2 class="text-5xl font-black uppercase italic text-fix-blue mb-8 underline decoration-4 underline-offset-8">Agendar Mantenimiento</h2>
+                    <h2 class="text-5xl font-black uppercase italic text-fix-blue mb-8 underline">Mantenimiento</h2>
                     <form id="maintForm" onsubmit="event.preventDefault(); saveMantenimiento();">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                            <input type="text" name="mNombre" placeholder="NOMBRE DEL CLIENTE*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl uppercase shadow-inner outline-none">
+                            <input type="text" name="mNombre" placeholder="CLIENTE*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl uppercase shadow-inner outline-none">
                             <input type="text" name="mCalle" placeholder="CALLE PRINCIPAL*" required class="p-6 bg-yellow-50 rounded-2xl font-black text-xl uppercase shadow-inner outline-none">
-                            <input type="text" name="mDireccion" placeholder="UBICACIÓN / MAPS*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
-                            <input type="tel" name="mTelefono" placeholder="TELÉFONO*" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
-                            <input type="number" name="mPrecio" placeholder="PRECIO TOTAL ($)*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
+                            <input type="text" name="mDireccion" placeholder="LINK GPS*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
+                            <input type="tel" name="mTelefono" placeholder="TELÉFONO*" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none text-center">
+                            <input type="number" name="mPrecio" placeholder="PRECIO TOTAL ($)*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none text-right">
                             <select id="selectTecnicoMaint" name="mTecnico" class="p-6 bg-slate-50 rounded-2xl font-black text-lg outline-none shadow-inner"></select>
-                            <div class="flex flex-col"><span class="text-[9px] font-black text-slate-300 ml-2 uppercase italic">Cantidad Equipos</span><input type="number" name="mNumEquipos" value="1" min="1" class="p-4 bg-slate-50 rounded-2xl font-black text-3xl text-fix-blue outline-none shadow-inner text-center"></div>
+                            <div class="flex flex-col"><span class="text-[9px] font-black text-slate-300 ml-2 uppercase italic text-center tracking-widest">N° Equipos</span><input type="number" name="mNumEquipos" value="1" min="1" class="p-4 bg-slate-50 rounded-2xl font-black text-3xl text-fix-blue outline-none shadow-inner text-center"></div>
                             <select name="mPago" class="p-6 bg-slate-50 rounded-2xl font-black text-lg outline-none shadow-inner"><option value="EFECTIVO">PAGO EN EFECTIVO</option><option value="TRANSFERENCIA">TRANSFERENCIA BANCARIA</option></select>
                             <textarea name="mObs" placeholder="OBSERVACIONES TÉCNICAS..." class="md:col-span-2 p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none h-32 uppercase"></textarea>
                         </div>
-                        <button type="submit" class="w-full bg-slate-800 text-white py-8 rounded-[4rem] text-3xl font-black uppercase italic shadow-xl active:scale-95 transition-transform">💾 REGISTRAR MANTENIMIENTO EN RUTA</button>
+                        <button type="submit" class="w-full bg-slate-800 text-white py-8 rounded-[4rem] text-3xl font-black uppercase italic shadow-xl active:scale-95 transition-transform">💾 AGENDAR MANTENIMIENTO</button>
                     </form>
                 </div>
             </div>
 
-            <!-- AGENDA TÉCNICA (COMPLETAR DATOS) -->
-            <div id="agendaContainer" class="lg:col-span-1 admin-only"><h2 class="text-3xl font-black uppercase italic mb-6 border-b-[6px] border-fix-blue text-slate-800 tracking-tighter">Completar Datos</h2><div id="visitsList" class="space-y-4"></div></div>
-
-            <!-- RUTERO LOGÍSTICO (Vista para técnicos) -->
-            <div id="ruteroView" class="hidden lg:col-span-3 bg-white p-6 md:p-8 rounded-[3rem] md:rounded-[4rem] shadow-premium">
-                <div class="flex flex-col gap-4 mb-6">
-                    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <h2 class="text-xl font-bold uppercase italic text-slate-400 tracking-tighter">Hoja de Ruta</h2>
-                        <select id="ruteroTechFilter" onchange="updateRuteroFilter(this.value)" class="p-3 bg-slate-100 rounded-xl font-black text-[10px] admin-only shadow-inner text-fix-blue outline-none border-none"></select>
+            <!-- STOCK -->
+            <div id="inventarioView" class="hidden lg:col-span-2 space-y-10 admin-only no-print">
+                <div class="bg-white p-12 rounded-[5rem] shadow-premium border-[15px] border-slate-50">
+                    <h2 class="text-5xl font-black uppercase italic text-fix-blue mb-8 underline decoration-4 underline-offset-8">Inventario</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 text-center">
+                        <select id="invAccesorioSelect" class="p-6 bg-slate-50 rounded-2xl font-black text-lg shadow-inner border-none outline-none"></select>
+                        <input type="number" id="invCantidad" placeholder="CANT" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none text-center">
+                        <input type="number" id="invCostoTotal" placeholder="COSTO TOTAL $" class="p-6 bg-yellow-50 rounded-2xl font-black text-xl shadow-inner outline-none text-right">
                     </div>
-                    
-                    <!-- SELECTOR DE FECHA PARA TÉCNICOS -->
-                    <div class="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 flex items-center justify-between shadow-sm">
-                        <span class="text-[9px] font-black uppercase text-slate-400 italic">Elegir Fecha:</span>
-                        <input type="date" id="filterDateInputRutero" onchange="renderRutero();" class="bg-white p-2 rounded-xl text-lg font-black italic text-fix-blue outline-none shadow-inner">
-                    </div>
-                </div>
-
-                <div class="overflow-x-auto w-full border-4 border-slate-50 rounded-[2.5rem] shadow-inner">
-                    <table class="w-full border-collapse rutero-table">
-                        <thead>
-                            <tr>
-                                <th class="border-r">Hora</th>
-                                <th class="border-r text-left">Cliente</th>
-                                <th class="border-r">Técnico</th>
-                                <th class="border-r text-center">Tipo</th>
-                                <th class="border-r text-center">Mapa</th>
-                                <th class="text-center">Tel.</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ruteroListBody"></tbody>
+                    <button onclick="saveFacturaCompra()" class="w-full bg-fix-report text-white py-8 rounded-[4rem] text-3xl font-black uppercase italic shadow-xl active:scale-95 transition-transform mb-12">📦 CARGAR A BODEGA</button>
+                    <table class="w-full border-collapse admin-table shadow-lg rounded-3xl overflow-hidden">
+                        <thead><tr><th>Accesorio</th><th class="text-center">Stock Actual</th><th class="text-right">Inversión</th></tr></thead>
+                        <tbody id="inventarioTableBody"></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- REPORTES -->
+            <!-- HISTORIAL -->
+            <div id="agendaContainer" class="lg:col-span-1 admin-only"><h2 class="text-3xl font-black uppercase italic mb-6 border-b-[6px] border-fix-blue text-slate-800 tracking-tighter text-center">Hoy</h2><div id="visitsList" class="space-y-4"></div></div>
+
+            <!-- RUTERO -->
+            <div id="ruteroView" class="hidden lg:col-span-3 bg-white p-6 md:p-8 rounded-[3rem] md:rounded-[4rem] shadow-premium">
+                <div class="flex flex-col gap-4 mb-6 transition-all">
+                    <div class="flex justify-between items-center"><h2 class="text-base font-bold uppercase italic text-slate-400 tracking-widest">Hoja de Ruta</h2><select id="ruteroTechFilter" onchange="updateRuteroFilter(this.value)" class="p-3 bg-slate-100 rounded-xl font-black text-[10px] admin-only shadow-inner text-fix-blue outline-none border-none"></select></div>
+                    <div class="bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 flex items-center justify-between shadow-sm"><span class="text-[9px] font-black uppercase text-slate-400 italic">Fecha:</span><input type="date" id="filterDateInputRutero" onchange="renderRutero();" class="bg-white p-2 rounded-xl text-lg font-black italic text-fix-blue outline-none shadow-inner text-center"></div>
+                </div>
+                <div class="overflow-x-auto w-full border-4 border-slate-50 rounded-[2.5rem] shadow-inner"><table class="w-full border-collapse rutero-table"><thead><tr id="ruteroHeaderRow"></tr></thead><tbody id="ruteroListBody"></tbody></table></div>
+            </div>
+
+            <!-- MAESTRO -->
             <div id="reporteTekaView" class="hidden lg:col-span-3 bg-white p-6 rounded-[3rem] shadow-premium overflow-hidden">
                 <div class="flex justify-between items-center mb-6"><h2 class="text-3xl font-black uppercase italic underline decoration-4 tracking-tighter">Reporte Maestro</h2><button onclick="downloadCSV('teka')" class="bg-fix-report text-white px-8 py-3 rounded-full font-black text-xs shadow-xl uppercase italic">📊 Descargar Excel</button></div>
                 <div class="overflow-x-auto w-full"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-950 text-white font-black text-[7px] uppercase"><th>Compra</th><th>Lugar</th><th>Factura</th><th>Código</th><th>Descripción</th><th>Serie</th><th>Garantía</th><th>Técnico</th><th>Ciudad</th><th>Atención</th><th>Cliente</th><th>Dirección</th><th>Teléfono</th><th>Precio</th><th>Origen</th><th>Atendió</th><th>Viático</th><th>Factura 2</th><th>Cédula</th><th>Email</th></tr></thead><tbody id="tekaReporteBody"></tbody></table></div>
             </div>
 
-            <div id="reporteMantenimientoView" class="hidden lg:col-span-3 bg-white p-6 rounded-[3rem] shadow-premium overflow-hidden">
-                <div class="flex justify-between items-center mb-6"><h2 class="text-3xl font-black uppercase italic underline decoration-4 tracking-tighter">Reporte de Mantenimientos</h2><button onclick="downloadCSV('mantenimiento')" class="bg-slate-800 text-white px-8 py-3 rounded-full font-black text-xs shadow-xl uppercase italic">📊 Descargar Excel Mantenimientos</button></div>
-                <div class="overflow-x-auto w-full"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-950 text-white font-black text-[7px] uppercase"><th>Cliente</th><th>Dirección</th><th>Teléfono</th><th>Precio</th><th>Forma Pago</th><th>Estado</th><th>Notas</th></tr></thead><tbody id="mantenimientoReporteBody"></tbody></table></div>
-            </div>
-
-            <!-- CONTABILIDAD -->
+            <!-- CAJA -->
             <div id="contabilidadView" class="hidden lg:col-span-3 bg-white p-10 rounded-[4rem] shadow-premium">
-                <div class="grid grid-cols-3 gap-6 mb-10 text-center uppercase italic font-black">
-                    <div class="p-6 bg-green-50 rounded-3xl shadow-inner"><span class="text-xs text-green-900">Ingresos</span><div id="totalIngresosDisplay" class="text-6xl font-black text-green-950">$0.00</div></div>
-                    <div class="p-6 bg-red-50 rounded-3xl shadow-inner"><span class="text-xs text-red-900">Egresos</span><div id="totalEgresosDisplay" class="text-6xl font-black text-red-950">$0.00</div></div>
-                    <div class="p-6 bg-slate-950 rounded-3xl shadow-2xl scale-105"><span class="text-xs text-slate-400">Balance</span><div id="balanceNetoDisplay" class="text-6xl text-white">$0.00</div></div>
+                <div class="grid grid-cols-3 gap-6 mb-10 text-center uppercase font-black italic tracking-tighter">
+                    <div class="p-6 bg-green-50 rounded-3xl shadow-inner italic"><span class="text-xs text-green-900 uppercase">Ingresos Totales</span><div id="totalIngresosDisplay" class="text-6xl text-green-950 font-black">$0.00</div></div>
+                    <div class="p-6 bg-red-50 rounded-3xl shadow-inner italic"><span class="text-xs text-red-900 uppercase">Egresos Totales</span><div id="totalEgresosDisplay" class="text-6xl text-red-950 font-black">$0.00</div></div>
+                    <div class="p-6 bg-slate-950 rounded-3xl shadow-2xl scale-105 text-white tracking-widest"><span>Balance Neto</span><div id="balanceNetoDisplay" class="text-6xl font-black">$0.00</div></div>
                 </div>
-                <div class="bg-red-50 p-6 rounded-3xl mb-8 border-4 border-white shadow-inner flex flex-wrap gap-4 items-center"><input type="text" id="egConcepto" placeholder="DESCRIPCIÓN DEL GASTO..." class="flex-grow p-4 rounded-xl font-black uppercase outline-none shadow-sm"><input type="number" id="egMonto" placeholder="0.00" class="w-32 p-4 rounded-xl text-right font-black border-none"><button onclick="saveManualEgreso()" class="bg-fix-error text-white px-8 py-4 rounded-xl font-black italic shadow-lg uppercase text-xs">💸 Registrar Gasto</button></div>
-                <table class="w-full text-left admin-table"><thead><tr><th class="p-4">Fecha</th><th class="p-4">Concepto</th><th class="p-4 text-right">Monto</th><th class="p-4 text-center">Acción</th></tr></thead><tbody id="contabilidadTableBody" class="font-black italic uppercase"></tbody></table>
+                
+                <div class="bg-slate-50 p-8 rounded-3xl mb-12 border-4 border-white shadow-inner flex flex-wrap gap-6 items-end">
+                    <div class="flex-grow">
+                        <span class="text-[10px] font-black text-slate-400 uppercase italic mb-2 block font-mono">Descripción del Movimiento</span>
+                        <input type="text" id="movConcepto" placeholder="EJ: PAGO REPUESTO EXTERNO..." class="w-full p-5 rounded-2xl font-black uppercase outline-none shadow-sm border-none">
+                    </div>
+                    <div class="w-40">
+                        <span class="text-[10px] font-black text-slate-400 uppercase italic mb-2 block font-mono">Monto $</span>
+                        <input type="number" id="movMonto" placeholder="0.00" class="w-full p-5 rounded-2xl text-right font-black border-none shadow-sm">
+                    </div>
+                    <div class="w-48">
+                        <span class="text-[10px] font-black text-slate-400 uppercase italic mb-2 block font-mono">Tipo</span>
+                        <select id="movType" class="w-full p-5 rounded-2xl font-black border-none shadow-sm bg-white">
+                            <option value="INGRESO">➕ INGRESO</option>
+                            <option value="EGRESO">➖ EGRESO</option>
+                        </select>
+                    </div>
+                    <button onclick="saveManualMovement()" class="bg-fix-blue text-white px-10 py-5 rounded-2xl font-black italic uppercase text-xs shadow-lg active:scale-95 transition-all">Registrar Movimiento</button>
+                </div>
+
+                <table class="w-full text-left admin-table">
+                    <thead><tr><th class="p-4">Fecha</th><th class="p-4">Concepto / Detalle de Cobro</th><th class="p-4 text-right tracking-widest">Monto</th><th class="p-4 text-center">Acción</th></tr></thead>
+                    <tbody id="contabilidadTableBody" class="font-black italic uppercase"></tbody>
+                </table>
             </div>
 
         </div>
