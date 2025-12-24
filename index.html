@@ -2,9 +2,18 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FIX - GESTIÓN</title>
     
+    <!-- CONFIGURACIÓN DE APLICACIÓN MÓVIL (PWA) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FIX">
+    <meta name="theme-color" content="#1e3a8a">
+    
+    <!-- ICONO DE LA APP (SVG Dinámico para el inicio del móvil) -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231e3a8a'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black' font-size='40' fill='white' font-style='italic'>FIX</text></svg>">
+
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -53,7 +62,7 @@
         .rutero-table th { font-size: 9px; padding: 8px !important; background: #f8fafc; color: #64748b; }
         
         .row-hover:hover { background-color: #f1f5f9; }
-        .detail-row { background-color: #f8fafc; border-left: 12px solid #1e3a8a; }
+        .detail-row { background-color: #f8fafc; border-left: 15px solid #1e3a8a; }
         html { scroll-behavior: smooth; }
         .report-cell { font-size: 8px; line-height: 1.1; padding: 4px !important; white-space: nowrap; border: 1px solid #e2e8f0; }
         
@@ -97,7 +106,17 @@
         let currentTechUser = null; 
         let ruteroFilterTech = ""; 
 
-        // --- FUNCIONES GLOBALES DE NAVEGACIÓN ---
+        // --- FUNCIONES MAESTRAS (EXPLICITAMENTE GLOBALES) ---
+
+        window.sendWA = function(id) {
+            const v = visitsArray.find(item => item.id === id);
+            if(!v || !v.telefono) return showMessage("⚠️ Teléfono inválido", "fix-error");
+            const msg = `¡Hola ${v.nombreCliente.split(' ')[0]}! Soy del equipo técnico de *FIX*.\n\nTe confirmo que el servicio de *${v.tipoAtencion || 'Asistencia'}* fue finalizado con éxito.\n\n¿Cómo calificarías nuestra atención hoy? ⭐⭐⭐⭐⭐\n\nRecuerda que en 6 meses te contactaremos para tu mantenimiento preventivo sugerido. 🛠️`;
+            const phone = v.telefono.replace(/\D/g, '');
+            const finalP = phone.startsWith('593') ? phone : '593' + (phone.startsWith('0') ? phone.substring(1) : phone);
+            window.open(`https://wa.me/${finalP}?text=${encodeURIComponent(msg)}`, '_blank');
+        };
+
         window.changeMasterView = function(view) {
             currentView = view;
             const p = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventarioView'];
@@ -130,44 +149,7 @@
             }
         };
 
-        // --- LÓGICA LOGÍSTICA ---
-        function getCoords(address) {
-            if (!address) return null;
-            const regex = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
-            const match = address.match(regex);
-            return match ? { lat: parseFloat(match[1]), lng: parseFloat(match[2]) } : null;
-        }
-
-        function getDistance(p1, p2) {
-            if (!p1 || !p2) return 99999;
-            return Math.sqrt(Math.pow(p1.lat - p2.lat, 2) + Math.pow(p1.lng - p2.lng, 2));
-        }
-
-        function calculateDuration(v) {
-            const count = v.esMantenimiento ? (parseInt(v.numEquipos) || 1) : (v.equipos || []).length;
-            return count <= 1 ? 60 : 60 + (count - 1) * 30;
-        }
-
-        function formatMinutes(totalMin) {
-            const h = Math.floor(totalMin / 60);
-            const m = totalMin % 60;
-            const ampm = h >= 12 ? 'PM' : 'AM';
-            const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
-            return `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
-        }
-
-        // --- WHATSAPP ---
-        function sendWA(id) {
-            const v = visitsArray.find(item => item.id === id);
-            if(!v || !v.telefono) return showMessage("⚠️ Teléfono inválido", "fix-error");
-            const msg = `¡Hola ${v.nombreCliente.split(' ')[0]}! Soy del equipo técnico de *FIX*.\n\nTe confirmo que el servicio de *${v.tipoAtencion || 'Asistencia'}* fue finalizado con éxito.\n\n¿Cómo calificarías nuestra atención hoy? ⭐⭐⭐⭐⭐\n\nRecuerda que en 6 meses te contactaremos para tu mantenimiento preventivo sugerido. 🛠️`;
-            const phone = v.telefono.replace(/\D/g, '');
-            const finalP = phone.startsWith('593') ? phone : '593' + (phone.startsWith('0') ? phone.substring(1) : phone);
-            window.open(`https://wa.me/${finalP}?text=${encodeURIComponent(msg)}`, '_blank');
-        }
-
-        // --- RENDERIZADO RUTERO ---
-        function renderRutero() {
+        window.renderRutero = function() {
             const list = document.getElementById('ruteroListBody');
             const header = document.getElementById('ruteroHeaderRow');
             if(!list || !header) return;
@@ -175,7 +157,7 @@
             const date = document.getElementById('filterDateInputRutero').value || document.getElementById('filterDateInput').value;
             let tech = currentTechUser || ruteroFilterTech;
             
-            header.innerHTML = `<th class="border-r">Hora</th><th class="border-r text-left">Cliente</th>${!currentTechUser ? '<th class="border-r">Técnico</th>' : ''}<th class="border-r text-center">Tipo</th><th class="border-r text-center">Mapa</th><th class="text-center">Tel.</th>`;
+            header.innerHTML = `<th class="border-r">Hora</th><th class="border-r text-left">Cliente</th>${!currentTechUser ? '<th class="border-r">Técnico</th>' : ''}<th class="border-r text-center">Tipo</th><th class="border-r text-center">Mapa</th><th class="text-center">Contacto</th>`;
 
             let filtered = visitsArray.filter(v => v.fechaInstalacion === date);
             if(tech) filtered = filtered.filter(v => v.tecnico === tech);
@@ -204,6 +186,8 @@
                 const time = formatMinutes(start);
                 start += dur + 15; 
                 const maps = v.direccion.includes('http') ? v.direccion : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.direccion)}`;
+                const cleanPhone = (v.telefono || "").replace(/\D/g, '');
+                const waPhone = cleanPhone.startsWith('593') ? cleanPhone : '593' + (cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone);
 
                 return `
                 <tr class="border-b row-hover transition-all">
@@ -211,10 +195,13 @@
                     <td class="border-r font-black text-fix-blue cursor-pointer" onclick="toggleDetail('${v.id}')">${v.nombreCliente}</td>
                     ${!currentTechUser ? `<td class="border-r text-slate-400 italic">${v.tecnico || 'S/A'}</td>` : ''}
                     <td class="border-r text-center font-mono text-fix-accent text-[8px] font-black">${v.esMantenimiento ? 'MANT.' : (v.equipos || []).length + ' EQ.'}</td>
-                    <td class="border-r text-center">
-                        <a href="${maps}" target="_blank" onclick="event.stopPropagation();" class="bg-fix-light text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-md">📍 VER</a>
+                    <td class="border-r text-center"><a href="${maps}" target="_blank" onclick="event.stopPropagation();" class="bg-fix-light text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-tighter shadow-md">📍 VER</a></td>
+                    <td class="text-center">
+                        <div class="flex flex-col gap-1 items-center">
+                            <a href="tel:${v.telefono}" onclick="event.stopPropagation();" class="bg-slate-50 p-2 rounded-lg border border-slate-200 shadow-sm text-lg">📞</a>
+                            <a href="https://wa.me/${waPhone}" target="_blank" onclick="event.stopPropagation();" class="bg-green-50 p-2 rounded-lg border border-green-200 shadow-sm text-lg">💬</a>
+                        </div>
                     </td>
-                    <td class="text-center"><a href="tel:${v.telefono}" onclick="event.stopPropagation();" class="bg-slate-100 p-3 rounded-lg inline-block shadow-sm">📞</a></td>
                 </tr>
                 <tr id="detail-${v.id}" class="hidden detail-row">
                     <td colspan="${currentTechUser ? 5 : 6}" class="p-6 bg-slate-50">
@@ -223,7 +210,6 @@
                                 <p><span class="text-slate-400">CALLE:</span> ${v.callePrincipal || 'N/A'}</p>
                                 <p><span class="text-slate-400">DURACIÓN:</span> ${dur} MINUTOS</p>
                                 <p><span class="text-slate-400">TELÉFONO:</span> ${v.telefono}</p>
-                                ${v.numFactura ? `<p><span class="text-slate-400">FACTURA:</span> ${v.numFactura}</p>` : ''}
                             </div>
                             <div class="bg-white p-5 rounded-2xl border-2 border-fix-blue/10 shadow-sm">
                                 <p class="text-fix-blue mb-4 text-center border-b pb-2 font-black text-[12px] uppercase italic">Reporte de Cierre</p>
@@ -231,84 +217,26 @@
                                     <select id="status_${v.id}" class="p-3 bg-slate-50 rounded-xl font-black text-sm border-none shadow-inner text-fix-blue"><option value="PENDIENTE">¿ATENDIÓ?</option><option value="SI" ${v.estado === 'Atendido' ? 'selected' : ''}>SÍ</option><option value="NO" ${v.estado === 'No Atendido' ? 'selected' : ''}>NO</option></select>
                                     <select id="type_${v.id}" class="p-3 bg-slate-50 rounded-xl font-black text-sm border-none shadow-inner">${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
                                 </div>
-                                <div class="mb-4">
-                                    <span class="text-[10px] font-black text-slate-300 ml-1 uppercase italic">Pago</span>
-                                    <select id="payment_${v.id}" class="w-full p-3 bg-yellow-50 rounded-xl font-black text-sm border-none shadow-inner text-fix-blue">
-                                        <option value="EFECTIVO" ${v.financiera?.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option>
-                                        <option value="TRANSFERENCIA" ${v.financiera?.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option>
-                                    </select>
-                                </div>
                                 <div class="grid grid-cols-1 gap-1 mb-4">
                                     ${Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => `<div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-100"><span class="text-[11px] font-black uppercase text-slate-500">${n}</span><input type="number" min="0" value="0" data-name="${n}" data-price="${p}" class="acc-${v.id} w-16 text-center bg-white rounded-lg p-1 text-md font-black text-fix-blue shadow-inner outline-none"></div>`).join('')}
                                     <div class="mt-2 p-3 bg-blue-50 rounded-xl border border-blue-100">
-                                        <span class="text-[9px] font-black text-blue-400 uppercase italic ml-1">Otro Adicional</span>
+                                        <span class="text-[9px] font-black text-blue-400 uppercase italic ml-1">Adicional</span>
                                         <div class="grid grid-cols-2 gap-3 mt-2">
-                                            <input type="text" id="customDesc_${v.id}" placeholder="Descripción..." class="p-3 bg-white rounded-xl text-[11px] font-bold uppercase shadow-inner border-none outline-none">
-                                            <input type="number" id="customPrice_${v.id}" placeholder="Valor $" class="p-3 bg-white rounded-xl text-[11px] font-black text-blue-700 shadow-inner border-none outline-none text-right">
+                                            <input type="text" id="customDesc_${v.id}" placeholder="Nota..." class="p-3 bg-white rounded-xl text-[11px] font-bold uppercase shadow-inner border-none outline-none">
+                                            <input type="number" id="customPrice_${v.id}" placeholder="$" class="p-3 bg-white rounded-xl text-[11px] font-black text-blue-700 shadow-inner border-none outline-none text-right">
                                         </div>
                                     </div>
                                 </div>
-                                <textarea id="reason_${v.id}" placeholder="Notas..." class="w-full bg-slate-50 p-4 rounded-2xl text-sm mb-4 uppercase h-24 shadow-inner border-none outline-none font-bold">${v.razonNoAtencion || ''}</textarea>
-                                <button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-report text-white font-black py-5 rounded-2xl text-md uppercase shadow active:scale-95 transition-all mb-4">💾 GUARDAR REPORTE</button>
-                                ${v.estado === 'Atendido' ? `<button onclick="sendWA('${v.id}')" class="w-full bg-green-500 text-white font-black py-4 rounded-2xl text-[12px] uppercase shadow-md active:scale-95 flex items-center justify-center gap-2">📲 ENVIAR ENCUESTA AL CLIENTE</button>` : ''}
+                                <textarea id="reason_${v.id}" placeholder="Notas..." class="w-full bg-slate-50 p-4 rounded-2xl text-sm mb-4 h-24 font-bold shadow-inner border-none outline-none"></textarea>
+                                <button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-report text-white font-black py-5 rounded-2xl text-md uppercase shadow active:scale-95 transition-all mb-4 tracking-widest italic">💾 GUARDAR REPORTE</button>
+                                ${v.estado === 'Atendido' ? `<button onclick="sendWA('${v.id}')" class="w-full bg-green-500 text-white font-black py-4 rounded-2xl text-[12px] uppercase shadow-md active:scale-95 flex items-center justify-center gap-2">📲 ENCUESTA WHATSAPP</button>` : ''}
                             </div>
                         </div>
                     </td>
                 </tr>`;
             }).join('');
-        }
-
-        // --- CORE ADMIN ---
-        window.toggleDetail = (id) => document.getElementById(`detail-${id}`)?.classList.toggle('hidden');
-
-        window.calculateFinancials = () => {
-            let mo = 0; document.querySelectorAll('input[name^="costoEquipo_"]').forEach(i => mo += parseFloat(i.value) || 0);
-            let acc = 0; document.querySelectorAll('.form-acc-qty').forEach(i => acc += (parseInt(i.value) || 0) * (parseFloat(i.dataset.price) || 0));
-            document.getElementById('displayCostoInstalacion').textContent = `$${mo.toFixed(2)}`;
-            document.getElementById('displayTotalAccesorios').textContent = `$${acc.toFixed(2)}`;
-            document.getElementById('displayTotalFinal').textContent = `$${(mo + acc).toFixed(2)}`;
         };
 
-        window.saveVisit = () => {
-            const form = document.getElementById('visitForm');
-            const data = Object.fromEntries(new FormData(form));
-            const eqs = []; const count = parseInt(data.numEquipos) || 1;
-            const date = document.getElementById('filterDateInput').value;
-            for(let i=1; i<=count; i++) eqs.push({ descProducto: data[`descProducto_${i}`], codProducto: "", serieEquipo: "", costoBase: parseFloat(data[`costoEquipo_${i}`]) || 0 });
-            const ref = database.ref('visits').push();
-            ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), cedula: data.cedula || '', email: data.email || '', telefono: data.telefono || '', direccion: data.direccion, callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', fechaInstalacion: date, fechaEmision: data.fechaEmision || date, lugarCompra: data.lugarCompra || '', tecnico: data.tecnico || '', tipoAtencion: "Pendiente", estado: 'PENDIENTE', createdAt: Date.now(), equipos: eqs, financiera: { totalCliente: parseFloat(document.getElementById('displayTotalFinal').textContent.replace('$','')), formaPago: 'PENDIENTE' }, esMantenimiento: false })
-            .then(() => { showMessage("✅ Agendado", "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
-        };
-
-        window.saveMantenimiento = () => {
-            const form = document.getElementById('maintForm');
-            const data = Object.fromEntries(new FormData(form));
-            const ref = database.ref('visits').push();
-            ref.set({ id: ref.key, nombreCliente: data.mNombre.toUpperCase(), telefono: data.mTelefono || '', direccion: data.mDireccion, callePrincipal: data.mCalle.toUpperCase(), tecnico: data.mTecnico || '', numEquipos: parseInt(data.mNumEquipos) || 1, tipoAtencion: "Mantenimiento", estado: 'PENDIENTE', createdAt: Date.now(), fechaInstalacion: document.getElementById('filterDateInput').value, mantenimientoObs: data.mObs.toUpperCase(), esMantenimiento: true, financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago } })
-            .then(() => { showMessage("✅ Mantenimiento Guardado", "fix-report"); form.reset(); });
-        };
-
-        window.closeVisitByTech = (id) => {
-            const s = document.getElementById(`status_${id}`).value;
-            const t = document.getElementById(`type_${id}`).value;
-            const pay = document.getElementById(`payment_${id}`).value;
-            const r = document.getElementById(`reason_${id}`).value;
-            const cp = parseFloat(document.getElementById(`customPrice_${id}`).value) || 0;
-            const cd = document.getElementById(`customDesc_${id}`).value;
-            const accs = []; let totalAccs = 0;
-            document.querySelectorAll(`.acc-${id}`).forEach(i => {
-                const q = parseInt(i.value) || 0;
-                if(q > 0) { const p = parseFloat(i.dataset.price); accs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); totalAccs += q * p; }
-            });
-            if(cp > 0) accs.push({ nombre: cd.toUpperCase() || 'ADICIONAL', cantidad: 1, precio: cp });
-            if(s === 'PENDIENTE') return showMessage("⚠️ Seleccione estado", "fix-accent");
-            const v = visitsArray.find(item => item.id === id);
-            const mo = v.esMantenimiento ? (v.financiera?.totalCliente || 0) : (v.equipos || []).reduce((acc, eq) => acc + (eq.costoBase || 0), 0);
-            database.ref('visits/' + id).update({ estado: s === 'SI' ? 'Atendido' : 'No Atendido', tipoAtencion: t, razonNoAtencion: r, accesoriosVendidos: accs, attendedDate: new Date().toISOString(), 'financiera/totalCliente': (mo + totalAccs + cp), 'financiera/formaPago': pay })
-            .then(() => { showMessage("✅ Guardado", "fix-report"); renderRutero(); });
-        };
-
-        // --- LÓGICA FINANCIERA ---
         window.processFinancialBalance = function() {
             const ingresosCaja = visitsArray.filter(v => v.estado === 'Atendido' && v.financiera).map(v => {
                 const count = v.esMantenimiento ? 1 : (v.equipos || []).length;
@@ -321,12 +249,10 @@
                 else { finalMonto = moVal + accVal; nota = ""; }
                 return { id: v.id, monto: finalMonto, type: 'INGRESO', concepto: `TÉCNICO: ${v.nombreCliente} ${nota}`, fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt };
             });
-
             const manuales = movementsArray.map(m => ({ id: m.id, monto: m.monto, type: m.type, concepto: `MANUAL: ${m.concepto}`, fecha: m.fecha }));
             const todos = [...ingresosCaja, ...manuales].sort((a,b) => b.fecha - a.fecha);
             const tb = document.getElementById('contabilidadTableBody');
             if(tb) tb.innerHTML = todos.map(m => `<tr class="border-b row-hover transition-all"><td class="p-4 text-[9px] font-black italic">${new Date(m.fecha).toLocaleDateString()}</td><td class="p-4 text-[9px] uppercase font-bold tracking-tight ${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type} - ${m.concepto}</td><td class="p-4 text-right text-[10px] font-black italic">$${m.monto.toFixed(2)}</td><td class="text-center p-4">${m.concepto.includes('MANUAL') ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error">🗑️</button>` : ''}</td></tr>`).join('');
-            
             let tIn = 0, tOut = 0; todos.forEach(m => m.type === 'INGRESO' ? tIn += m.monto : tOut += m.monto);
             if(document.getElementById('totalIngresosDisplay')) {
                 document.getElementById('totalIngresosDisplay').textContent = `$${tIn.toFixed(2)}`;
@@ -335,7 +261,52 @@
             }
         };
 
-        window.saveManualMovement = () => {
+        window.calculateFinancials = function() {
+            let mo = 0; document.querySelectorAll('input[name^="costoEquipo_"]').forEach(i => mo += parseFloat(i.value) || 0);
+            let acc = 0; document.querySelectorAll('.form-acc-qty').forEach(i => acc += (parseInt(i.value) || 0) * (parseFloat(i.dataset.price) || 0));
+            document.getElementById('displayCostoInstalacion').textContent = `$${mo.toFixed(2)}`;
+            document.getElementById('displayTotalAccesorios').textContent = `$${acc.toFixed(2)}`;
+            document.getElementById('displayTotalFinal').textContent = `$${(mo + acc).toFixed(2)}`;
+        };
+
+        window.saveVisit = function() {
+            const form = document.getElementById('visitForm');
+            const data = Object.fromEntries(new FormData(form));
+            const eqs = []; const count = parseInt(data.numEquipos) || 1;
+            const date = document.getElementById('filterDateInput').value;
+            for(let i=1; i<=count; i++) eqs.push({ descProducto: data[`descProducto_${i}`], codProducto: "", serieEquipo: "", costoBase: parseFloat(data[`costoEquipo_${i}`]) || 0 });
+            const ref = database.ref('visits').push();
+            ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), cedula: data.cedula || '', email: data.email || '', telefono: data.telefono || '', direccion: data.direccion, callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', fechaInstalacion: date, fechaEmision: data.fechaEmision || date, lugarCompra: data.lugarCompra || '', tecnico: data.tecnico || '', tipoAtencion: "Pendiente", estado: 'PENDIENTE', createdAt: Date.now(), equipos: eqs, financiera: { totalCliente: parseFloat(document.getElementById('displayTotalFinal').textContent.replace('$','')), formaPago: 'PENDIENTE' }, esMantenimiento: false })
+            .then(() => { showMessage("✅ Agendado", "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
+        };
+
+        window.saveMantenimiento = function() {
+            const form = document.getElementById('maintForm');
+            const data = Object.fromEntries(new FormData(form));
+            const ref = database.ref('visits').push();
+            ref.set({ id: ref.key, nombreCliente: data.mNombre.toUpperCase(), telefono: data.mTelefono || '', direccion: data.mDireccion, callePrincipal: data.mCalle.toUpperCase(), tecnico: data.mTecnico || '', numEquipos: parseInt(data.mNumEquipos) || 1, tipoAtencion: "Mantenimiento", estado: 'PENDIENTE', createdAt: Date.now(), fechaInstalacion: document.getElementById('filterDateInput').value, mantenimientoObs: data.mObs.toUpperCase(), esMantenimiento: true, financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago } })
+            .then(() => { showMessage("✅ Mantenimiento Guardado", "fix-report"); form.reset(); });
+        };
+
+        window.closeVisitByTech = function(id) {
+            const s = document.getElementById(`status_${id}`).value;
+            const pay = document.getElementById(`payment_${id}`).value;
+            const cp = parseFloat(document.getElementById(`customPrice_${id}`).value) || 0;
+            const cd = document.getElementById(`customDesc_${id}`).value;
+            const accs = []; let totalAccs = 0;
+            document.querySelectorAll(`.acc-${id}`).forEach(i => {
+                const q = parseInt(i.value) || 0;
+                if(q > 0) { const p = parseFloat(i.dataset.price); accs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); totalAccs += q * p; }
+            });
+            if(cp > 0) accs.push({ nombre: cd.toUpperCase() || 'ADICIONAL', cantidad: 1, precio: cp });
+            if(s === 'PENDIENTE') return showMessage("⚠️ Seleccione estado", "fix-accent");
+            const v = visitsArray.find(item => item.id === id);
+            const mo = v.esMantenimiento ? (v.financiera?.totalCliente || 0) : (v.equipos || []).reduce((acc, eq) => acc + (eq.costoBase || 0), 0);
+            database.ref('visits/' + id).update({ estado: s === 'SI' ? 'Atendido' : 'No Atendido', tipoAtencion: document.getElementById(`type_${id}`).value, razonNoAtencion: document.getElementById(`reason_${id}`).value, accesoriosVendidos: accs, attendedDate: new Date().toISOString(), 'financiera/totalCliente': (mo + totalAccs + cp), 'financiera/formaPago': pay })
+            .then(() => { showMessage("✅ Guardado con éxito", "fix-report"); renderRutero(); });
+        };
+
+        window.saveManualMovement = function() {
             const c = document.getElementById('movConcepto').value; 
             const m = parseFloat(document.getElementById('movMonto').value);
             const t = document.getElementById('movType').value;
@@ -345,7 +316,7 @@
             .then(() => { showMessage(`✅ ${t} Registrado`, "fix-report"); document.getElementById('movConcepto').value=''; document.getElementById('movMonto').value=''; });
         };
 
-        window.exportDatabaseBackup = () => {
+        window.exportDatabaseBackup = function() {
             const backup = { visits: visitsArray, movements: movementsArray, inventory: inventarioMovs, exportedAt: new Date().toISOString() };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup));
             const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", "FIX_RESPALDO_" + new Date().toISOString().split('T')[0] + ".json");
@@ -353,10 +324,23 @@
             showMessage("✅ Respaldo descargado", "fix-report");
         };
 
-        window.deleteVisit = (id) => {
+        window.deleteVisit = function(id) {
             if(confirm("¿Seguro de eliminar este registro? Se borrará de todo el sistema.")) {
                 database.ref('visits/' + id).remove().then(() => showMessage("🗑️ Registro eliminado", "fix-error"));
             }
+        };
+
+        window.expandEquipmentUI = function() {
+            const c = parseInt(document.getElementById('numEquipos').value) || 1;
+            let p = 25.00; if (c === 2) p = 20.00; else if (c >= 3) p = 15.00;
+            const container = document.getElementById('productInputsContainer'); if(!container) return; container.innerHTML = '';
+            for(let i=1; i<=c; i++) container.innerHTML += `<div class="p-4 bg-slate-50 rounded-2xl border-2 border-white mb-2 grid grid-cols-1 md:grid-cols-2 gap-2"><select name="descProducto_${i}" class="p-2 bg-white rounded font-bold text-xs shadow-sm outline-none" required><option value="">ELEGIR EQUIPO...</option>${TIPOS_EQUIPO.map(t => `<option value="${t}">${t}</option>`).join('')}</select><input type="number" name="costoEquipo_${i}" step="0.01" value="${p.toFixed(2)}" oninput="calculateFinancials()" class="p-2 bg-yellow-50 rounded font-black text-right text-fix-blue border-none shadow-inner outline-none"></div>`;
+            calculateFinancials();
+        };
+
+        window.renderInsumosAdmin = function() {
+            const container = document.getElementById('accesoriosContainerAdmin'); if(!container) return;
+            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => `<div class="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-100 shadow-sm"><span class="text-[9px] font-black text-slate-400 uppercase">${n}</span><input type="number" min="0" value="0" data-price="${p}" data-name="${n}" oninput="calculateFinancials()" class="form-acc-qty w-10 text-center bg-slate-50 rounded p-1 text-xs font-black outline-none border-none shadow-inner"></div>`).join('');
         };
 
         function startSync() {
@@ -386,14 +370,6 @@
             body.innerHTML = regularVisits.flatMap(v => (v.equipos || []).map(eq => `<tr class="border-b row-hover"><td class="border report-cell font-bold">${v.fechaEmision || ''}</td><td class="border report-cell">${v.lugarCompra || ''}</td><td class="border report-cell font-black">${v.numFactura || ''}</td><td class="border report-cell">${eq.codProducto || ''}</td><td class="border report-cell font-black uppercase text-fix-blue tracking-tighter">${eq.descProducto || ''}</td><td class="border report-cell">${eq.serieEquipo || ''}</td><td class="border report-cell font-black">SAP</td><td class="border report-cell">capelo</td><td class="border report-cell font-black">Cuenca</td><td class="border report-cell font-black">${v.fechaInstalacion}</td><td class="border report-cell font-black uppercase italic">${v.nombreCliente || ''}</td><td class="border report-cell text-[7px] break-words max-w-[80px] font-black">${v.callePrincipal || ''}</td><td class="border report-cell">${v.telefono || ''}</td><td class="border report-cell font-black text-right">$${(eq.costoBase || 0).toFixed(2)}</td><td class="border report-cell">cliente final</td><td class="border report-cell">capelo</td><td class="border report-cell"></td><td class="border report-cell font-black">${v.numFactura || ''}</td><td class="border report-cell font-black">${v.cedula || ''}</td><td class="border report-cell">${v.email || ''}</td><td class="border report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td></tr>`)).join('');
         }
 
-        function saveAdminEq(id) { const v = visitsArray.find(item => item.id === id); if(!v) return; const newEqs = v.equipos.map((e, i) => ({ ...e, codProducto: document.getElementById(`admin_cod_${id}_${i}`).value.toUpperCase(), serieEquipo: document.getElementById(`admin_ser_${id}_${i}`).value.toUpperCase() })); database.ref('visits/' + id).update({ equipos: newEqs }).then(() => showMessage("✅ Actualizado", "fix-report")); }
-
-        function saveFacturaCompra() {
-            const item = document.getElementById('invAccesorioSelect').value; const qty = parseInt(document.getElementById('invCantidad').value); const cost = parseFloat(document.getElementById('invCostoTotal').value);
-            if(!item || !qty || !cost) return showMessage("Datos incompletos", "fix-accent");
-            database.ref('inventory_movs').push({ item, qty, cost, fecha: Date.now() }).then(() => { showMessage("✅ Stock actualizado", "fix-report"); });
-        }
-
         function renderInventario() {
             const stock = {}; Object.keys(ACCESORIOS_DEFAULT).forEach(k => stock[k] = { qty: 0, totalCost: 0 });
             inventarioMovs.forEach(m => { if(stock[m.item]) { stock[m.item].qty += m.qty; stock[m.item].totalCost += m.cost; } });
@@ -402,18 +378,9 @@
             if(tb) tb.innerHTML = Object.entries(stock).map(([n, d]) => `<tr class="border-b"><td class="p-6 font-black uppercase text-sm">${n}</td><td class="p-6 text-center"><span class="${d.qty < 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'} px-6 py-2 rounded-full font-black text-xl">${d.qty}</span></td><td class="p-6 text-right font-mono font-bold italic">$${d.totalCost.toFixed(2)}</td></tr>`).join('');
         }
 
-        function expandEquipmentUI() {
-            const c = parseInt(document.getElementById('numEquipos').value) || 1;
-            let p = 25.00; if (c === 2) p = 20.00; else if (c >= 3) p = 15.00;
-            const container = document.getElementById('productInputsContainer'); if(!container) return; container.innerHTML = '';
-            for(let i=1; i<=c; i++) container.innerHTML += `<div class="p-4 bg-slate-50 rounded-2xl border-2 border-white mb-2 grid grid-cols-1 md:grid-cols-2 gap-2"><select name="descProducto_${i}" class="p-2 bg-white rounded font-bold text-xs shadow-sm outline-none" required><option value="">ELEGIR EQUIPO...</option>${TIPOS_EQUIPO.map(t => `<option value="${t}">${t}</option>`).join('')}</select><input type="number" name="costoEquipo_${i}" step="0.01" value="${p.toFixed(2)}" oninput="calculateFinancials()" class="p-2 bg-yellow-50 rounded font-black text-right text-fix-blue border-none shadow-inner outline-none"></div>`;
-            calculateFinancials();
-        }
+        function showMessage(msg, color) { const box = document.getElementById('messageBox'); if(!box) return; box.textContent = msg; box.style.opacity = '1'; box.className = `fixed bottom-32 left-1/2 -translate-x-1/2 p-10 rounded-full shadow-premium text-white font-black uppercase text-xs bg-${color} z-[9999] transition-opacity duration-500`; setTimeout(() => { box.style.opacity = '0'; }, 3000); }
 
-        function renderInsumosAdmin() {
-            const container = document.getElementById('accesoriosContainerAdmin'); if(!container) return;
-            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => `<div class="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-100 shadow-sm"><span class="text-[9px] font-black text-slate-400 uppercase">${n}</span><input type="number" min="0" value="0" data-price="${p}" data-name="${n}" oninput="calculateFinancials()" class="form-acc-qty w-10 text-center bg-slate-50 rounded p-1 text-xs font-black outline-none border-none shadow-inner"></div>`).join('');
-        }
+        window.updateRuteroFilter = (val) => { ruteroFilterTech = val; renderRutero(); }
 
         document.addEventListener('DOMContentLoaded', () => {
             const hoy = new Date().toISOString().split('T')[0];
@@ -441,7 +408,7 @@
         <header class="mb-14 flex flex-col xl:flex-row justify-between items-center gap-10 no-print transition-all">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-8 rounded-[1.5rem] shadow-premium mr-10 logo-container"><span class="text-7xl font-black text-white italic tracking-tighter logo-text">FIX</span></div>
-                <div><h1 class="text-6xl font-black uppercase italic text-slate-800 tracking-tighter leading-none main-title">Gestión</h1><span id="userDisplayLabel" class="text-xs font-black text-slate-400 uppercase italic user-label tracking-widest">Cargando...</span></div>
+                <div><h1 class="text-6xl font-black uppercase italic text-slate-800 tracking-tighter leading-none main-title">Gestión</h1><span id="userDisplayLabel" class="text-xs font-black text-slate-400 uppercase italic user-label tracking-widest">ADMIN CENTRAL FIX</span></div>
             </div>
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-3 rounded-full shadow-premium border-[6px] border-slate-50 gap-4 admin-only">
                 <button onclick="changeMasterView('reporte_admin')" class="view-btn py-3 px-8 rounded-full font-black text-[10px] uppercase bg-fix-blue text-white italic shadow-md">Registro</button>
@@ -494,8 +461,8 @@
                     <h2 class="text-5xl font-black uppercase italic text-fix-blue mb-8 underline">Mantenimiento</h2>
                     <form id="maintForm" onsubmit="event.preventDefault(); saveMantenimiento();">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                            <input type="text" name="mNombre" placeholder="CLIENTE*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl uppercase shadow-inner outline-none">
-                            <input type="text" name="mCalle" placeholder="CALLE PRINCIPAL*" required class="p-6 bg-yellow-50 rounded-2xl font-black text-xl uppercase shadow-inner outline-none">
+                            <input type="text" name="mNombre" placeholder="CLIENTE*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl uppercase shadow-inner outline-none uppercase">
+                            <input type="text" name="mCalle" placeholder="CALLE PRINCIPAL*" required class="p-6 bg-yellow-50 rounded-2xl font-black text-xl uppercase shadow-inner outline-none uppercase">
                             <input type="text" name="mDireccion" placeholder="LINK GPS*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none">
                             <input type="tel" name="mTelefono" placeholder="TELÉFONO*" class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none text-center">
                             <input type="number" name="mPrecio" placeholder="PRECIO TOTAL ($)*" required class="p-6 bg-slate-50 rounded-2xl font-black text-xl shadow-inner outline-none text-right">
