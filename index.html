@@ -42,9 +42,6 @@
         body.technician-mode header { margin-bottom: 0.5rem !important; padding: 0.5rem !important; flex-direction: row !important; }
         body.technician-mode .logo-text { font-size: 1.5rem !important; }
 
-        body.technician-mode .rutero-table td { font-size: 16px !important; padding: 16px 8px !important; font-weight: 800; text-transform: uppercase; }
-        body.technician-mode .time-badge { font-size: 15px !important; padding: 6px 12px !important; }
-
         .admin-table thead th { position: sticky; top: 0; background: #1e293b; color: white; z-index: 10; padding: 0.75rem; text-transform: uppercase; font-size: 0.55rem; border: 1px solid #334155; }
         .rutero-table td { font-size: 10px; padding: 8px; text-transform: uppercase; font-weight: 700; }
         .rutero-table th { font-size: 9px; padding: 8px; background: #f8fafc; color: #64748b; }
@@ -81,7 +78,7 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // --- CATALOGS (ACTUALIZADOS A MAYÚSCULAS) ---
+        // --- CATALOGS ---
         const LISTA_TECNICOS = ["", "Andres Cardenas", "Cristian Capelo", "Juan Carlos Pando", "Allan Skykaz", "Juana Cardenas"];
         const LUGARES_COMPRA = ["", "COMERCIAL KYWI", "COMERCIAL SOLIS", "COMO HOGAR", "SUKASA", "LUNA PAZMIÑO", "MACAOFERTAS", "HOME VEGA", "MERCARD", "TEKA DIRECTO", "OTRO"];
         const TIPOS_SERVICIO = ["Instalación", "Garantía", "Fuera de Garantía", "Mantenimiento", "Reparación", "Visita Técnica"];
@@ -198,7 +195,6 @@
                 const next = pool.shift(); sorted.push(next);
                 const coords = getCoords(next.direccion); if(coords) curPos = coords;
             }
-
             let start = 9 * 60; 
             list.innerHTML = sorted.map(v => {
                 const dur = calculateDuration(v); const time = formatMinutes(start); start += dur + 15; 
@@ -214,7 +210,51 @@
                     <td class="border-r text-center"><a href="${maps}" target="_blank" class="bg-fix-light text-white px-2 py-1 rounded text-[8px] uppercase font-black">📍 MAPA</a></td>
                     <td class="text-center"><div class="flex flex-col gap-1 items-center"><a href="tel:${v.telefono}" class="text-lg">📞</a><a href="https://wa.me/${waPhone}" target="_blank" class="text-lg">💬</a></div></td>
                     ${!currentTechUser ? `<td class="text-center"><button onclick="openEditModal('${v.id}')" class="bg-fix-blue text-white px-2 py-1 rounded text-[8px] font-black uppercase">EDITAR</button></td>` : ''}
-                </tr><tr id="detail-${v.id}" class="hidden detail-row"><td colspan="${colCount + 1}" class="p-6 bg-slate-50 uppercase font-bold text-[12px]"><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div><p><span class="text-slate-400">CALLE:</span> ${v.callePrincipal || 'N/A'}</p><p><span class="text-slate-400">TELÉFONO:</span> ${v.telefono}</p>${v.descFalla ? `<p class='text-fix-error mt-2'>FALLA: ${v.descFalla}</p><p class='text-fix-error'>VISITA: ${v.numeroVisita}</p>` : ''}</div><div class="bg-white p-5 rounded-2xl border-2 border-fix-blue/10 shadow-sm"><p class="text-fix-blue mb-4 text-center border-b pb-2 font-black text-[12px] uppercase italic">Cierre Técnico</p><div class="grid grid-cols-2 gap-3 mb-4"><select id="status_${v.id}" class="p-3 bg-slate-50 rounded-xl font-black text-sm text-fix-blue"><option value="PENDIENTE">¿ATENDIÓ?</option><option value="SI" ${v.estado === 'Atendido' ? 'selected' : ''}>SÍ</option><option value="NO" ${v.estado === 'No Atendido' ? 'selected' : ''}>NO</option></select><select id="type_${v.id}" class="p-3 bg-slate-50 rounded-xl font-black text-sm">${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div><div class="mb-4"><select id="payment_${v.id}" class="w-full p-3 bg-yellow-50 rounded-xl font-black text-sm text-fix-blue"><option value="EFECTIVO" ${v.financiera?.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option><option value="TRANSFERENCIA" ${v.financiera?.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option></select></div><textarea id="reason_${v.id}" placeholder="Notas..." class="w-full bg-slate-50 p-4 rounded-2xl text-sm mb-4 h-24 font-bold shadow-inner border-none outline-none italic uppercase"></textarea><button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-report text-white font-black py-5 rounded-2xl text-md uppercase shadow italic">💾 GUARDAR REPORTE</button></div></div></td></tr>`;
+                </tr>
+                <tr id="detail-${v.id}" class="hidden detail-row">
+                    <td colspan="${colCount + 1}" class="p-6 bg-slate-50">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 uppercase">
+                            <div class="bg-blue-50 p-6 rounded-3xl border-2 border-fix-blue/10 shadow-inner">
+                                <h4 class="text-fix-blue font-black text-[10px] mb-4 border-b border-fix-blue/20 pb-2 italic tracking-widest">📄 Datos para Orden Física</h4>
+                                <div class="space-y-2 text-[11px] font-bold">
+                                    <p><span class="text-slate-500 italic">CLIENTE:</span> <span class="text-fix-blue font-black">${v.nombreCliente}</span></p>
+                                    <p><span class="text-slate-500 italic">CÉDULA:</span> <span class="font-mono text-slate-700">${v.cedula || '---'}</span></p>
+                                    <p><span class="text-slate-500 italic">EMAIL:</span> <span class="lowercase font-mono text-slate-700">${v.email || '---'}</span></p>
+                                    <p><span class="text-slate-500 italic">TELÉFONO:</span> <span class="font-mono text-slate-700">${v.telefono}</span></p>
+                                    <div class="py-2 border-y border-fix-blue/5 my-2">
+                                        <p><span class="text-slate-500 italic">FACTURA COMPRA:</span> <span class="font-black text-fix-accent font-mono">${v.numFactura || '---'}</span></p>
+                                        <p><span class="text-slate-500 italic">FECHA COMPRA:</span> <span class="font-mono">${v.fechaEmision || '---'}</span></p>
+                                        <p><span class="text-slate-500 italic">LUGAR COMPRA:</span> <span class="text-slate-700">${v.lugarCompra || '---'}</span></p>
+                                    </div>
+                                    <p><span class="text-slate-500 italic text-[9px]">DIRECCIÓN GPS:</span><br><span class="text-slate-600 font-normal normal-case">${v.direccion}</span></p>
+                                    <p><span class="text-slate-500 italic text-[9px]">CALLE REPORTE:</span><br><span class="text-slate-700 font-black">${v.callePrincipal || 'N/A'}</span></p>
+                                    ${v.descFalla ? `<div class="mt-2 p-3 bg-red-100 rounded-xl border border-red-200"><p class='text-fix-error font-black'>⚠️ FALLA: ${v.descFalla}</p><p class='text-fix-error font-black italic'>VISITA: ${v.numeroVisita}</p></div>` : ''}
+                                    <div class="mt-4 pt-2 border-t border-fix-blue/10">
+                                        <p class="text-fix-blue font-black text-[10px] mb-1">EQUIPOS A ATENDER:</p>
+                                        ${(v.equipos || []).map(e => `<div class="bg-white/50 p-1 px-3 rounded-lg mb-1 border border-fix-blue/5 text-[10px]">• ${e.descProducto} ${e.serieEquipo ? `(S/N: ${e.serieEquipo})` : ''}</div>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-3xl border-2 border-slate-200 shadow-sm">
+                                <h4 class="text-slate-400 font-black text-[10px] mb-4 border-b pb-2 italic tracking-widest uppercase">🛠️ Reporte de Cierre</h4>
+                                <div class="grid grid-cols-2 gap-3 mb-4">
+                                    <select id="status_${v.id}" class="p-3 bg-slate-50 rounded-xl font-black text-sm text-fix-blue outline-none shadow-inner"><option value="PENDIENTE">¿ATENDIÓ?</option><option value="SI" ${v.estado === 'Atendido' ? 'selected' : ''}>SÍ</option><option value="NO" ${v.estado === 'No Atendido' ? 'selected' : ''}>NO</option></select>
+                                    <select id="type_${v.id}" class="p-3 bg-slate-50 rounded-xl font-black text-sm outline-none shadow-inner">${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
+                                </div>
+                                <div class="mb-4">
+                                    <span class="text-[9px] font-black text-slate-300 ml-1 uppercase italic font-mono">Forma de Pago</span>
+                                    <select id="payment_${v.id}" class="w-full p-3 bg-yellow-50 rounded-xl font-black text-sm text-fix-blue outline-none shadow-inner"><option value="EFECTIVO" ${v.financiera?.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option><option value="TRANSFERENCIA" ${v.financiera?.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option></select>
+                                </div>
+                                <span class="text-[9px] font-black text-slate-300 ml-1 uppercase italic font-mono">Insumos Utilizados</span>
+                                <div class="grid grid-cols-1 gap-1 mb-4 max-h-[150px] overflow-y-auto pr-1">
+                                    ${Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => `<div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-100"><span class="text-[10px] font-black uppercase text-slate-500">${n}</span><input type="number" min="0" value="0" data-name="${n}" data-price="${p}" class="acc-${v.id} w-14 text-center bg-white rounded-lg p-1 text-md font-black text-fix-blue shadow-inner outline-none"></div>`).join('')}
+                                </div>
+                                <textarea id="reason_${v.id}" placeholder="Observaciones técnicas..." class="w-full bg-slate-50 p-4 rounded-2xl text-xs mb-4 h-20 font-bold shadow-inner border-none outline-none italic uppercase"></textarea>
+                                <button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-report text-white font-black py-5 rounded-2xl text-sm uppercase shadow-xl active:scale-95 italic">💾 GUARDAR Y CERRAR</button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>`;
             }).join('');
         }
 
@@ -232,6 +272,20 @@
             document.getElementById('edit_numVisita').value = v.numeroVisita || "Primera Visita";
             const tecSel = document.getElementById('edit_tecnico');
             tecSel.innerHTML = LISTA_TECNICOS.map(t => `<option value="${t}" ${v.tecnico === t ? 'selected' : ''}>${t || 'SIN ASIGNAR'}</option>`).join('');
+            
+            // Renderizar los equipos para editar Código y Serie
+            const eqContainer = document.getElementById('edit_equipos_container');
+            eqContainer.innerHTML = (v.equipos || []).map((eq, index) => `
+                <div class="bg-slate-50 p-4 rounded-3xl border-2 border-fix-blue/5 mb-3">
+                    <p class="text-[10px] font-black text-fix-blue mb-2 italic">📦 Equipo #${index + 1}: ${eq.descProducto}</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex flex-col"><span class="text-[8px] text-slate-400 ml-2">Modelo / Descripción</span><input type="text" value="${eq.descProducto}" class="eq-desc-${index} p-3 bg-white rounded-xl shadow-inner text-xs font-bold uppercase"></div>
+                        <div class="flex flex-col"><span class="text-[8px] text-slate-400 ml-2">Código Producto</span><input type="text" value="${eq.codProducto || ''}" class="eq-cod-${index} p-3 bg-white rounded-xl shadow-inner text-xs font-bold uppercase font-mono"></div>
+                        <div class="flex flex-col col-span-2"><span class="text-[8px] text-slate-400 ml-2">Serie del Equipo</span><input type="text" value="${eq.serieEquipo || ''}" class="eq-serie-${index} p-3 bg-yellow-50 rounded-xl shadow-inner text-xs font-black uppercase font-mono text-fix-blue"></div>
+                    </div>
+                </div>
+            `).join('');
+            
             modal.classList.remove('hidden');
         };
 
@@ -239,6 +293,16 @@
 
         window.saveEditChanges = function() {
             const id = document.getElementById('edit_id').value;
+            const v = visitsArray.find(item => item.id === id);
+            
+            // Capturar datos actualizados de los equipos
+            const updatedEquipos = (v.equipos || []).map((eq, index) => ({
+                ...eq,
+                descProducto: document.querySelector(`.eq-desc-${index}`).value.toUpperCase(),
+                codProducto: document.querySelector(`.eq-cod-${index}`).value.toUpperCase(),
+                serieEquipo: document.querySelector(`.eq-serie-${index}`).value.toUpperCase()
+            }));
+
             const data = {
                 nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(),
                 telefono: document.getElementById('edit_telefono').value,
@@ -247,9 +311,14 @@
                 tecnico: document.getElementById('edit_tecnico').value,
                 priority: document.getElementById('edit_priority').value,
                 descFalla: document.getElementById('edit_descFalla').value.toUpperCase(),
-                numeroVisita: document.getElementById('edit_numVisita').value
+                numeroVisita: document.getElementById('edit_numVisita').value,
+                equipos: updatedEquipos
             };
-            database.ref('visits/' + id).update(data).then(() => { showMessage("✅ Cambios Guardados", "fix-report"); closeEditModal(); refreshData(); });
+            database.ref('visits/' + id).update(data).then(() => {
+                showMessage("✅ Datos y Equipos Actualizados", "fix-report");
+                closeEditModal();
+                refreshData();
+            });
         };
 
         function processFinancialBalance() {
@@ -267,8 +336,9 @@
             const todos = [...ingresosCaja, ...manuales].sort((a,b) => b.fecha - a.fecha);
             const tb = document.getElementById('contabilidadTableBody');
             if(tb) tb.innerHTML = todos.map(m => `<tr class="border-b row-hover">
-                <td class="p-4 text-[9px] font-black italic font-mono">${new Date(m.fecha).toLocaleDateString()}</td>
-                <td class="p-4 text-[9px] uppercase font-bold tracking-tight ${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type} - ${m.concepto}</td>
+                <td class="p-4 text-[9px] font-black font-mono">${new Date(m.fecha).toLocaleDateString()}</td>
+                <td class="p-4 text-[9px] uppercase font-bold tracking-tight ${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</td>
+                <td class="p-4 text-sm font-black italic uppercase text-xs tracking-tighter">${m.concepto}</td>
                 <td class="p-4 text-right text-[10px] font-black italic font-mono">$${m.monto.toFixed(2)}</td>
                 <td class="text-center p-4">${m.id && m.concepto.includes('MANUAL') ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</td>
             </tr>`).join('');
@@ -282,7 +352,7 @@
             const data = Object.fromEntries(new FormData(form));
             const count = parseInt(data.numEquipos) || 1;
             const date = document.getElementById('filterDateInput').value;
-            const eqs = []; for(let i=1; i<=count; i++) eqs.push({ descProducto: data[`descProducto_${i}`], costoBase: parseFloat(data[`costoEquipo_${i}`]) || 0, codProducto: "", serieEquipo: "" });
+            const eqs = []; for(let i=1; i<=count; i++) eqs.push({ descProducto: data[`descProducto_${i}`].toUpperCase(), costoBase: parseFloat(data[`costoEquipo_${i}`]) || 0, codProducto: "", serieEquipo: "" });
             const ref = database.ref('visits').push();
             const tipoG = data.tipoServicioGlobal;
             ref.set({ 
@@ -369,20 +439,23 @@
 
         function renderReporteTeka() {
             const body = document.getElementById('tekaReporteBody'); if(!body) return;
-            body.innerHTML = visitsArray.filter(v => !v.esMantenimiento).flatMap(v => (v.equipos || []).map(eq => `<tr class="border-b row-hover">
+            const regularVisits = visitsArray.filter(v => !v.esMantenimiento);
+            body.innerHTML = regularVisits.flatMap(v => (v.equipos || []).map(eq => `<tr class="border-b row-hover">
                 <td class="report-cell font-mono">${v.fechaEmision || ''}</td><td class="report-cell">${v.lugarCompra || ''}</td>
-                <td class="report-cell font-black font-mono">${v.numFactura || ''}</td><td class="report-cell">${eq.codProducto || '-'}</td>
-                <td class="report-cell font-black uppercase text-fix-blue">${eq.descProducto || ''}</td><td class="report-cell">${eq.serieEquipo || '-'}</td>
+                <td class="report-cell font-black font-mono">${v.numFactura || ''}</td><td class="report-cell font-mono">${eq.codProducto || '-'}</td>
+                <td class="report-cell font-black uppercase text-fix-blue">${eq.descProducto || ''}</td><td class="report-cell font-mono font-black text-fix-accent">${eq.serieEquipo || '-'}</td>
                 <td class="report-cell">SAP</td><td class="report-cell text-slate-400 italic">capelo</td><td class="report-cell">Cuenca</td>
                 <td class="report-cell font-black font-mono">${v.fechaInstalacion}</td><td class="report-cell font-black uppercase italic">${v.nombreCliente || ''}</td>
-                <td class="report-cell text-[7px] max-w-[80px] break-words">${v.callePrincipal || ''}</td><td class="report-cell font-mono">${v.telefono || ''}</td>
-                <td class="report-cell font-black text-right font-mono">$${(eq.costoBase || 0).toFixed(2)}</td><td class="report-cell">cliente final</td>
+                <td class="report-cell text-[7px] max-w-[80px] break-words uppercase">${v.callePrincipal || ''}</td><td class="report-cell font-mono">${v.telefono || ''}</td>
+                <td class="report-cell font-black text-right font-mono">$${(eq.costoBase || 0).toFixed(2)}</td><td class="report-cell text-[8px]">cliente final</td>
                 <td class="report-cell text-slate-400 italic">${v.tecnico || ''}</td><td class="report-cell"></td>
                 <td class="report-cell font-mono">${v.numFactura || ''}</td><td class="report-cell font-mono">${v.cedula || ''}</td>
                 <td class="report-cell lowercase text-[7px]">${v.email || ''}</td>
                 <td class="report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td>
             </tr>`)).join('');
         }
+
+        window.updateRuteroFilter = function(val) { renderRutero(); };
 
         document.addEventListener('DOMContentLoaded', () => {
             const hoy = new Date().toISOString().split('T')[0];
@@ -416,7 +489,7 @@
                     <h1 class="text-6xl font-black uppercase italic text-slate-800 tracking-tighter leading-none main-title font-sans">Gestión</h1>
                     <div class="flex flex-col">
                         <span id="userDisplayLabel" class="text-xs font-black text-slate-400 uppercase italic user-label tracking-widest tracking-tighter">Panel Administrativo</span>
-                        <span class="version-badge">V. 1.1.3 - PRO</span>
+                        <span class="version-badge">V. 1.1.6 - PRO</span>
                     </div>
                 </div>
             </div>
@@ -477,10 +550,10 @@
                 </div>
             </div>
 
-            <!-- MODAL DE EDICIÓN ADMINISTRATIVA -->
+            <!-- MODAL DE EDICIÓN ADMINISTRATIVA (ACTUALIZADO CON EQUIPOS) -->
             <div id="editModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 overflow-y-auto uppercase italic font-black text-xs">
                 <div class="bg-white w-full max-w-4xl rounded-[4rem] shadow-2xl p-10 border-[15px] border-slate-50 max-h-[90vh] overflow-y-auto">
-                    <h2 class="text-4xl font-black uppercase italic text-fix-blue mb-8 border-b-4 pb-4">Editar Datos Maestros</h2>
+                    <h2 class="text-4xl font-black uppercase italic text-fix-blue mb-8 border-b-4 pb-4 tracking-tighter">Editar Datos Maestros</h2>
                     <input type="hidden" id="edit_id">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 uppercase font-bold italic">
                         <div class="flex flex-col"><span class="text-[10px] text-slate-400 ml-4">Nombre Cliente</span><input type="text" id="edit_nombre" class="p-5 bg-slate-50 rounded-3xl outline-none shadow-inner uppercase"></div>
@@ -492,8 +565,13 @@
                         <div class="flex flex-col"><span class="text-[10px] text-slate-400 ml-4 font-mono tracking-tighter uppercase italic">Visita N°</span><select id="edit_numVisita" class="p-5 bg-slate-50 rounded-3xl outline-none shadow-inner font-black"><option value="Primera Visita">Primera Visita</option><option value="Segunda Visita">Segunda Visita</option></select></div>
                         <div class="flex flex-col"><span class="text-[10px] text-slate-400 ml-4 font-mono tracking-tighter uppercase italic">Prioridad (1-10)</span><input type="number" id="edit_priority" placeholder="0 = Auto GPS" class="p-5 bg-blue-50 rounded-3xl outline-none shadow-inner font-black text-fix-blue font-mono"></div>
                     </div>
+
+                    <!-- NUEVA SECCIÓN DE EQUIPOS -->
+                    <h3 class="text-xl font-black uppercase italic text-slate-400 mb-6 border-b pb-2 tracking-widest">⚙️ Detalle Técnico de Equipos (Post-Visita)</h3>
+                    <div id="edit_equipos_container" class="space-y-4 mb-10"></div>
+
                     <div class="grid grid-cols-2 gap-4">
-                        <button onclick="saveEditChanges()" class="bg-fix-report text-white py-6 rounded-[3rem] font-black uppercase text-xl italic shadow-lg active:scale-95 transition-all">💾 Guardar Cambios</button>
+                        <button onclick="saveEditChanges()" class="bg-fix-report text-white py-6 rounded-[3rem] font-black uppercase text-xl italic shadow-lg active:scale-95 transition-all">💾 Guardar Cambios Maestros</button>
                         <button onclick="closeEditModal()" class="bg-slate-200 text-slate-500 py-6 rounded-[3rem] font-black uppercase text-xl italic shadow-md active:scale-95 transition-all">Cancelar</button>
                     </div>
                 </div>
@@ -521,7 +599,7 @@
             </div>
 
             <!-- AGENDA LOCAL -->
-            <div id="agendaContainer" class="lg:col-span-1 admin-only uppercase italic"><h2 class="text-3xl font-black uppercase italic mb-6 border-b-[6px] border-fix-blue text-slate-800 tracking-tighter text-center">Agenda Local</h2><div id="visitsList" class="space-y-4"></div></div>
+            <div id="agendaContainer" class="lg:col-span-1 admin-only uppercase italic"><h2 class="text-3xl font-black uppercase italic mb-6 border-b-[6px] border-fix-blue text-slate-800 tracking-tighter text-center tracking-widest tracking-tighter">Agenda Local</h2><div id="visitsList" class="space-y-4"></div></div>
 
             <!-- LOGÍSTICA -->
             <div id="ruteroView" class="hidden lg:col-span-3 bg-white p-6 md:p-8 rounded-[3rem] md:rounded-[4rem] shadow-premium">
@@ -532,7 +610,7 @@
                 <div class="overflow-x-auto w-full border-4 border-slate-50 rounded-[2.5rem] shadow-inner"><table class="w-full border-collapse rutero-table"><thead><tr id="ruteroHeaderRow"></tr></thead><tbody id="ruteroListBody"></tbody></table></div>
             </div>
 
-            <!-- MAESTRO (RESTABLECIDO CON 20 COLUMNAS) -->
+            <!-- MAESTRO -->
             <div id="reporteTekaView" class="hidden lg:col-span-3 bg-white p-6 rounded-[3rem] shadow-premium overflow-hidden">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-3xl font-black uppercase italic underline decoration-4 tracking-tighter tracking-tighter">Base Histórica Administrativa</h2>
@@ -542,7 +620,7 @@
                     <table class="w-full border-collapse admin-table">
                         <thead>
                             <tr class="bg-slate-900 text-white font-black text-[7px] uppercase">
-                                <th>Fecha Compra</th><th>Lugar</th><th>Factura</th><th>Código</th><th>Descripción</th><th>Serie</th><th>Gar.</th><th>Téc.</th><th>Ciudad</th><th>Atención</th><th>Cliente</th><th>Dirección</th><th>Celular</th><th>Precio</th><th>Ori.</th><th>Téc. At.</th><th>Viá.</th><th>Fact 2</th><th>Cédula</th><th>Email</th><th>Borrar</th>
+                                <th>Fecha Compra</th><th>Lugar</th><th>Factura</th><th>Código</th><th>Descripción</th><th>Serie</th><th>Gar.</th><th>Téc.</th><th>Ciudad</th><th>Atención</th><th>Cliente</th><th>Dirección</th><th>Celular</th><th>Precio</th><th>Ori.</th><th>Téc. At.</th><th>Viá.</th><th>Fact 2</th><th>Cédula</th><th>Email</th><th>X</th>
                             </tr>
                         </thead>
                         <tbody id="tekaReporteBody"></tbody>
@@ -558,7 +636,7 @@
                     <div class="p-6 bg-slate-950 rounded-3xl shadow-2xl scale-105 text-white tracking-widest"><span>Balance</span><div id="balanceNetoDisplay" class="text-6xl font-black font-mono">$0.00</div></div>
                 </div>
                 <div class="bg-slate-50 p-8 rounded-3xl mb-12 border-4 border-white shadow-inner flex flex-wrap gap-6 items-end">
-                    <div class="flex-grow"><span class="text-[10px] font-black text-slate-400 uppercase italic mb-2 block font-mono tracking-widest text-center text-xs">Concepto Manual</span><input type="text" id="movConcepto" placeholder="..." class="w-full p-5 rounded-2xl font-black uppercase outline-none shadow-sm border-none uppercase"></div>
+                    <div class="flex-grow"><span class="text-[10px] font-black text-slate-400 uppercase italic mb-2 block font-mono tracking-widest text-center text-xs text-center">Concepto Manual</span><input type="text" id="movConcepto" placeholder="..." class="w-full p-5 rounded-2xl font-black uppercase outline-none shadow-sm border-none uppercase"></div>
                     <div class="w-40"><span class="text-[10px] font-black text-slate-400 uppercase italic mb-2 block font-mono tracking-widest text-center text-xs font-mono">Monto $</span><input type="number" id="movMonto" placeholder="0.00" class="w-full p-5 rounded-2xl text-right font-black border-none shadow-sm font-mono"></div>
                     <div class="w-48"><span class="text-[10px] font-black text-slate-400 uppercase italic mb-2 block font-mono tracking-widest text-center text-xs">Tipo</span><select id="movType" class="w-full p-5 rounded-2xl font-black border-none shadow-sm bg-white font-mono"><option value="INGRESO">➕ INGRESO</option><option value="EGRESO">➖ EGRESO</option></select></div>
                     <button onclick="saveManualMovement()" class="bg-fix-blue text-white px-10 py-5 rounded-2xl font-black italic uppercase text-xs shadow-lg active:scale-95 transition-all tracking-widest uppercase font-mono">Registrar</button>
