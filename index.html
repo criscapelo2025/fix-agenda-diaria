@@ -10,10 +10,38 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="FIX GESTIÓN">
     <meta name="theme-color" content="#1e3a8a">
+    <meta name="mobile-web-app-capable" content="yes">
     
     <!-- ICONO DE LA APP (SVG Dinámico) -->
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231e3a8a'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black' font-size='40' fill='white' font-style='italic'>FIX</text></svg>">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231e3a8a'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black' font-size='40' fill='white' font-style='italic'>FIX</text></svg>">
+
+    <!-- MANIFIESTO DINÁMICO PARA INSTALACIÓN COMO APP -->
+    <script>
+        const manifest = {
+            "name": "FIX GESTIÓN",
+            "short_name": "FIX",
+            "start_url": window.location.href,
+            "display": "standalone",
+            "background_color": "#f1f5f9",
+            "theme_color": "#1e3a8a",
+            "icons": [
+                {
+                    "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231e3a8a'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black' font-size='40' fill='white' font-style='italic'>FIX</text></svg>",
+                    "sizes": "512x512",
+                    "type": "image/svg+xml",
+                    "purpose": "any maskable"
+                }
+            ]
+        };
+        const stringManifest = JSON.stringify(manifest);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestURL;
+        document.head.appendChild(link);
+    </script>
 
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -113,8 +141,8 @@
             const v = visitsArray.find(item => item.id === id);
             if(!v || !v.telefono) return showMessage("⚠️ Teléfono inválido", "fix-error");
             const msg = `¡Hola ${v.nombreCliente.split(' ')[0]}! Soy del equipo técnico de *FIX*.\n\nTe confirmo que el servicio de *${v.tipoAtencion || 'Asistencia'}* fue finalizado con éxito.\n\n¿Cómo calificarías nuestra atención hoy? ⭐⭐⭐⭐⭐\n\nRecuerda que en 6 meses te contactaremos para tu mantenimiento preventivo sugerido. 🛠️`;
-            const phone = v.telefono.replace(/\D/g, '');
-            const finalP = phone.startsWith('593') ? phone : '593' + (phone.startsWith('0') ? phone.substring(1) : phone);
+            const cleanPhone = v.telefono.replace(/\D/g, '');
+            const finalP = cleanPhone.startsWith('593') ? cleanPhone : '593' + (cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone);
             window.open(`https://wa.me/${finalP}?text=${encodeURIComponent(msg)}`, '_blank');
         };
 
@@ -300,7 +328,9 @@
 
         window.closeVisitByTech = function(id) {
             const s = document.getElementById(`status_${id}`).value;
+            const t = document.getElementById(`type_${id}`).value;
             const pay = document.getElementById(`payment_${id}`).value;
+            const r = document.getElementById(`reason_${id}`).value;
             const cp = parseFloat(document.getElementById(`customPrice_${id}`).value) || 0;
             const cd = document.getElementById(`customDesc_${id}`).value;
             const accs = []; let totalAccs = 0;
@@ -312,7 +342,7 @@
             if(s === 'PENDIENTE') return showMessage("⚠️ Seleccione estado", "fix-accent");
             const v = visitsArray.find(item => item.id === id);
             const mo = v.esMantenimiento ? (v.financiera?.totalCliente || 0) : (v.equipos || []).reduce((acc, eq) => acc + (eq.costoBase || 0), 0);
-            database.ref('visits/' + id).update({ estado: s === 'SI' ? 'Atendido' : 'No Atendido', tipoAtencion: document.getElementById(`type_${id}`).value, razonNoAtencion: document.getElementById(`reason_${id}`).value, accesoriosVendidos: accs, attendedDate: new Date().toISOString(), 'financiera/totalCliente': (mo + totalAccs + cp), 'financiera/formaPago': pay })
+            database.ref('visits/' + id).update({ estado: s === 'SI' ? 'Atendido' : 'No Atendido', tipoAtencion: t, razonNoAtencion: r, accesoriosVendidos: accs, attendedDate: new Date().toISOString(), 'financiera/totalCliente': (mo + totalAccs + cp), 'financiera/formaPago': pay })
             .then(() => { showMessage("✅ Guardado", "fix-report"); renderRutero(); });
         };
 
@@ -394,10 +424,6 @@
             database.ref('inventory_movs').push({ item, qty, cost, fecha: Date.now() }).then(() => { showMessage("✅ Stock actualizado", "fix-report"); });
         }
 
-        function showMessage(msg, color) { const box = document.getElementById('messageBox'); if(!box) return; box.textContent = msg; box.style.opacity = '1'; box.className = `fixed bottom-32 left-1/2 -translate-x-1/2 p-10 rounded-full shadow-premium text-white font-black uppercase text-xs bg-${color} z-[9999] transition-opacity duration-500`; setTimeout(() => { box.style.opacity = '0'; }, 3000); }
-
-        window.updateRuteroFilter = (val) => { ruteroFilterTech = val; renderRutero(); }
-
         document.addEventListener('DOMContentLoaded', () => {
             const hoy = new Date().toISOString().split('T')[0];
             document.getElementById('filterDateInput').value = hoy;
@@ -438,6 +464,7 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-10 main-grid">
             
+            <!-- REGISTRO -->
             <div id="formContainer" class="lg:col-span-2 space-y-10 admin-only no-print">
                 <div class="bg-white p-8 rounded-[3rem] shadow-premium border-[8px] border-white">
                     <input type="date" id="filterDateInput" onchange="renderUIAgenda(); renderRutero();" class="bg-slate-50 p-4 rounded-2xl text-3xl font-black italic text-fix-blue outline-none border-none shadow-inner w-full text-center">
