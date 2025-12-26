@@ -79,14 +79,44 @@
           messagingSenderId: "98719439808",
           appId: "1:98719439808:web:66576c19c8b5233a718625",
         };
+        
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
         const LISTA_TECNICOS = ["", "Andres Cardenas", "Cristian Capelo", "Juan Carlos Pando", "Allan Skykaz", "Juana Cardenas"];
         const LUGARES_COMPRA = ["", "COMERCIAL KYWI", "COMERCIAL SOLIS", "COMO HOGAR", "SUKASA", "LUNA PAZMIÑO", "MACAOFERTAS", "HOME VEGA", "MERCARD", "TEKA DIRECTO", "OTRO"];
         const TIPOS_SERVICIO = ["Instalación", "Garantía", "Fuera de Garantía", "Mantenimiento", "Reparación", "Visita Técnica"];
-        const TIPOS_EQUIPO = ["Cocina Inducción", "Cocina a Gas", "Horno Eléctrico", "Horno a Gas", "Campana Tradicional", "Campana Decorativa", "Microondas", "Refrigerador", "Lavavajillas", "Triturador", "Fregadero/Grifería"];
-        const ACCESORIOS_DEFAULT = { 'Enchufe 110V': 5.00, 'Enchufe 220V 20V': 7.00, 'Enchufe 220V 50V': 10.00, 'Manguera c/bridas': 4.00, 'Ducto 4 pulgadas metro': 5.00, 'Enchufe chinito': 5.00, 'Segunda visita': 12.00, 'Visita fuera de garantía': 20.00 };
+        
+        const TIPOS_EQUIPO = ["Horno Eléctrico", "Horno a Gas", "Cocina Inducción", "Cocina a Gas", "Microondas", "Campana Tradicional", "Campana Decorativa", "Campana Isla", "Refrigerador", "Triturador", "Grifería", "Fregadero", "Lavavajillas", "Cafetera"];
+        
+        const COSTOS_EQUIPO = {
+            "Horno Eléctrico": 25.00,
+            "Horno a Gas": 29.00,
+            "Cocina Inducción": 25.00,
+            "Cocina a Gas": 29.00,
+            "Microondas": 25.00,
+            "Campana Tradicional": 15.00,
+            "Campana Decorativa": 36.00,
+            "Campana Isla": 45.00,
+            "Refrigerador": 30.00,
+            "Triturador": 15.00,
+            "Grifería": 13.00,
+            "Fregadero": 13.00,
+            "Lavavajillas": 25.00,
+            "Cafetera": 25.00
+        };
+
+        const ACCESORIOS_DEFAULT = { 
+            'Enchufe 110V': 5.00, 
+            'Enchufe 220V 20V': 7.00, 
+            'Enchufe 220V 50V': 10.00, 
+            'Manguera c/bridas': 4.00, 
+            'Ducto 4 pulgadas metro': 5.00, 
+            'Enchufe chinito': 5.00, 
+            'Acople': 5.00,
+            'Segunda visita': 12.00, 
+            'Visita fuera de garantía': 20.00 
+        };
 
         let visitsArray = [];      
         let movementsArray = [];     
@@ -115,21 +145,44 @@
             if(cT) cT.textContent = `$${(mo + acc).toFixed(2)}`;
         }
 
+        // Lógica de precio automatizada por cantidad
+        function updateEquipmentPrice(selectEl, index) {
+            const selectedVal = selectEl.value;
+            const count = parseInt(document.getElementById('numEquipos').value) || 1;
+            const priceInput = document.getElementsByName(`costoEquipo_${index}`)[0];
+            
+            if(!priceInput) return;
+
+            if (count === 1) {
+                priceInput.value = (COSTOS_EQUIPO[selectedVal] || 0.00).toFixed(2);
+            } else if (count === 2) {
+                priceInput.value = "20.00";
+            } else if (count >= 3) {
+                priceInput.value = "15.00";
+            }
+            
+            calculateFinancials();
+        }
+
         function expandEquipmentUI() {
-            const c = parseInt(document.getElementById('numEquipos').value) || 1;
-            let p = 25.00; 
-            if (c === 2) p = 20.00; else if (c >= 3) p = 15.00;
+            const count = parseInt(document.getElementById('numEquipos').value) || 1;
             const container = document.getElementById('productInputsContainer'); 
             if(!container) return; 
+
+            // Determinar precio base según cantidad para nuevos campos
+            let unitPrice = 0;
+            if (count === 2) unitPrice = 20.00;
+            else if (count >= 3) unitPrice = 15.00;
+
             container.innerHTML = '';
-            for(let i=1; i<=c; i++) {
+            for(let i=1; i<=count; i++) {
                 container.innerHTML += `
                 <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 mb-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <select name="descProducto_${i}" class="p-2 bg-white rounded font-bold text-xs shadow-sm outline-none uppercase" required>
+                    <select name="descProducto_${i}" onchange="updateEquipmentPrice(this, ${i})" class="p-2 bg-white rounded font-bold text-xs shadow-sm outline-none uppercase" required>
                         <option value="">ELEGIR EQUIPO...</option>
                         ${TIPOS_EQUIPO.map(t => `<option value="${t}">${t}</option>`).join('')}
                     </select>
-                    <input type="number" name="costoEquipo_${i}" step="0.01" value="${p.toFixed(2)}" oninput="calculateFinancials()" class="p-2 bg-yellow-50 rounded font-black text-right text-fix-blue outline-none font-mono">
+                    <input type="number" name="costoEquipo_${i}" step="0.01" value="${unitPrice.toFixed(2)}" oninput="calculateFinancials()" class="p-2 bg-yellow-50 rounded font-black text-right text-fix-blue outline-none font-mono">
                 </div>`;
             }
             calculateFinancials();
@@ -227,6 +280,7 @@
             if(v.tipoAtencion === 'Garantía' || t === 'Garantía') mo = 0;
             const totalFinal = mo + totalAccs;
             const numVisita = document.getElementById(`visit_num_${id}`)?.value || v.numeroVisita || "Visita 1";
+            
             database.ref('visits/' + id).update({ 
                 estado: s === 'SI' ? 'Atendido' : 'No Atendido', 
                 tipoAtencion: t, 
@@ -241,6 +295,14 @@
                 showMessage("✅ Guardado", "fix-report"); 
                 renderRutero(); 
             });
+        }
+
+        function deleteVisit(id) {
+            if(confirm("¿ELIMINAR ESTE REGISTRO?")) {
+                database.ref('visits/' + id).remove().then(() => {
+                    showMessage("🗑️ Registro Eliminado", "fix-error");
+                });
+            }
         }
 
         function renderUIAgenda() {
@@ -301,7 +363,6 @@
 
                 const maps = v.direccion && v.direccion.includes('http') ? v.direccion : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.direccion || '')}`;
                 const waPhone = v.telefono ? v.telefono.replace(/\D/g, '') : '';
-                const isWarranty = v.tipoAtencion === 'Garantía';
                 
                 return `
                 <tr class="border-b row-hover uppercase font-black">
@@ -347,17 +408,9 @@
                                         <option value="SI" ${v.estado === 'Atendido' ? 'selected' : ''}>SÍ, ATENDIDO</option>
                                         <option value="NO" ${v.estado === 'No Atendido' ? 'selected' : ''}>NO ATENDIDO</option>
                                     </select>
-                                    ${isWarranty ? `
-                                        <select id="visit_num_${v.id}" class="p-2 bg-yellow-50 rounded text-[10px] font-black uppercase">
-                                            <option value="Visita 1" ${v.numeroVisita === 'Visita 1' ? 'selected' : ''}>Visita 1</option>
-                                            <option value="Visita 2" ${v.numeroVisita === 'Visita 2' ? 'selected' : ''}>Visita 2</option>
-                                            <option value="Visita 3" ${v.numeroVisita === 'Visita 3' ? 'selected' : ''}>Visita 3</option>
-                                        </select>
-                                    ` : `
-                                        <select id="type_${v.id}" class="p-2 bg-slate-100 rounded text-[10px] font-black uppercase">
-                                            ${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}
-                                        </select>
-                                    `}
+                                    <select id="type_${v.id}" class="p-2 bg-slate-100 rounded text-[10px] font-black uppercase">
+                                        ${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}
+                                    </select>
                                 </div>
                                 <select id="payment_${v.id}" class="w-full p-2 bg-slate-100 rounded mb-2 text-[10px] font-black uppercase">
                                     <option value="EFECTIVO" ${v.financiera?.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option>
@@ -365,20 +418,13 @@
                                 </select>
                                 <textarea id="reason_${v.id}" placeholder="Novedades..." class="w-full p-2 text-xs bg-slate-50 rounded mb-2 border-none outline-none font-bold uppercase italic">${v.razonNoAtencion || ''}</textarea>
                                 <div class="max-h-24 overflow-y-auto mb-2 border rounded p-1">
-                                    ${isWarranty ? `
-                                        <div class="flex justify-between items-center mb-1 bg-blue-50 p-1 rounded font-black uppercase">
-                                            <span class="text-[8px] uppercase">Cargo por Revisión ($20.00)</span>
-                                            <input type="number" min="0" value="${(v.accesoriosVendidos || []).find(a=>a.nombre==='Visita fuera de garantía')?.cantidad || 0}" data-name="Visita fuera de garantía" data-price="20.00" class="acc-${v.id} w-10 text-center text-[11px] border-none font-black bg-white rounded shadow-inner">
-                                        </div>
-                                    ` : `
-                                        ${Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => {
-                                            const existing = (v.accesoriosVendidos || []).find(a => a.nombre === n);
-                                            return `<div class="flex justify-between items-center mb-1 bg-slate-50 p-1 rounded font-black">
-                                                <span class="text-[8px] uppercase">${n} ($${p.toFixed(2)})</span>
-                                                <input type="number" min="0" value="${existing ? existing.cantidad : 0}" data-name="${n}" data-price="${p}" class="acc-${v.id} w-10 text-center text-[11px] border-none font-black text-fix-blue bg-white rounded shadow-inner">
-                                            </div>`;
-                                        }).join('')}
-                                    `}
+                                    ${Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => {
+                                        const existing = (v.accesoriosVendidos || []).find(a => a.nombre === n);
+                                        return `<div class="flex justify-between items-center mb-1 bg-slate-50 p-1 rounded font-black">
+                                            <span class="text-[8px] uppercase">${n} ($${p.toFixed(2)})</span>
+                                            <input type="number" min="0" value="${existing ? existing.cantidad : 0}" data-name="${n}" data-price="${p}" class="acc-${v.id} w-10 text-center text-[11px] border-none font-black text-fix-blue bg-white rounded shadow-inner">
+                                        </div>`;
+                                    }).join('')}
                                 </div>
                                 <button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-report text-white py-2 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95">💾 GUARDAR FINAL</button>
                             </div>
@@ -388,28 +434,66 @@
             }).join('');
         }
 
-        // --- FILTROS DE REPORTE MAESTRO ---
+        // --- REPORTE MAESTRO - ESTRUCTURA 21 COLUMNAS ---
         function renderReporteTeka() {
             const body = document.getElementById('tekaReporteBody'); if(!body) return;
             const start = document.getElementById('maestroDateStart').value;
             const end = document.getElementById('maestroDateEnd').value;
-            let filtered = visitsArray.filter(v => !v.esMantenimiento);
+            
+            let filtered = visitsArray.filter(v => !v.esMantenimiento && v.estado === 'Atendido');
             if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
 
+            let rowCount = 1;
             body.innerHTML = filtered.flatMap(v => (v.equipos || []).map(eq => `
                 <tr class="border-b row-hover font-black uppercase">
-                    <td class="report-cell font-mono">${v.fechaEmision || ''}</td>
-                    <td class="report-cell font-black uppercase italic">${v.nombreCliente}</td>
-                    <td class="report-cell font-black uppercase text-fix-blue">${eq.descProducto}</td>
-                    <td class="report-cell font-mono font-black text-fix-accent tracking-widest">${eq.serieEquipo || '-'}</td>
-                    <td class="report-cell font-black font-mono uppercase">${v.fechaInstalacion}</td>
-                    <td class="report-cell text-slate-400 font-black">${v.tecnico}</td>
-                    <td class="report-cell font-black text-right font-mono">$${(eq.costoBase || 0).toFixed(2)}</td>
-                    <td class="report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td>
+                    <td class="report-cell text-center font-mono bg-slate-50">${rowCount++}</td> <!-- 1. NRO -->
+                    <td class="report-cell font-mono">${v.fechaEmision || ''}</td> <!-- 2. FECHA DE EMISIÓN -->
+                    <td class="report-cell">${v.lugarCompra || 'OTRO'}</td> <!-- 3. LUGAR DE COMPRA -->
+                    <td class="report-cell font-mono">${v.numFactura || '-'}</td> <!-- 4. FACTURA -->
+                    <td class="report-cell font-mono">${eq.codProducto || '-'}</td> <!-- 5. CÓDIGO -->
+                    <td class="report-cell italic text-slate-400"></td> <!-- 6. DESCRIPCIÓN -->
+                    <td class="report-cell font-mono tracking-widest">${eq.serieEquipo || '-'}</td> <!-- 7. SERIE -->
+                    <td class="report-cell font-black">SAP</td> <!-- 8. SAP -->
+                    <td class="report-cell">CAPELO</td> <!-- 9. TÉCNICO -->
+                    <td class="report-cell">CUENCA</td> <!-- 10. CIUDAD -->
+                    <td class="report-cell font-mono">${v.fechaInstalacion}</td> <!-- 11. FECHA ATENCIÓN -->
+                    <td class="report-cell font-black italic">${v.nombreCliente}</td> <!-- 12. CLIENTE -->
+                    <td class="report-cell max-w-[150px] truncate">${v.callePrincipal || '-'}</td> <!-- 13. CALLE -->
+                    <td class="report-cell font-mono">${v.telefono || '-'}</td> <!-- 14. TELÉFONO -->
+                    <td class="report-cell font-black text-right font-mono">$${(eq.costoBase || 0).toFixed(2)}</td> <!-- 15. PRECIO -->
+                    <td class="report-cell">CLIENTE FINAL</td> <!-- 16. LLEGADA INFO -->
+                    <td class="report-cell">CAPELO</td> <!-- 17. TÉCNICO QUE ATENDIÓ -->
+                    <td class="report-cell italic text-slate-400"></td> <!-- 18. VIÁTICO -->
+                    <td class="report-cell font-mono">${v.numFactura || '-'}</td> <!-- 19. FACTURA REP -->
+                    <td class="report-cell font-mono">${v.cedula || '-'}</td> <!-- 20. CÉDULA -->
+                    <td class="report-cell lowercase">${v.email || '-'}</td> <!-- 21. CORREO -->
                 </tr>`)).join('');
         }
 
-        // --- FILTROS Y EXPORTACION DE CAJA ---
+        function downloadCSV() {
+            const start = document.getElementById('maestroDateStart').value || "HISTORICO";
+            const end = document.getElementById('maestroDateEnd').value || "HISTORICO";
+            
+            let csv = "NRO,FECHA DE EMISION,LUGAR DE COMPRA,FACTURA,CODIGO,DESCRIPCION,SERIE,SAP,TECNICO,CIUDAD,FECHA ATENCION,CLIENTE,CALLE,TELEFONO,PRECIO,LLEGADA INFO,TECNICO QUE ATENDIO,VIATICO,FACTURA REP,CEDULA,CORREO\n";
+            
+            document.querySelectorAll('#tekaReporteBody tr').forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if(cols.length >= 21) {
+                    let rowData = [];
+                    for(let i=0; i<21; i++) {
+                        let text = cols[i].innerText.replace(/"/g, '""').replace(/\n/g, ' ');
+                        rowData.push(`"${text}"`);
+                    }
+                    csv += rowData.join(",") + "\n";
+                }
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", `REPORTE_MAESTRO_FIX_SAP_${start}_AL_${end}.csv`);
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
         function processFinancialBalance() {
             const start = document.getElementById('cajaDateStart').value;
             const end = document.getElementById('cajaDateEnd').value;
@@ -495,6 +579,7 @@
             document.getElementById('edit_id').value = v.id;
             document.getElementById('edit_nombre').value = v.nombreCliente || "";
             document.getElementById('edit_telefono').value = v.telefono || "";
+            document.getElementById('edit_email').value = v.email || "";
             document.getElementById('edit_fecha').value = v.fechaInstalacion || "";
             document.getElementById('edit_direccion').value = v.direccion || "";
             document.getElementById('edit_priority').value = v.priority || "";
@@ -509,6 +594,7 @@
             database.ref('visits/' + id).update({
                 nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(),
                 telefono: document.getElementById('edit_telefono').value,
+                email: document.getElementById('edit_email').value.toLowerCase(),
                 fechaInstalacion: document.getElementById('edit_fecha').value,
                 direccion: document.getElementById('edit_direccion').value,
                 tecnico: document.getElementById('edit_tecnico').value,
@@ -624,7 +710,7 @@
                     <h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1>
                     <div class="flex flex-col">
                         <span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span>
-                        <span class="version-badge">V. 1.8.5</span>
+                        <span class="version-badge">V. 1.8.7</span>
                     </div>
                 </div>
             </div>
@@ -632,7 +718,7 @@
                 <button onclick="changeMasterView('reporte_admin')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-fix-blue text-white italic">Registro</button>
                 <button onclick="changeMasterView('mantenimiento')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Mantenimiento</button>
                 <button onclick="changeMasterView('rutero')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Logística</button>
-                <button onclick="changeMasterView('reporte_teka')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Maestro</button>
+                <button onclick="changeMasterView('reporte_teka')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-fix-blue text-white italic">Maestro</button>
                 <button onclick="changeMasterView('contabilidad')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Caja</button>
             </nav>
         </header>
@@ -647,12 +733,13 @@
                 <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50">
                     <form id="visitForm" onsubmit="event.preventDefault(); saveVisit();">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                            <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs uppercase font-black">
-                            <input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs uppercase font-black">
+                            <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black">
+                            <input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black">
                             <input type="text" name="cedula" placeholder="CÉDULA*" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono">
                             <input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black">
-                            <input type="text" name="direccion" placeholder="LINK GPS*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner">
+                            <input type="email" name="email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner">
                             <input type="text" name="numFactura" placeholder="N° FACTURA*" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center uppercase font-black">
+                            <input type="text" name="direccion" placeholder="LINK GPS*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner md:col-span-2">
                             <select name="tecnico" id="selectTecnico" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select>
                             <select id="selectLugar" name="lugarCompra" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select>
                             <div class="flex flex-col"><span class="text-[8px] font-black text-slate-400 ml-2 italic">EMISIÓN FACTURA</span><input type="date" name="fechaEmision" id="inputEmision" class="p-3 bg-slate-50 rounded-xl font-bold text-xs outline-none shadow-inner text-center font-mono"></div>
@@ -728,28 +815,52 @@
                 </div>
             </div>
 
-            <!-- MAESTRO (FILTRO FECHA) -->
+            <!-- MAESTRO (FILTRO FECHA) - ESTRUCTURA FINAL 21 COLUMNAS EXACTAS -->
             <div id="reporteTekaView" class="hidden lg:col-span-3 bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase">
                 <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
                     <div>
-                        <h2 class="text-lg font-black uppercase italic font-sans italic underline">Base Maestro SAP</h2>
+                        <h2 class="text-lg font-black uppercase italic font-sans italic underline text-fix-blue">Maestro SAP (21 Columnas)</h2>
                         <div class="flex gap-2 mt-2 font-black">
                             <input type="date" id="maestroDateStart" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black">
                             <input type="date" id="maestroDateEnd" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black">
                             <button onclick="renderReporteTeka()" class="bg-fix-blue text-white px-2 rounded text-[10px]">VER</button>
                         </div>
                     </div>
-                    <button onclick="downloadCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic">📊 EXCEL SAP</button>
+                    <button onclick="downloadCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic">📊 DESCARGAR SAP FINAL</button>
                 </div>
                 <div class="overflow-x-auto border-2 border-slate-50 rounded-xl">
                     <table class="w-full border-collapse admin-table">
-                        <thead><tr class="bg-slate-900 text-white text-[7px] uppercase"><th>Emisión</th><th>Cliente</th><th>Producto</th><th>Serie</th><th>Fecha At</th><th>Téc</th><th>Precio</th><th>X</th></tr></thead>
+                        <thead>
+                            <tr class="bg-slate-900 text-white text-[7px] uppercase">
+                                <th class="bg-slate-800">NRO</th>
+                                <th>FECHA DE EMISIÓN</th>
+                                <th>LUGAR DE COMPRA</th>
+                                <th>FACTURA</th>
+                                <th>CÓDIGO</th>
+                                <th>DESCRIPCIÓN</th>
+                                <th>SERIE</th>
+                                <th>SAP</th>
+                                <th>TÉCNICO</th>
+                                <th>CIUDAD</th>
+                                <th>FECHA ATENCIÓN</th>
+                                <th>CLIENTE</th>
+                                <th>CALLE</th>
+                                <th>TELÉFONO</th>
+                                <th>PRECIO</th>
+                                <th>LLEGADA INFO</th>
+                                <th>TÉCNICO ATENDIÓ</th>
+                                <th>VIÁTICO</th>
+                                <th>FACTURA REP</th>
+                                <th>CÉDULA</th>
+                                <th>CORREO</th>
+                            </tr>
+                        </thead>
                         <tbody id="tekaReporteBody" class="uppercase font-bold"></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- CAJA (FILTRO FECHA Y EXCEL) -->
+            <!-- CAJA -->
             <div id="contabilidadView" class="hidden lg:col-span-3 bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase">
                 <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
                     <div>
@@ -785,7 +896,7 @@
 
     <!-- MODAL DE AJUSTE FINANCIERO -->
     <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic">
+        <div class="bg-white w-full max-sm rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic">
             <h2 class="text-xl font-black uppercase text-fix-blue mb-4 border-b-2 pb-2">VALOR REAL</h2>
             <input type="hidden" id="finance_id">
             <input type="hidden" id="finance_source">
@@ -800,7 +911,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE EDICIÓN (REGISTRO) -->
+    <!-- MODAL DE EDICIÓN -->
     <div id="editModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 font-black">
         <div class="bg-white w-full max-w-xl rounded-[2rem] shadow-2xl p-8 font-black italic border-[6px] border-slate-50 uppercase">
             <h2 class="text-xl font-black uppercase text-fix-blue mb-6 border-b-2 pb-2 italic uppercase">EDITAR CITA</h2>
@@ -808,6 +919,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                 <input type="text" id="edit_nombre" class="p-3 bg-slate-50 rounded-xl border font-black text-xs">
                 <input type="text" id="edit_telefono" class="p-3 bg-slate-50 rounded-xl border font-mono font-black text-xs">
+                <input type="email" id="edit_email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl border font-black text-xs">
                 <input type="number" id="edit_priority" placeholder="Prioridad..." class="p-3 bg-yellow-50 rounded-xl border font-black text-xs font-mono">
                 <select id="edit_tecnico" class="p-3 bg-slate-50 rounded-xl border font-black text-xs italic uppercase"></select>
                 <input type="date" id="edit_fecha" class="p-3 bg-slate-50 rounded-xl border font-black text-xs font-mono">
