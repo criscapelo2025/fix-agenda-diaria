@@ -121,7 +121,6 @@
             let acc = 0; 
             document.querySelectorAll('.form-acc-qty').forEach(i => acc += (parseInt(i.value) || 0) * (parseFloat(i.dataset.price) || 0));
             
-            // Sumar accesorio manual extra
             const manualVal = parseFloat(document.getElementById('manualAccPrice').value) || 0;
             acc += manualVal;
 
@@ -177,7 +176,6 @@
                     <input type="number" min="0" value="0" data-price="${p}" data-name="${n}" oninput="calculateFinancials()" class="form-acc-qty w-10 text-center bg-slate-50 rounded p-1 text-xs font-black outline-none shadow-inner" placeholder="0">
                 </div>`).join('');
             
-            // Fila Extra Manual
             html += `
                 <div class="col-span-1 md:col-span-2 p-2 bg-slate-100 rounded-xl border border-slate-300 mt-2">
                     <p class="text-[9px] font-black text-fix-blue mb-1 italic">➕ OTRO ACCESORIO / EXTRA (GRABACIÓN MANUAL)</p>
@@ -252,7 +250,7 @@
 
         function toggleDetail(id) { document.getElementById(`detail-${id}`)?.classList.toggle('hidden'); }
 
-        // --- CIERRE TÉCNICO v1.9.9 (CON SOPORTE EXTRA MANUAL) ---
+        // --- CIERRE TÉCNICO v2.0.1 (MANEJO DE COBRO MANUAL EN MANTENIMIENTOS) ---
         function closeVisitByTech(id) {
             const s = document.getElementById(`status_${id}`).value;
             const t = document.getElementById(`type_${id}`).value;
@@ -286,7 +284,9 @@
             
             let moParaCaja = 0;
             if (v.esMantenimiento) {
-                moParaCaja = v.financiera?.totalCliente || 0;
+                // Para mantenimiento, el técnico puede ingresar el valor del cobro directamente
+                const maintTechValue = parseFloat(document.getElementById(`maint_tech_price_${id}`).value);
+                moParaCaja = !isNaN(maintTechValue) ? maintTechValue : (v.financiera?.totalCliente || 0);
             } else if (eqCount === 1 && v.tipoAtencion !== 'Garantía' && t !== 'Garantía') {
                 moParaCaja = (v.equipos || []).reduce((acc, eq) => acc + (eq.costoBase || 0), 0);
             }
@@ -349,7 +349,7 @@
             }
         }
 
-        // --- RENDERIZADO DE RUTERO (LOGÍSTICA) v1.9.9 (CON EXTRA TÉCNICO) ---
+        // --- RENDERIZADO DE RUTERO (LOGÍSTICA) v2.0.1 (CAMPO COBRO MANTENIMIENTO) ---
         function renderRutero() {
             const list = document.getElementById('ruteroListBody'); if(!list) return;
             const date = document.getElementById('filterDateInputRutero').value;
@@ -407,7 +407,7 @@
                     <td class="border-r text-center font-mono text-slate-400 text-[9px] italic">${initials}</td>
                     <td class="border-r text-center">${statusBadge}</td>
                     <td class="border-r text-center">
-                        <a href="${maps}" target="_blank" class="bg-fix-light text-white px-3 py-2 rounded-lg text-[8px] font-black shadow-md italic inline-block w-full">📍 MAPA</a>
+                        <a href="${maps}" target="_blank" class="bg-fix-light text-white px-3 py-2 rounded-lg text-[8px] font-black shadow-md italic inline-block w-full text-center">📍 MAPA</a>
                     </td>
                     <td class="text-center">
                         <div class="flex justify-center gap-2 items-center p-1">
@@ -432,6 +432,14 @@
                                     <select id="status_${v.id}" class="p-2 bg-slate-100 rounded text-[10px] font-black uppercase"><option value="PENDIENTE">¿ATENDIÓ?</option><option value="SI" ${v.estado === 'Atendido' ? 'selected' : ''}>SÍ, ATENDIDO</option><option value="NO" ${v.estado === 'No Atendido' ? 'selected' : ''}>NO ATENDIDO</option></select>
                                     <select id="type_${v.id}" class="p-2 bg-slate-100 rounded text-[10px] font-black uppercase">${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
                                 </div>
+                                
+                                ${v.esMantenimiento ? `
+                                <div class="mb-2">
+                                    <label class="text-[8px] font-black text-slate-400 block ml-1 mb-1 italic">💰 VALOR DEL COBRO MANTENIMIENTO:</label>
+                                    <input type="number" id="maint_tech_price_${v.id}" value="${v.financiera?.totalCliente || ''}" step="0.01" placeholder="INGRESE VALOR COBRADO $" class="w-full p-2 bg-yellow-50 rounded text-xs font-mono font-black border border-fix-accent/20">
+                                </div>
+                                ` : ''}
+
                                 <select id="payment_${v.id}" class="w-full p-2 bg-slate-100 rounded mb-2 text-[10px] font-black uppercase"><option value="EFECTIVO" ${v.financiera?.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option><option value="TRANSFERENCIA" ${v.financiera?.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option></select>
                                 <textarea id="reason_${v.id}" placeholder="Novedades del Servicio..." class="w-full p-2 text-xs bg-slate-50 rounded mb-2 border-none outline-none font-bold uppercase italic">${v.razonNoAtencion || ''}</textarea>
                                 
@@ -442,7 +450,6 @@
                                     }).join('')}
                                 </div>
 
-                                <!-- ACCESORIO EXTRA TÉCNICO -->
                                 <div class="p-2 bg-slate-100 rounded-lg border border-slate-200 mb-2">
                                     <p class="text-[7px] font-black text-slate-500 mb-1">ACCESORIO NO EN LISTA / CARGO EXTRA:</p>
                                     <div class="flex gap-1">
@@ -488,28 +495,6 @@
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
-        function downloadMantenimientoCSV() {
-            const start = document.getElementById('maestroDateStart').value || "HISTORICO";
-            const end = document.getElementById('maestroDateEnd').value || "HISTORICO";
-            let csv = "FECHA,CLIENTE,TELÉFONO,CALLE,EQUIPO,VALOR,ESTADO\n";
-            document.querySelectorAll('#mantenimientoReporteBody tr').forEach(row => {
-                const cols = row.querySelectorAll('td');
-                if(cols.length >= 7) {
-                    let rowData = [];
-                    for(let i=0; i<7; i++) { 
-                        let text = cols[i].innerText.replace(/"/g, '""').replace(/\n/g, ' ').replace('$',''); 
-                        rowData.push(`"${text}"`); 
-                    }
-                    csv += rowData.join(",") + "\n";
-                }
-            });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
-            link.setAttribute("download", `REPORTE_MANTENIMIENTOS_FIX_${start}_AL_${end}.csv`);
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        }
-
-        // --- LÓGICA DE INVENTARIO ---
         function renderInventoryView() {
             const container = document.getElementById('inventoryTableBody'); if(!container) return;
             const selectAcc = document.getElementById('invAccSelect');
@@ -557,28 +542,12 @@
             });
         }
 
-        function downloadInventoryCSV() {
-            let csv = "ACCESORIO,ENTRADAS,UTILIZADO,STOCK ACTUAL,PRECIO UNIT\n";
-            document.querySelectorAll('#inventoryTableBody tr').forEach(row => {
-                const cols = row.querySelectorAll('td');
-                if(cols.length >= 5) {
-                    csv += `"${cols[0].innerText}",${cols[1].innerText},${cols[2].innerText},${cols[3].innerText},${cols[4].innerText.replace('$','')}\n`;
-                }
-            });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
-            link.setAttribute("download", `INVENTARIO_FIX_${new Date().toISOString().split('T')[0]}.csv`);
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        }
-
-        // --- LÓGICA DE CONTABILIDAD v2.0 (CASH ONLY BALANCE) ---
         function processFinancialBalance() {
             const start = document.getElementById('cajaDateStart').value; 
             const end = document.getElementById('cajaDateEnd').value;
             const techFilter = document.getElementById('cajaTechFilter').value;
             let todos = [];
             
-            // 1. Procesar Visitas
             visitsArray.filter(v => v.estado === 'Atendido' && v.financiera).forEach(v => {
                 let monto = 0;
                 const eqCount = v.esMantenimiento ? 1 : (v.equipos || []).length;
@@ -600,7 +569,6 @@
                 });
             });
 
-            // 2. Procesar Movimientos Manuales
             movementsArray.forEach(m => {
                 todos.push({ 
                     id: m.id, monto: m.monto, type: m.type, concepto: `MANUAL: ${m.concepto}`, 
@@ -609,7 +577,6 @@
                 });
             });
 
-            // 3. Aplicar Filtros (Fecha y Técnico)
             if(start && end) todos = todos.filter(m => m.dateStr >= start && m.dateStr <= end);
             if(techFilter) todos = todos.filter(m => m.tecnico === techFilter);
 
@@ -636,7 +603,6 @@
                     </td>
                 </tr>`).join('');
             
-            // 4. Cálculos Dashboard (NUEVA LÓGICA: SÓLO EFECTIVO PARA EL NETO)
             let tIn = 0, tOut = 0, tCashIn = 0, tTransIn = 0;
             
             todos.forEach(m => {
@@ -645,12 +611,10 @@
                     if(m.formaPago === 'EFECTIVO') tCashIn += m.monto;
                     else if(m.formaPago === 'TRANSFERENCIA') tTransIn += m.monto;
                 } else {
-                    // Se asume que los EGRESOS/GASTOS salen siempre del EFECTIVO
                     tOut += m.monto;
                 }
             });
 
-            // EL NETO (LO QUE DEBE HABER EN CAJA FÍSICA) ES SÓLO EFECTIVO - EGRESOS
             const netoCajaFisica = tCashIn - tOut;
             
             document.getElementById('totalIngresosDisplay').textContent = `$${tIn.toFixed(2)}`;
@@ -659,47 +623,12 @@
             document.getElementById('totalEfectivoDisplay').textContent = `$${tCashIn.toFixed(2)}`;
             document.getElementById('totalTransferDisplay').textContent = `$${tTransIn.toFixed(2)}`;
             
-            // Actualizar cuadro de resumen final (Negro)
             document.getElementById('finalReportIngresos').textContent = `+$${tCashIn.toFixed(2)} (Cash)`;
             document.getElementById('finalReportEgresos').textContent = `-$${tOut.toFixed(2)}`;
             document.getElementById('finalReportNeto').textContent = `$${netoCajaFisica.toFixed(2)}`;
-            document.getElementById('finalReportNeto').classList.remove('text-green-600', 'text-red-600');
+            document.getElementById('finalReportNeto').classList.remove('text-green-400', 'text-red-400');
             document.getElementById('finalReportNeto').classList.add(netoCajaFisica >= 0 ? 'text-green-400' : 'text-red-400');
-            
-            // Información bancaria aparte en el resumen final si se desea, 
-            // pero para total caja mandatorio el efectivo.
         }
-
-        function downloadCajaCSV() {
-            const start = document.getElementById('cajaDateStart').value || "HISTORICO"; const end = document.getElementById('cajaDateEnd').value || "HISTORICO";
-            let csv = "FECHA,TÉCNICO,TIPO,PAGO,DETALLE,MONTO\n";
-            document.querySelectorAll('#contabilidadTableBody tr').forEach(row => {
-                const cols = row.querySelectorAll('td');
-                if(cols.length >= 4) {
-                    const fechaT = cols[0].innerText.replace('\n', ' ');
-                    const tipoP = cols[1].innerText.replace('\n', ' ');
-                    const detalle = cols[2].innerText;
-                    const monto = cols[3].innerText.replace('$','');
-                    csv += `"${fechaT}","${tipoP}","${detalle}",${monto}\n`;
-                }
-            });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
-            link.setAttribute("download", `FIX_CAJA_${start}_AL_${end}.csv`);
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        }
-
-        window.openEditFinanceModal = function(id, source, currentMonto, concepto) {
-            document.getElementById('finance_id').value = id; document.getElementById('finance_source').value = source; document.getElementById('finance_monto').value = currentMonto; document.getElementById('finance_concepto').value = concepto; document.getElementById('editFinanceModal').classList.remove('hidden');
-        };
-
-        window.closeEditFinanceModal = function() { document.getElementById('editFinanceModal').classList.add('hidden'); };
-
-        window.saveFinanceAdjustment = function() {
-            const id = document.getElementById('finance_id').value; const source = document.getElementById('finance_source').value; const nuevoMonto = parseFloat(document.getElementById('finance_monto').value) || 0; const nuevoConcepto = document.getElementById('finance_concepto').value.toUpperCase();
-            if (source === 'MANUAL') database.ref('movements/' + id).update({ monto: nuevoMonto, concepto: nuevoConcepto.replace('MANUAL: ', '') }).then(() => closeEditFinanceModal());
-            else database.ref('visits/' + id).update({ 'financiera/totalCliente': nuevoMonto }).then(() => closeEditFinanceModal());
-        };
 
         window.openEditModal = function(id) {
             const v = visitsArray.find(item => item.id === id); if(!v) return;
@@ -760,10 +689,10 @@
             const id = document.getElementById('edit_id').value;
             const count = parseInt(document.getElementById('edit_numEquipos').value) || 1;
             const selects = document.querySelectorAll('.edit-eq-select');
-            const costs = document.querySelectorAll('.edit-eq-cost');
+            const selectsCosts = document.querySelectorAll('.edit-eq-cost');
             let updatedEquipos = []; let totalMO = 0;
             for(let i=0; i<selects.length; i++) {
-                const c = parseFloat(costs[i].value) || 0; totalMO += c;
+                const c = parseFloat(selectsCosts[i].value) || 0; totalMO += c;
                 updatedEquipos.push({ descProducto: selects[i].value.toUpperCase(), costoBase: c, codProducto: "", serieEquipo: "" });
             }
             let updatedAccs = []; let totalAccs = 0;
@@ -782,7 +711,6 @@
             const form = document.getElementById('visitForm'); const data = Object.fromEntries(new FormData(form));
             const eqs = []; for(let i=1; i<=parseInt(data.numEquipos); i++) eqs.push({ descProducto: data[`descProducto_${i}`].toUpperCase(), costoBase: parseFloat(data[`costoEquipo_${i}`]) || 0, codProducto: "", serieEquipo: "" });
             
-            // Recolectar accesorios vendidos (estándar + manual)
             let accs = [];
             document.querySelectorAll('.form-acc-qty').forEach(i => {
                 const q = parseInt(i.value) || 0;
@@ -806,20 +734,33 @@
             });
         };
 
-        window.saveMantenimiento = function() {
-            const form = document.getElementById('maintForm'); const data = Object.fromEntries(new FormData(form));
-            const ref = database.ref('visits').push();
-            ref.set({ id: ref.key, nombreCliente: data.mNombre.toUpperCase(), telefono: data.mTelefono || '', direccion: data.mDireccion, callePrincipal: data.mCalle.toUpperCase(), mantenimientoEquipo: data.mEquipo.toUpperCase(), tecnico: data.mTecnico || '', numEquipos: 1, tipoAtencion: "Mantenimiento", estado: 'PENDIENTE', createdAt: Date.now(), fechaInstalacion: document.getElementById('filterDateInput').value, esMantenimiento: true, financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago }, priority: 0 
-            }).then(() => { showMessage("✅ Guardado", "fix-report"); form.reset(); });
+        function startSync() {
+            database.ref('visits').on('value', snap => {
+                visitsArray = snap.val() ? Object.entries(snap.val()).map(([id, val]) => ({...val, id})) : [];
+                renderUIAgenda(); renderRutero(); renderInventoryView();
+                if(currentView === 'reporte_teka') renderReporteTeka(); if(currentView === 'mantenimiento') renderReporteMantenimiento(); if(currentView === 'contabilidad') processFinancialBalance();
+            });
+            database.ref('movements').on('value', snap => { movementsArray = snap.val() ? Object.entries(snap.val()).map(([id, val]) => ({...val, id})) : []; if(currentView === 'contabilidad') processFinancialBalance(); });
+            database.ref('inventory_entries').on('value', snap => { inventoryEntries = snap.val() ? Object.values(snap.val()) : []; renderInventoryView(); });
+        }
+
+        window.openEditFinanceModal = function(id, source, currentMonto, concepto) {
+            document.getElementById('finance_id').value = id; 
+            document.getElementById('finance_source').value = source; 
+            document.getElementById('finance_monto').value = currentMonto; 
+            document.getElementById('finance_concepto').value = concepto; 
+            document.getElementById('editFinanceModal').classList.remove('hidden');
         };
 
-        function renderReporteMantenimiento() {
-            const body = document.getElementById('mantenimientoReporteBody'); if(!body) return;
-            body.innerHTML = visitsArray.filter(v => v.esMantenimiento).map(v => `
-                <tr class="border-b row-hover font-black uppercase">
-                    <td class="report-cell font-mono font-black">${v.fechaInstalacion}</td><td class="report-cell font-black text-fix-blue">${v.nombreCliente}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell uppercase text-[7px] max-w-[100px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell uppercase text-[7px] font-bold text-fix-accent">${v.mantenimientoEquipo || 'General'}</td><td class="report-cell font-black text-right text-fix-report">$${(v.financiera?.totalCliente || 0).toFixed(2)}</td><td class="report-cell text-center font-black">${v.estado === 'Atendido' ? '✅' : '⏳'}</td><td class="report-cell text-center font-black"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td>
-                </tr>`).join('');
-        }
+        window.closeEditFinanceModal = function() { 
+            document.getElementById('editFinanceModal').classList.add('hidden'); 
+        };
+
+        window.saveFinanceAdjustment = function() {
+            const id = document.getElementById('finance_id').value; const source = document.getElementById('finance_source').value; const nuevoMonto = parseFloat(document.getElementById('finance_monto').value) || 0; const nuevoConcepto = document.getElementById('finance_concepto').value.toUpperCase();
+            if (source === 'MANUAL') database.ref('movements/' + id).update({ monto: nuevoMonto, concepto: nuevoConcepto.replace('MANUAL: ', '') }).then(() => closeEditFinanceModal());
+            else database.ref('visits/' + id).update({ 'financiera/totalCliente': nuevoMonto }).then(() => closeEditFinanceModal());
+        };
 
         window.saveManualMovement = function() {
             const c = document.getElementById('movConcepto').value; 
@@ -840,14 +781,78 @@
             });
         };
 
-        function startSync() {
-            database.ref('visits').on('value', snap => {
-                visitsArray = snap.val() ? Object.entries(snap.val()).map(([id, val]) => ({...val, id})) : [];
-                renderUIAgenda(); renderRutero(); renderInventoryView();
-                if(currentView === 'reporte_teka') renderReporteTeka(); if(currentView === 'mantenimiento') renderReporteMantenimiento(); if(currentView === 'contabilidad') processFinancialBalance();
+        window.saveMantenimiento = function() {
+            const form = document.getElementById('maintForm'); const data = Object.fromEntries(new FormData(form));
+            const ref = database.ref('visits').push();
+            // GPS y Precio ya no son obligatorios en el ref.set
+            ref.set({ id: ref.key, nombreCliente: data.mNombre.toUpperCase(), telefono: data.mTelefono || '', direccion: data.mDireccion || '', callePrincipal: data.mCalle.toUpperCase(), mantenimientoEquipo: data.mEquipo.toUpperCase(), tecnico: data.mTecnico || '', numEquipos: 1, tipoAtencion: "Mantenimiento", estado: 'PENDIENTE', createdAt: Date.now(), fechaInstalacion: document.getElementById('filterDateInput').value, esMantenimiento: true, financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago }, priority: 0 
+            }).then(() => { showMessage("✅ Guardado", "fix-report"); form.reset(); });
+        };
+
+        function renderReporteMantenimiento() {
+            const body = document.getElementById('mantenimientoReporteBody'); if(!body) return;
+            body.innerHTML = visitsArray.filter(v => v.esMantenimiento).map(v => `
+                <tr class="border-b row-hover font-black uppercase">
+                    <td class="report-cell font-mono font-black">${v.fechaInstalacion}</td><td class="report-cell font-black text-fix-blue">${v.nombreCliente}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell uppercase text-[7px] max-w-[100px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell uppercase text-[7px] font-bold text-fix-accent">${v.mantenimientoEquipo || 'General'}</td><td class="report-cell font-black text-right text-fix-report">$${(v.financiera?.totalCliente || 0).toFixed(2)}</td><td class="report-cell text-center font-black">${v.estado === 'Atendido' ? '✅' : '⏳'}</td><td class="report-cell text-center font-black"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td>
+                </tr>`).join('');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        function downloadMantenimientoCSV() {
+            const start = document.getElementById('maestroDateStart').value || "HISTORICO";
+            const end = document.getElementById('maestroDateEnd').value || "HISTORICO";
+            let csv = "FECHA,CLIENTE,TELÉFONO,CALLE,EQUIPO,VALOR,ESTADO\n";
+            document.querySelectorAll('#mantenimientoReporteBody tr').forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if(cols.length >= 7) {
+                    let rowData = [];
+                    for(let i=0; i<7; i++) { 
+                        let text = cols[i].innerText.replace(/"/g, '""').replace(/\n/g, ' ').replace('$',''); 
+                        rowData.push(`"${text}"`); 
+                    }
+                    csv += rowData.join(",") + "\n";
+                }
             });
-            database.ref('movements').on('value', snap => { movementsArray = snap.val() ? Object.entries(snap.val()).map(([id, val]) => ({...val, id})) : []; if(currentView === 'contabilidad') processFinancialBalance(); });
-            database.ref('inventory_entries').on('value', snap => { inventoryEntries = snap.val() ? Object.values(snap.val()) : []; renderInventoryView(); });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", `REPORTE_MANTENIMIENTOS_FIX_${start}_AL_${end}.csv`);
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        function downloadInventoryCSV() {
+            let csv = "ACCESORIO,ENTRADAS,UTILIZADO,STOCK ACTUAL,PRECIO UNIT\n";
+            document.querySelectorAll('#inventoryTableBody tr').forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if(cols.length >= 5) {
+                    csv += `"${cols[0].innerText}",${cols[1].innerText},${cols[2].innerText},${cols[3].innerText},${cols[4].innerText.replace('$','')}\n`;
+                }
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", `INVENTARIO_FIX_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        function downloadCajaCSV() {
+            const start = document.getElementById('cajaDateStart').value || "HISTORICO"; const end = document.getElementById('cajaDateEnd').value || "HISTORICO";
+            let csv = "FECHA,TÉCNICO,TIPO,PAGO,DETALLE,MONTO\n";
+            document.querySelectorAll('#contabilidadTableBody tr').forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if(cols.length >= 4) {
+                    const fechaT = cols[0].innerText.replace('\n', ' ');
+                    const tipoP = cols[1].innerText.replace('\n', ' ');
+                    const detalle = cols[2].innerText;
+                    const monto = cols[3].innerText.replace('$','');
+                    csv += `"${fechaT}","${tipoP}","${detalle}",${monto}\n`;
+                }
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", `FIX_CAJA_${start}_AL_${end}.csv`);
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -891,7 +896,7 @@
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
                 <div>
                     <h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1>
-                    <div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.0.0</span></div>
+                    <div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.0.1</span></div>
                 </div>
             </div>
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
@@ -912,7 +917,18 @@
                 <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50">
                     <form id="visitForm" onsubmit="event.preventDefault(); saveVisit();">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                            <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black"><input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black"><input type="text" name="cedula" placeholder="CÉDULA*" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono"><input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black"><input type="email" name="email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner"><input type="text" name="numFactura" placeholder="N° FACTURA*" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center uppercase font-black"><input type="text" name="direccion" placeholder="LINK GPS*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner md:col-span-2"><select name="tecnico" id="selectTecnico" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><select id="selectLugar" name="lugarCompra" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><div class="flex flex-col"><span class="text-[8px] font-black text-slate-400 ml-2 italic">EMISIÓN FACTURA</span><input type="date" name="fechaEmision" id="inputEmision" class="p-3 bg-slate-50 rounded-xl font-bold text-xs outline-none shadow-inner text-center font-mono"></div><select name="tipoServicioGlobal" class="p-3 bg-white border-2 border-fix-blue/10 rounded-xl font-black text-[10px] uppercase text-fix-blue italic"><option value="Instalación">Instalación Estándar</option><option value="Garantía">Garantía de Fábrica</option><option value="Fuera de Garantía">Fuera de Garantía</option></select><div class="bg-slate-50 p-3 rounded-xl flex items-center justify-between shadow-inner"><span class="text-[10px] font-black italic">EQUIPOS:</span><input type="number" id="numEquipos" name="numEquipos" value="1" min="1" oninput="expandEquipmentUI()" class="w-10 text-center text-xl text-fix-blue bg-transparent outline-none font-black font-mono"></div>
+                            <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black">
+                            <input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black">
+                            <input type="text" name="cedula" placeholder="CÉDULA*" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono">
+                            <input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black">
+                            <input type="email" name="email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner">
+                            <input type="text" name="numFactura" placeholder="N° FACTURA*" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center uppercase font-black">
+                            <input type="text" name="direccion" placeholder="LINK GPS*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner md:col-span-2">
+                            <select name="tecnico" id="selectTecnico" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select>
+                            <select id="selectLugar" name="lugarCompra" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select>
+                            <div class="flex flex-col"><span class="text-[8px] font-black text-slate-400 ml-2 italic">EMISIÓN FACTURA</span><input type="date" name="fechaEmision" id="inputEmision" class="p-3 bg-slate-50 rounded-xl font-bold text-xs outline-none shadow-inner text-center font-mono"></div>
+                            <select name="tipoServicioGlobal" class="p-3 bg-white border-2 border-fix-blue/10 rounded-xl font-black text-[10px] uppercase text-fix-blue italic"><option value="Instalación">Instalación Estándar</option><option value="Garantía">Garantía de Fábrica</option><option value="Fuera de Garantía">Fuera de Garantía</option></select>
+                            <div class="bg-slate-50 p-3 rounded-xl flex items-center justify-between shadow-inner"><span class="text-[10px] font-black italic">EQUIPOS:</span><input type="number" id="numEquipos" name="numEquipos" value="1" min="1" oninput="expandEquipmentUI()" class="w-10 text-center text-xl text-fix-blue bg-transparent outline-none font-black font-mono"></div>
                         </div>
                         <div id="productInputsContainer" class="space-y-2"></div>
                         <div id="accesoriosContainerAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 italic font-black"></div>
@@ -928,7 +944,13 @@
             </div>
 
             <!-- AGENDA LOCAL -->
-            <div id="agendaContainer" class="lg:col-span-1 admin-only uppercase font-black"><h2 class="text-xl font-black uppercase italic mb-4 border-b-4 border-fix-blue text-slate-800 text-center font-sans italic">Agenda Local</h2><div class="mb-4 relative font-black"><input type="text" id="searchClientInput" oninput="renderUIAgenda()" placeholder="🔍 BUSCAR CLIENTE..." class="w-full p-4 bg-white rounded-2xl shadow-md border-2 border-slate-100 font-black text-xs uppercase italic outline-none focus:border-fix-blue transition-all"></div><div id="visitsList" class="space-y-3 max-h-[700px] overflow-y-auto pr-2"></div></div>
+            <div id="agendaContainer" class="lg:col-span-1 admin-only uppercase font-black">
+                <h2 class="text-xl font-black uppercase italic mb-4 border-b-4 border-fix-blue text-slate-800 text-center font-sans italic">Agenda Local</h2>
+                <div class="mb-4 relative font-black">
+                    <input type="text" id="searchClientInput" oninput="renderUIAgenda()" placeholder="🔍 BUSCAR CLIENTE..." class="w-full p-4 bg-white rounded-2xl shadow-md border-2 border-slate-100 font-black text-xs uppercase italic outline-none focus:border-fix-blue transition-all">
+                </div>
+                <div id="visitsList" class="space-y-3 max-h-[700px] overflow-y-auto pr-2"></div>
+            </div>
 
             <!-- VISTA MANTENIMIENTOS -->
             <div id="mantenimientoView" class="hidden lg:col-span-3 space-y-6">
@@ -939,10 +961,16 @@
                             <input type="text" name="mNombre" placeholder="CLIENTE*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase text-sm">
                             <input type="tel" name="mTelefono" placeholder="TELÉFONO*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner font-mono text-sm">
                             <input type="text" name="mCalle" placeholder="CALLE*" required class="p-4 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-sm">
-                            <input type="text" name="mDireccion" placeholder="LINK GPS*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner text-sm">
+                            
+                            <!-- GPS Link ya NO es obligatorio -->
+                            <input type="text" name="mDireccion" placeholder="LINK GPS (OPCIONAL)" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner text-sm">
+                            
                             <input type="text" name="mEquipo" placeholder="EQUIPO*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner text-sm">
                             <select name="mTecnico" id="selectTecnicoMaint" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase italic text-sm"></select>
-                            <input type="number" name="mPrecio" placeholder="VALOR $" step="0.01" class="p-4 bg-blue-50 border border-fix-blue/20 rounded-xl font-black text-fix-blue font-mono text-sm">
+                            
+                            <!-- Precio ya NO es obligatorio -->
+                            <input type="number" name="mPrecio" placeholder="VALOR ESTIMADO $ (OPCIONAL)" step="0.01" class="p-4 bg-blue-50 border border-fix-blue/20 rounded-xl font-black text-fix-blue font-mono text-sm">
+                            
                             <select name="mPago" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner italic text-sm">
                                 <option value="EFECTIVO">EFECTIVO</option>
                                 <option value="TRANSFERENCIA">TRANSFERENCIA</option>
@@ -1006,7 +1034,7 @@
                 </div>
             </div>
 
-            <!-- LOGÍSTICA (OPTIMIZADO v1.9.8) -->
+            <!-- LOGÍSTICA -->
             <div id="ruteroView" class="hidden lg:col-span-3 bg-white p-4 rounded-[2rem] shadow-xl">
                 <div class="flex flex-col md:flex-row justify-between items-center mb-4 px-2 gap-2">
                     <h2 class="text-sm font-black uppercase italic font-sans">Logística Diaria</h2>
@@ -1060,7 +1088,7 @@
                 </div>
             </div>
 
-            <!-- CAJA v2.0 (CASH ONLY) -->
+            <!-- CAJA v2.0 -->
             <div id="contabilidadView" class="hidden lg:col-span-3 space-y-6">
                 <div class="bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase">
                     <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
@@ -1076,7 +1104,6 @@
                         <button onclick="downloadCajaCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic">📊 EXCEL CAJA</button>
                     </div>
 
-                    <!-- DASHBOARD DE CAJA (LÓGICA DE DINERO FÍSICO) -->
                     <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6 text-center italic font-black">
                         <div class="p-3 bg-green-50 rounded-xl border border-green-100 flex flex-col justify-center">
                             <span class="text-[8px] uppercase text-slate-500">INGRESOS (EFECTIVO)</span>
@@ -1086,15 +1113,15 @@
                             <span class="text-[8px] uppercase text-slate-500">EGRESOS / GASTOS</span>
                             <div id="totalEgresosDisplay" class="text-lg font-black text-red-700">$0.00</div>
                         </div>
-                        <div class="p-3 bg-slate-900 rounded-xl text-white shadow-xl col-span-2 md:col-span-1 flex flex-col justify-center">
+                        <div class="p-3 bg-slate-900 rounded-xl text-white shadow-xl col-span-2 md:col-span-1 flex flex-col justify-center border-2 border-fix-accent">
                             <span class="text-[8px] uppercase text-fix-accent">SALDO NETO (CASH)</span>
                             <div id="balanceNetoDisplay" class="text-xl font-black text-fix-accent">$0.00</div>
                         </div>
-                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center opacity-60">
+                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center opacity-80">
                             <span class="text-[8px] uppercase text-slate-500">BANCO (TRANSFER.)</span>
                             <div id="totalTransferDisplay" class="text-lg font-black text-blue-700">$0.00</div>
                         </div>
-                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-40">
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-60">
                             <span class="text-[8px] uppercase text-slate-500">VENTA TOTAL PERIODO</span>
                             <div id="totalIngresosDisplay" class="text-lg font-black text-slate-600">$0.00</div>
                         </div>
@@ -1118,7 +1145,7 @@
                     </div>
                 </div>
 
-                <!-- CUADRO DE RESUMEN FINAL DE REPORTE -->
+                <!-- CUADRO DE RESUMEN FINAL -->
                 <div class="bg-slate-900 p-8 rounded-[3rem] shadow-2xl text-white font-black italic border-[10px] border-white">
                     <div class="flex justify-between items-center border-b border-white/20 pb-4 mb-6">
                         <h2 class="text-xl uppercase tracking-tighter">Resumen de Caja Diaria</h2>
@@ -1149,12 +1176,26 @@
     </div>
 
     <!-- MODAL DE AJUSTE FINANCIERO -->
-    <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4"><div class="bg-white w-full max-sm rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic"><h2 class="text-xl font-black uppercase text-fix-blue mb-4 border-b-2 pb-2">VALOR REAL</h2><input type="hidden" id="finance_id"><input type="hidden" id="finance_source"><div class="space-y-4"><input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs"><input type="number" step="0.01" id="finance_monto" class="w-full p-3 bg-yellow-50 rounded-xl border font-mono font-black text-xl text-right"></div><div class="grid grid-cols-2 gap-3 mt-6"><button onclick="saveFinanceAdjustment()" class="bg-fix-report text-white py-3 rounded-xl font-black shadow-lg">💾 AJUSTAR</button><button onclick="closeEditFinanceModal()" class="bg-slate-200 text-slate-600 py-3 rounded-xl font-black">SALIR</button></div></div></div>
+    <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic">
+            <h2 class="text-xl font-black uppercase text-fix-blue mb-4 border-b-2 pb-2">VALOR REAL</h2>
+            <input type="hidden" id="finance_id">
+            <input type="hidden" id="finance_source">
+            <div class="space-y-4">
+                <input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs">
+                <input type="number" step="0.01" id="finance_monto" class="w-full p-3 bg-yellow-50 rounded-xl border font-mono font-black text-xl text-right">
+            </div>
+            <div class="grid grid-cols-2 gap-3 mt-6">
+                <button onclick="saveFinanceAdjustment()" class="bg-fix-report text-white py-3 rounded-xl font-black shadow-lg">💾 AJUSTAR</button>
+                <button onclick="closeEditFinanceModal()" class="bg-slate-200 text-slate-600 py-3 rounded-xl font-black">SALIR</button>
+            </div>
+        </div>
+    </div>
 
-    <!-- MODAL DE EDICIÓN ADMINISTRATIVA AVANZADA -->
+    <!-- MODAL DE EDICIÓN ADMINISTRATIVA -->
     <div id="editModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 font-black">
         <div class="bg-white w-full max-w-3xl rounded-[2rem] shadow-2xl p-8 font-black italic border-[6px] border-slate-50 uppercase overflow-y-auto max-h-[95vh]">
-            <h2 class="text-xl font-black uppercase text-fix-blue mb-6 border-b-2 pb-2 italic uppercase">CORRECCIÓN ADMINISTRATIVA</h2>
+            <h2 class="text-xl font-black uppercase text-fix-blue mb-6 border-b-2 pb-2 italic">CORRECCIÓN ADMINISTRATIVA</h2>
             <input type="hidden" id="edit_id">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
                 <div><label class="text-[7px] text-slate-400 ml-2">NOMBRE CLIENTE</label><input type="text" id="edit_nombre" class="w-full p-2 bg-slate-50 rounded-lg border font-black text-xs"></div>
@@ -1192,7 +1233,12 @@
     </div>
 
     <!-- BOTÓN ACTUALIZAR -->
-    <button onclick="refreshData()" class="btn-refresh-float no-print" title="Actualizar"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></button>
+    <button onclick="refreshData()" class="btn-refresh-float no-print" title="Actualizar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 4v6h-6"></path>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+    </button>
 
     <div id="messageBox" class="opacity-0 fixed transition-opacity duration-500 pointer-events-none z-[99999] font-black uppercase"></div>
 
