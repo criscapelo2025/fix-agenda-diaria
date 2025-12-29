@@ -140,17 +140,23 @@
             });
         }
 
-        // --- LÓGICA DE INTERFAZ GARANTÍA v2.4.2 ---
+        // --- LÓGICA DE INTERFAZ GARANTÍA v2.4.3 CORREGIDA ---
         function toggleServiceTypeUI() {
             const type = document.getElementById('tipoServicioGlobal').value;
             const standardFields = document.getElementById('standardServiceFields');
             const warrantyFields = document.getElementById('warrantyFields');
             const financialDashboard = document.getElementById('financialDashboardRegistration');
+            const warrantySelect = document.getElementById('warrantyEquipmentSelect');
 
             if (type === 'Garantía') {
                 standardFields.classList.add('hidden');
                 warrantyFields.classList.remove('hidden');
                 financialDashboard.classList.add('opacity-30', 'pointer-events-none');
+                
+                // IMPORTANTE: Quitar required de campos estándar para que el navegador deje grabar
+                document.querySelectorAll('#productInputsContainer select').forEach(s => s.required = false);
+                if(warrantySelect) warrantySelect.required = true;
+
                 document.getElementById('displayCostoInstalacion').textContent = "$0.00";
                 document.getElementById('displayTotalAccesorios').textContent = "$0.00";
                 document.getElementById('displayTotalFinal').textContent = "$0.00";
@@ -158,6 +164,11 @@
                 standardFields.classList.remove('hidden');
                 warrantyFields.classList.add('hidden');
                 financialDashboard.classList.remove('opacity-30', 'pointer-events-none');
+                
+                // Restaurar required para flujos normales
+                document.querySelectorAll('#productInputsContainer select').forEach(s => s.required = true);
+                if(warrantySelect) warrantySelect.required = false;
+
                 calculateFinancials();
             }
         }
@@ -692,7 +703,8 @@
             }).then(() => { 
                 showMessage("✅ Agendado con éxito", "fix-report"); 
                 form.reset(); 
-                if (isWarranty) toggleServiceTypeUI(); 
+                // Tras el reset, volver a la UI de Instalación por defecto
+                toggleServiceTypeUI(); 
                 expandEquipmentUI(); 
             }).catch(err => {
                 console.error(err);
@@ -831,7 +843,7 @@
                         <div id="warrantyFields" class="hidden space-y-4 p-4 bg-fix-blue/5 rounded-3xl border-2 border-fix-blue/10 italic">
                             <p class="text-[10px] font-black text-fix-blue underline uppercase">DATOS DE GARANTÍA (SIN COSTO)</p>
                             <select id="warrantyEquipmentSelect" class="w-full p-3 bg-white rounded-xl font-black text-xs uppercase shadow-sm outline-none">
-                                <option value="">--- SELECCIONAR EQUIPO A REVISAR ---</option>
+                                <option value="">--- SELECCIONAR EQUIPO ---</option>
                             </select>
                             <textarea id="warrantyDamageDesc" placeholder="DESCRIBA LA FALLA O MOTIVO DE LA GARANTÍA..." class="w-full p-4 bg-white rounded-2xl font-black text-xs uppercase shadow-inner min-h-[100px] outline-none border-none"></textarea>
                         </div>
