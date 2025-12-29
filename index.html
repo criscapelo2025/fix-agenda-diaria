@@ -89,10 +89,11 @@
         const LUGARES_COMPRA = ["", "COMERCIAL KYWI", "COMERCIAL SOLIS", "COMO HOGAR", "SUKASA", "LUNA PAZMIÑO", "MACAOFERTAS", "HOME VEGA", "MERCARD", "TEKA DIRECTO", "OTRO"];
         const TIPOS_SERVICIO = ["Instalación", "Garantía", "Fuera de Garantía", "Mantenimiento", "Reparación", "Visita Técnica"];
         
-        const TIPOS_EQUIPO = ["Horno Eléctrico", "Horno a Gas", "Cocina Inducción", "Cocina a Gas", "Microondas", "Campana Tradicional", "Campana Decorativa", "Campana Isla", "Refrigerador", "Triturador", "Grifería", "Fregadero", "Lavavajillas", "Cafetera"];
+        // MODIFICACIÓN v2.3.0: Añadida PARRILLA BBQ
+        const TIPOS_EQUIPO = ["Horno Eléctrico", "Horno a Gas", "Cocina Inducción", "Cocina a Gas", "Microondas", "Campana Tradicional", "Campana Decorativa", "Campana Isla", "Refrigerador", "Triturador", "Grifería", "Fregadero", "Lavavajillas", "Cafetera", "PARRILLA BBQ"];
         
         const COSTOS_EQUIPO = {
-            "Horno Eléctrico": 25.00, "Horno a Gas": 29.00, "Cocina Inducción": 25.00, "Cocina a Gas": 29.00, "Microondas": 25.00, "Campana Tradicional": 15.00, "Campana Decorativa": 36.00, "Campana Isla": 45.00, "Refrigerador": 30.00, "Triturador": 15.00, "Grifería": 13.00, "Fregadero": 13.00, "Lavavajillas": 25.00, "Cafetera": 25.00
+            "Horno Eléctrico": 25.00, "Horno a Gas": 29.00, "Cocina Inducción": 25.00, "Cocina a Gas": 29.00, "Microondas": 25.00, "Campana Tradicional": 15.00, "Campana Decorativa": 36.00, "Campana Isla": 45.00, "Refrigerador": 30.00, "Triturador": 15.00, "Grifería": 13.00, "Fregadero": 13.00, "Lavavajillas": 25.00, "Cafetera": 25.00, "PARRILLA BBQ": 29.00
         };
 
         const ACCESORIOS_DEFAULT = { 
@@ -140,21 +141,39 @@
             });
         }
 
+        // --- LÓGICA FINANCIERA ACTUALIZADA v2.3.0 (REGLA PARRILLA BBQ) ---
         function calculateFinancials() {
-            let mo = 0; 
+            let moTotalSAP = 0; 
+            let moParaTecnico = 0;
             const count = parseInt(document.getElementById('numEquipos').value) || 1;
-            document.querySelectorAll('input[name^="costoEquipo_"]').forEach(i => mo += parseFloat(i.value) || 0);
+
+            for(let i=1; i<=count; i++) {
+                const sel = document.getElementsByName(`descProducto_${i}`)[0];
+                const pri = document.getElementsByName(`costoEquipo_${i}`)[0];
+                if(sel && pri) {
+                    const valorMO = parseFloat(pri.value) || 0;
+                    moTotalSAP += valorMO;
+
+                    // Lógica de cobro para técnico (Total Caja):
+                    // 1. Si es Parrilla BBQ, el técnico NUNCA cobra ($0 para el técnico).
+                    // 2. Si son 2+ equipos, el técnico NUNCA cobra ($0 para el técnico).
+                    // 3. Si es solo 1 equipo y NO es Parrilla, el técnico cobra la MO.
+                    if (sel.value !== "PARRILLA BBQ" && count === 1) {
+                        moParaTecnico += valorMO;
+                    }
+                }
+            }
+            
             let acc = 0; 
             document.querySelectorAll('.form-acc-qty').forEach(i => acc += (parseInt(i.value) || 0) * (parseFloat(i.dataset.price) || 0));
-            const manualVal = parseFloat(document.getElementById('manualAccPrice').value) || 0;
-            acc += manualVal;
-            const cI = document.getElementById('displayCostoInstalacion');
-            const cA = document.getElementById('displayTotalAccesorios');
-            const cT = document.getElementById('displayTotalFinal');
-            const moParaCaja = count >= 2 ? 0 : mo;
-            if(cI) cI.textContent = `$${mo.toFixed(2)}`; 
-            if(cA) cA.textContent = `$${acc.toFixed(2)}`; 
-            if(cT) cT.textContent = `$${(moParaCaja + acc).toFixed(2)}`;
+            acc += parseFloat(document.getElementById('manualAccPrice').value) || 0;
+
+            if(document.getElementById('displayCostoInstalacion')) 
+                document.getElementById('displayCostoInstalacion').textContent = `$${moTotalSAP.toFixed(2)}`; 
+            if(document.getElementById('displayTotalAccesorios')) 
+                document.getElementById('displayTotalAccesorios').textContent = `$${acc.toFixed(2)}`; 
+            if(document.getElementById('displayTotalFinal')) 
+                document.getElementById('displayTotalFinal').textContent = `$${(moParaTecnico + acc).toFixed(2)}`;
         }
 
         function updateEquipmentPrice(selectEl, index) {
@@ -162,9 +181,15 @@
             const count = parseInt(document.getElementById('numEquipos').value) || 1;
             const priceInput = document.getElementsByName(`costoEquipo_${index}`)[0];
             if(!priceInput) return;
-            if (count === 1) priceInput.value = (COSTOS_EQUIPO[selectedVal] || 0.00).toFixed(2);
-            else if (count === 2) priceInput.value = "20.00";
-            else if (count >= 3) priceInput.value = "15.00";
+
+            // REGLA BBQ: Siempre 29
+            if (selectedVal === "PARRILLA BBQ") {
+                priceInput.value = "29.00";
+            } else {
+                if (count === 1) priceInput.value = (COSTOS_EQUIPO[selectedVal] || 0.00).toFixed(2);
+                else if (count === 2) priceInput.value = "20.00";
+                else if (count >= 3) priceInput.value = "15.00";
+            }
             calculateFinancials();
         }
 
@@ -260,15 +285,22 @@
             const manualPrice = parseFloat(document.getElementById(`manual_acc_price_${id}`).value) || 0;
             if(manualDesc && manualPrice > 0) { accs.push({ nombre: manualDesc.toUpperCase(), cantidad: 1, precio: manualPrice }); totalAccs += manualPrice; }
             if(s === 'PENDIENTE') return showMessage("⚠️ Seleccione estado", "fix-accent");
+            
             const v = visitsArray.find(item => item.id === id);
             const eqCount = v.esMantenimiento ? 1 : (v.equipos || []).length;
+            
             let moParaCaja = 0;
             if (v.esMantenimiento) {
                 const maintTechValue = parseFloat(document.getElementById(`maint_tech_price_${id}`).value);
                 moParaCaja = !isNaN(maintTechValue) ? maintTechValue : (v.financiera?.totalCliente || 0);
-            } else if (eqCount === 1 && v.tipoAtencion !== 'Garantía' && t !== 'Garantía') {
-                moParaCaja = (v.equipos || []).reduce((acc, eq) => acc + (eq.costoBase || 0), 0);
+            } else {
+                // Lógica de cobro caja en cierre (igual a la de registro v2.3.0)
+                const containsBBQ = (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ");
+                if (eqCount === 1 && v.tipoAtencion !== 'Garantía' && t !== 'Garantía' && !containsBBQ) {
+                    moParaCaja = (v.equipos || []).reduce((acc, eq) => acc + (eq.costoBase || 0), 0);
+                }
             }
+            
             const totalFinal = moParaCaja + totalAccs;
             database.ref('visits/' + id).update({ 
                 estado: s === 'SI' ? 'Atendido' : 'No Atendido', tipoAtencion: t, razonNoAtencion: r, accesoriosVendidos: accs, commentarioCliente: comment.toUpperCase(), fotosRegistro: photos, numeroVisita: document.getElementById(`visit_num_${id}`)?.value || v.numeroVisita || "Visita 1", attendedDate: new Date().toISOString(), 'financiera/totalCliente': totalFinal, 'financiera/formaPago': pay 
@@ -459,8 +491,15 @@
             let todos = [];
             visitsArray.filter(v => v.estado === 'Atendido' && v.financiera && !v.esMantenimiento).forEach(v => {
                 let monto = 0; const eqCount = (v.equipos || []).length;
-                if (eqCount === 1 && v.tipoAtencion !== 'Garantía') { monto = v.financiera.totalCliente || 0; } 
-                else { monto = (v.accesoriosVendidos || []).reduce((sum, a) => sum + (a.cantidad * a.precio), 0); }
+                
+                // REGLA BBQ v2.3.0: No sumar MO si hay Parrilla BBQ
+                const hasBBQ = (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ");
+
+                if (eqCount === 1 && v.tipoAtencion !== 'Garantía' && !hasBBQ) { 
+                    monto = v.financiera.totalCliente || 0; 
+                } else { 
+                    monto = (v.accesoriosVendidos || []).reduce((sum, a) => sum + (a.cantidad * a.precio), 0); 
+                }
                 todos.push({ id: v.id, monto, type: 'INGRESO', concepto: `VISITA: ${v.nombreCliente}`, fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt, dateStr: v.fechaInstalacion, source: 'VISITA', tecnico: v.tecnico || '---', formaPago: v.financiera.formaPago || 'EFECTIVO' });
             });
             movementsArray.forEach(m => { todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: `MANUAL: ${m.concepto}`, fecha: m.fecha, dateStr: new Date(m.fecha).toISOString().split('T')[0], source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' }); });
@@ -508,7 +547,6 @@
             processMaintBalance(); renderReporteMantenimiento();
         }
 
-        // --- FUNCIÓN RESTAURADA: renderReporteMantenimiento ---
         function renderReporteMantenimiento() {
             const body = document.getElementById('mantenimientoReporteBody'); if(!body) return;
             const start = document.getElementById('maintBalanceStart').value;
@@ -521,7 +559,6 @@
                 </tr>`).join('');
         }
 
-        // --- FUNCIÓN RESTAURADA: downloadMantenimientoCSV ---
         function downloadMantenimientoCSV() {
             const start = document.getElementById('maintBalanceStart').value || "HISTORICO";
             const end = document.getElementById('maintBalanceEnd').value || "HISTORICO";
@@ -542,6 +579,8 @@
             link.setAttribute("download", `REPORTE_MANTENIMIENTOS_FIX_${start}_AL_${end}.csv`);
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
+
+        function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
 
         window.openEditModal = function(id) {
             const v = visitsArray.find(item => item.id === id); if(!v) return;
@@ -591,9 +630,14 @@
         function updateEditPrice(selectEl, index) {
             const count = parseInt(document.getElementById('edit_numEquipos').value) || 1;
             const costInputs = document.querySelectorAll('.edit-eq-cost');
-            if (count === 1) costInputs[index].value = (COSTOS_EQUIPO[selectEl.value] || 0.00).toFixed(2);
-            else if (count === 2) costInputs.forEach(i => i.value = "20.00");
-            else if (count >= 3) costInputs.forEach(i => i.value = "15.00");
+            // REGLA BBQ v2.3.0 en Edición
+            if (selectEl.value === "PARRILLA BBQ") {
+                costInputs[index].value = "29.00";
+            } else {
+                if (count === 1) costInputs[index].value = (COSTOS_EQUIPO[selectEl.value] || 0.00).toFixed(2);
+                else if (count === 2) costInputs.forEach(i => i.value = "20.00");
+                else if (count >= 3) costInputs.forEach(i => i.value = "15.00");
+            }
         }
 
         function rebuildEditAccessoriesInputs(vendidos) {
@@ -610,18 +654,43 @@
             const codes = document.querySelectorAll('.edit-eq-code');
             const series = document.querySelectorAll('.edit-eq-serie');
             const selectsCosts = document.querySelectorAll('.edit-eq-cost');
-            let updatedEquipos = []; let totalMO = 0;
-            for(let i=0; i<selects.length; i++) {
-                const c = parseFloat(selectsCosts[i].value) || 0; totalMO += c;
-                updatedEquipos.push({ descProducto: selects[i].value.toUpperCase(), costoBase: c, codProducto: codes[i].value.toUpperCase(), serieEquipo: series[i].value.toUpperCase() });
-            }
-            let updatedAccs = []; let totalAccs = 0;
-            document.querySelectorAll('.edit-acc-qty').forEach(i => { const q = parseInt(i.value) || 0; if(q > 0) { const p = parseFloat(i.dataset.price); updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); totalAccs += q * p; } });
+            
+            let updatedEquipos = []; 
+            let moParaTecnico = 0;
             const count = selects.length;
-            const moParaCaja = count >= 2 ? 0 : totalMO;
-            const totalFinal = moParaCaja + totalAccs;
+
+            for(let i=0; i<selects.length; i++) {
+                const valorMO = parseFloat(selectsCosts[i].value) || 0;
+                const prodName = selects[i].value.toUpperCase();
+
+                updatedEquipos.push({ 
+                    descProducto: prodName, 
+                    costoBase: valorMO, 
+                    codProducto: codes[i].value.toUpperCase(), 
+                    serieEquipo: series[i].value.toUpperCase() 
+                });
+
+                // REGLA BBQ v2.3.0: No sumar al técnico si es BBQ o si son 2+ equipos
+                if (prodName !== "PARRILLA BBQ" && count === 1) {
+                    moParaTecnico += valorMO;
+                }
+            }
+
+            let updatedAccs = []; 
+            let totalAccs = 0;
+            document.querySelectorAll('.edit-acc-qty').forEach(i => { 
+                const q = parseInt(i.value) || 0; 
+                if(q > 0) { 
+                    const p = parseFloat(i.dataset.price); 
+                    updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); 
+                    totalAccs += q * p; 
+                } 
+            });
+
+            const totalFinalTecnico = moParaTecnico + totalAccs;
+
             database.ref('visits/' + id).update({
-                nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), telefono: document.getElementById('edit_telefono').value, email: document.getElementById('edit_email').value.toLowerCase(), cedula: document.getElementById('edit_cedula').value, fechaInstalacion: document.getElementById('edit_fecha').value, direccion: document.getElementById('edit_direccion').value, tecnico: document.getElementById('edit_tecnico').value, numFactura: document.getElementById('edit_numFactura').value.toUpperCase(), lugarCompra: document.getElementById('edit_lugarCompra').value, priority: parseInt(document.getElementById('edit_priority').value) || 0, equipos: updatedEquipos, accesoriosVendidos: updatedAccs, 'financiera/totalCliente': totalFinal
+                nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), telefono: document.getElementById('edit_telefono').value, email: document.getElementById('edit_email').value.toLowerCase(), cedula: document.getElementById('edit_cedula').value, fechaInstalacion: document.getElementById('edit_fecha').value, direccion: document.getElementById('edit_direccion').value, tecnico: document.getElementById('edit_tecnico').value, numFactura: document.getElementById('edit_numFactura').value.toUpperCase(), lugarCompra: document.getElementById('edit_lugarCompra').value, priority: parseInt(document.getElementById('edit_priority').value) || 0, equipos: updatedEquipos, accesoriosVendidos: updatedAccs, 'financiera/totalCliente': totalFinalTecnico
             }).then(() => { showMessage("✅ Registro Actualizado", "fix-report"); closeEditModal(); });
         };
 
@@ -709,7 +778,7 @@
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
                 <div>
                     <h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1>
-                    <div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.2.1</span></div>
+                    <div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.3.0</span></div>
                 </div>
             </div>
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
@@ -934,7 +1003,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE EDICIÓN ADMINISTRATIVA AVANZADA (CORRECCIÓN) -->
+    <!-- MODAL DE EDICIÓN ADMINISTRATIVA -->
     <div id="editModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 font-black">
         <div class="bg-white w-full max-w-3xl rounded-[2rem] shadow-2xl p-8 font-black italic border-[6px] border-slate-50 uppercase overflow-y-auto max-h-[95vh]">
             <div class="flex justify-between items-start mb-6 border-b-2 pb-2">
