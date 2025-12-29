@@ -110,13 +110,13 @@
             if(!box) return;
             box.textContent = msg; 
             box.style.opacity = '1';
-            box.className = `fixed bottom-10 left-1/2 -translate-x-1/2 p-4 rounded-full shadow-2xl text-white font-black uppercase text-[10px] z-[99999] transition-opacity duration-500 bg-${colorClass}`;
-            setTimeout(() => { if(box) box.style.opacity = '0'; }, 3000);
+            box.className = "fixed bottom-10 left-1/2 -translate-x-1/2 p-4 rounded-full shadow-2xl text-white font-black uppercase text-[10px] z-[99999] transition-opacity duration-500 bg-" + colorClass;
+            setTimeout(function() { if(box) box.style.opacity = '0'; }, 3000);
         }
 
         async function handleImageSelect(event, id) {
             const files = event.target.files;
-            const container = document.getElementById(`photo_previews_${id}`);
+            const container = document.getElementById("photo_previews_" + id);
             if(!container) return;
             container.innerHTML = '';
             const photoData = [];
@@ -129,15 +129,15 @@
                 img.className = 'photo-preview';
                 container.appendChild(img);
             }
-            window[`photos_${id}`] = photoData;
+            window["photos_" + id] = photoData;
         }
 
         function convertToBase64(file) {
-            return new Promise((resolve, reject) => {
+            return new Promise(function(resolve, reject) {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = error => reject(error);
+                reader.onload = function() { resolve(reader.result); };
+                reader.onerror = function(error) { reject(error); };
             });
         }
 
@@ -155,7 +155,7 @@
                 if(warrantyFields) warrantyFields.classList.remove('hidden');
                 if(financialDashboard) financialDashboard.classList.add('opacity-30', 'pointer-events-none');
                 
-                document.querySelectorAll('#productInputsContainer select').forEach(s => s.required = false);
+                document.querySelectorAll('#productInputsContainer select').forEach(function(s) { s.required = false; });
                 if(warrantySelect) warrantySelect.required = true;
 
                 document.getElementById('displayCostoInstalacion').textContent = "$0.00";
@@ -166,7 +166,7 @@
                 if(warrantyFields) warrantyFields.classList.add('hidden');
                 if(financialDashboard) financialDashboard.classList.remove('opacity-30', 'pointer-events-none');
                 
-                document.querySelectorAll('#productInputsContainer select').forEach(s => s.required = true);
+                document.querySelectorAll('#productInputsContainer select').forEach(function(s) { s.required = true; });
                 if(warrantySelect) warrantySelect.required = false;
 
                 calculateFinancials();
@@ -189,8 +189,8 @@
             const count = parseInt(document.getElementById('numEquipos').value) || 1;
 
             for(let i=1; i<=count; i++) {
-                const sel = document.getElementsByName(`descProducto_${i}`)[0];
-                const pri = document.getElementsByName(`costoEquipo_${i}`)[0];
+                const sel = document.getElementsByName("descProducto_" + i)[0];
+                const pri = document.getElementsByName("costoEquipo_" + i)[0];
                 if(sel && pri) {
                     const valorMO = parseFloat(pri.value) || 0;
                     moTotalSAP += valorMO;
@@ -201,19 +201,19 @@
             }
             
             let acc = 0; 
-            document.querySelectorAll('.form-acc-qty').forEach(i => acc += (parseInt(i.value) || 0) * (parseFloat(i.dataset.price) || 0));
+            document.querySelectorAll('.form-acc-qty').forEach(function(i) { acc += (parseInt(i.value) || 0) * (parseFloat(i.dataset.price) || 0); });
             const manualPriceEl = document.getElementById('manualAccPrice');
             acc += (manualPriceEl ? parseFloat(manualPriceEl.value) : 0) || 0;
 
-            if(document.getElementById('displayCostoInstalacion')) document.getElementById('displayCostoInstalacion').textContent = `$${moTotalSAP.toFixed(2)}`; 
-            if(document.getElementById('displayTotalAccesorios')) document.getElementById('displayTotalAccesorios').textContent = `$${acc.toFixed(2)}`; 
-            if(document.getElementById('displayTotalFinal')) document.getElementById('displayTotalFinal').textContent = `$${(moParaTecnico + acc).toFixed(2)}`;
+            if(document.getElementById('displayCostoInstalacion')) document.getElementById('displayCostoInstalacion').textContent = "$" + moTotalSAP.toFixed(2); 
+            if(document.getElementById('displayTotalAccesorios')) document.getElementById('displayTotalAccesorios').textContent = "$" + acc.toFixed(2); 
+            if(document.getElementById('displayTotalFinal')) document.getElementById('displayTotalFinal').textContent = "$" + (moParaTecnico + acc).toFixed(2);
         }
 
         function updateEquipmentPrice(selectEl, index) {
             const selectedVal = selectEl.value;
             const count = parseInt(document.getElementById('numEquipos').value) || 1;
-            const priceInput = document.getElementsByName(`costoEquipo_${index}`)[0];
+            const priceInput = document.getElementsByName("costoEquipo_" + index)[0];
             if(!priceInput) return;
             if (selectedVal === "PARRILLA BBQ") { priceInput.value = "29.00"; } 
             else {
@@ -236,7 +236,7 @@
                 <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 mb-2 grid grid-cols-1 md:grid-cols-2 gap-2 shadow-sm">
                     <select name="descProducto_${i}" onchange="updateEquipmentPrice(this, ${i})" class="p-2 bg-white rounded font-bold text-xs shadow-sm outline-none uppercase" required>
                         <option value="">ELEGIR EQUIPO...</option>
-                        ${TIPOS_EQUIPO.map(t => `<option value="${t}">${t}</option>`).join('')}
+                        ${TIPOS_EQUIPO.map(function(t) { return '<option value="' + t + '">' + t + '</option>'; }).join('')}
                     </select>
                     <input type="number" name="costoEquipo_${i}" step="0.01" value="${unitPrice.toFixed(2)}" oninput="calculateFinancials()" class="p-2 bg-yellow-50 rounded font-black text-right text-fix-blue outline-none font-mono">
                 </div>`;
@@ -247,11 +247,14 @@
         function renderInsumosAdmin() {
             const container = document.getElementById('accesoriosContainerAdmin'); 
             if(!container) return;
-            let html = Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => `
+            let html = Object.entries(ACCESORIOS_DEFAULT).map(function(item) { 
+                const n = item[0]; const p = item[1];
+                return `
                 <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
                     <span class="text-[9px] font-black text-slate-500 uppercase">${n} ($${p.toFixed(2)})</span>
                     <input type="number" min="0" value="0" data-price="${p}" data-name="${n}" oninput="calculateFinancials()" class="form-acc-qty w-10 text-center bg-slate-50 rounded p-1 text-xs font-black outline-none shadow-inner" placeholder="0">
-                </div>`).join('');
+                </div>`;
+            }).join('');
             html += `
                 <div class="col-span-1 md:col-span-2 p-2 bg-slate-100 rounded-xl border border-slate-300 mt-2">
                     <p class="text-[9px] font-black text-fix-blue mb-1 italic">➕ OTRO ACCESORIO / EXTRA (GRABACIÓN MANUAL)</p>
@@ -266,7 +269,7 @@
 
         function refreshData() {
             showMessage("🔄 Sincronizando...", "fix-blue");
-            database.ref('visits').once('value', () => {
+            database.ref('visits').once('value', function() {
                 renderUIAgenda(); renderRutero(); processFinancialBalance(); processMaintBalance(); renderInventoryView();
                 if(currentView === 'reporte_teka') renderReporteTeka();
                 if(currentView === 'mantenimiento') renderReporteMantenimiento();
@@ -276,173 +279,113 @@
 
         function syncDates(sourceId) {
             const val = document.getElementById(sourceId).value;
-            const targets = ['filterDateInput', 'filterDateInputRutero', 'cajaDateStart', 'cajaDateEnd', 'maintBalanceStart', 'maintBalanceEnd'];
-            targets.forEach(id => { const el = document.getElementById(id); if(el) el.value = val; });
+            const targets = ['filterDateInput', 'filterDateInputRutero', 'cajaDateStart', 'cajaDateEnd', 'maintScheduleDate'];
+            targets.forEach(function(id) { const el = document.getElementById(id); if(el) el.value = val; });
             renderUIAgenda(); renderRutero(); processFinancialBalance(); processMaintBalance();
         }
 
         function changeMasterView(view) {
             currentView = view;
             const sections = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView'];
-            sections.forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
+            sections.forEach(function(id) { 
+                const el = document.getElementById(id); 
+                if(el) el.classList.add('hidden'); 
+            });
+
             if(view === 'reporte_admin') { 
                 const fc = document.getElementById('formContainer'); if(fc) fc.classList.remove('hidden'); 
                 const ac = document.getElementById('agendaContainer'); if(ac) ac.classList.remove('hidden'); 
             }
-            else if(view === 'reporte_teka') { const rtv = document.getElementById('reporteTekaView'); if(rtv) rtv.classList.remove('hidden'); renderReporteTeka(); }
-            else if(view === 'mantenimiento') { const mv = document.getElementById('mantenimientoView'); if(mv) mv.classList.remove('hidden'); renderReporteMantenimiento(); processMaintBalance(); }
-            else { const el = document.getElementById(view + 'View'); if(el) el.classList.remove('hidden'); }
+            else if(view === 'reporte_teka') { 
+                const rtv = document.getElementById('reporteTekaView'); if(rtv) rtv.classList.remove('hidden'); renderReporteTeka(); 
+            }
+            else if(view === 'mantenimiento') { 
+                const mv = document.getElementById('mantenimientoView'); if(mv) mv.classList.remove('hidden'); renderReporteMantenimiento(); processMaintBalance(); 
+            }
+            else { 
+                const el = document.getElementById(view + 'View'); if(el) el.classList.remove('hidden'); 
+            }
             
             if(view === 'rutero') renderRutero();
             if(view === 'contabilidad') processFinancialBalance();
             if(view === 'inventory') renderInventoryView();
-            document.querySelectorAll('.view-btn').forEach(btn => { btn.classList.remove('bg-fix-blue', 'text-white'); btn.classList.add('bg-gray-100', 'text-gray-500'); });
-            const act = document.querySelector(`[onclick*="'${view}'"]`);
+            
+            document.querySelectorAll('.view-btn').forEach(function(btn) { 
+                btn.classList.remove('bg-fix-blue', 'text-white'); btn.classList.add('bg-gray-100', 'text-gray-500'); 
+            });
+            const act = document.querySelector("[onclick*=\"'" + view + "'\"]");
             if(act) { act.classList.add('bg-fix-blue', 'text-white'); act.classList.remove('bg-gray-100', 'text-gray-500'); }
         }
 
         function toggleDetail(id) { 
-            const det = document.getElementById(`detail-${id}`);
+            const det = document.getElementById("detail-" + id);
             if(det) det.classList.toggle('hidden'); 
         }
 
-        // --- CIERRE TÉCNICO v2.4.3 (CORREGIDO PARA PARRILLA BBQ) ---
         function closeVisitByTech(id) {
             try {
-                const sEl = document.getElementById(`status_${id}`);
-                const tEl = document.getElementById(`type_${id}`);
-                const pEl = document.getElementById(`payment_${id}`);
-                const rEl = document.getElementById(`reason_${id}`);
-                
+                const sEl = document.getElementById("status_" + id);
+                const tEl = document.getElementById("type_" + id);
+                const pEl = document.getElementById("payment_" + id);
+                const rEl = document.getElementById("reason_" + id);
                 if(!sEl || !tEl) return showMessage("❌ Error en formulario", "fix-error");
-
-                const s = sEl.value;
-                const t = tEl.value;
-                const pay = pEl ? pEl.value : "EFECTIVO";
-                const r = rEl ? rEl.value : "";
-                const commentEl = document.getElementById(`client_comment_${id}`);
-                const comment = commentEl ? commentEl.value : "";
-                const photos = window[`photos_${id}`] || [];
-
+                const s = sEl.value; const t = tEl.value; const pay = pEl ? pEl.value : "EFECTIVO"; const r = rEl ? rEl.value : "";
+                const commentEl = document.getElementById("client_comment_" + id); const comment = commentEl ? commentEl.value : "";
+                const photos = window["photos_" + id] || [];
                 if(s === 'PENDIENTE') return showMessage("⚠️ Seleccione estado", "fix-accent");
-
-                const v = visitsArray.find(item => item.id === id);
+                const v = visitsArray.find(function(item) { return item.id === id; });
                 if(!v) return showMessage("❌ No se encontró la visita", "fix-error");
-
-                let moParaCaja = 0;
-                let totalAccs = 0; 
-                const accs = [];
-
-                // 1. Recoger accesorios
-                document.querySelectorAll(`.acc-${id}`).forEach(i => {
-                    const q = parseInt(i.value) || 0;
-                    if(q > 0) { 
-                        const p = parseFloat(i.dataset.price); 
-                        accs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); 
-                        totalAccs += q * p; 
-                    }
-                });
-
-                // 2. Accesorios manuales
-                const mDescEl = document.getElementById(`manual_acc_desc_${id}`);
-                const mPriceEl = document.getElementById(`manual_acc_price_${id}`);
-                if(mDescEl && mPriceEl && mDescEl.value && parseFloat(mPriceEl.value) > 0) {
-                    accs.push({ nombre: mDescEl.value.toUpperCase(), cantidad: 1, precio: parseFloat(mPriceEl.value) });
-                    totalAccs += parseFloat(mPriceEl.value);
-                }
-
-                // 3. Lógica de Cobro MO (Considerando Garantía y BBQ)
+                let moParaCaja = 0; let totalAccs = 0; const accs = [];
+                document.querySelectorAll(".acc-" + id).forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) { const p = parseFloat(i.dataset.price); accs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); totalAccs += q * p; } });
+                const mDescEl = document.getElementById("manual_acc_desc_" + id); const mPriceEl = document.getElementById("manual_acc_price_" + id);
+                if(mDescEl && mPriceEl && mDescEl.value && parseFloat(mPriceEl.value) > 0) { accs.push({ nombre: mDescEl.value.toUpperCase(), cantidad: 1, precio: parseFloat(mPriceEl.value) }); totalAccs += parseFloat(mPriceEl.value); }
                 const eqCount = v.esMantenimiento ? 1 : (v.equipos || []).length;
-                if (v.esMantenimiento) {
-                    const mtpEl = document.getElementById(`maint_tech_price_${id}`);
-                    moParaCaja = mtpEl ? (parseFloat(mtpEl.value) || 0) : (v.financiera ? v.financiera.totalCliente : 0);
-                } else {
-                    // Si el tipo es Garantía (Original o cambiado en el cierre), mo es 0
-                    if (v.tipoAtencion !== 'Garantía' && t !== 'Garantía') {
-                        // Si tiene una PARRILLA BBQ, el técnico no cobra MO
-                        const hasBBQ = (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ");
-                        if (eqCount === 1 && !hasBBQ) {
-                            moParaCaja = (v.equipos || []).reduce((acc, eq) => acc + (eq.costoBase || 0), 0);
-                        }
-                    }
-                }
-                
+                if (v.esMantenimiento) { const mtpEl = document.getElementById("maint_tech_price_" + id); moParaCaja = mtpEl ? (parseFloat(mtpEl.value) || 0) : (v.financiera ? v.financiera.totalCliente : 0); } 
+                else { if (v.tipoAtencion !== 'Garantía' && t !== 'Garantía') { const hasBBQ = (v.equipos || []).some(function(eq) { return eq.descProducto === "PARRILLA BBQ"; }); if (eqCount === 1 && !hasBBQ) { moParaCaja = (v.equipos || []).reduce(function(acc, eq) { return acc + (eq.costoBase || 0); }, 0); } } }
                 const totalFinal = moParaCaja + totalAccs;
-                
                 database.ref('visits/' + id).update({ 
-                    estado: s === 'SI' ? 'Atendido' : 'No Atendido', 
-                    tipoAtencion: t, 
-                    razonNoAtencion: r, 
-                    accesoriosVendidos: accs, 
-                    commentarioCliente: comment.toUpperCase(), 
-                    fotosRegistro: photos, 
-                    attendedDate: new Date().toISOString(), 
-                    'financiera/totalCliente': totalFinal, 
-                    'financiera/formaPago': pay 
-                }).then(() => { 
-                    showMessage("✅ Guardado con éxito", "fix-report"); 
-                    renderRutero(); 
-                }).catch(err => {
-                    showMessage("❌ Error Firebase", "fix-error");
-                });
-            } catch(e) {
-                console.error(e);
-                showMessage("❌ Error Crítico", "fix-error");
-            }
+                    estado: s === 'SI' ? 'Atendido' : 'No Atendido', tipoAtencion: t, razonNoAtencion: r, accesoriosVendidos: accs, commentarioCliente: comment.toUpperCase(), fotosRegistro: photos, attendedDate: new Date().toISOString(), 'financiera/totalCliente': totalFinal, 'financiera/formaPago': pay 
+                }).then(function() { showMessage("✅ Guardado con éxito", "fix-report"); renderRutero(); }).catch(function(err) { showMessage("❌ Error Firebase", "fix-error"); });
+            } catch(e) { console.error(e); showMessage("❌ Error Crítico", "fix-error"); }
         }
 
-        function deleteVisit(id) { if(confirm("¿ELIMINAR ESTE REGISTRO PERMANENTEMENTE?")) { database.ref('visits/' + id).remove().then(() => showMessage("🗑️ Registro Eliminado", "fix-error")); } }
+        function deleteVisit(id) { if(confirm("¿ELIMINAR ESTE REGISTRO PERMANENTEMENTE?")) { database.ref('visits/' + id).remove().then(function() { showMessage("🗑️ Registro Eliminado", "fix-error"); }); } }
 
         function renderUIAgenda() {
             const list = document.getElementById('visitsList'); if(!list) return;
             const df = document.getElementById('filterDateInput').value;
             const searchQuery = document.getElementById('searchClientInput') ? document.getElementById('searchClientInput').value.toLowerCase() : "";
-            let filtered = visitsArray.filter(v => v.fechaInstalacion === df);
-            if(searchQuery) filtered = filtered.filter(v => v.nombreCliente.toLowerCase().includes(searchQuery));
-            list.innerHTML = filtered.map(v => `
+            let filtered = visitsArray.filter(function(v) { return v.fechaInstalacion === df; });
+            if(searchQuery) filtered = filtered.filter(function(v) { return v.nombreCliente.toLowerCase().includes(searchQuery); });
+            list.innerHTML = filtered.map(function(v) {
+                return `
                 <div class="bg-white p-4 rounded-2xl shadow-md border-l-[10px] ${v.estado === 'Atendido' ? 'border-fix-report' : 'border-fix-accent'} mb-4 uppercase">
                     <div class="flex justify-between items-start mb-1"><p class="font-black text-fix-blue text-sm italic">${v.nombreCliente}</p><button onclick="deleteVisit('${v.id}')" class="text-fix-error text-[10px]">🗑️</button></div>
-                    <div class="text-slate-400 text-[9px] font-black uppercase">${v.esMantenimiento ? 'MANTENIMIENTO' : (v.equipos || []).map(e => `• ${e.descProducto}`).join('<br>')}</div>
-                </div>`).join('');
-        }
-
-        function movePriority(id, step) {
-            const date = document.getElementById('filterDateInputRutero').value;
-            let tech = currentTechUser || (document.getElementById('ruteroTechFilter') ? document.getElementById('ruteroTechFilter').value : "");
-            let filtered = visitsArray.filter(v => v.fechaInstalacion === date && (tech === "" || v.tecnico === tech));
-            let sorted = [...filtered].sort((a,b) => (parseInt(a.priority) || 999) - (parseInt(b.priority) || 999));
-            const idx = sorted.findIndex(v => v.id === id);
-            const targetIdx = idx + step;
-            if (targetIdx >= 0 && targetIdx < sorted.length) {
-                const currentVisit = sorted[idx]; const targetVisit = sorted[targetIdx];
-                const p1 = parseInt(targetVisit.priority) || (targetIdx + 1);
-                const p2 = parseInt(currentVisit.priority) || (idx + 1);
-                database.ref('visits/' + currentVisit.id).update({ priority: p1 === p2 ? p1 + step : p1 });
-                database.ref('visits/' + targetVisit.id).update({ priority: p2 });
-                showMessage("🔄 Reordenando...", "fix-blue");
-            }
+                    <div class="text-slate-400 text-[9px] font-black uppercase">${v.esMantenimiento ? 'MANTENIMIENTO' : (v.equipos || []).map(function(e) { return '• ' + e.descProducto; }).join('<br>')}</div>
+                </div>`;
+            }).join('');
         }
 
         function renderRutero() {
             const list = document.getElementById('ruteroListBody'); if(!list) return;
             const date = document.getElementById('filterDateInputRutero').value;
             let tech = currentTechUser || (document.getElementById('ruteroTechFilter') ? document.getElementById('ruteroTechFilter').value : "");
-            let filtered = visitsArray.filter(v => v.fechaInstalacion === date);
-            if(tech) filtered = filtered.filter(v => v.tecnico === tech);
-            if(filtered.length === 0) { list.innerHTML = `<tr><td colspan="9" class="p-10 text-center text-slate-300 italic font-black uppercase text-sm">Sin servicios hoy</td></tr>`; return; }
-            let sorted = [...filtered].sort((a,b) => (parseInt(a.priority) || 999) - (parseInt(b.priority) || 999));
+            let filtered = visitsArray.filter(function(v) { return v.fechaInstalacion === date; });
+            if(tech) filtered = filtered.filter(function(v) { return v.tecnico === tech; });
+            if(filtered.length === 0) { list.innerHTML = '<tr><td colspan="9" class="p-10 text-center text-slate-300 italic font-black uppercase text-sm">Sin servicios hoy</td></tr>'; return; }
+            let sorted = filtered.slice().sort(function(a,b) { return (parseInt(a.priority) || 999) - (parseInt(b.priority) || 999); });
             let currentMinutes = 9 * 60;
-            list.innerHTML = sorted.map((v, index) => {
+            list.innerHTML = sorted.map(function(v, index) {
                 const h = Math.floor(currentMinutes / 60); const m = currentMinutes % 60;
-                const timeStr = `${h > 12 ? h - 12 : (h === 0 ? 12 : h)}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+                const timeStr = (h > 12 ? h - 12 : (h === 0 ? 12 : h)) + ":" + m.toString().padStart(2, '0') + " " + (h >= 12 ? 'PM' : 'AM');
                 const eqCount = v.esMantenimiento ? 1 : (v.equipos || []).length;
                 currentMinutes += (60 + (Math.max(0, eqCount - 1) * 20)) + 15;
-                const maps = v.direccion && v.direccion.indexOf('http') !== -1 ? v.direccion : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.direccion || '')}`;
+                const maps = v.direccion && v.direccion.indexOf('http') !== -1 ? v.direccion : "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(v.direccion || '');
                 const waPhone = v.telefono ? v.telefono.replace(/\D/g, '') : '';
-                const initials = v.tecnico ? v.tecnico.split(' ').map(n => n[0]).join('').toUpperCase() : '---';
-                let statusBadge = `<span class="px-2 py-0.5 rounded-full text-[7px] bg-slate-200 text-slate-600 font-black">PENDIENTE</span>`;
-                if(v.estado === 'Atendido') statusBadge = `<span class="px-2 py-0.5 rounded-full text-[7px] bg-green-100 text-green-700 font-black">ATENDIDO</span>`;
-                else if(v.estado === 'No Atendido') statusBadge = `<span class="px-2 py-0.5 rounded-full text-[7px] bg-red-100 text-red-700 font-black">NO ATENDIDO</span>`;
+                const initials = v.tecnico ? v.tecnico.split(' ').map(function(n) { return n[0]; }).join('').toUpperCase() : '---';
+                let statusBadge = '<span class="px-2 py-0.5 rounded-full text-[7px] bg-slate-200 text-slate-600 font-black">PENDIENTE</span>';
+                if(v.estado === 'Atendido') statusBadge = '<span class="px-2 py-0.5 rounded-full text-[7px] bg-green-100 text-green-700 font-black">ATENDIDO</span>';
+                else if(v.estado === 'No Atendido') statusBadge = '<span class="px-2 py-0.5 rounded-full text-[7px] bg-red-100 text-red-700 font-black">NO ATENDIDO</span>';
                 const tipoServ = v.esMantenimiento ? '⚙️ MANT.' : (v.tipoAtencion === 'Garantía' ? '🛡️ GARANTÍA' : (v.tipoAtencion === 'Visita Técnica' || v.tipoAtencion === 'Reparación' ? '🛠️ SERV.TEC' : '🛠️ INSTALACIÓN'));
                 const colorTipo = v.esMantenimiento ? 'text-fix-accent' : (v.tipoAtencion === 'Garantía' ? 'text-fix-blue' : 'text-fix-report');
                 return `
@@ -463,9 +406,9 @@
                             <div class="bg-white p-4 rounded-xl shadow-sm">
                                 <p class="text-[10px] font-black text-fix-blue uppercase mb-2 italic">📄 Información</p>
                                 <p class="text-xs"><b>CALLE:</b> ${v.callePrincipal || '---'}</p>
-                                <p class="text-xs uppercase"><b>EQUIPOS:</b> ${v.esMantenimiento ? v.mantenimientoEquipo : (v.equipos || []).map(e => e.descProducto).join(', ')}</p>
+                                <p class="text-xs uppercase"><b>EQUIPOS:</b> ${v.esMantenimiento ? v.mantenimientoEquipo : (v.equipos || []).map(function(e){return e.descProducto;}).join(', ')}</p>
                                 ${v.descFalla ? `<p class="text-[10px] text-fix-error mt-2 font-black italic"><b>FALLA REPORTE:</b> ${v.descFalla}</p>` : ''}
-                                ${v.fotosRegistro ? `<div class="mt-4"><p class="text-[8px] font-black text-slate-400 mb-1">REGISTRO FOTOGRÁFICO:</p><div class="flex gap-2">${v.fotosRegistro.map(f => `<img src="${f}" class="photo-preview cursor-pointer" onclick="window.open(this.src)">`).join('')}</div></div>` : ''}
+                                ${v.fotosRegistro ? `<div class="mt-4"><p class="text-[8px] font-black text-slate-400 mb-1">REGISTRO FOTOGRÁFICO:</p><div class="flex gap-2">${v.fotosRegistro.map(function(f){return '<img src="' + f + '" class="photo-preview cursor-pointer" onclick="window.open(this.src)">';}).join('')}</div></div>` : ''}
                                 ${v.commentarioCliente ? `<div class="mt-4 p-2 bg-slate-50 border rounded-lg"><p class="text-[8px] font-black text-fix-report italic">TESTIMONIO DEL CLIENTE:</p><p class="text-[10px] font-bold text-slate-600">${v.commentarioCliente}</p></div>` : ''}
                                 <div class="mt-4 p-2 bg-slate-50 rounded-lg"><p class="text-[8px] text-slate-400 font-black italic">Notas Adicionales:</p><p class="text-xs text-fix-error uppercase">${v.razonNoAtencion || 'Ninguna'}</p></div>
                             </div>
@@ -473,7 +416,7 @@
                                 <p class="text-[10px] font-black text-fix-report uppercase mb-2 italic">🛠️ Cierre Técnico</p>
                                 <div class="grid grid-cols-2 gap-2 mb-2 italic">
                                     <select id="status_${v.id}" class="p-2 bg-slate-100 rounded text-[10px] font-black uppercase"><option value="PENDIENTE">¿ATENDIÓ?</option><option value="SI" ${v.estado === 'Atendido' ? 'selected' : ''}>SÍ, ATENDIDO</option><option value="NO" ${v.estado === 'No Atendido' ? 'selected' : ''}>NO ATENDIDO</option></select>
-                                    <select id="type_${v.id}" class="p-2 bg-slate-100 rounded text-[10px] font-black uppercase">${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
+                                    <select id="type_${v.id}" class="p-2 bg-slate-100 rounded text-[10px] font-black uppercase">${TIPOS_SERVICIO.map(function(t){return '<option value="' + t + '" ' + (v.tipoAtencion === t ? 'selected' : '') + '>' + t + '</option>';}).join('')}</select>
                                 </div>
                                 ${v.esMantenimiento ? `<div class="mb-2"><label class="text-[8px] font-black text-slate-400 block ml-1 mb-1 italic">💰 VALOR DEL COBRO MANTENIMIENTO:</label><input type="number" id="maint_tech_price_${v.id}" value="${v.financiera ? v.financiera.totalCliente : ''}" step="0.01" placeholder="INGRESE VALOR COBRADO $" class="w-full p-2 bg-yellow-50 rounded text-xs font-mono font-black border border-fix-accent/20"></div>` : ''}
                                 <select id="payment_${v.id}" class="w-full p-2 bg-slate-100 rounded mb-2 text-[10px] font-black uppercase"><option value="EFECTIVO" ${v.financiera && v.financiera.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option><option value="TRANSFERENCIA" ${v.financiera && v.financiera.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option></select>
@@ -485,12 +428,12 @@
                                 </div>
                                 <textarea id="reason_${v.id}" placeholder="Novedades Técnicas Internas..." class="w-full p-2 text-xs bg-slate-50 rounded mb-2 border-none outline-none font-bold uppercase italic">${v.razonNoAtencion || ''}</textarea>
                                 <div class="max-h-24 overflow-y-auto mb-2 border rounded p-1 bg-slate-50">
-                                    ${Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => {
-                                        const existing = (v.accesoriosVendidos || []).find(a => a.nombre === n);
+                                    ${Object.entries(ACCESORIOS_DEFAULT).map(function(item){
+                                        const n = item[0]; const p = item[1];
+                                        const existing = (v.accesoriosVendidos || []).find(function(a){return a.nombre === n;});
                                         return `<div class="flex justify-between items-center mb-1 bg-white p-1 rounded font-black border border-slate-100"><span class="text-[8px] uppercase">${n} ($${p.toFixed(2)})</span><input type="number" min="0" value="${existing ? existing.cantidad : 0}" data-name="${n}" data-price="${p}" class="acc-${v.id} w-10 text-center text-[10px] border-none font-black text-fix-blue bg-slate-50 rounded shadow-inner"></div>`;
                                     }).join('')}
                                 </div>
-                                <div class="p-2 bg-slate-100 rounded-lg border border-slate-200 mb-2"><p class="text-[7px] font-black text-slate-500 mb-1">ACCESORIO NO EN LISTA / CARGO EXTRA:</p><div class="flex gap-1"><input type="text" id="manual_acc_desc_${v.id}" placeholder="DESCRIPCIÓN..." class="flex-grow p-1.5 text-[9px] rounded border-none font-black uppercase"><input type="number" id="manual_acc_price_${v.id}" placeholder="$0.00" class="w-16 p-1.5 text-right text-[9px] rounded border-none font-mono font-black"></div></div>
                                 <button onclick="closeVisitByTech('${v.id}')" class="w-full bg-fix-report text-white py-2 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all">💾 GUARDAR CIERRE FINAL</button>
                             </div>
                         </div>
@@ -502,40 +445,55 @@
         function renderReporteTeka() {
             const body = document.getElementById('tekaReporteBody'); if(!body) return;
             const start = document.getElementById('maestroDateStart').value; const end = document.getElementById('maestroDateEnd').value;
-            let filtered = visitsArray.filter(v => !v.esMantenimiento && v.estado === 'Atendido');
-            if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
+            let filtered = visitsArray.filter(function(v){ return !v.esMantenimiento && v.estado === 'Atendido'; });
+            if(start && end) filtered = filtered.filter(function(v){ return v.fechaInstalacion >= start && v.fechaInstalacion <= end; });
             let rowCount = 1;
-            body.innerHTML = filtered.flatMap(v => (v.equipos || []).map(eq => `
-                <tr class="border-b row-hover font-black uppercase">
-                    <td class="report-cell text-center font-mono bg-slate-50">${rowCount++}</td><td class="report-cell font-mono">${v.fechaEmision || ''}</td><td class="report-cell">${v.lugarCompra || 'OTRO'}</td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${eq.codProducto || '-'}</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono tracking-widest">${eq.serieEquipo || '-'}</td><td class="report-cell font-black">SAP</td><td class="report-cell">CAPELO</td><td class="report-cell">CUENCA</td><td class="report-cell font-mono">${v.fechaInstalacion}</td><td class="report-cell font-black italic">${v.nombreCliente}</td><td class="report-cell max-w-[150px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell font-black text-right font-mono">$${(eq.costoBase || 0).toFixed(2)}</td><td class="report-cell">CLIENTE FINAL</td><td class="report-cell">CAPELO</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${v.cedula || '-'}</td><td class="report-cell lowercase">${v.email || '-'}</td><td class="report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td>
-                </tr>`)).join('');
+            body.innerHTML = filtered.flatMap(function(v){ 
+                return (v.equipos || []).map(function(eq){
+                    return `<tr class="border-b row-hover font-black uppercase">
+                        <td class="report-cell text-center font-mono bg-slate-50">${rowCount++}</td><td class="report-cell font-mono">${v.fechaEmision || ''}</td><td class="report-cell">${v.lugarCompra || 'OTRO'}</td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${eq.codProducto || '-'}</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono tracking-widest">${eq.serieEquipo || '-'}</td><td class="report-cell font-black">SAP</td><td class="report-cell">CAPELO</td><td class="report-cell">CUENCA</td><td class="report-cell font-mono">${v.fechaInstalacion}</td><td class="report-cell font-black italic">${v.nombreCliente}</td><td class="report-cell max-w-[150px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell font-black text-right font-mono">$${(eq.costoBase || 0).toFixed(2)}</td><td class="report-cell">CLIENTE FINAL</td><td class="report-cell">CAPELO</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${v.cedula || '-'}</td><td class="report-cell lowercase">${v.email || '-'}</td><td class="report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td>
+                    </tr>`;
+                });
+            }).join('');
+        }
+
+        function renderReporteMantenimiento() {
+            const body = document.getElementById('mantenimientoReporteBody'); if(!body) return;
+            const start = document.getElementById('maintBalanceStart') ? document.getElementById('maintBalanceStart').value : "";
+            const end = document.getElementById('maintBalanceEnd') ? document.getElementById('maintBalanceEnd').value : "";
+            let filtered = visitsArray.filter(function(v){ return v.esMantenimiento; });
+            if(start && end) filtered = filtered.filter(function(v){ return v.fechaInstalacion >= start && v.fechaInstalacion <= end; });
+            body.innerHTML = filtered.map(function(v){ 
+                return `<tr class="border-b row-hover font-black uppercase"><td class="report-cell font-mono font-black">${v.fechaInstalacion}</td><td class="report-cell font-black text-fix-blue">${v.nombreCliente}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell uppercase text-[7px] max-w-[100px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell uppercase text-[7px] font-bold text-fix-accent">${v.mantenimientoEquipo || 'General'}</td><td class="report-cell font-black text-right text-fix-report">$${(v.financiera ? v.financiera.totalCliente : 0).toFixed(2)}</td><td class="report-cell text-center font-black">${v.estado === 'Atendido' ? '✅' : '⏳'}</td><td class="report-cell text-center font-black"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td></tr>`;
+            }).join('');
         }
 
         function downloadCSV() {
             const start = document.getElementById('maestroDateStart').value || "HISTORICO"; const end = document.getElementById('maestroDateEnd').value || "HISTORICO";
             let csv = "NRO,FECHA DE EMISION,LUGAR DE COMPRA,FACTURA,CODIGO,DESCRIPCION,SERIE,SAP,TECNICO,CIUDAD,FECHA ATENCION,CLIENTE,CALLE,TELEFONO,PRECIO,LLEGADA INFO,TECNICO QUE ATENDIO,VIATICO,FACTURA REP,CEDULA,CORREO\n";
-            document.querySelectorAll('#tekaReporteBody tr').forEach(row => {
-                const cols = row.querySelectorAll('td');
-                if(cols.length >= 21) {
-                    let rowData = [];
-                    for(let i=0; i<21; i++) { let text = cols[i].innerText.replace(/"/g, '""').replace(/\n/g, ' '); rowData.push(`"${text}"`); }
-                    csv += rowData.join(",") + "\n";
-                }
-            });
+            document.querySelectorAll('#tekaReporteBody tr').forEach(function(row){ const cols = row.querySelectorAll('td'); if(cols.length >= 21) { let rowData = []; for(let i=0; i<21; i++) { let text = cols[i].innerText.replace(/"/g, '""').replace(/\n/g, ' '); rowData.push('"' + text + '"'); } csv += rowData.join(",") + "\n"; } });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
-            link.setAttribute("download", `REPORTE_MAESTRO_FIX_SAP_${start}_AL_${end}.csv`);
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "REPORTE_MAESTRO_FIX_SAP_" + start + "_AL_" + end + ".csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        function downloadMantenimientoCSV() {
+            const start = document.getElementById('maintBalanceStart') ? document.getElementById('maintBalanceStart').value : "HISTORICO";
+            const end = document.getElementById('maintBalanceEnd') ? document.getElementById('maintBalanceEnd').value : "HISTORICO";
+            let csv = "FECHA,CLIENTE,TELÉFONO,CALLE,EQUIPO,VALOR,ESTADO\n";
+            document.querySelectorAll('#mantenimientoReporteBody tr').forEach(function(row){ const cols = row.querySelectorAll('td'); if(cols.length >= 7) { let rowData = []; for(let i=0; i<7; i++) { let text = cols[i].innerText.replace(/"/g, '""').replace(/\n/g, ' ').replace('$',''); rowData.push('"' + text + '"'); } csv += rowData.join(",") + "\n"; } });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "REPORTE_MANTENIMIENTOS_FIX_" + start + "_AL_" + end + ".csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
         function renderInventoryView() {
             const container = document.getElementById('inventoryTableBody'); if(!container) return;
             const selectAcc = document.getElementById('invAccSelect');
-            if(selectAcc && selectAcc.options.length === 0) { Object.keys(ACCESORIOS_DEFAULT).forEach(n => selectAcc.add(new Option(n, n))); }
-            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(([name, price]) => {
-                const totalIn = inventoryEntries.filter(e => e.accesorio === name).reduce((sum, e) => sum + e.cantidad, 0);
+            if(selectAcc && selectAcc.options.length === 0) { Object.keys(ACCESORIOS_DEFAULT).forEach(function(n){ selectAcc.add(new Option(n, n)); }); }
+            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(function(item){
+                const name = item[0]; const price = item[1];
+                const totalIn = inventoryEntries.filter(function(e){return e.accesorio === name;}).reduce(function(sum, e){return sum + e.cantidad;}, 0);
                 let totalOut = 0;
-                visitsArray.filter(v => v.estado === 'Atendido' && v.accesoriosVendidos).forEach(v => { const sold = v.accesoriosVendidos.find(a => a.nombre === name); if(sold) totalOut += sold.cantidad; });
+                visitsArray.filter(function(v){return v.estado === 'Atendido' && v.accesoriosVendidos;}).forEach(function(v){ const sold = v.accesoriosVendidos.find(function(a){return a.nombre === name;}); if(sold) totalOut += sold.cantidad; });
                 const stock = totalIn - totalOut;
                 return `<tr class="border-b row-hover font-black uppercase"><td class="p-4 text-xs font-black text-fix-blue tracking-tighter">${name}</td><td class="p-4 text-center text-[10px] font-mono font-bold text-slate-400">${totalIn}</td><td class="p-4 text-center text-[10px] font-mono font-bold text-fix-error">${totalOut}</td><td class="p-4 text-center"><span class="px-3 py-1 rounded-full text-xs font-mono font-black ${stock <= 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">${stock}</span></td><td class="p-4 text-right text-[10px] font-mono text-slate-400 italic">$${price.toFixed(2)}</td></tr>`;
             }).join('');
@@ -544,46 +502,50 @@
         function processFinancialBalance() {
             const start = document.getElementById('cajaDateStart').value; const end = document.getElementById('cajaDateEnd').value; const techFilter = document.getElementById('cajaTechFilter').value;
             let todos = [];
-            visitsArray.filter(v => v.estado === 'Atendido' && v.financiera && !v.esMantenimiento).forEach(v => {
+            visitsArray.filter(function(v){return v.estado === 'Atendido' && v.financiera && !v.esMantenimiento;}).forEach(function(v){
                 let monto = 0; const eqCount = (v.equipos || []).length;
-                const hasBBQ = (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ");
+                const hasBBQ = (v.equipos || []).some(function(eq){return eq.descProducto === "PARRILLA BBQ";});
                 if (v.tipoAtencion === 'Garantía') { monto = 0; }
                 else if (eqCount === 1 && !hasBBQ) { monto = v.financiera.totalCliente || 0; } 
-                else { monto = (v.accesoriosVendidos || []).reduce((sum, a) => sum + (a.cantidad * a.precio), 0); }
-                todos.push({ id: v.id, monto, type: 'INGRESO', concepto: `VISITA: ${v.nombreCliente}`, fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt, dateStr: v.fechaInstalacion, source: 'VISITA', tecnico: v.tecnico || '---', formaPago: v.financiera.formaPago || 'EFECTIVO' });
+                else { monto = (v.accesoriosVendidos || []).reduce(function(sum, a){return sum + (a.cantidad * a.precio);}, 0); }
+                todos.push({ id: v.id, monto, type: 'INGRESO', concepto: "VISITA: " + v.nombreCliente, fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt, dateStr: v.fechaInstalacion, source: 'VISITA', tecnico: v.tecnico || '---', formaPago: v.financiera.formaPago || 'EFECTIVO' });
             });
-            movementsArray.forEach(m => { todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: `MANUAL: ${m.concepto}`, fecha: m.fecha, dateStr: new Date(m.fecha).toISOString().split('T')[0], source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' }); });
-            if(start && end) todos = todos.filter(m => m.dateStr >= start && m.dateStr <= end);
-            if(techFilter) todos = todos.filter(m => m.tecnico === techFilter);
-            todos.sort((a,b) => b.fecha - a.fecha);
+            movementsArray.forEach(function(m){ todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: "MANUAL: " + m.concepto, fecha: m.fecha, dateStr: new Date(m.fecha).toISOString().split('T')[0], source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' }); });
+            if(start && end) todos = todos.filter(function(m){return m.dateStr >= start && m.dateStr <= end;});
+            if(techFilter) todos = todos.filter(function(m){return m.tecnico === techFilter;});
+            todos.sort(function(a,b){return b.fecha - a.fecha;});
             const tb = document.getElementById('contabilidadTableBody');
-            if(tb) tb.innerHTML = todos.map(m => `
-                <tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${new Date(m.fecha).toLocaleDateString()}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${m.monto.toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center"><button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
+            if(tb) tb.innerHTML = todos.map(function(m){
+                return `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${new Date(m.fecha).toLocaleDateString()}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${m.monto.toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center"><button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`;
+            }).join('');
             let tIn = 0, tOut = 0, tCashIn = 0, tTransIn = 0;
-            todos.forEach(m => { if(m.type === 'INGRESO') { tIn += m.monto; if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; else if(m.formaPago === 'TRANSFERENCIA') tTransIn += m.monto; } else { tOut += m.monto; } });
+            todos.forEach(function(m){ if(m.type === 'INGRESO') { tIn += m.monto; if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; else if(m.formaPago === 'TRANSFERENCIA') tTransIn += m.monto; } else { tOut += m.monto; } });
             const netoCajaFisica = tCashIn - tOut;
-            document.getElementById('totalIngresosDisplay').textContent = `$${tIn.toFixed(2)}`;
-            document.getElementById('totalEgresosDisplay').textContent = `$${tOut.toFixed(2)}`;
-            document.getElementById('balanceNetoDisplay').textContent = `$${netoCajaFisica.toFixed(2)}`;
-            document.getElementById('totalEfectivoDisplay').textContent = `$${tCashIn.toFixed(2)}`;
-            document.getElementById('totalTransferDisplay').textContent = `$${tTransIn.toFixed(2)}`;
-            document.getElementById('finalReportIngresos').textContent = `+$${tCashIn.toFixed(2)} (Cash)`;
-            document.getElementById('finalReportEgresos').textContent = `-$${tOut.toFixed(2)}`;
-            document.getElementById('finalReportNeto').textContent = `$${netoCajaFisica.toFixed(2)}`;
-            document.getElementById('finalReportNeto').classList.remove('text-green-400', 'text-red-400');
-            document.getElementById('finalReportNeto').classList.add(netoCajaFisica >= 0 ? 'text-green-400' : 'text-red-400');
+            if(document.getElementById('totalIngresosDisplay')) document.getElementById('totalIngresosDisplay').textContent = "$" + tIn.toFixed(2);
+            if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tOut.toFixed(2);
+            if(document.getElementById('balanceNetoDisplay')) document.getElementById('balanceNetoDisplay').textContent = "$" + netoCajaFisica.toFixed(2);
+            if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
+            if(document.getElementById('totalTransferDisplay')) document.getElementById('totalTransferDisplay').textContent = "$" + tTransIn.toFixed(2);
+            if(document.getElementById('finalReportIngresos')) document.getElementById('finalReportIngresos').textContent = "+$" + tCashIn.toFixed(2) + " (Cash)";
+            if(document.getElementById('finalReportEgresos')) document.getElementById('finalReportEgresos').textContent = "-$" + tOut.toFixed(2);
+            if(document.getElementById('finalReportNeto')) {
+                document.getElementById('finalReportNeto').textContent = "$" + netoCajaFisica.toFixed(2);
+                document.getElementById('finalReportNeto').classList.remove('text-green-400', 'text-red-400');
+                document.getElementById('finalReportNeto').classList.add(netoCajaFisica >= 0 ? 'text-green-400' : 'text-red-400');
+            }
         }
 
         function processMaintBalance() {
-            const start = document.getElementById('maintBalanceStart')?.value; const end = document.getElementById('maintBalanceEnd')?.value;
-            let filtered = visitsArray.filter(v => v.esMantenimiento && v.estado === 'Atendido' && v.financiera);
-            if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
+            const start = document.getElementById('maintBalanceStart') ? document.getElementById('maintBalanceStart').value : "";
+            const end = document.getElementById('maintBalanceEnd') ? document.getElementById('maintBalanceEnd').value : "";
+            let filtered = visitsArray.filter(function(v){return v.esMantenimiento && v.estado === 'Atendido' && v.financiera;});
+            if(start && end) filtered = filtered.filter(function(v){return v.fechaInstalacion >= start && v.fechaInstalacion <= end;});
             let cash = 0, trans = 0;
-            filtered.forEach(v => { const monto = v.financiera.totalCliente || 0; if(v.financiera.formaPago === 'TRANSFERENCIA') trans += monto; else cash += monto; });
+            filtered.forEach(function(v){ const monto = v.financiera.totalCliente || 0; if(v.financiera.formaPago === 'TRANSFERENCIA') trans += monto; else cash += monto; });
             const total = cash + trans;
-            if(document.getElementById('maintTotalCash')) document.getElementById('maintTotalCash').textContent = `$${cash.toFixed(2)}`;
-            if(document.getElementById('maintTotalTrans')) document.getElementById('maintTotalTrans').textContent = `$${trans.toFixed(2)}`;
-            if(document.getElementById('maintTotalGeneral')) document.getElementById('maintTotalGeneral').textContent = `$${total.toFixed(2)}`;
+            if(document.getElementById('maintTotalCash')) document.getElementById('maintTotalCash').textContent = "$" + cash.toFixed(2);
+            if(document.getElementById('maintTotalTrans')) document.getElementById('maintTotalTrans').textContent = "$" + trans.toFixed(2);
+            if(document.getElementById('maintTotalGeneral')) document.getElementById('maintTotalGeneral').textContent = "$" + total.toFixed(2);
         }
 
         function setMaintFilter(type) {
@@ -594,26 +556,8 @@
             processMaintBalance(); renderReporteMantenimiento();
         }
 
-        function renderReporteMantenimiento() {
-            const body = document.getElementById('mantenimientoReporteBody'); if(!body) return;
-            const start = document.getElementById('maintBalanceStart').value; const end = document.getElementById('maintBalanceEnd').value;
-            let filtered = visitsArray.filter(v => v.esMantenimiento);
-            if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
-            body.innerHTML = filtered.map(v => `<tr class="border-b row-hover font-black uppercase"><td class="report-cell font-mono font-black">${v.fechaInstalacion}</td><td class="report-cell font-black text-fix-blue">${v.nombreCliente}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell uppercase text-[7px] max-w-[100px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell uppercase text-[7px] font-bold text-fix-accent">${v.mantenimientoEquipo || 'General'}</td><td class="report-cell font-black text-right text-fix-report">$${(v.financiera?.totalCliente || 0).toFixed(2)}</td><td class="report-cell text-center font-black">${v.estado === 'Atendido' ? '✅' : '⏳'}</td><td class="report-cell text-center font-black"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td></tr>`).join('');
-        }
-
-        function downloadMantenimientoCSV() {
-            const start = document.getElementById('maintBalanceStart').value || "HISTORICO"; const end = document.getElementById('maintBalanceEnd').value || "HISTORICO";
-            let csv = "FECHA,CLIENTE,TELÉFONO,CALLE,EQUIPO,VALOR,ESTADO\n";
-            document.querySelectorAll('#mantenimientoReporteBody tr').forEach(row => { const cols = row.querySelectorAll('td'); if(cols.length >= 7) { let rowData = []; for(let i=0; i<7; i++) { let text = cols[i].innerText.replace(/"/g, '""').replace(/\n/g, ' ').replace('$',''); rowData.push(`"${text}"`); } csv += rowData.join(",") + "\n"; } });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", `REPORTE_MANTENIMIENTOS_FIX_${start}_AL_${end}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        }
-
-        function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
-
         window.openEditModal = function(id) {
-            const v = visitsArray.find(item => item.id === id); if(!v) return;
+            const v = visitsArray.find(function(item){return item.id === id;}); if(!v) return;
             document.getElementById('edit_id').value = v.id;
             document.getElementById('edit_nombre').value = v.nombreCliente || "";
             document.getElementById('edit_telefono').value = v.telefono || "";
@@ -642,7 +586,7 @@
                     <div class="p-3 border rounded-xl bg-slate-50 mb-3 shadow-sm">
                         <p class="text-[9px] font-black mb-2 text-fix-blue">EQUIPO ${i+1}</p>
                         <div class="grid grid-cols-1 gap-2">
-                            <select class="edit-eq-select w-full p-2 text-[10px] font-black uppercase rounded border" onchange="updateEditPrice(this, ${i})"><option value="">-- ELEGIR PRODUCTO --</option>${TIPOS_EQUIPO.map(t => `<option value="${t}" ${eq.descProducto === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
+                            <select class="edit-eq-select w-full p-2 text-[10px] font-black uppercase rounded border" onchange="updateEditPrice(this, ${i})"><option value="">-- ELEGIR PRODUCTO --</option>${TIPOS_EQUIPO.map(function(t){return '<option value="' + t + '" ' + (eq.descProducto === t ? 'selected' : '') + '>' + t + '</option>';}).join('')}</select>
                             <div class="grid grid-cols-2 gap-2">
                                 <div class="flex flex-col"><label class="text-[7px] text-slate-400 ml-1">CÓDIGO SAP</label><input type="text" class="edit-eq-code w-full p-2 text-[10px] font-mono font-black rounded border bg-white" placeholder="EJ: 4023..." value="${eq.codProducto || ''}"></div>
                                 <div class="flex flex-col"><label class="text-[7px] text-slate-400 ml-1">NÚMERO SERIE</label><input type="text" class="edit-eq-serie w-full p-2 text-[10px] font-mono font-black rounded border bg-white" placeholder="SERIE EQUIPO" value="${eq.serieEquipo || ''}"></div>
@@ -657,12 +601,16 @@
             const count = parseInt(document.getElementById('edit_numEquipos').value) || 1;
             const costInputs = document.querySelectorAll('.edit-eq-cost');
             if (selectEl.value === "PARRILLA BBQ") { costInputs[index].value = "29.00"; } 
-            else { if (count === 1) costInputs[index].value = (COSTOS_EQUIPO[selectEl.value] || 0.00).toFixed(2); else if (count === 2) costInputs.forEach(i => i.value = "20.00"); else if (count >= 3) costInputs.forEach(i => i.value = "15.00"); }
+            else { if (count === 1) costInputs[index].value = (COSTOS_EQUIPO[selectEl.value] || 0.00).toFixed(2); else if (count === 2) costInputs.forEach(function(i){ i.value = "20.00"; }); else if (count >= 3) costInputs.forEach(function(i){ i.value = "15.00"; }); }
         }
 
         function rebuildEditAccessoriesInputs(vendidos) {
             const container = document.getElementById('editAccesoriosContainer');
-            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(([n, p]) => { const v = vendidos.find(a => a.nombre === n) || { cantidad: 0 }; return `<div class="flex justify-between items-center p-2 border-b"><span class="text-[8px] font-black">${n} ($${p.toFixed(2)})</span><input type="number" min="0" value="${v.cantidad}" data-name="${n}" data-price="${p}" class="edit-acc-qty w-10 text-center font-black text-xs border rounded"></div>`; }).join('');
+            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(function(item){
+                const n = item[0]; const p = item[1];
+                const v = vendidos.find(function(a){return a.nombre === n;}) || { cantidad: 0 };
+                return `<div class="flex justify-between items-center p-2 border-b"><span class="text-[8px] font-black">${n} ($${p.toFixed(2)})</span><input type="number" min="0" value="${v.cantidad}" data-name="${n}" data-price="${p}" class="edit-acc-qty w-10 text-center font-black text-xs border rounded"></div>`;
+            }).join('');
         }
 
         window.saveEditChanges = function() {
@@ -671,8 +619,7 @@
             const codes = document.querySelectorAll('.edit-eq-code');
             const series = document.querySelectorAll('.edit-eq-serie');
             const selectsCosts = document.querySelectorAll('.edit-eq-cost');
-            const v = visitsArray.find(item => item.id === id);
-            
+            const v = visitsArray.find(function(item){return item.id === id;});
             let updatedEquipos = []; let moParaTecnico = 0; const count = selects.length;
             for(let i=0; i<selects.length; i++) {
                 const valorMO = parseFloat(selectsCosts[i].value) || 0;
@@ -681,102 +628,80 @@
                 if (v && v.tipoAtencion !== 'Garantía' && prodName !== "PARRILLA BBQ" && count === 1) { moParaTecnico += valorMO; }
             }
             let updatedAccs = []; let totalAccs = 0;
-            document.querySelectorAll('.edit-acc-qty').forEach(i => { const q = parseInt(i.value) || 0; if(q > 0) { const p = parseFloat(i.dataset.price); updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); totalAccs += q * p; } });
+            document.querySelectorAll('.edit-acc-qty').forEach(function(i){ const q = parseInt(i.value) || 0; if(q > 0) { const p = parseFloat(i.dataset.price); updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); totalAccs += q * p; } });
             const totalFinalTecnico = moParaTecnico + totalAccs;
             database.ref('visits/' + id).update({
                 nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), telefono: document.getElementById('edit_telefono').value, email: document.getElementById('edit_email').value.toLowerCase(), cedula: document.getElementById('edit_cedula').value, fechaInstalacion: document.getElementById('edit_fecha').value, direccion: document.getElementById('edit_direccion').value, tecnico: document.getElementById('edit_tecnico').value, numFactura: document.getElementById('edit_numFactura').value.toUpperCase(), lugarCompra: document.getElementById('edit_lugarCompra').value, priority: parseInt(document.getElementById('edit_priority').value) || 0, equipos: updatedEquipos, accesoriosVendidos: updatedAccs, 'financiera/totalCliente': totalFinalTecnico
-            }).then(() => { showMessage("✅ Registro Actualizado", "fix-report"); closeEditModal(); });
+            }).then(function(){ showMessage("✅ Registro Actualizado", "fix-report"); closeEditModal(); });
         };
 
         window.saveVisit = function() {
             const form = document.getElementById('visitForm');
             const data = Object.fromEntries(new FormData(form));
             const isWarranty = data.tipoServicioGlobal === 'Garantía';
-            
             if (!data.nombreCliente) return showMessage("⚠️ Ingrese nombre del cliente", "fix-accent");
             if (!data.callePrincipal) return showMessage("⚠️ Ingrese calle principal", "fix-accent");
-
             let eqs = [];
             let falla = data.descFalla ? data.descFalla.toUpperCase() : "";
-
             if (isWarranty) {
-                const eqWarrantySelect = document.getElementById('warrantyEquipmentSelect');
-                const eqWarranty = eqWarrantySelect ? eqWarrantySelect.value : "";
+                const eqWarranty = document.getElementById('warrantyEquipmentSelect').value;
                 if (!eqWarranty) return showMessage("⚠️ Seleccione equipo para garantía", "fix-accent");
-                const damageDescEl = document.getElementById('warrantyDamageDesc');
-                falla = damageDescEl ? damageDescEl.value.toUpperCase() : "";
+                falla = document.getElementById('warrantyDamageDesc').value.toUpperCase();
                 eqs.push({ descProducto: eqWarranty.toUpperCase(), costoBase: 0, codProducto: "", serieEquipo: "" });
             } else {
                 for(let i=1; i<=parseInt(data.numEquipos); i++) {
-                    const eqName = data[`descProducto_${i}`];
-                    if (!eqName) return showMessage(`⚠️ Seleccione producto para equipo ${i}`, "fix-accent");
-                    eqs.push({ descProducto: eqName.toUpperCase(), costoBase: parseFloat(data[`costoEquipo_${i}`]) || 0, codProducto: "", serieEquipo: "" });
+                    const eqName = data["descProducto_" + i];
+                    if (!eqName) return showMessage("⚠️ Seleccione producto para equipo " + i, "fix-accent");
+                    eqs.push({ descProducto: eqName.toUpperCase(), costoBase: parseFloat(data["costoEquipo_" + i]) || 0, codProducto: "", serieEquipo: "" });
                 }
             }
-
             let accs = [];
             if (!isWarranty) {
-                document.querySelectorAll('.form-acc-qty').forEach(i => { 
-                    const q = parseInt(i.value) || 0; 
-                    if(q > 0) { accs.push({ nombre: i.dataset.name, cantidad: q, precio: parseFloat(i.dataset.price) }); } 
-                });
-                const manualDescEl = document.getElementById('manualAccDesc');
-                const manualPriceEl = document.getElementById('manualAccPrice');
-                const manualDesc = manualDescEl ? manualDescEl.value : ""; 
-                const manualPrice = manualPriceEl ? parseFloat(manualPriceEl.value) : 0;
+                document.querySelectorAll('.form-acc-qty').forEach(function(i){ const q = parseInt(i.value) || 0; if(q > 0) { accs.push({ nombre: i.dataset.name, cantidad: q, precio: parseFloat(i.dataset.price) }); } });
+                const manualDesc = document.getElementById('manualAccDesc') ? document.getElementById('manualAccDesc').value : ""; 
+                const manualPrice = document.getElementById('manualAccPrice') ? parseFloat(document.getElementById('manualAccPrice').value) : 0;
                 if(manualDesc && manualPrice > 0) { accs.push({ nombre: manualDesc.toUpperCase(), cantidad: 1, precio: manualPrice }); }
             }
-
-            const fechaEl = document.getElementById('filterDateInput');
-            const fechaFinal = fechaEl ? fechaEl.value : "";
-
+            const fechaFinal = document.getElementById('filterDateInput').value;
             const ref = database.ref('visits').push();
             ref.set({ 
-                id: ref.key, 
-                nombreCliente: data.nombreCliente.toUpperCase(), 
-                cedula: data.cedula || '', 
-                telefono: data.telefono || '', 
-                email: data.email || '', 
-                direccion: data.direccion || '', 
-                callePrincipal: data.callePrincipal.toUpperCase(), 
-                numFactura: data.numFactura || '', 
-                fechaInstalacion: fechaFinal, 
-                fechaEmision: data.fechaEmision || '', 
-                lugarCompra: data.lugarCompra || "OTRO", 
-                tecnico: data.tecnico || '', 
-                tipoAtencion: data.tipoServicioGlobal, 
-                descFalla: falla, 
-                numeroVisita: "Visita 1", 
-                estado: 'PENDIENTE', 
-                createdAt: Date.now(), 
-                equipos: eqs, 
-                accesoriosVendidos: accs, 
-                financiera: { 
-                    totalCliente: isWarranty ? 0 : parseFloat(document.getElementById('displayTotalFinal').textContent.replace('$','')), 
-                    formaPago: 'PENDIENTE' 
-                }, 
-                esMantenimiento: false, 
-                priority: 0 
-            }).then(() => { 
-                showMessage("✅ Agendado con éxito", "fix-report"); 
-                form.reset(); 
-                toggleServiceTypeUI(); 
-                expandEquipmentUI(); 
-            }).catch(err => {
-                showMessage("❌ Error al guardar", "fix-error");
-            });
+                id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), cedula: data.cedula || '', telefono: data.telefono || '', email: data.email || '', direccion: data.direccion || '', callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', fechaInstalacion: fechaFinal, fechaEmision: data.fechaEmision || '', lugarCompra: data.lugarCompra || "OTRO", tecnico: data.tecnico || '', tipoAtencion: data.tipoServicioGlobal, descFalla: falla, numeroVisita: "Visita 1", estado: 'PENDIENTE', createdAt: Date.now(), equipos: eqs, accesoriosVendidos: accs, financiera: { totalCliente: isWarranty ? 0 : parseFloat(document.getElementById('displayTotalFinal').textContent.replace('$','')), formaPago: 'PENDIENTE' }, esMantenimiento: false, priority: 0 
+            }).then(function(){ showMessage("✅ Agendado con éxito", "fix-report"); form.reset(); toggleServiceTypeUI(); expandEquipmentUI(); }).catch(function(err){ showMessage("❌ Error al guardar", "fix-error"); });
         };
 
         function startSync() {
-            database.ref('visits').on('value', snap => {
-                visitsArray = snap.val() ? Object.entries(snap.val()).map(([id, val]) => ({...val, id})) : [];
+            database.ref('visits').on('value', function(snap) {
+                visitsArray = snap.val() ? Object.entries(snap.val()).map(function(item){ 
+                    const id = item[0]; const val = item[1];
+                    return Object.assign({}, val, {id: id});
+                }) : [];
                 renderUIAgenda(); renderRutero(); renderInventoryView();
                 if(currentView === 'reporte_teka') renderReporteTeka(); if(currentView === 'mantenimiento') renderReporteMantenimiento(); if(currentView === 'contabilidad') processFinancialBalance();
                 processMaintBalance();
             });
-            database.ref('movements').on('value', snap => { movementsArray = snap.val() ? Object.entries(snap.val()).map(([id, val]) => ({...val, id})) : []; if(currentView === 'contabilidad') processFinancialBalance(); });
-            database.ref('inventory_entries').on('value', snap => { inventoryEntries = snap.val() ? Object.values(snap.val()) : []; renderInventoryView(); });
+            database.ref('movements').on('value', function(snap) { 
+                movementsArray = snap.val() ? Object.entries(snap.val()).map(function(item){
+                    const id = item[0]; const val = item[1];
+                    return Object.assign({}, val, {id: id});
+                }) : []; 
+                if(currentView === 'contabilidad') processFinancialBalance(); 
+            });
+            database.ref('inventory_entries').on('value', function(snap) { 
+                inventoryEntries = snap.val() ? Object.values(snap.val()) : []; 
+                renderInventoryView(); 
+            });
         }
+
+        window.saveMantenimiento = function() {
+            const form = document.getElementById('maintForm'); const data = Object.fromEntries(new FormData(form));
+            const fechaSched = document.getElementById('maintScheduleDate').value;
+            const ref = database.ref('visits').push();
+            ref.set({ 
+                id: ref.key, nombreCliente: data.mNombre.toUpperCase(), telefono: data.mTelefono || '', direccion: data.mDireccion || '', callePrincipal: data.mCalle.toUpperCase(), mantenimientoEquipo: data.mEquipo.toUpperCase(), tecnico: data.mTecnico || '', numEquipos: 1, tipoAtencion: "Mantenimiento", estado: 'PENDIENTE', createdAt: Date.now(), fechaInstalacion: fechaSched, esMantenimiento: true, financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago }, priority: 0 
+            }).then(function() { showMessage("✅ Guardado", "fix-report"); form.reset(); });
+        };
+
+        function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
 
         window.openEditFinanceModal = function(id, source, currentMonto, concepto) {
             const fid = document.getElementById('finance_id'); if(fid) fid.value = id; 
@@ -795,48 +720,29 @@
         };
 
         window.saveManualMovement = function() {
-            const cEl = document.getElementById('movConcepto');
-            const mEl = document.getElementById('movMonto');
+            const cEl = document.getElementById('movConcepto'); const mEl = document.getElementById('movMonto');
             if(!cEl || !mEl || !cEl.value || !mEl.value) return showMessage("⚠️ Incompleto", "fix-accent");
-            
-            const c = cEl.value; const m = parseFloat(mEl.value); 
-            const t = document.getElementById('movType').value; 
-            const p = document.getElementById('movPago').value; 
-            const tech = document.getElementById('movTecnico').value;
-            
+            const c = cEl.value; const m = parseFloat(mEl.value); const t = document.getElementById('movType').value; const p = document.getElementById('movPago').value; const tech = document.getElementById('movTecnico').value;
             const ref = database.ref('movements').push();
-            ref.set({ id: ref.key, concepto: c.toUpperCase(), monto: m, fecha: Date.now(), type: t, formaPago: p, tecnico: tech || 'ADMIN'
-            }).then(() => { cEl.value=''; mEl.value=''; showMessage("✅ Registro Manual Guardado", "fix-report"); });
+            ref.set({ id: ref.key, concepto: c.toUpperCase(), monto: m, fecha: Date.now(), type: t, formaPago: p, tecnico: tech || 'ADMIN' }).then(() => { cEl.value=''; mEl.value=''; showMessage("✅ Registro Manual Guardado", "fix-report"); });
         };
 
-        window.saveMantenimiento = function() {
-            const form = document.getElementById('maintForm'); const data = Object.fromEntries(new FormData(form));
-            const ref = database.ref('visits').push();
-            ref.set({ id: ref.key, nombreCliente: data.mNombre.toUpperCase(), telefono: data.mTelefono || '', direccion: data.mDireccion || '', callePrincipal: data.mCalle.toUpperCase(), mantenimientoEquipo: data.mEquipo.toUpperCase(), tecnico: data.mTecnico || '', numEquipos: 1, tipoAtencion: "Mantenimiento", estado: 'PENDIENTE', createdAt: Date.now(), fechaInstalacion: document.getElementById('filterDateInput').value, esMantenimiento: true, financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago }, priority: 0 
-            }).then(() => { showMessage("✅ Guardado", "fix-report"); form.reset(); });
-        };
-
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', function() {
             const hoy = new Date().toISOString().split('T')[0];
-            const dateInputs = ['filterDateInput', 'filterDateInputRutero', 'inputEmision', 'maestroDateStart', 'maestroDateEnd', 'cajaDateStart', 'cajaDateEnd', 'maintBalanceStart', 'maintBalanceEnd'];
-            dateInputs.forEach(id => { const el = document.getElementById(id); if(el) el.value = hoy; });
-            
+            const dateInputs = ['filterDateInput', 'filterDateInputRutero', 'inputEmision', 'maestroDateStart', 'maestroDateEnd', 'cajaDateStart', 'cajaDateEnd', 'maintBalanceStart', 'maintBalanceEnd', 'maintScheduleDate'];
+            dateInputs.forEach(function(id) { const el = document.getElementById(id); if(el) el.value = hoy; });
             const warrantySelect = document.getElementById('warrantyEquipmentSelect');
-            if(warrantySelect) {
-                warrantySelect.innerHTML = '<option value="">--- SELECCIONAR EQUIPO ---</option>';
-                TIPOS_EQUIPO.forEach(t => { warrantySelect.add(new Option(t, t)); });
-            }
-
+            if(warrantySelect) { warrantySelect.innerHTML = '<option value="">--- SELECCIONAR EQUIPO ---</option>'; TIPOS_EQUIPO.forEach(function(t) { warrantySelect.add(new Option(t, t)); }); }
             const p = new URLSearchParams(window.location.search); const t = p.get('tech');
-            if(t && LISTA_TECNICOS.includes(t)) { currentTechUser = t; document.body.classList.add('technician-mode'); document.getElementById('userDisplayLabel').textContent = "RUTA: " + t.toUpperCase(); changeMasterView('rutero'); } 
+            if(t && LISTA_TECNICOS.indexOf(t) !== -1) { currentTechUser = t; document.body.classList.add('technician-mode'); document.getElementById('userDisplayLabel').textContent = "RUTA: " + t.toUpperCase(); changeMasterView('rutero'); } 
             startSync();
-            LISTA_TECNICOS.forEach(item => { 
-                ['selectTecnico', 'ruteroTechFilter', 'selectTecnicoMaint', 'edit_tecnico', 'movTecnico', 'cajaTechFilter'].forEach(id => {
+            LISTA_TECNICOS.forEach(function(item) { 
+                ['selectTecnico', 'ruteroTechFilter', 'selectTecnicoMaint', 'edit_tecnico', 'movTecnico', 'cajaTechFilter'].forEach(function(id) {
                     const el = document.getElementById(id); if(el) el.add(new Option(item || (id === 'cajaTechFilter' ? "TODOS LOS TÉCNICOS" : "--- TÉCNICO ---"), item));
                 });
             });
             const editLugar = document.getElementById('edit_lugarCompra');
-            LUGARES_COMPRA.forEach(i => { 
+            LUGARES_COMPRA.forEach(function(i) { 
                 const sl = document.getElementById('selectLugar'); if(sl) sl.add(new Option(i || "--- LUGAR COMPRA ---", i)); 
                 if(editLugar) editLugar.add(new Option(i || "--- LUGAR COMPRA ---", i)); 
             });
@@ -852,10 +758,7 @@
         <header class="mb-4 sm:mb-10 flex flex-col xl:flex-row justify-between items-center gap-2 no-print">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
-                <div>
-                    <h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1>
-                    <div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.4.3</span></div>
-                </div>
+                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.5.1</span></div></div>
             </div>
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
                 <button onclick="changeMasterView('reporte_admin')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-fix-blue text-white italic">Registro</button>
@@ -875,44 +778,11 @@
                 <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50">
                     <form id="visitForm" onsubmit="event.preventDefault(); saveVisit();">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                            <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black">
-                            <input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black">
-                            <input type="text" name="cedula" placeholder="CÉDULA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono">
-                            <input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black">
-                            <input type="email" name="email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner">
-                            <input type="text" name="numFactura" placeholder="N° FACTURA COMPRA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center uppercase font-black">
-                            <input type="text" name="direccion" placeholder="LINK GPS (OPCIONAL EN REGISTRO)" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner md:col-span-2">
-                            <select name="tecnico" id="selectTecnico" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select>
-                            <select id="selectLugar" name="lugarCompra" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select>
-                            <div class="flex flex-col"><span class="text-[8px] font-black text-slate-400 ml-2 italic">EMISIÓN FACTURA</span><input type="date" name="fechaEmision" id="inputEmision" class="p-3 bg-slate-50 rounded-xl font-bold text-xs outline-none shadow-inner text-center font-mono"></div>
-                            <select name="tipoServicioGlobal" id="tipoServicioGlobal" onchange="toggleServiceTypeUI()" class="p-3 bg-white border-2 border-fix-blue/10 rounded-xl font-black text-[10px] uppercase text-fix-blue italic">
-                                <option value="Instalación">Instalación Estándar</option>
-                                <option value="Garantía">Garantía de Fábrica</option>
-                                <option value="Fuera de Garantía">Fuera de Garantía</option>
-                                <option value="Reparación">Reparación/Serv.Tecnico</option>
-                                <option value="Visita Técnica">Visita Técnica</option>
-                            </select>
+                            <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black"><input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black"><input type="text" name="cedula" placeholder="CÉDULA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono"><input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black"><input type="email" name="email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner"><input type="text" name="numFactura" placeholder="N° FACTURA COMPRA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center uppercase font-black"><input type="text" name="direccion" placeholder="LINK GPS (OPCIONAL EN REGISTRO)" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner md:col-span-2"><select name="tecnico" id="selectTecnico" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><select id="selectLugar" name="lugarCompra" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><div class="flex flex-col"><span class="text-[8px] font-black text-slate-400 ml-2 italic">EMISIÓN FACTURA</span><input type="date" name="fechaEmision" id="inputEmision" class="p-3 bg-slate-50 rounded-xl font-bold text-xs outline-none shadow-inner text-center font-mono"></div><select name="tipoServicioGlobal" id="tipoServicioGlobal" onchange="toggleServiceTypeUI()" class="p-3 bg-white border-2 border-fix-blue/10 rounded-xl font-black text-[10px] uppercase text-fix-blue italic"><option value="Instalación">Instalación Estándar</option><option value="Garantía">Garantía de Fábrica</option><option value="Fuera de Garantía">Fuera de Garantía</option><option value="Reparación">Reparación/Serv.Tecnico</option><option value="Visita Técnica">Visita Técnica</option></select>
                         </div>
-
-                        <div id="standardServiceFields" class="space-y-4">
-                            <div class="bg-slate-50 p-3 rounded-xl flex items-center justify-between shadow-inner"><span class="text-[10px] font-black italic">CANTIDAD EQUIPOS:</span><input type="number" id="numEquipos" name="numEquipos" value="1" min="1" oninput="expandEquipmentUI()" class="w-10 text-center text-xl text-fix-blue bg-transparent outline-none font-black font-mono"></div>
-                            <div id="productInputsContainer" class="space-y-2"></div>
-                            <div id="accesoriosContainerAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 italic font-black"></div>
-                        </div>
-
-                        <div id="warrantyFields" class="hidden space-y-4 p-4 bg-fix-blue/5 rounded-3xl border-2 border-fix-blue/10 italic">
-                            <p class="text-[10px] font-black text-fix-blue underline uppercase">DATOS DE GARANTÍA (SIN COSTO)</p>
-                            <select id="warrantyEquipmentSelect" class="w-full p-3 bg-white rounded-xl font-black text-xs uppercase shadow-sm outline-none">
-                                <option value="">--- SELECCIONAR EQUIPO ---</option>
-                            </select>
-                            <textarea id="warrantyDamageDesc" placeholder="DESCRIBA LA FALLA O MOTIVO DE LA GARANTÍA..." class="w-full p-4 bg-white rounded-2xl font-black text-xs uppercase shadow-inner min-h-[100px] outline-none border-none"></textarea>
-                        </div>
-
-                        <div id="financialDashboardRegistration" class="mt-8 grid grid-cols-3 gap-2 text-center">
-                            <div class="bg-slate-50 p-2 rounded-xl italic text-[8px]">M.O. (MAESTRO)<br><span id="displayCostoInstalacion" class="text-sm font-black">$0.00</span></div>
-                            <div class="bg-slate-50 p-2 rounded-xl italic text-[8px]">INSUMOS<br><span id="displayTotalAccesorios" class="text-sm font-black">$0.00</span></div>
-                            <div class="bg-fix-accent p-2 rounded-xl font-black text-white shadow-lg uppercase">TOTAL CAJA<br><span id="displayTotalFinal" class="text-lg font-mono">$0.00</span></div>
-                        </div>
+                        <div id="standardServiceFields" class="space-y-4"><div class="bg-slate-50 p-3 rounded-xl flex items-center justify-between shadow-inner"><span class="text-[10px] font-black italic">CANTIDAD EQUIPOS:</span><input type="number" id="numEquipos" name="numEquipos" value="1" min="1" oninput="expandEquipmentUI()" class="w-10 text-center text-xl text-fix-blue bg-transparent outline-none font-black font-mono"></div><div id="productInputsContainer" class="space-y-2"></div><div id="accesoriosContainerAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 italic font-black"></div></div>
+                        <div id="warrantyFields" class="hidden space-y-4 p-4 bg-fix-blue/5 rounded-3xl border-2 border-fix-blue/10 italic"><p class="text-[10px] font-black text-fix-blue underline uppercase">DATOS DE GARANTÍA (SIN COSTO)</p><select id="warrantyEquipmentSelect" class="w-full p-3 bg-white rounded-xl font-black text-xs uppercase shadow-sm outline-none"></select><textarea id="warrantyDamageDesc" placeholder="DESCRIBA LA FALLA O MOTIVO DE LA GARANTÍA..." class="w-full p-4 bg-white rounded-2xl font-black text-xs uppercase shadow-inner min-h-[100px] outline-none border-none"></textarea></div>
+                        <div id="financialDashboardRegistration" class="mt-8 grid grid-cols-3 gap-2 text-center"><div class="bg-slate-50 p-2 rounded-xl italic text-[8px]">M.O. (MAESTRO)<br><span id="displayCostoInstalacion" class="text-sm font-black">$0.00</span></div><div class="bg-slate-50 p-2 rounded-xl italic text-[8px]">INSUMOS<br><span id="displayTotalAccesorios" class="text-sm font-black">$0.00</span></div><div class="bg-fix-accent p-2 rounded-xl font-black text-white shadow-lg uppercase">TOTAL CAJA<br><span id="displayTotalFinal" class="text-lg font-mono">$0.00</span></div></div>
                         <button type="submit" class="w-full bg-fix-blue text-white py-4 rounded-2xl mt-4 text-lg font-black uppercase italic shadow-lg active:scale-95 transition-all">🚀 AGENDAR VISITA</button>
                     </form>
                 </div>
@@ -927,8 +797,12 @@
                 <div id="visitsList" class="space-y-3 max-h-[700px] overflow-y-auto pr-2"></div>
             </div>
 
-            <!-- MANTENIMIENTOS -->
+            <!-- VISTA MANTENIMIENTOS v2.5.1 -->
             <div id="mantenimientoView" class="hidden lg:col-span-3 space-y-6">
+                <div class="bg-white p-4 rounded-3xl shadow-lg border-[4px] border-fix-accent/20">
+                    <p class="text-[8px] font-black text-fix-accent mb-1 ml-2 italic underline">📅 AGENDAR FECHA PARA MANTENIMIENTO:</p>
+                    <input type="date" id="maintScheduleDate" class="bg-slate-50 p-3 rounded-xl text-xl font-black italic text-fix-accent outline-none border-none shadow-inner w-full text-center font-mono">
+                </div>
                 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     <div class="xl:col-span-2 bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50 font-black italic">
                         <h2 class="text-xl font-black uppercase mb-6 border-b-4 border-fix-blue pb-2 font-sans italic">MANTENIMIENTOS FIX - REGISTRO</h2>
@@ -974,7 +848,6 @@
     <!-- MODAL DE AJUSTE FINANCIERO -->
     <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4"><div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic"><h2 class="text-xl font-black uppercase text-fix-blue mb-4 border-b-2 pb-2">VALOR REAL</h2><input type="hidden" id="finance_id"><input type="hidden" id="finance_source"><div class="space-y-4"><input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs"><input type="number" step="0.01" id="finance_monto" class="w-full p-3 bg-yellow-50 rounded-xl border font-mono font-black text-xl text-right"></div><div class="grid grid-cols-2 gap-3 mt-6"><button onclick="saveFinanceAdjustment()" class="bg-fix-report text-white py-3 rounded-xl font-black shadow-lg">💾 AJUSTAR</button><button onclick="closeEditFinanceModal()" class="bg-slate-200 text-slate-600 py-3 rounded-xl font-black">SALIR</button></div></div></div>
 
-    <!-- BOTÓN ACTUALIZAR -->
     <button onclick="refreshData()" class="btn-refresh-float no-print" title="Actualizar"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></button>
     <div id="messageBox" class="opacity-0 fixed transition-opacity duration-500 pointer-events-none z-[99999] font-black uppercase text-center"></div>
 
