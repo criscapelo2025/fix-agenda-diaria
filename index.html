@@ -457,7 +457,6 @@
             }).join('');
         }
 
-        // --- FUNCIONES DE MANTENIMIENTO ---
         function renderReporteMantenimiento() {
             const body = document.getElementById('mantenimientoReporteBody'); if(!body) return;
             const start = document.getElementById('maintBalanceStart')?.value;
@@ -482,7 +481,6 @@
             if(document.getElementById('maintTotalGeneral')) document.getElementById('maintTotalGeneral').textContent = "$" + (cash + trans).toFixed(2);
         }
 
-        // --- FILTRADO RAPIDO MANTENIMIENTOS (RESTAURADO) ---
         window.setMaintFilter = function(type) {
             const now = new Date(); let start, end;
             if(type === 'week') { 
@@ -501,7 +499,6 @@
             renderReporteMantenimiento();
         };
 
-        // --- FUNCIONES DE EXPORTACIÓN ---
         function downloadCSV() {
             const start = document.getElementById('maestroDateStart').value || "HISTORICO";
             let csv = "NRO,FECHA DE EMISION,LUGAR DE COMPRA,FACTURA,CODIGO,DESCRIPCION,SERIE,SAP,TECNICO,CIUDAD,FECHA ATENCION,CLIENTE,CALLE,TELEFONO,PRECIO,LLEGADA INFO,TECNICO QUE ATENDIO,VIATICO,FACTURA REP,CEDULA,CORREO\n";
@@ -554,7 +551,6 @@
             }).join('');
         }
 
-        // --- DESGLOSE FINANCIERO ---
         window.showDesgloseVisita = function(id) {
             const v = visitsArray.find(item => item.id === id);
             if (!v) return;
@@ -604,7 +600,7 @@
             if(techFilter) todos = todos.filter(m => m.tecnico === techFilter);
             todos.sort((a,b) => b.fecha - a.fecha);
             const tb = document.getElementById('contabilidadTableBody');
-            if(tb) tb.innerHTML = todos.map(m => `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${new Date(m.fecha).toLocaleDateString()}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-green-600 text-xs font-black">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
+            if(tb) tb.innerHTML = todos.map(m => `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${new Date(m.fecha).toLocaleDateString()}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-green-600 text-xs font-black" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
             let tIn = 0, tOut = 0, tCashIn = 0, tTransIn = 0;
             todos.forEach(m => { if(m.type === 'INGRESO') { tIn += m.monto; if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; else tTransIn += m.monto; } else { tOut += m.monto; } });
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
@@ -638,7 +634,6 @@
             document.getElementById('edit_numFactura').value = v.numFactura || "";
             document.getElementById('edit_lugarCompra').value = v.lugarCompra || "";
             document.getElementById('edit_numEquipos').value = v.equipos ? v.equipos.length : 1;
-            
             rebuildEditEquipmentInputs(v.equipos || []);
             rebuildEditAccessoriesInputs(v.accesoriosVendidos || []);
             document.getElementById('editModal').classList.remove('hidden');
@@ -688,10 +683,7 @@
                 const data = Object.fromEntries(new FormData(form));
                 if(!data.nombreCliente || !data.callePrincipal) { showMessage("⚠️ Datos obligatorios", "fix-error"); return; }
                 let eqs = [];
-                if (data.tipoServicioGlobal === 'Garantía') {
-                    const wEq = document.getElementById('warrantyEquipmentSelect')?.value || "";
-                    eqs.push({ descProducto: wEq.toUpperCase(), costoBase: 0, codProducto: "", serieEquipo: "" });
-                }
+                if (data.tipoServicioGlobal === 'Garantía') eqs.push({ descProducto: document.getElementById('warrantyEquipmentSelect').value.toUpperCase(), costoBase: 0, codProducto: "", serieEquipo: "" });
                 else { const num = parseInt(data.numEquipos) || 1; for(let i=1; i<=num; i++) { const eqName = data["descProducto_" + i]; if(eqName) eqs.push({ descProducto: eqName.toUpperCase(), costoBase: parseFloat(data["costoEquipo_" + i]) || 0, codProducto: "", serieEquipo: "" }); } }
                 let accs = [];
                 document.querySelectorAll('.form-acc-qty').forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) accs.push({ nombre: i.dataset.name, cantidad: q, precio: parseFloat(i.dataset.price) || 0 }); });
@@ -782,7 +774,7 @@
         <header class="mb-4 sm:mb-10 flex flex-col xl:flex-row justify-between items-center gap-2 no-print">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
-                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.7.2</span></div></div>
+                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.7.3</span></div></div>
             </div>
             <!-- MENU ADMIN -->
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
@@ -905,7 +897,40 @@
             <div id="reporteTekaView" class="hidden lg:col-span-3 bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase admin-only"><div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6"><div><h2 class="text-lg font-black uppercase italic font-sans italic underline text-fix-blue">Maestro SAP</h2><div class="flex gap-2 mt-2 font-black"><input type="date" id="maestroDateStart" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black"><input type="date" id="maestroDateEnd" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black"><button onclick="renderReporteTeka()" class="bg-fix-blue text-white px-2 rounded text-[10px]">VER</button></div></div><button onclick="downloadCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic">📊 DESCARGAR SAP FINAL</button></div><div class="overflow-x-auto border-2 border-slate-50 rounded-xl"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-900 text-white text-[7px] uppercase"><th class="bg-slate-800">NRO</th><th>FECHA DE EMISIÓN</th><th>LUGAR DE COMPRA</th><th>FACTURA</th><th>CÓDIGO</th><th>DESCRIPCIÓN</th><th>SERIE</th><th>SAP</th><th>TÉCNICO</th><th>CIUDAD</th><th>FECHA ATENCIÓN</th><th>CLIENTE</th><th>CALLE</th><th>TELÉFONO</th><th>PRECIO</th><th>LLEGADA INFO</th><th>TÉCNICO ATENDIÓ</th><th>VIÁTICO</th><th>FACTURA REP</th><th>CÉDULA</th><th>CORREO</th><th>X</th></tr></thead><tbody id="tekaReporteBody" class="uppercase font-bold"></tbody></table></div></div>
 
             <!-- CAJA (ADMIN ONLY) -->
-            <div id="contabilidadView" class="hidden lg:col-span-3 space-y-6 admin-only"><div class="bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase"><div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6"><div><h2 class="text-lg font-black uppercase underline font-sans italic">CONTABILIDAD Y CAJA</h2><div class="flex flex-wrap gap-2 mt-2 font-black"><input type="date" id="cajaDateStart" class="bg-slate-50 p-1 rounded text-[10px] border font-black"><input type="date" id="cajaDateEnd" class="bg-slate-50 p-1 rounded text-[10px] border font-black"><select id="cajaTechFilter" onchange="processFinancialBalance()" class="bg-slate-50 p-1 rounded text-[10px] border font-black"></select><button onclick="downloadCajaCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic ml-4">📊 EXPORTAR CAJA</button></div></div></div><div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6 text-center italic font-black"><div class="p-3 bg-green-50 rounded-xl border border-green-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">INGRESOS (EFECTIVO)</span><div id="totalEfectivoDisplay" class="text-lg font-black text-green-700">$0.00</div></div><div class="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">EGRESOS / GASTOS</span><div id="totalEgresosDisplay" class="text-lg font-black text-red-700">$0.00</div></div><div class="p-3 bg-slate-900 rounded-xl text-white shadow-xl col-span-2 md:col-span-1 flex flex-col justify-center border-2 border-fix-accent"><span class="text-[8px] uppercase text-fix-accent">SALDO NETO (CASH)</span><div id="balanceNetoDisplay" class="text-xl font-black text-fix-accent">$0.00</div></div><div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center opacity-80"><span class="text-[8px] uppercase text-slate-500">BANCO (TRANSFER.)</span><div id="totalTransferDisplay" class="text-lg font-black text-blue-700">$0.00</div></div><div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-60"><span class="text-[8px] uppercase text-slate-500">VENTA TOTAL PERIODO</span><div id="totalIngresosDisplay" class="text-lg font-black text-slate-600">$0.00</div></div></div><div class="overflow-x-auto rounded-xl border border-slate-100"><table class="w-full text-left admin-table font-mono"><thead><tr class="text-[9px] uppercase"><th>FECHA/TÉCNICO</th><th>TIPO/PAGO</th><th>DETALLE</th><th class="text-right">MONTO</th><th class="text-center">X</th></tr></thead><tbody id="contabilidadTableBody"></tbody></table></div></div>
+            <div id="contabilidadView" class="hidden lg:col-span-3 space-y-6 admin-only">
+                <div class="bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase">
+                    <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+                        <div>
+                            <h2 class="text-lg font-black uppercase underline font-sans italic">CONTABILIDAD Y CAJA</h2>
+                            <div class="flex flex-wrap gap-2 mt-2 font-black">
+                                <input type="date" id="cajaDateStart" class="bg-slate-50 p-1 rounded text-[10px] border font-black">
+                                <input type="date" id="cajaDateEnd" class="bg-slate-50 p-1 rounded text-[10px] border font-black">
+                                <select id="cajaTechFilter" onchange="processFinancialBalance()" class="bg-slate-50 p-1 rounded text-[10px] border font-black"></select>
+                                <button onclick="downloadCajaCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic ml-4">📊 EXPORTAR CAJA</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6 text-center italic font-black">
+                        <div class="p-3 bg-green-50 rounded-xl border border-green-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">INGRESOS (EFECTIVO)</span><div id="totalEfectivoDisplay" class="text-lg font-black text-green-700">$0.00</div></div>
+                        <div class="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">EGRESOS / GASTOS</span><div id="totalEgresosDisplay" class="text-lg font-black text-red-700">$0.00</div></div>
+                        <div class="p-3 bg-slate-900 rounded-xl text-white shadow-xl col-span-2 md:col-span-1 flex flex-col justify-center border-2 border-fix-accent"><span class="text-[8px] uppercase text-fix-accent">SALDO NETO (CASH)</span><div id="balanceNetoDisplay" class="text-xl font-black text-fix-accent">$0.00</div></div>
+                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center opacity-80"><span class="text-[8px] uppercase text-slate-500">BANCO (TRANSFER.)</span><div id="totalTransferDisplay" class="text-lg font-black text-blue-700">$0.00</div></div>
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-60"><span class="text-[8px] uppercase text-slate-500">VENTA TOTAL PERIODO</span><div id="totalIngresosDisplay" class="text-lg font-black text-slate-600">$0.00</div></div>
+                    </div>
+
+                    <!-- REGISTRO MANUAL DE CAJA (RESTAURADO) -->
+                    <div class="bg-slate-50 p-4 rounded-xl mb-6 grid grid-cols-1 md:grid-cols-5 gap-2 items-end italic font-black border border-slate-200">
+                        <div class="md:col-span-1"><label class="text-[7px] ml-2">CONCEPTO</label><input type="text" id="movConcepto" placeholder="CONCEPTO..." class="w-full p-2 rounded-lg font-bold outline-none border text-xs"></div>
+                        <div><label class="text-[7px] ml-2">MONTO $</label><input type="number" id="movMonto" placeholder="$0" class="w-full p-2 rounded-lg text-right font-black border text-xs font-mono"></div>
+                        <div><label class="text-[7px] ml-2">TIPO</label><select id="movType" class="w-full p-2 rounded-lg font-black bg-white border text-[10px]"><option value="EGRESO">➖ EGRESO</option><option value="INGRESO">➕ INGRESO</option></select></div>
+                        <div><label class="text-[7px] ml-2">PAGO/TÉCNICO</label><div class="flex gap-1"><select id="movPago" class="w-1/2 p-2 rounded-lg font-black bg-white border text-[8px]"><option value="EFECTIVO">EFECT.</option><option value="TRANSFERENCIA">TRANS.</option></select><select id="movTecnico" class="w-1/2 p-2 rounded-lg font-black bg-white border text-[8px]"></select></div></div>
+                        <button onclick="saveManualMovement()" class="bg-fix-blue text-white py-2 rounded-lg font-black text-xs shadow-md hover:scale-95 transition-all">REGISTRAR</button>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-xl border border-slate-100"><table class="w-full text-left admin-table font-mono"><thead><tr class="text-[9px] uppercase"><th>FECHA/TÉCNICO</th><th>TIPO/PAGO</th><th>DETALLE</th><th class="text-right">MONTO</th><th class="text-center">X</th></tr></thead><tbody id="contabilidadTableBody"></tbody></table></div>
+                </div>
+            </div>
         </div>
     </div>
 
