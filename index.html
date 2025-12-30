@@ -501,60 +501,35 @@
         window.showDesgloseVisita = function(id) {
             const v = visitsArray.find(item => item.id === id);
             if (!v) return;
-            
             const container = document.getElementById('desgloseContent');
             const modal = document.getElementById('desgloseModal');
-            
             let html = `<div class="space-y-3">`;
             let totalGeneral = 0;
-
-            // 1. Mano de Obra
             if (v.tipoAtencion !== 'Garantía') {
                 const hasBBQ = (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ");
                 const eqCount = (v.equipos || []).length;
                 if (eqCount === 1 && !hasBBQ) {
                     const mo = (v.equipos || []).reduce((sum, eq) => sum + (eq.costoBase || 0), 0);
                     if(mo > 0) {
-                        html += `<div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                    <span class="text-xs font-black text-slate-500 uppercase tracking-tighter">🛠️ MANO DE OBRA</span>
-                                    <span class="font-mono font-black text-fix-blue text-sm">$${mo.toFixed(2)}</span>
-                                 </div>`;
+                        html += `<div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100"><span class="text-xs font-black text-slate-500 uppercase tracking-tighter">🛠️ MANO DE OBRA</span><span class="font-mono font-black text-fix-blue text-sm">$${mo.toFixed(2)}</span></div>`;
                         totalGeneral += mo;
                     }
                 }
             }
-
-            // 2. Accesorios
             if (v.accesoriosVendidos && v.accesoriosVendidos.length > 0) {
                 v.accesoriosVendidos.forEach(a => {
                     const itemTotal = a.cantidad * a.precio;
-                    html += `<div class="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                                <div class="flex flex-col">
-                                    <span class="text-[10px] font-black text-slate-800 uppercase tracking-tighter">${a.nombre}</span>
-                                    <span class="text-[8px] font-bold text-slate-400">CANT: ${a.cantidad} x $${a.precio.toFixed(2)}</span>
-                                </div>
-                                <span class="font-mono font-black text-fix-report text-sm">$${itemTotal.toFixed(2)}</span>
-                             </div>`;
+                    html += `<div class="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm"><div class="flex flex-col"><span class="text-[10px] font-black text-slate-800 uppercase tracking-tighter">${a.nombre}</span><span class="text-[8px] font-bold text-slate-400">CANT: ${a.cantidad} x $${a.precio.toFixed(2)}</span></div><span class="font-mono font-black text-fix-report text-sm">$${itemTotal.toFixed(2)}</span></div>`;
                     totalGeneral += itemTotal;
                 });
             }
-
-            // 3. Totales
-            html += `<div class="pt-4 border-t-2 border-dashed border-slate-200 flex justify-between items-end">
-                        <span class="text-[10px] font-black text-slate-400 uppercase italic">Total Liquidado:</span>
-                        <span class="text-2xl font-mono font-black text-slate-900 tracking-tighter">$${totalGeneral.toFixed(2)}</span>
-                     </div>`;
-            
-            html += `</div>`;
-            
+            html += `<div class="pt-4 border-t-2 border-dashed border-slate-200 flex justify-between items-end"><span class="text-[10px] font-black text-slate-400 uppercase italic">Total Liquidado:</span><span class="text-2xl font-mono font-black text-slate-900 tracking-tighter">$${totalGeneral.toFixed(2)}</span></div></div>`;
             document.getElementById('desgloseTitle').textContent = v.nombreCliente;
             container.innerHTML = html;
             modal.classList.remove('hidden');
         };
 
-        window.closeDesgloseModal = function() {
-            document.getElementById('desgloseModal').classList.add('hidden');
-        };
+        window.closeDesgloseModal = function() { document.getElementById('desgloseModal').classList.add('hidden'); };
 
         function processFinancialBalance() {
             const startInput = document.getElementById('cajaDateStart');
@@ -562,38 +537,20 @@
             const start = startInput ? startInput.value : ""; 
             const end = endInput ? endInput.value : "";
             const techFilter = document.getElementById('cajaTechFilter') ? document.getElementById('cajaTechFilter').value : "";
-            
             let todos = [];
             visitsArray.filter(v => v.estado === 'Atendido' && v.financiera && !v.esMantenimiento).forEach(v => {
                 let monto = (v.tipoAtencion === 'Garantía') ? 0 : (v.equipos?.length === 1 && !v.equipos.some(e=>e.descProducto==="PARRILLA BBQ") ? (v.financiera.totalCliente || 0) : (v.accesoriosVendidos || []).reduce((s,a)=>s+(a.cantidad*a.precio), 0));
-                todos.push({ 
-                    id: v.id, monto, type: 'INGRESO', concepto: "VISITA: " + v.nombreCliente, fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt, dateStr: v.fechaInstalacion, source: 'VISITA', tecnico: v.tecnico || '---', formaPago: v.financiera.formaPago || 'EFECTIVO' 
-                });
+                todos.push({ id: v.id, monto, type: 'INGRESO', concepto: "VISITA: " + v.nombreCliente, fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt, dateStr: v.fechaInstalacion, source: 'VISITA', tecnico: v.tecnico || '---', formaPago: v.financiera.formaPago || 'EFECTIVO' });
             });
             movementsArray.forEach(m => todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: "MANUAL: " + m.concepto, fecha: m.fecha, dateStr: new Date(m.fecha).toISOString().split('T')[0], source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' }));
-            
             if(start && end) todos = todos.filter(m => m.dateStr >= start && m.dateStr <= end);
             if(techFilter) todos = todos.filter(m => m.tecnico === techFilter);
             todos.sort((a,b) => b.fecha - a.fecha);
-            
             const tb = document.getElementById('contabilidadTableBody');
             if(tb) tb.innerHTML = todos.map(m => {
                 const isVisit = m.source === 'VISITA';
-                return `<tr class="border-b row-hover uppercase font-black">
-                    <td class="p-4 text-[9px] font-mono font-black italic">${new Date(m.fecha).toLocaleDateString()}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td>
-                    <td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td>
-                    <td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td>
-                    <td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td>
-                    <td class="text-center p-4">
-                        <div class="flex gap-2 justify-center">
-                            ${isVisit ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-green-600 text-xs font-black" title="Ver Desglose">👁️</button>` : ''}
-                            <button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>
-                            ${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}
-                        </div>
-                    </td>
-                </tr>`;
+                return `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${new Date(m.fecha).toLocaleDateString()}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${isVisit ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-green-600 text-xs font-black" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`;
             }).join('');
-            
             let tIn = 0, tOut = 0, tCashIn = 0, tTransIn = 0;
             todos.forEach(m => { if(m.type === 'INGRESO') { tIn += m.monto; if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; else tTransIn += m.monto; } else { tOut += m.monto; } });
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
@@ -601,6 +558,17 @@
             if(document.getElementById('balanceNetoDisplay')) document.getElementById('balanceNetoDisplay').textContent = "$" + (tCashIn - tOut).toFixed(2);
             if(document.getElementById('totalTransferDisplay')) document.getElementById('totalTransferDisplay').textContent = "$" + tTransIn.toFixed(2);
             if(document.getElementById('totalIngresosDisplay')) document.getElementById('totalIngresosDisplay').textContent = "$" + tIn.toFixed(2);
+        }
+
+        // --- FUNCIÓN DE RECONSTRUCCIÓN DE ACCESORIOS EN EDICIÓN (RESTAURADA) ---
+        function rebuildEditAccessoriesInputs(vendidos) {
+            const container = document.getElementById('editAccesoriosContainer');
+            if(!container) return;
+            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(function(item){
+                const n = item[0]; const p = item[1];
+                const v = (vendidos || []).find(function(a){return a.nombre === n;}) || { cantidad: 0 };
+                return `<div class="flex justify-between items-center p-2 border-b"><span class="text-[8px] font-black">${n} ($${p.toFixed(2)})</span><input type="number" min="0" value="${v.cantidad}" data-name="${n}" data-price="${p}" class="edit-acc-qty w-10 text-center font-black text-xs border rounded"></div>`;
+            }).join('');
         }
 
         window.openEditModal = function(id) {
@@ -617,6 +585,7 @@
             document.getElementById('edit_numFactura').value = v.numFactura || "";
             document.getElementById('edit_lugarCompra').value = v.lugarCompra || "";
             document.getElementById('edit_numEquipos').value = v.equipos ? v.equipos.length : 1;
+            
             rebuildEditEquipmentInputs(v.equipos || []);
             rebuildEditAccessoriesInputs(v.accesoriosVendidos || []);
             document.getElementById('editModal').classList.remove('hidden');
@@ -653,94 +622,28 @@
             for(let i=0; i<selects.length; i++) {
                 updatedEquipos.push({ descProducto: selects[i].value.toUpperCase(), costoBase: parseFloat(selectsCosts[i].value) || 0, codProducto: codes[i].value.toUpperCase(), serieEquipo: series[i].value.toUpperCase() });
             }
+            let updatedAccs = [];
+            document.querySelectorAll('.edit-acc-qty').forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) { updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: parseFloat(i.dataset.price) || 0 }); } });
             database.ref('visits/' + id).update({
-                nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), telefono: document.getElementById('edit_telefono').value, email: document.getElementById('edit_email').value.toLowerCase(), cedula: document.getElementById('edit_cedula').value, fechaInstalacion: document.getElementById('edit_fecha').value, direccion: document.getElementById('edit_direccion').value, tecnico: document.getElementById('edit_tecnico').value, numFactura: document.getElementById('edit_numFactura').value.toUpperCase(), lugarCompra: document.getElementById('edit_lugarCompra').value, priority: parseInt(document.getElementById('edit_priority').value) || 0, equipos: updatedEquipos
+                nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), telefono: document.getElementById('edit_telefono').value, email: document.getElementById('edit_email').value.toLowerCase(), cedula: document.getElementById('edit_cedula').value, fechaInstalacion: document.getElementById('edit_fecha').value, direccion: document.getElementById('edit_direccion').value, tecnico: document.getElementById('edit_tecnico').value, numFactura: document.getElementById('edit_numFactura').value.toUpperCase(), lugarCompra: document.getElementById('edit_lugarCompra').value, priority: parseInt(document.getElementById('edit_priority').value) || 0, equipos: updatedEquipos, accesoriosVendidos: updatedAccs
             }).then(() => { showMessage("✅ Actualizado", "fix-report"); closeEditModal(); }).catch(e => { showMessage("❌ Error", "fix-error"); });
         };
 
-        function rebuildEditAccessoriesInputs(vendidos) {
-            const container = document.getElementById('editAccesoriosContainer');
-            if(!container) return;
-            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(function(item){
-                const n = item[0]; const p = item[1];
-                const v = (vendidos || []).find(function(a){return a.nombre === n;}) || { cantidad: 0 };
-                return `<div class="flex justify-between items-center p-2 border-b"><span class="text-[8px] font-black">${n} ($${p.toFixed(2)})</span><input type="number" min="0" value="${v.cantidad}" data-name="${n}" data-price="${p}" class="edit-acc-qty w-10 text-center font-black text-xs border rounded"></div>`;
-            }).join('');
-        }
-
-        // --- FUNCIÓN DE GUARDADO PRINCIPAL (VERSION BLINDADA) ---
         window.saveVisit = function() {
             try {
                 const form = document.getElementById('visitForm');
                 const data = Object.fromEntries(new FormData(form));
                 const isWarranty = data.tipoServicioGlobal === 'Garantía';
-                
-                if(!data.nombreCliente || !data.callePrincipal) {
-                    showMessage("⚠️ Datos obligatorios faltantes", "fix-error");
-                    return;
-                }
-
+                if(!data.nombreCliente || !data.callePrincipal) { showMessage("⚠️ Datos obligatorios", "fix-error"); return; }
                 let eqs = [];
-                if (isWarranty) {
-                    const wEqSelect = document.getElementById('warrantyEquipmentSelect');
-                    const wEq = wEqSelect ? wEqSelect.value : "";
-                    eqs.push({ descProducto: wEq.toUpperCase(), costoBase: 0, codProducto: "", serieEquipo: "" });
-                } else {
-                    const num = parseInt(data.numEquipos) || 1;
-                    for(let i=1; i<=num; i++) { 
-                        const eqName = data["descProducto_" + i];
-                        if(eqName) {
-                            eqs.push({ descProducto: eqName.toUpperCase(), costoBase: parseFloat(data["costoEquipo_" + i]) || 0, codProducto: "", serieEquipo: "" }); 
-                        }
-                    }
-                }
-
+                if (isWarranty) eqs.push({ descProducto: document.getElementById('warrantyEquipmentSelect').value.toUpperCase(), costoBase: 0, codProducto: "", serieEquipo: "" });
+                else { const num = parseInt(data.numEquipos) || 1; for(let i=1; i<=num; i++) { const eqName = data["descProducto_" + i]; if(eqName) eqs.push({ descProducto: eqName.toUpperCase(), costoBase: parseFloat(data["costoEquipo_" + i]) || 0, codProducto: "", serieEquipo: "" }); } }
                 let accs = [];
-                document.querySelectorAll('.form-acc-qty').forEach(function(i) { 
-                    const q = parseInt(i.value) || 0; 
-                    if(q > 0) { 
-                        accs.push({ nombre: i.dataset.name, cantidad: q, precio: parseFloat(i.dataset.price) || 0 }); 
-                    } 
-                });
-                
-                const manualDesc = document.getElementById('manualAccDesc')?.value;
-                const manualPrice = parseFloat(document.getElementById('manualAccPrice')?.value) || 0;
-                if(manualDesc && manualPrice > 0) {
-                    accs.push({ nombre: manualDesc.toUpperCase(), cantidad: 1, precio: manualPrice });
-                }
-
-                const totalFinalStr = document.getElementById('displayTotalFinal').textContent.replace(/[^\d.]/g, '');
-                const totalFinal = parseFloat(totalFinalStr) || 0;
-
+                document.querySelectorAll('.form-acc-qty').forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) accs.push({ nombre: i.dataset.name, cantidad: q, precio: parseFloat(i.dataset.price) || 0 }); });
+                const totalFinal = parseFloat(document.getElementById('displayTotalFinal').textContent.replace(/[^\d.]/g, '')) || 0;
                 const ref = database.ref('visits').push();
-                ref.set({ 
-                    id: ref.key, 
-                    nombreCliente: data.nombreCliente.toUpperCase(), 
-                    telefono: data.telefono || '', 
-                    callePrincipal: data.callePrincipal.toUpperCase(), 
-                    numFactura: data.numFactura || '', 
-                    fechaInstalacion: document.getElementById('filterDateInput').value, 
-                    tecnico: data.tecnico || '', 
-                    tipoAtencion: data.tipoServicioGlobal, 
-                    estado: 'PENDIENTE', 
-                    createdAt: Date.now(), 
-                    equipos: eqs,
-                    accesoriosVendidos: accs,
-                    financiera: { totalCliente: totalFinal }, 
-                    priority: 0 
-                }).then(() => { 
-                    showMessage("🚀 AGENDADO CON ÉXITO", "fix-report"); 
-                    form.reset(); 
-                    expandEquipmentUI();
-                    renderInsumosAdmin();
-                }).catch(e => {
-                    console.error(e);
-                    showMessage("❌ ERROR AL GUARDAR", "fix-error");
-                });
-            } catch (err) {
-                console.error(err);
-                showMessage("❌ ERROR CRÍTICO", "fix-error");
-            }
+                ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), telefono: data.telefono || '', callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', fechaInstalacion: document.getElementById('filterDateInput').value, tecnico: data.tecnico || '', tipoAtencion: data.tipoServicioGlobal, estado: 'PENDIENTE', createdAt: Date.now(), equipos: eqs, accesoriosVendidos: accs, financiera: { totalCliente: totalFinal }, priority: 0 }).then(() => { showMessage("🚀 Agendado", "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
+            } catch (err) { showMessage("❌ Error Crítico", "fix-error"); }
         };
 
         function startSync() {
@@ -753,52 +656,21 @@
             database.ref('inventory_entries').on('value', snap => { inventoryEntries = snap.val() ? Object.values(snap.val()) : []; renderInventoryView(); });
         }
 
-        // --- FUNCIÓN DE MANTENIMIENTO ---
         window.saveMantenimiento = function() {
             try {
-                const form = document.getElementById('maintForm'); 
-                const data = Object.fromEntries(new FormData(form));
-                if(!data.mNombre || !data.mCalle) {
-                    showMessage("⚠️ Datos obligatorios faltantes", "fix-error");
-                    return;
-                }
-
+                const form = document.getElementById('maintForm'); const data = Object.fromEntries(new FormData(form));
+                if(!data.mNombre || !data.mCalle) { showMessage("⚠️ Datos obligatorios", "fix-error"); return; }
                 const ref = database.ref('visits').push();
-                ref.set({ 
-                    id: ref.key, 
-                    nombreCliente: data.mNombre.toUpperCase(), 
-                    telefono: data.mTelefono || '', 
-                    callePrincipal: data.mCalle.toUpperCase(), 
-                    mantenimientoEquipo: data.mEquipo.toUpperCase(), 
-                    tecnico: data.mTecnico || '', 
-                    tipoAtencion: "Mantenimiento", 
-                    estado: 'PENDIENTE', 
-                    createdAt: Date.now(), 
-                    fechaInstalacion: document.getElementById('maintScheduleDate').value, 
-                    esMantenimiento: true, 
-                    financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago || 'EFECTIVO' }, 
-                    priority: 999 
-                }).then(() => { 
-                    showMessage("✅ Mantenimiento Guardado", "fix-report"); 
-                    form.reset(); 
-                }).catch(e => {
-                    showMessage("❌ ERROR FIREBASE", "fix-error");
-                });
-            } catch (err) {
-                showMessage("❌ ERROR CRÍTICO", "fix-error");
-            }
+                ref.set({ id: ref.key, nombreCliente: data.mNombre.toUpperCase(), telefono: data.mTelefono || '', callePrincipal: data.mCalle.toUpperCase(), mantenimientoEquipo: data.mEquipo.toUpperCase(), tecnico: data.mTecnico || '', tipoAtencion: "Mantenimiento", estado: 'PENDIENTE', createdAt: Date.now(), fechaInstalacion: document.getElementById('maintScheduleDate').value, esMantenimiento: true, financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago || 'EFECTIVO' }, priority: 999 }).then(() => { showMessage("✅ Mantenimiento Guardado", "fix-report"); form.reset(); });
+            } catch (err) { showMessage("❌ Error", "fix-error"); }
         };
 
         window.saveInventoryEntry = function() {
             const acc = document.getElementById('invAccSelect').value;
-            const qtyInput = document.getElementById('invQty');
-            const qty = parseInt(qtyInput ? qtyInput.value : 0) || 0;
+            const qty = parseInt(document.getElementById('invQty').value) || 0;
             if (qty <= 0) return showMessage("⚠️ Ingrese cantidad", "fix-accent");
             const ref = database.ref('inventory_entries').push();
-            ref.set({ accesorio: acc, cantidad: qty, fecha: Date.now() }).then(() => {
-                if(qtyInput) qtyInput.value = '';
-                showMessage("✅ Ingreso Registrado", "fix-report");
-            });
+            ref.set({ accesorio: acc, cantidad: qty, fecha: Date.now() }).then(() => { document.getElementById('invQty').value = ''; showMessage("✅ Ingreso Registrado", "fix-report"); });
         };
 
         window.openEditFinanceModal = function(id, source, currentMonto, concepto) {
@@ -826,10 +698,7 @@
             const tech = document.getElementById('movTecnico').value;
             if(!c || isNaN(m)) return showMessage("⚠️ Incompleto", "fix-accent");
             const ref = database.ref('movements').push();
-            ref.set({ id: ref.key, concepto: c.toUpperCase(), monto: m, fecha: Date.now(), type: t, formaPago: p, tecnico: tech || 'ADMIN' }).then(() => {
-                document.getElementById('movConcepto').value=''; document.getElementById('movMonto').value='';
-                showMessage("✅ Manual Guardado", "fix-report");
-            });
+            ref.set({ id: ref.key, concepto: c.toUpperCase(), monto: m, fecha: Date.now(), type: t, formaPago: p, tecnico: tech || 'ADMIN' }).then(() => { document.getElementById('movConcepto').value=''; document.getElementById('movMonto').value=''; showMessage("✅ Manual Guardado", "fix-report"); });
         };
 
         function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
@@ -838,27 +707,14 @@
         document.addEventListener('DOMContentLoaded', function() {
             const hoy = new Date().toISOString().split('T')[0];
             ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'cajaDateStart', 'cajaDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoy; });
-            
             const p = new URLSearchParams(window.location.search); 
             const t = p.get('tech');
-            if(t && LISTA_TECNICOS.indexOf(t) !== -1) { 
-                currentTechUser = t; 
-                document.body.classList.add('technician-mode'); 
-                document.getElementById('userDisplayLabel').textContent = "RUTA: " + t.toUpperCase(); 
-                document.getElementById('adminNav').classList.add('hidden'); 
-                changeMasterView('rutero'); 
-            } 
-
+            if(t && LISTA_TECNICOS.indexOf(t) !== -1) { currentTechUser = t; document.body.classList.add('technician-mode'); document.getElementById('userDisplayLabel').textContent = "RUTA: " + t.toUpperCase(); document.getElementById('adminNav').classList.add('hidden'); changeMasterView('rutero'); } 
             startSync();
             LISTA_TECNICOS.forEach(item => { ['selectTecnico', 'ruteroTechFilter', 'selectTecnicoMaint', 'edit_tecnico', 'movTecnico', 'cajaTechFilter', 'pendingTechFilter'].forEach(id => { const el = document.getElementById(id); if(el) el.add(new Option(item || (id === 'cajaTechFilter' ? "TODOS LOS TÉCNICOS" : "--- TÉCNICO ---"), item)); }); });
-            
             const elLugar = document.getElementById('selectLugar');
             const elLugarEdit = document.getElementById('edit_lugarCompra');
-            LUGARES_COMPRA.forEach(i => {
-                if(elLugar) elLugar.add(new Option(i || "--- LUGAR COMPRA ---", i));
-                if(elLugarEdit) elLugarEdit.add(new Option(i || "--- LUGAR COMPRA ---", i));
-            });
-
+            LUGARES_COMPRA.forEach(i => { if(elLugar) elLugar.add(new Option(i || "--- LUGAR COMPRA ---", i)); if(elLugarEdit) elLugarEdit.add(new Option(i || "--- LUGAR COMPRA ---", i)); });
             renderInsumosAdmin(); expandEquipmentUI();
         });
     </script>
@@ -871,7 +727,7 @@
         <header class="mb-4 sm:mb-10 flex flex-col xl:flex-row justify-between items-center gap-2 no-print">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
-                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.6.7</span></div></div>
+                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.6.9</span></div></div>
             </div>
             <!-- MENU ADMIN -->
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
@@ -965,7 +821,7 @@
 
             <!-- INVENTARIO (ADMIN ONLY) -->
             <div id="inventoryView" class="hidden lg:col-span-3 space-y-6 admin-only">
-                <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50 font-black italic uppercase"><h2 class="text-xl font-black uppercase mb-6 border-b-4 border-fix-report pb-2 font-sans italic text-fix-report">CONTROL DE INVENTARIO Y STOCK</h2><div class="bg-slate-50 p-6 rounded-2xl mb-8 flex flex-wrap gap-4 items-end border border-slate-200"><div class="flex-grow"><label class="text-[8px] ml-2">ACCESORIO / INSUMO</label><select id="invAccSelect" class="w-full p-3 bg-white rounded-xl border font-black text-xs uppercase"></select></div><div class="w-32"><label class="text-[8px] ml-2">CANTIDAD ENTRADA</label><input type="number" id="invQty" placeholder="0" class="w-full p-3 bg-white rounded-xl border text-center font-black font-mono"></div><button onclick="saveInventoryEntry()" class="bg-fix-report text-white px-8 py-3 rounded-xl font-black text-xs shadow-lg active:scale-95 transition-all italic">💾 REGISTRAR INGRESO</button></div><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-sans underline italic">BALANCE GENERAL DE INSUMOS</h3><button onclick="downloadInventoryCSV()" class="bg-slate-800 text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic">📊 EXPORTAR STOCK</button></div><div class="overflow-x-auto border-2 border-slate-50 rounded-xl"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-900 text-white text-[8px] uppercase"><th class="text-left">Nombre del Insumo</th><th>Total Entradas</th><th>Utilizado</th><th>Stock Disponible</th><th class="text-right">PVP Estimado</th></tr></thead><tbody id="inventoryTableBody" class="font-bold"></tbody></table></div></div>
+                <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50 font-black italic uppercase"><h2 class="text-xl font-black uppercase mb-6 border-b-4 border-fix-report pb-2 font-sans italic text-fix-report">CONTROL DE INVENTARIO Y STOCK</h2><div class="bg-slate-50 p-6 rounded-2xl mb-8 flex flex-wrap gap-4 items-end border border-slate-200"><div class="flex-grow"><label class="text-[8px] ml-2">ACCESORIO / INSUMO</label><select id="invAccSelect" class="w-full p-3 bg-white rounded-xl border font-black text-xs uppercase"></select></div><div class="w-32"><label class="text-[8px] ml-2">CANTIDAD ENTRADA</label><input type="number" id="invQty" placeholder="0" class="w-full p-3 bg-white rounded-xl border text-center font-black font-mono"></div><button onclick="saveInventoryEntry()" class="bg-fix-report text-white px-8 py-3 rounded-xl font-black text-xs shadow-lg active:scale-95 transition-all italic">💾 REGISTRAR INGRESO</button></div><div class="overflow-x-auto border-2 border-slate-50 rounded-xl"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-900 text-white text-[8px] uppercase"><th class="text-left">Nombre del Insumo</th><th>Total Entradas</th><th>Utilizado</th><th>Stock Disponible</th><th class="text-right">PVP Estimado</th></tr></thead><tbody id="inventoryTableBody" class="font-bold"></tbody></table></div></div>
             </div>
 
             <!-- LOGÍSTICA (PARA TODOS) -->
@@ -997,11 +853,54 @@
         </div>
     </div>
 
-    <!-- MODALES EXISTENTES -->
+    <!-- MODAL DE EDICIÓN ADMINISTRATIVA (REPARADO Y COMPLETADO) -->
     <div id="editModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 font-black admin-only">
-        <div class="bg-white w-full max-w-3xl rounded-[2rem] shadow-2xl p-8 font-black italic border-[6px] border-slate-50 uppercase overflow-y-auto max-h-[95vh]"><div class="flex justify-between items-start mb-6 border-b-2 pb-2"><h2 class="text-xl font-black uppercase text-fix-blue italic">CORRECCIÓN Y REGISTRO</h2><button onclick="closeEditModal()" class="text-slate-300 hover:text-fix-error">✕</button></div><input type="hidden" id="edit_id"><div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100"><div><label class="text-[7px] text-slate-400">NOMBRE CLIENTE</label><input type="text" id="edit_nombre" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div><div><label class="text-[7px] text-slate-400">TELÉFONO</label><input type="text" id="edit_telefono" class="w-full p-2 bg-white rounded-lg border font-mono font-black text-xs"></div><div><label class="text-[7px] text-slate-400">CÉDULA</label><input type="text" id="edit_cedula" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div><div><label class="text-[7px] text-slate-400">CORREO</label><input type="email" id="edit_email" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div><div><label class="text-[7px] text-slate-400">FECHA</label><input type="date" id="edit_fecha" class="w-full p-2 bg-white rounded-lg border font-black text-xs font-mono"></div><div><label class="text-[7px] text-slate-400">TÉCNICO</label><select id="edit_tecnico" class="w-full p-2 bg-white rounded-lg border font-black text-[10px]"></select></div><div class="md:col-span-3"><label class="text-[7px] text-slate-400 ml-2">DIRECCIÓN / GPS</label><input type="text" id="edit_direccion" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div></div><div id="editEquiposContainer" class="space-y-4"></div><div class="grid grid-cols-2 gap-4 mt-6"><button onclick="saveEditChanges()" class="bg-fix-report text-white py-4 rounded-2xl font-black shadow-xl">💾 GUARDAR</button><button onclick="closeEditModal()" class="bg-slate-200 text-slate-600 py-4 rounded-2xl font-black">DESCARTAR</button></div></div>
+        <div class="bg-white w-full max-w-3xl rounded-[2rem] shadow-2xl p-8 font-black italic border-[6px] border-slate-50 uppercase overflow-y-auto max-h-[95vh]">
+            <div class="flex justify-between items-start mb-6 border-b-2 pb-2">
+                <h2 class="text-xl font-black uppercase text-fix-blue italic tracking-tighter">Corregir Datos del Cliente</h2>
+                <button onclick="closeEditModal()" class="text-slate-300 hover:text-fix-error text-2xl">✕</button>
+            </div>
+            
+            <input type="hidden" id="edit_id">
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div class="md:col-span-3 text-[10px] text-fix-blue font-black mb-1 italic underline">Información de contacto</div>
+                <div><label class="text-[7px] text-slate-400 ml-2">NOMBRE CLIENTE</label><input type="text" id="edit_nombre" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
+                <div><label class="text-[7px] text-slate-400 ml-2">TELÉFONO</label><input type="text" id="edit_telefono" class="w-full p-2 bg-white rounded-lg border font-mono font-black text-xs"></div>
+                <div><label class="text-[7px] text-slate-400 ml-2">CÉDULA</label><input type="text" id="edit_cedula" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
+                <div><label class="text-[7px] text-slate-400 ml-2">CORREO</label><input type="email" id="edit_email" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
+                
+                <div class="md:col-span-3 text-[10px] text-fix-blue font-black mt-2 mb-1 italic underline">Logística y Venta</div>
+                <div><label class="text-[7px] text-slate-400 ml-2">N° FACTURA COMPRA</label><input type="text" id="edit_numFactura" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
+                <div><label class="text-[7px] text-slate-400 ml-2">LUGAR COMPRA</label><select id="edit_lugarCompra" class="w-full p-2 bg-white rounded-lg border font-black text-[10px] uppercase"></select></div>
+                <div><label class="text-[7px] text-slate-400 ml-2">FECHA ATENCIÓN</label><input type="date" id="edit_fecha" class="w-full p-2 bg-white rounded-lg border font-black text-xs font-mono"></div>
+                <div><label class="text-[7px] text-slate-400 ml-2">TÉCNICO</label><select id="edit_tecnico" class="w-full p-2 bg-white rounded-lg border font-black text-[10px]"></select></div>
+                <div><label class="text-[7px] text-slate-400 ml-2">PRIORIDAD (RUTA)</label><input type="number" id="edit_priority" class="w-full p-2 bg-yellow-50 rounded-lg border font-black text-xs font-mono"></div>
+                
+                <div class="md:col-span-3"><label class="text-[7px] text-slate-400 ml-2">LINK GPS / DIRECCIÓN</label><input type="text" id="edit_direccion" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
+            </div>
+
+            <div class="p-4 bg-blue-50/50 border border-blue-100 rounded-3xl mb-6">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-xs font-black text-fix-blue uppercase underline italic">Equipos registrados</h3>
+                    <div class="flex items-center gap-2 bg-white px-2 py-1 rounded-full shadow-sm border"><label class="text-[8px] font-black">CANTIDAD:</label><input type="number" id="edit_numEquipos" min="1" oninput="rebuildEditEquipmentInputs([])" class="w-8 text-center bg-transparent font-black text-xs outline-none"></div>
+                </div>
+                <div id="editEquiposContainer" class="space-y-3"></div>
+            </div>
+
+            <div class="p-4 bg-slate-100 rounded-2xl mb-6">
+                <h3 class="text-[10px] font-black text-fix-report mb-2 uppercase italic underline">Insumos y accesorios</h3>
+                <div id="editAccesoriosContainer" class="grid grid-cols-1 md:grid-cols-2 gap-x-4"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 sticky bottom-0 bg-white pt-4 border-t-2 border-dashed">
+                <button onclick="saveEditChanges()" class="bg-fix-report text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all text-lg tracking-tighter uppercase italic">💾 Guardar Cambios</button>
+                <button onclick="closeEditModal()" class="bg-slate-200 text-slate-600 py-4 rounded-2xl font-black uppercase italic">Descartar</button>
+            </div>
+        </div>
     </div>
 
+    <!-- MODAL AJUSTE FINANCIERO (ADMIN ONLY) -->
     <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 admin-only"><div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic"><h2 class="text-xl font-black uppercase text-fix-blue mb-4 border-b-2 pb-2">VALOR REAL</h2><input type="hidden" id="finance_id"><input type="hidden" id="finance_source"><div class="space-y-4"><input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs"><input type="number" step="0.01" id="finance_monto" class="w-full p-3 bg-yellow-50 rounded-xl border font-mono font-black text-xl text-right"></div><div class="grid grid-cols-2 gap-3 mt-6"><button onclick="saveFinanceAdjustment()" class="bg-fix-report text-white py-3 rounded-xl font-black shadow-lg">💾 AJUSTAR</button><button onclick="closeEditFinanceModal()" class="bg-slate-200 text-slate-600 py-3 rounded-xl font-black">SALIR</button></div></div></div>
 
     <button onclick="refreshData()" class="btn-refresh-float no-print" title="Actualizar"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></button>
