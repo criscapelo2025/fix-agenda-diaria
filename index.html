@@ -34,6 +34,7 @@
         .currency-input { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; }
         @media print { .no-print { display: none !important; } }
         
+        /* SEGURIDAD TÉCNICA: Ocultar todo lo que sea admin-only si el body tiene technician-mode */
         body.technician-mode .admin-only { display: none !important; }
         body.technician-mode header { margin-bottom: 0.5rem !important; padding-top: 0.5rem !important; }
         
@@ -145,7 +146,6 @@
             });
         }
 
-        // --- FUNCIÓN DE PRIORIDAD ---
         window.movePriority = function(id, direction) {
             const date = document.getElementById('filterDateInputRutero').value;
             const tech = currentTechUser || document.getElementById('ruteroTechFilter').value;
@@ -299,6 +299,12 @@
         }
 
         function changeMasterView(view) {
+            // SEGURIDAD JS: Los técnicos solo pueden estar en 'rutero'
+            if (currentTechUser && view !== 'rutero') {
+                showMessage("🔒 ACCESO RESTRINGIDO", "fix-error");
+                return;
+            }
+
             currentView = view;
             const sections = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView'];
             sections.forEach(function(id) { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
@@ -395,7 +401,6 @@
             }).join('');
         }
 
-        // --- VISTA DE SEGUIMIENTO DE PENDIENTES ---
         function renderPendientes() {
             const container = document.getElementById('pendientesList'); if(!container) return;
             const techFilter = document.getElementById('pendingTechFilter').value;
@@ -413,7 +418,6 @@
             }).join('');
         }
 
-        // --- FUNCIONES DE MANTENIMIENTO ---
         function renderReporteMantenimiento() {
             const body = document.getElementById('mantenimientoReporteBody'); if(!body) return;
             const start = document.getElementById('maintBalanceStart')?.value;
@@ -438,7 +442,6 @@
             if(document.getElementById('maintTotalGeneral')) document.getElementById('maintTotalGeneral').textContent = "$" + (cash + trans).toFixed(2);
         }
 
-        // --- FUNCIONES DE EXPORTACIÓN ---
         function downloadCSV() {
             const start = document.getElementById('maestroDateStart').value || "HISTORICO";
             let csv = "NRO,FECHA DE EMISION,LUGAR DE COMPRA,FACTURA,CODIGO,DESCRIPCION,SERIE,SAP,TECNICO,CIUDAD,FECHA ATENCION,CLIENTE,CALLE,TELEFONO,PRECIO,LLEGADA INFO,TECNICO QUE ATENDIO,VIATICO,FACTURA REP,CEDULA,CORREO\n";
@@ -539,7 +542,7 @@
             container.innerHTML = '';
             for(let i=0; i<count; i++) {
                 const eq = equipos[i] || { descProducto: "", costoBase: unitPrice, codProducto: "", serieEquipo: "" };
-                container.innerHTML += `<div class="p-3 border rounded-xl bg-slate-50 mb-3 shadow-sm"><p class="text-[9px] font-black mb-2 text-fix-blue">EQUIPO ${i+1}</p><div class="grid grid-cols-1 gap-2"><select class="edit-eq-select w-full p-2 text-[10px] font-black uppercase rounded border"><option value="">-- ELEGIR PRODUCTO --</option>${TIPOS_EQUIPO.map(t=>`<option value="${t}" ${eq.descProducto === t ? 'selected' : ''}>${t}</option>`).join('')}</select><div class="grid grid-cols-2 gap-2"><div><label class="text-[7px] text-slate-400">CÓDIGO SAP</label><input type="text" class="edit-eq-code w-full p-2 text-[10px] font-black rounded border" value="${eq.codProducto || ''}"></div><div><label class="text-[7px] text-slate-400">NÚMERO SERIE</label><input type="text" class="edit-eq-serie w-full p-2 text-[10px] font-black rounded border" value="${eq.serieEquipo || ''}"></div></div><div><label class="text-[7px] text-slate-400">VALOR MO $</label><input type="number" step="0.01" value="${(eq.costoBase || 0).toFixed(2)}" class="edit-eq-cost w-full p-2 text-[10px] font-mono font-black rounded border"></div></div></div>`;
+                container.innerHTML += `<div class="p-3 border rounded-xl bg-slate-50 mb-3 shadow-sm"><p class="text-[9px] font-black mb-2 text-fix-blue">EQUIPO ${i+1}</p><div class="grid grid-cols-1 gap-2"><select class="edit-eq-select w-full p-2 text-[10px] font-black uppercase rounded border" onchange="updateEditPrice(this, ${i})"><option value="">-- ELEGIR PRODUCTO --</option>${TIPOS_EQUIPO.map(t=>`<option value="${t}" ${eq.descProducto === t ? 'selected' : ''}>${t}</option>`).join('')}</select><div class="grid grid-cols-2 gap-2"><div><label class="text-[7px] text-slate-400">CÓDIGO SAP</label><input type="text" class="edit-eq-code w-full p-2 text-[10px] font-black rounded border" value="${eq.codProducto || ''}"></div><div><label class="text-[7px] text-slate-400">NÚMERO SERIE</label><input type="text" class="edit-eq-serie w-full p-2 text-[10px] font-black rounded border" value="${eq.serieEquipo || ''}"></div></div><div><label class="text-[7px] text-slate-400">VALOR MO $</label><input type="number" step="0.01" value="${(eq.costoBase || 0).toFixed(2)}" class="edit-eq-cost w-full p-2 text-[10px] font-mono font-black rounded border"></div></div></div>`;
             }
         }
 
@@ -662,7 +665,7 @@
         <header class="mb-4 sm:mb-10 flex flex-col xl:flex-row justify-between items-center gap-2 no-print">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
-                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.6.3</span></div></div>
+                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.6.4</span></div></div>
             </div>
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
                 <button onclick="changeMasterView('reporte_admin')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-fix-blue text-white italic">Registro</button>
@@ -677,7 +680,7 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
             
-            <!-- FORMULARIO PRINCIPAL -->
+            <!-- FORMULARIO PRINCIPAL (ADMIN ONLY) -->
             <div id="formContainer" class="lg:col-span-2 space-y-4 admin-only no-print">
                 <div class="bg-white p-4 rounded-3xl shadow-lg"><input type="date" id="filterDateInput" onchange="syncDates('filterDateInput')" class="bg-slate-50 p-3 rounded-xl text-xl font-black italic text-fix-blue outline-none border-none shadow-inner w-full text-center font-mono"></div>
                 <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50">
@@ -693,7 +696,7 @@
                 </div>
             </div>
 
-            <!-- AGENDA LOCAL -->
+            <!-- AGENDA LOCAL (ADMIN ONLY) -->
             <div id="agendaContainer" class="lg:col-span-1 admin-only uppercase font-black">
                 <h2 class="text-xl font-black uppercase italic mb-4 border-b-4 border-fix-blue text-slate-800 text-center font-sans italic">Agenda Local</h2>
                 <div class="mb-4 relative font-black">
@@ -702,11 +705,11 @@
                 <div id="visitsList" class="space-y-3 max-h-[700px] overflow-y-auto pr-2"></div>
             </div>
 
-            <!-- VISTA DE PENDIENTES (SEGUIMIENTO) -->
-            <div id="pendientesView" class="hidden lg:col-span-3 space-y-6">
+            <!-- VISTA DE PENDIENTES (SEGUIMIENTO - ADMIN ONLY) -->
+            <div id="pendientesView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-fix-pending/10">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                        <h2 class="text-xl font-black uppercase italic font-sans italic underline text-fix-pending tracking-tighter">Seguimiento de Pendientes y No Atendidos</h2>
+                        <h2 class="text-xl font-black uppercase italic font-sans italic underline text-fix-pending tracking-tighter">Seguimiento de Pendientes</h2>
                         <div class="flex flex-wrap gap-2 w-full md:w-auto">
                             <select id="pendingTypeFilter" onchange="renderPendientes()" class="p-2 bg-slate-50 border rounded text-[10px] font-black uppercase">
                                 <option value="TODOS">TODOS LOS CASOS</option>
@@ -720,8 +723,8 @@
                 </div>
             </div>
 
-            <!-- VISTA MANTENIMIENTOS -->
-            <div id="mantenimientoView" class="hidden lg:col-span-3 space-y-6">
+            <!-- VISTA MANTENIMIENTOS (ADMIN ONLY) -->
+            <div id="mantenimientoView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="bg-white p-4 rounded-3xl shadow-lg border-[4px] border-fix-accent/20">
                     <p class="text-[8px] font-black text-fix-accent mb-1 ml-2 italic underline">📅 AGENDAR FECHA PARA MANTENIMIENTO:</p>
                     <input type="date" id="maintScheduleDate" class="bg-slate-50 p-3 rounded-xl text-xl font-black italic text-fix-accent outline-none border-none shadow-inner w-full text-center font-mono">
@@ -753,31 +756,31 @@
                 </div>
             </div>
 
-            <!-- INVENTARIO -->
-            <div id="inventoryView" class="hidden lg:col-span-3 space-y-6">
+            <!-- INVENTARIO (ADMIN ONLY) -->
+            <div id="inventoryView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50 font-black italic uppercase"><h2 class="text-xl font-black uppercase mb-6 border-b-4 border-fix-report pb-2 font-sans italic text-fix-report">CONTROL DE INVENTARIO Y STOCK</h2><div class="bg-slate-50 p-6 rounded-2xl mb-8 flex flex-wrap gap-4 items-end border border-slate-200"><div class="flex-grow"><label class="text-[8px] ml-2">ACCESORIO / INSUMO</label><select id="invAccSelect" class="w-full p-3 bg-white rounded-xl border font-black text-xs uppercase"></select></div><div class="w-32"><label class="text-[8px] ml-2">CANTIDAD ENTRADA</label><input type="number" id="invQty" placeholder="0" class="w-full p-3 bg-white rounded-xl border text-center font-black font-mono"></div><button onclick="saveInventoryEntry()" class="bg-fix-report text-white px-8 py-3 rounded-xl font-black text-xs shadow-lg active:scale-95 transition-all italic">💾 REGISTRAR INGRESO</button></div><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-sans underline italic">BALANCE GENERAL DE INSUMOS</h3><button onclick="downloadInventoryCSV()" class="bg-slate-800 text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic">📊 EXPORTAR STOCK</button></div><div class="overflow-x-auto border-2 border-slate-50 rounded-xl"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-900 text-white text-[8px] uppercase"><th class="text-left">Nombre del Insumo</th><th>Total Entradas</th><th>Utilizado</th><th>Stock Disponible</th><th class="text-right">PVP Estimado</th></tr></thead><tbody id="inventoryTableBody" class="font-bold"></tbody></table></div></div>
             </div>
 
-            <!-- LOGÍSTICA -->
+            <!-- LOGÍSTICA (VISIBLE PARA TODOS) -->
             <div id="ruteroView" class="hidden lg:col-span-3 bg-white p-4 rounded-[2rem] shadow-xl">
                 <div class="flex flex-col md:flex-row justify-between items-center mb-4 px-2 gap-2"><h2 class="text-sm font-black uppercase italic font-sans">Logística Diaria</h2><div class="flex gap-2 w-full md:w-auto"><select id="ruteroTechFilter" onchange="renderRutero()" class="admin-only flex-grow p-1.5 bg-slate-100 rounded-lg text-[9px] font-black outline-none border-none italic uppercase"></select><input type="date" id="filterDateInputRutero" onchange="syncDates('filterDateInputRutero')" class="p-1.5 rounded-lg text-xs font-black italic text-fix-blue outline-none shadow-sm border font-mono"></div></div><div class="overflow-x-auto w-full border-2 border-slate-50 rounded-2xl shadow-inner font-black uppercase"><table class="w-full border-collapse rutero-table"><thead><tr class="bg-slate-900 text-white text-[7px] uppercase"><th class="w-12">Hora</th><th class="text-left w-32">Cliente</th><th class="text-left w-40">Calle Principal</th><th class="w-20">Servicio</th><th class="w-10">Téc</th><th class="w-16">Estado</th><th class="w-24">Mapa</th><th class="w-32">Contacto</th><th class="w-10 admin-only">Adm</th></tr></thead><tbody id="ruteroListBody" class="uppercase italic font-black"></tbody></table></div>
             </div>
 
-            <!-- MAESTRO -->
-            <div id="reporteTekaView" class="hidden lg:col-span-3 bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase"><div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6"><div><h2 class="text-lg font-black uppercase italic font-sans italic underline text-fix-blue">Maestro SAP</h2><div class="flex gap-2 mt-2 font-black"><input type="date" id="maestroDateStart" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black"><input type="date" id="maestroDateEnd" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black"><button onclick="renderReporteTeka()" class="bg-fix-blue text-white px-2 rounded text-[10px]">VER</button></div></div><button onclick="downloadCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic">📊 DESCARGAR SAP FINAL</button></div><div class="overflow-x-auto border-2 border-slate-50 rounded-xl"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-900 text-white text-[7px] uppercase"><th class="bg-slate-800">NRO</th><th>FECHA DE EMISIÓN</th><th>LUGAR DE COMPRA</th><th>FACTURA</th><th>CÓDIGO</th><th>DESCRIPCIÓN</th><th>SERIE</th><th>SAP</th><th>TÉCNICO</th><th>CIUDAD</th><th>FECHA ATENCIÓN</th><th>CLIENTE</th><th>CALLE</th><th>TELÉFONO</th><th>PRECIO</th><th>LLEGADA INFO</th><th>TÉCNICO ATENDIÓ</th><th>VIÁTICO</th><th>FACTURA REP</th><th>CÉDULA</th><th>CORREO</th><th>X</th></tr></thead><tbody id="tekaReporteBody" class="uppercase font-bold"></tbody></table></div></div>
+            <!-- MAESTRO (ADMIN ONLY) -->
+            <div id="reporteTekaView" class="hidden lg:col-span-3 bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase admin-only"><div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6"><div><h2 class="text-lg font-black uppercase italic font-sans italic underline text-fix-blue">Maestro SAP</h2><div class="flex gap-2 mt-2 font-black"><input type="date" id="maestroDateStart" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black"><input type="date" id="maestroDateEnd" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black"><button onclick="renderReporteTeka()" class="bg-fix-blue text-white px-2 rounded text-[10px]">VER</button></div></div><button onclick="downloadCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic">📊 DESCARGAR SAP FINAL</button></div><div class="overflow-x-auto border-2 border-slate-50 rounded-xl"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-900 text-white text-[7px] uppercase"><th class="bg-slate-800">NRO</th><th>FECHA DE EMISIÓN</th><th>LUGAR DE COMPRA</th><th>FACTURA</th><th>CÓDIGO</th><th>DESCRIPCIÓN</th><th>SERIE</th><th>SAP</th><th>TÉCNICO</th><th>CIUDAD</th><th>FECHA ATENCIÓN</th><th>CLIENTE</th><th>CALLE</th><th>TELÉFONO</th><th>PRECIO</th><th>LLEGADA INFO</th><th>TÉCNICO ATENDIÓ</th><th>VIÁTICO</th><th>FACTURA REP</th><th>CÉDULA</th><th>CORREO</th><th>X</th></tr></thead><tbody id="tekaReporteBody" class="uppercase font-bold"></tbody></table></div></div>
 
-            <!-- CAJA -->
-            <div id="contabilidadView" class="hidden lg:col-span-3 space-y-6"><div class="bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase"><div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6"><div><h2 class="text-lg font-black uppercase underline font-sans italic">CONTABILIDAD Y CAJA</h2><div class="flex flex-wrap gap-2 mt-2 font-black"><input type="date" id="cajaDateStart" class="bg-slate-50 p-1 rounded text-[10px] border font-black"><input type="date" id="cajaDateEnd" class="bg-slate-50 p-1 rounded text-[10px] border font-black"><select id="cajaTechFilter" onchange="processFinancialBalance()" class="bg-slate-50 p-1 rounded text-[10px] border font-black"></select><button onclick="downloadCajaCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic ml-4">📊 EXPORTAR CAJA</button></div></div></div><div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6 text-center italic font-black"><div class="p-3 bg-green-50 rounded-xl border border-green-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">INGRESOS (EFECTIVO)</span><div id="totalEfectivoDisplay" class="text-lg font-black text-green-700">$0.00</div></div><div class="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">EGRESOS / GASTOS</span><div id="totalEgresosDisplay" class="text-lg font-black text-red-700">$0.00</div></div><div class="p-3 bg-slate-900 rounded-xl text-white shadow-xl col-span-2 md:col-span-1 flex flex-col justify-center border-2 border-fix-accent"><span class="text-[8px] uppercase text-fix-accent">SALDO NETO (CASH)</span><div id="balanceNetoDisplay" class="text-xl font-black text-fix-accent">$0.00</div></div><div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center opacity-80"><span class="text-[8px] uppercase text-slate-500">BANCO (TRANSFER.)</span><div id="totalTransferDisplay" class="text-lg font-black text-blue-700">$0.00</div></div><div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-60"><span class="text-[8px] uppercase text-slate-500">VENTA TOTAL PERIODO</span><div id="totalIngresosDisplay" class="text-lg font-black text-slate-600">$0.00</div></div></div><div class="overflow-x-auto rounded-xl border border-slate-100"><table class="w-full text-left admin-table font-mono"><thead><tr class="text-[9px] uppercase"><th>FECHA/TÉCNICO</th><th>TIPO/PAGO</th><th>DETALLE</th><th class="text-right">MONTO</th><th class="text-center">X</th></tr></thead><tbody id="contabilidadTableBody"></tbody></table></div></div>
+            <!-- CAJA (ADMIN ONLY) -->
+            <div id="contabilidadView" class="hidden lg:col-span-3 space-y-6 admin-only"><div class="bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase"><div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6"><div><h2 class="text-lg font-black uppercase underline font-sans italic">CONTABILIDAD Y CAJA</h2><div class="flex flex-wrap gap-2 mt-2 font-black"><input type="date" id="cajaDateStart" class="bg-slate-50 p-1 rounded text-[10px] border font-black"><input type="date" id="cajaDateEnd" class="bg-slate-50 p-1 rounded text-[10px] border font-black"><select id="cajaTechFilter" onchange="processFinancialBalance()" class="bg-slate-50 p-1 rounded text-[10px] border font-black"></select><button onclick="downloadCajaCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic ml-4">📊 EXPORTAR CAJA</button></div></div></div><div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6 text-center italic font-black"><div class="p-3 bg-green-50 rounded-xl border border-green-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">INGRESOS (EFECTIVO)</span><div id="totalEfectivoDisplay" class="text-lg font-black text-green-700">$0.00</div></div><div class="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">EGRESOS / GASTOS</span><div id="totalEgresosDisplay" class="text-lg font-black text-red-700">$0.00</div></div><div class="p-3 bg-slate-900 rounded-xl text-white shadow-xl col-span-2 md:col-span-1 flex flex-col justify-center border-2 border-fix-accent"><span class="text-[8px] uppercase text-fix-accent">SALDO NETO (CASH)</span><div id="balanceNetoDisplay" class="text-xl font-black text-fix-accent">$0.00</div></div><div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center opacity-80"><span class="text-[8px] uppercase text-slate-500">BANCO (TRANSFER.)</span><div id="totalTransferDisplay" class="text-lg font-black text-blue-700">$0.00</div></div><div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-60"><span class="text-[8px] uppercase text-slate-500">VENTA TOTAL PERIODO</span><div id="totalIngresosDisplay" class="text-lg font-black text-slate-600">$0.00</div></div></div><div class="overflow-x-auto rounded-xl border border-slate-100"><table class="w-full text-left admin-table font-mono"><thead><tr class="text-[9px] uppercase"><th>FECHA/TÉCNICO</th><th>TIPO/PAGO</th><th>DETALLE</th><th class="text-right">MONTO</th><th class="text-center">X</th></tr></thead><tbody id="contabilidadTableBody"></tbody></table></div></div>
         </div>
     </div>
 
-    <!-- MODAL DE EDICIÓN -->
-    <div id="editModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 font-black">
+    <!-- MODAL DE EDICIÓN ADMINISTRATIVA (ADMIN ONLY) -->
+    <div id="editModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 font-black admin-only">
         <div class="bg-white w-full max-w-3xl rounded-[2rem] shadow-2xl p-8 font-black italic border-[6px] border-slate-50 uppercase overflow-y-auto max-h-[95vh]"><div class="flex justify-between items-start mb-6 border-b-2 pb-2"><h2 class="text-xl font-black uppercase text-fix-blue italic">CORRECCIÓN Y REGISTRO DE SERIES</h2><button onclick="closeEditModal()" class="text-slate-300 hover:text-fix-error">✕</button></div><input type="hidden" id="edit_id"><div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100"><div class="md:col-span-3 text-[10px] text-fix-blue font-black mb-2 underline italic">DATOS GENERALES DEL CLIENTE</div><div><label class="text-[7px] text-slate-400 ml-2">NOMBRE CLIENTE</label><input type="text" id="edit_nombre" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div><div><label class="text-[7px] text-slate-400 ml-2">TELÉFONO</label><input type="text" id="edit_telefono" class="w-full p-2 bg-white rounded-lg border font-mono font-black text-xs"></div><div><label class="text-[7px] text-slate-400 ml-2">CÉDULA</label><input type="text" id="edit_cedula" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div><div><label class="text-[7px] text-slate-400 ml-2">CORREO</label><input type="email" id="edit_email" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div><div><label class="text-[7px] text-slate-400 ml-2">N° FACTURA COMPRA</label><input type="text" id="edit_numFactura" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div><div><label class="text-[7px] text-slate-400 ml-2">LUGAR COMPRA</label><select id="edit_lugarCompra" class="w-full p-2 bg-white rounded-lg border font-black text-[10px]"></select></div><div><label class="text-[7px] text-slate-400 ml-2">FECHA ATENCIÓN</label><input type="date" id="edit_fecha" class="w-full p-2 bg-white rounded-lg border font-black text-xs font-mono"></div><div><label class="text-[7px] text-slate-400 ml-2">TÉCNICO ASIGNADO</label><select id="edit_tecnico" class="w-full p-2 bg-white rounded-lg border font-black text-[10px]"></select></div><div><label class="text-[7px] text-slate-400 ml-2">ORDEN/PRIORIDAD</label><input type="number" id="edit_priority" class="w-full p-2 bg-yellow-50 rounded-lg border font-black text-xs font-mono"></div><div class="md:col-span-3"><label class="text-[7px] text-slate-400 ml-2">LINK GPS / DIRECCIÓN</label><input type="text" id="edit_direccion" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div></div><div class="p-5 bg-fix-blue/5 rounded-3xl border-2 border-fix-blue/10 mb-8"><div class="flex justify-between items-center mb-4"><h3 class="text-sm font-black text-fix-blue italic underline tracking-tighter uppercase">REGISTRO TÉCNICO DE EQUIPOS (CÓDIGO Y SERIE)</h3><div class="flex items-center gap-2 bg-white px-3 py-1 rounded-full border shadow-sm"><label class="text-[8px] font-black">CANT. EQUIPOS:</label><input type="number" id="edit_numEquipos" min="1" oninput="rebuildEditEquipmentInputs([])" class="w-10 text-center bg-transparent font-black text-xs outline-none"></div></div><div id="editEquiposContainer" class="space-y-4 max-h-[400px] overflow-y-auto pr-2"></div></div><div class="grid grid-cols-2 gap-4 sticky bottom-0 bg-white pt-4"><button onclick="saveEditChanges()" class="bg-fix-report text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all text-lg uppercase italic tracking-tighter">💾 GUARDAR CAMBIOS</button><button onclick="closeEditModal()" class="bg-slate-200 text-slate-600 py-4 rounded-2xl font-black">DESCARTAR</button></div></div>
     </div>
 
-    <!-- MODAL AJUSTE FINANCIERO -->
-    <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4"><div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic"><h2 class="text-xl font-black uppercase text-fix-blue mb-4 border-b-2 pb-2">VALOR REAL</h2><input type="hidden" id="finance_id"><input type="hidden" id="finance_source"><div class="space-y-4"><input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs"><input type="number" step="0.01" id="finance_monto" class="w-full p-3 bg-yellow-50 rounded-xl border font-mono font-black text-xl text-right"></div><div class="grid grid-cols-2 gap-3 mt-6"><button onclick="saveFinanceAdjustment()" class="bg-fix-report text-white py-3 rounded-xl font-black shadow-lg">💾 AJUSTAR</button><button onclick="closeEditFinanceModal()" class="bg-slate-200 text-slate-600 py-3 rounded-xl font-black">SALIR</button></div></div></div>
+    <!-- MODAL AJUSTE FINANCIERO (ADMIN ONLY) -->
+    <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 admin-only"><div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic"><h2 class="text-xl font-black uppercase text-fix-blue mb-4 border-b-2 pb-2">VALOR REAL</h2><input type="hidden" id="finance_id"><input type="hidden" id="finance_source"><div class="space-y-4"><input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs"><input type="number" step="0.01" id="finance_monto" class="w-full p-3 bg-yellow-50 rounded-xl border font-mono font-black text-xl text-right"></div><div class="grid grid-cols-2 gap-3 mt-6"><button onclick="saveFinanceAdjustment()" class="bg-fix-report text-white py-3 rounded-xl font-black shadow-lg">💾 AJUSTAR</button><button onclick="closeEditFinanceModal()" class="bg-slate-200 text-slate-600 py-3 rounded-xl font-black">SALIR</button></div></div></div>
 
     <button onclick="refreshData()" class="btn-refresh-float no-print" title="Actualizar"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></button>
     <div id="messageBox" class="opacity-0 fixed transition-opacity duration-500 pointer-events-none z-[99999] font-black uppercase text-center"></div>
