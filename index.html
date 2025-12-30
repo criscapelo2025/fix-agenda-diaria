@@ -97,7 +97,7 @@
         const database = firebase.database();
 
         const LISTA_TECNICOS = ["", "Andres Cardenas", "Cristian Capelo", "Juan Carlos Pando", "Allan Skykaz", "Juana Cardenas"];
-        const LUGARES_COMPRA = ["", "COMERCIAL KYWI", "COMERCIAL SOLIS", "COMO HOGAR", "SUKASA", "LUNA PAZMIÑO", "MACAOFERTAS", "HOME VEGA", "MERCARD", "TEKA DIRECTO", "ALMACENES BOYACÁ", "OTRO"];
+        const LUGARES_COMPRA = ["", "COMERCIAL KYWI", "COMERCIAL SOLIS", "COMO HOGAR", "SUKASA", "LUNA PAZMIÑO", "MACAOFERTAS", "HOME VEGA", "MERCARD", "TEKA DIRECTO", "ALMACENES BOYACÁ", "VTORIA HOGAR", "OTRO"];
         const TIPOS_SERVICIO = ["Instalación", "Garantía", "Fuera de Garantía", "Mantenimiento", "Reparación", "Visita Técnica"];
         
         const TIPOS_EQUIPO = ["Horno Eléctrico", "Horno a Gas", "Cocina Inducción", "Cocina a Gas", "Microondas", "Campana Tradicional", "Campana Decorativa", "Campana Isla", "Refrigerador", "Triturador", "Grifería", "Fregadero", "Lavavajillas", "Cafetera", "PARRILLA BBQ"];
@@ -152,7 +152,6 @@
             });
         }
 
-        // --- FUNCIÓN DE PRIORIDAD ---
         window.movePriority = function(id, direction) {
             const date = document.getElementById('filterDateInputRutero').value;
             const tech = currentTechUser || document.getElementById('ruteroTechFilter').value;
@@ -212,7 +211,8 @@
                 return;
             }
             let moTotalSAP = 0; let moParaTecnico = 0;
-            const count = parseInt(document.getElementById('numEquipos').value) || 1;
+            const countInput = document.getElementById('numEquipos');
+            const count = parseInt(countInput ? countInput.value : 1) || 1;
             for(let i=1; i<=count; i++) {
                 const sel = document.getElementsByName("descProducto_" + i)[0];
                 const pri = document.getElementsByName("costoEquipo_" + i)[0];
@@ -233,7 +233,8 @@
 
         function updateEquipmentPrice(selectEl, index) {
             const selectedVal = selectEl.value;
-            const count = parseInt(document.getElementById('numEquipos').value) || 1;
+            const countInput = document.getElementById('numEquipos');
+            const count = parseInt(countInput ? countInput.value : 1) || 1;
             const priceInput = document.getElementsByName("costoEquipo_" + index)[0];
             if(!priceInput) return;
             if (selectedVal === "PARRILLA BBQ") { priceInput.value = "29.00"; } 
@@ -246,7 +247,8 @@
         }
 
         function expandEquipmentUI() {
-            const count = parseInt(document.getElementById('numEquipos').value) || 1;
+            const countInput = document.getElementById('numEquipos');
+            const count = parseInt(countInput ? countInput.value : 1) || 1;
             const container = document.getElementById('productInputsContainer'); 
             if(!container) return; 
             let unitPrice = 0;
@@ -273,7 +275,7 @@
                 return `
                 <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
                     <span class="text-[9px] font-black text-slate-500 uppercase">${n} ($${p.toFixed(2)})</span>
-                    <input type="number" min="0" value="0" data-price="${p}" data-name="${n}" oninput="calculateFinancials()" class="form-acc-qty w-10 text-center bg-slate-50 rounded p-1 text-xs font-black outline-none shadow-inner" placeholder="0">
+                    <input type="number" min="0" value="0" data-price="${p}" data-name="${n}" oninput="calculateFinancials()" class="form-acc-qty w-10 text-center bg-slate-50 rounded p-1 text-xs font-black outline-none shadow-inner" placeholder="0" name="acc_qty_${n.replace(/\s+/g, '_')}">
                 </div>`;
             }).join('');
             html += `
@@ -341,20 +343,28 @@
                 const pEl = document.getElementById("payment_" + id);
                 const rEl = document.getElementById("reason_" + id);
                 if(!sEl || !tEl) return showMessage("❌ Error en formulario", "fix-error");
-                const s = sEl.value; const t = tEl.value; const pay = pEl ? pEl.value : "EFECTIVO"; const r = rEl ? rEl.value : "";
+                
+                const s = sEl.value; 
+                const t = tEl.value; 
+                const pay = pEl ? pEl.value : "EFECTIVO"; 
+                const r = rEl ? rEl.value : "";
                 const commentEl = document.getElementById("client_comment_" + id); const comment = commentEl ? commentEl.value : "";
                 const photos = window["photos_" + id] || [];
+                
                 if(s === 'PENDIENTE') return showMessage("⚠️ Seleccione estado", "fix-accent");
                 const v = visitsArray.find(function(item) { return item.id === id; });
                 if(!v) return showMessage("❌ No encontrado", "fix-error");
+
                 let moParaCaja = 0; let totalAccs = 0; const accs = [];
                 document.querySelectorAll(".acc-" + id).forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) { const p = parseFloat(i.dataset.price); accs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); totalAccs += q * p; } });
                 const mDescEl = document.getElementById("manual_acc_desc_" + id); const mPriceEl = document.getElementById("manual_acc_price_" + id);
                 if(mDescEl && mPriceEl && mDescEl.value && parseFloat(mPriceEl.value) > 0) { accs.push({ nombre: mDescEl.value.toUpperCase(), cantidad: 1, precio: parseFloat(mPriceEl.value) }); totalAccs += parseFloat(mPriceEl.value); }
+                
                 const eqCount = v.esMantenimiento ? 1 : (v.equipos || []).length;
                 if (v.esMantenimiento) { const mtpEl = document.getElementById("maint_tech_price_" + id); moParaCaja = mtpEl ? (parseFloat(mtpEl.value) || 0) : (v.financiera ? v.financiera.totalCliente : 0); } 
                 else { if (v.tipoAtencion !== 'Garantía' && t !== 'Garantía') { const hasBBQ = (v.equipos || []).some(function(eq) { return eq.descProducto === "PARRILLA BBQ"; }); if (eqCount === 1 && !hasBBQ) { moParaCaja = (v.equipos || []).reduce(function(acc, eq) { return acc + (eq.costoBase || 0); }, 0); } } }
                 const totalFinal = moParaCaja + totalAccs;
+
                 database.ref('visits/' + id).update({ 
                     estado: s, tipoAtencion: t, razonNoAtencion: r.toUpperCase(), accesoriosVendidos: accs, commentarioCliente: comment.toUpperCase(), fotosRegistro: photos, attendedDate: new Date().toISOString(), 'financiera/totalCliente': totalFinal, 'financiera/formaPago': pay 
                 }).then(function() { showMessage("✅ Guardado", "fix-report"); renderRutero(); renderPendientes(); }).catch(function() { showMessage("❌ Error", "fix-error"); });
@@ -487,7 +497,7 @@
             }).join('');
         }
 
-        // --- FUNCIÓN DE DESGLOSE FINANCIERO (ACTUALIZADA) ---
+        // --- FUNCIÓN DE DESGLOSE FINANCIERO ---
         window.showDesgloseVisita = function(id) {
             const v = visitsArray.find(item => item.id === id);
             if (!v) return;
@@ -547,7 +557,12 @@
         };
 
         function processFinancialBalance() {
-            const start = document.getElementById('cajaDateStart').value; const end = document.getElementById('cajaDateEnd').value; const techFilter = document.getElementById('cajaTechFilter').value;
+            const startInput = document.getElementById('cajaDateStart');
+            const endInput = document.getElementById('cajaDateEnd');
+            const start = startInput ? startInput.value : ""; 
+            const end = endInput ? endInput.value : "";
+            const techFilter = document.getElementById('cajaTechFilter') ? document.getElementById('cajaTechFilter').value : "";
+            
             let todos = [];
             visitsArray.filter(v => v.estado === 'Atendido' && v.financiera && !v.esMantenimiento).forEach(v => {
                 let monto = (v.tipoAtencion === 'Garantía') ? 0 : (v.equipos?.length === 1 && !v.equipos.some(e=>e.descProducto==="PARRILLA BBQ") ? (v.financiera.totalCliente || 0) : (v.accesoriosVendidos || []).reduce((s,a)=>s+(a.cantidad*a.precio), 0));
@@ -556,9 +571,11 @@
                 });
             });
             movementsArray.forEach(m => todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: "MANUAL: " + m.concepto, fecha: m.fecha, dateStr: new Date(m.fecha).toISOString().split('T')[0], source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' }));
+            
             if(start && end) todos = todos.filter(m => m.dateStr >= start && m.dateStr <= end);
             if(techFilter) todos = todos.filter(m => m.tecnico === techFilter);
             todos.sort((a,b) => b.fecha - a.fecha);
+            
             const tb = document.getElementById('contabilidadTableBody');
             if(tb) tb.innerHTML = todos.map(m => {
                 const isVisit = m.source === 'VISITA';
@@ -576,6 +593,7 @@
                     </td>
                 </tr>`;
             }).join('');
+            
             let tIn = 0, tOut = 0, tCashIn = 0, tTransIn = 0;
             todos.forEach(m => { if(m.type === 'INGRESO') { tIn += m.monto; if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; else tTransIn += m.monto; } else { tOut += m.monto; } });
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
@@ -605,8 +623,10 @@
         };
 
         function rebuildEditEquipmentInputs(equipos) {
-            const count = parseInt(document.getElementById('edit_numEquipos').value) || 1;
+            const countInput = document.getElementById('edit_numEquipos');
+            const count = parseInt(countInput ? countInput.value : 1) || 1;
             const container = document.getElementById('editEquiposContainer');
+            if(!container) return;
             let unitPrice = 0; if (count === 2) unitPrice = 20.00; else if (count >= 3) unitPrice = 15.00;
             container.innerHTML = '';
             for(let i=0; i<count; i++) {
@@ -618,6 +638,7 @@
         window.updateEditPrice = function(selectEl, index) {
              const costInputs = document.querySelectorAll('.edit-eq-cost');
              const selectedVal = selectEl.value;
+             if(!costInputs[index]) return;
              if (selectedVal === "PARRILLA BBQ") costInputs[index].value = "29.00";
              else costInputs[index].value = (COSTOS_EQUIPO[selectedVal] || 0.00).toFixed(2);
         }
@@ -634,7 +655,92 @@
             }
             database.ref('visits/' + id).update({
                 nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), telefono: document.getElementById('edit_telefono').value, email: document.getElementById('edit_email').value.toLowerCase(), cedula: document.getElementById('edit_cedula').value, fechaInstalacion: document.getElementById('edit_fecha').value, direccion: document.getElementById('edit_direccion').value, tecnico: document.getElementById('edit_tecnico').value, numFactura: document.getElementById('edit_numFactura').value.toUpperCase(), lugarCompra: document.getElementById('edit_lugarCompra').value, priority: parseInt(document.getElementById('edit_priority').value) || 0, equipos: updatedEquipos
-            }).then(() => { showMessage("✅ Actualizado", "fix-report"); closeEditModal(); });
+            }).then(() => { showMessage("✅ Actualizado", "fix-report"); closeEditModal(); }).catch(e => { showMessage("❌ Error", "fix-error"); });
+        };
+
+        function rebuildEditAccessoriesInputs(vendidos) {
+            const container = document.getElementById('editAccesoriosContainer');
+            if(!container) return;
+            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(function(item){
+                const n = item[0]; const p = item[1];
+                const v = (vendidos || []).find(function(a){return a.nombre === n;}) || { cantidad: 0 };
+                return `<div class="flex justify-between items-center p-2 border-b"><span class="text-[8px] font-black">${n} ($${p.toFixed(2)})</span><input type="number" min="0" value="${v.cantidad}" data-name="${n}" data-price="${p}" class="edit-acc-qty w-10 text-center font-black text-xs border rounded"></div>`;
+            }).join('');
+        }
+
+        // --- FUNCIÓN DE GUARDADO PRINCIPAL (VERSION BLINDADA) ---
+        window.saveVisit = function() {
+            try {
+                const form = document.getElementById('visitForm');
+                const data = Object.fromEntries(new FormData(form));
+                const isWarranty = data.tipoServicioGlobal === 'Garantía';
+                
+                if(!data.nombreCliente || !data.callePrincipal) {
+                    showMessage("⚠️ Datos obligatorios faltantes", "fix-error");
+                    return;
+                }
+
+                let eqs = [];
+                if (isWarranty) {
+                    const wEqSelect = document.getElementById('warrantyEquipmentSelect');
+                    const wEq = wEqSelect ? wEqSelect.value : "";
+                    eqs.push({ descProducto: wEq.toUpperCase(), costoBase: 0, codProducto: "", serieEquipo: "" });
+                } else {
+                    const num = parseInt(data.numEquipos) || 1;
+                    for(let i=1; i<=num; i++) { 
+                        const eqName = data["descProducto_" + i];
+                        if(eqName) {
+                            eqs.push({ descProducto: eqName.toUpperCase(), costoBase: parseFloat(data["costoEquipo_" + i]) || 0, codProducto: "", serieEquipo: "" }); 
+                        }
+                    }
+                }
+
+                let accs = [];
+                document.querySelectorAll('.form-acc-qty').forEach(function(i) { 
+                    const q = parseInt(i.value) || 0; 
+                    if(q > 0) { 
+                        accs.push({ nombre: i.dataset.name, cantidad: q, precio: parseFloat(i.dataset.price) || 0 }); 
+                    } 
+                });
+                
+                const manualDesc = document.getElementById('manualAccDesc')?.value;
+                const manualPrice = parseFloat(document.getElementById('manualAccPrice')?.value) || 0;
+                if(manualDesc && manualPrice > 0) {
+                    accs.push({ nombre: manualDesc.toUpperCase(), cantidad: 1, precio: manualPrice });
+                }
+
+                const totalFinalStr = document.getElementById('displayTotalFinal').textContent.replace(/[^\d.]/g, '');
+                const totalFinal = parseFloat(totalFinalStr) || 0;
+
+                const ref = database.ref('visits').push();
+                ref.set({ 
+                    id: ref.key, 
+                    nombreCliente: data.nombreCliente.toUpperCase(), 
+                    telefono: data.telefono || '', 
+                    callePrincipal: data.callePrincipal.toUpperCase(), 
+                    numFactura: data.numFactura || '', 
+                    fechaInstalacion: document.getElementById('filterDateInput').value, 
+                    tecnico: data.tecnico || '', 
+                    tipoAtencion: data.tipoServicioGlobal, 
+                    estado: 'PENDIENTE', 
+                    createdAt: Date.now(), 
+                    equipos: eqs,
+                    accesoriosVendidos: accs,
+                    financiera: { totalCliente: totalFinal }, 
+                    priority: 0 
+                }).then(() => { 
+                    showMessage("🚀 AGENDADO CON ÉXITO", "fix-report"); 
+                    form.reset(); 
+                    expandEquipmentUI();
+                    renderInsumosAdmin();
+                }).catch(e => {
+                    console.error(e);
+                    showMessage("❌ ERROR AL GUARDAR", "fix-error");
+                });
+            } catch (err) {
+                console.error(err);
+                showMessage("❌ ERROR CRÍTICO", "fix-error");
+            }
         };
 
         function startSync() {
@@ -647,21 +753,50 @@
             database.ref('inventory_entries').on('value', snap => { inventoryEntries = snap.val() ? Object.values(snap.val()) : []; renderInventoryView(); });
         }
 
+        // --- FUNCIÓN DE MANTENIMIENTO ---
         window.saveMantenimiento = function() {
-            const form = document.getElementById('maintForm'); const data = Object.fromEntries(new FormData(form));
-            const ref = database.ref('visits').push();
-            ref.set({ 
-                id: ref.key, nombreCliente: data.mNombre.toUpperCase(), telefono: data.mTelefono || '', callePrincipal: data.mCalle.toUpperCase(), mantenimientoEquipo: data.mEquipo.toUpperCase(), tecnico: data.mTecnico || '', tipoAtencion: "Mantenimiento", estado: 'PENDIENTE', createdAt: Date.now(), fechaInstalacion: document.getElementById('maintScheduleDate').value, esMantenimiento: true, financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago }, priority: 999 
-            }).then(() => { showMessage("✅ Mantenimiento Guardado", "fix-report"); form.reset(); });
+            try {
+                const form = document.getElementById('maintForm'); 
+                const data = Object.fromEntries(new FormData(form));
+                if(!data.mNombre || !data.mCalle) {
+                    showMessage("⚠️ Datos obligatorios faltantes", "fix-error");
+                    return;
+                }
+
+                const ref = database.ref('visits').push();
+                ref.set({ 
+                    id: ref.key, 
+                    nombreCliente: data.mNombre.toUpperCase(), 
+                    telefono: data.mTelefono || '', 
+                    callePrincipal: data.mCalle.toUpperCase(), 
+                    mantenimientoEquipo: data.mEquipo.toUpperCase(), 
+                    tecnico: data.mTecnico || '', 
+                    tipoAtencion: "Mantenimiento", 
+                    estado: 'PENDIENTE', 
+                    createdAt: Date.now(), 
+                    fechaInstalacion: document.getElementById('maintScheduleDate').value, 
+                    esMantenimiento: true, 
+                    financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago || 'EFECTIVO' }, 
+                    priority: 999 
+                }).then(() => { 
+                    showMessage("✅ Mantenimiento Guardado", "fix-report"); 
+                    form.reset(); 
+                }).catch(e => {
+                    showMessage("❌ ERROR FIREBASE", "fix-error");
+                });
+            } catch (err) {
+                showMessage("❌ ERROR CRÍTICO", "fix-error");
+            }
         };
 
         window.saveInventoryEntry = function() {
             const acc = document.getElementById('invAccSelect').value;
-            const qty = parseInt(document.getElementById('invQty').value) || 0;
+            const qtyInput = document.getElementById('invQty');
+            const qty = parseInt(qtyInput ? qtyInput.value : 0) || 0;
             if (qty <= 0) return showMessage("⚠️ Ingrese cantidad", "fix-accent");
             const ref = database.ref('inventory_entries').push();
             ref.set({ accesorio: acc, cantidad: qty, fecha: Date.now() }).then(() => {
-                document.getElementById('invQty').value = '';
+                if(qtyInput) qtyInput.value = '';
                 showMessage("✅ Ingreso Registrado", "fix-report");
             });
         };
@@ -715,8 +850,15 @@
             } 
 
             startSync();
-            LISTA_TECNICOS.forEach(item => { ['selectTecnico', 'ruteroTechFilter', 'selectTecnicoMaint', 'edit_tecnico', 'movTecnico', 'cajaTechFilter', 'pendingTechFilter'].forEach(id => { const el = document.getElementById(id); if(el) el.add(new Option(item || "--- TÉCNICO ---", item)); }); });
-            LUGARES_COMPRA.forEach(i => { ['selectLugar', 'edit_lugarCompra'].forEach(id => { const el = document.getElementById(id); if(el && !el.querySelector(`option[value="${i}"]`)) el.add(new Option(i || "--- LUGAR COMPRA ---", i)); }); });
+            LISTA_TECNICOS.forEach(item => { ['selectTecnico', 'ruteroTechFilter', 'selectTecnicoMaint', 'edit_tecnico', 'movTecnico', 'cajaTechFilter', 'pendingTechFilter'].forEach(id => { const el = document.getElementById(id); if(el) el.add(new Option(item || (id === 'cajaTechFilter' ? "TODOS LOS TÉCNICOS" : "--- TÉCNICO ---"), item)); }); });
+            
+            const elLugar = document.getElementById('selectLugar');
+            const elLugarEdit = document.getElementById('edit_lugarCompra');
+            LUGARES_COMPRA.forEach(i => {
+                if(elLugar) elLugar.add(new Option(i || "--- LUGAR COMPRA ---", i));
+                if(elLugarEdit) elLugarEdit.add(new Option(i || "--- LUGAR COMPRA ---", i));
+            });
+
             renderInsumosAdmin(); expandEquipmentUI();
         });
     </script>
@@ -729,7 +871,7 @@
         <header class="mb-4 sm:mb-10 flex flex-col xl:flex-row justify-between items-center gap-2 no-print">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
-                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.6.6</span></div></div>
+                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.6.7</span></div></div>
             </div>
             <!-- MENU ADMIN -->
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
@@ -823,7 +965,7 @@
 
             <!-- INVENTARIO (ADMIN ONLY) -->
             <div id="inventoryView" class="hidden lg:col-span-3 space-y-6 admin-only">
-                <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50 font-black italic uppercase"><h2 class="text-xl font-black uppercase mb-6 border-b-4 border-fix-report pb-2 font-sans italic text-fix-report">CONTROL DE INVENTARIO Y STOCK</h2><div class="bg-slate-50 p-6 rounded-2xl mb-8 flex flex-wrap gap-4 items-end border border-slate-200"><div class="flex-grow"><label class="text-[8px] ml-2">ACCESORIO / INSUMO</label><select id="invAccSelect" class="w-full p-3 bg-white rounded-xl border font-black text-xs uppercase"></select></div><div class="w-32"><label class="text-[8px] ml-2">CANTIDAD ENTRADA</label><input type="number" id="invQty" placeholder="0" class="w-full p-3 bg-white rounded-xl border text-center font-black font-mono"></div><button onclick="saveInventoryEntry()" class="bg-fix-report text-white px-8 py-3 rounded-xl font-black text-xs shadow-lg active:scale-95 transition-all italic">💾 REGISTRAR INGRESO</button></div><div class="overflow-x-auto border-2 border-slate-50 rounded-xl"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-900 text-white text-[8px] uppercase"><th class="text-left">Nombre del Insumo</th><th>Total Entradas</th><th>Utilizado</th><th>Stock Disponible</th><th class="text-right">PVP Estimado</th></tr></thead><tbody id="inventoryTableBody" class="font-bold"></tbody></table></div></div>
+                <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50 font-black italic uppercase"><h2 class="text-xl font-black uppercase mb-6 border-b-4 border-fix-report pb-2 font-sans italic text-fix-report">CONTROL DE INVENTARIO Y STOCK</h2><div class="bg-slate-50 p-6 rounded-2xl mb-8 flex flex-wrap gap-4 items-end border border-slate-200"><div class="flex-grow"><label class="text-[8px] ml-2">ACCESORIO / INSUMO</label><select id="invAccSelect" class="w-full p-3 bg-white rounded-xl border font-black text-xs uppercase"></select></div><div class="w-32"><label class="text-[8px] ml-2">CANTIDAD ENTRADA</label><input type="number" id="invQty" placeholder="0" class="w-full p-3 bg-white rounded-xl border text-center font-black font-mono"></div><button onclick="saveInventoryEntry()" class="bg-fix-report text-white px-8 py-3 rounded-xl font-black text-xs shadow-lg active:scale-95 transition-all italic">💾 REGISTRAR INGRESO</button></div><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-sans underline italic">BALANCE GENERAL DE INSUMOS</h3><button onclick="downloadInventoryCSV()" class="bg-slate-800 text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic">📊 EXPORTAR STOCK</button></div><div class="overflow-x-auto border-2 border-slate-50 rounded-xl"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-900 text-white text-[8px] uppercase"><th class="text-left">Nombre del Insumo</th><th>Total Entradas</th><th>Utilizado</th><th>Stock Disponible</th><th class="text-right">PVP Estimado</th></tr></thead><tbody id="inventoryTableBody" class="font-bold"></tbody></table></div></div>
             </div>
 
             <!-- LOGÍSTICA (PARA TODOS) -->
@@ -839,7 +981,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE DESGLOSE (NUEVO) -->
+    <!-- MODAL DE DESGLOSE -->
     <div id="desgloseModal" class="hidden fixed inset-0 z-[30000] modal-overlay flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 border-[6px] border-slate-50 uppercase italic font-black">
             <div class="flex justify-between items-start mb-6 border-b-2 pb-2">
@@ -850,7 +992,6 @@
                 <button onclick="closeDesgloseModal()" class="text-slate-300 hover:text-fix-error text-xl">✕</button>
             </div>
             <div id="desgloseContent" class="space-y-4 mb-8 max-h-[50vh] overflow-y-auto pr-2">
-                <!-- Se llena dinámicamente -->
             </div>
             <button onclick="closeDesgloseModal()" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black shadow-lg active:scale-95 transition-all text-sm uppercase italic">Entendido</button>
         </div>
