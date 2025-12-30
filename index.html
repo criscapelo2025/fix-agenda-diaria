@@ -293,7 +293,7 @@
 
         function syncDates(sourceId) {
             const val = document.getElementById(sourceId).value;
-            const targets = ['filterDateInput', 'filterDateInputRutero', 'cajaDateStart', 'cajaDateEnd', 'maintScheduleDate'];
+            const targets = ['filterDateInput', 'filterDateInputRutero', 'cajaDateStart', 'cajaDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd'];
             targets.forEach(function(id) { const el = document.getElementById(id); if(el) el.value = val; });
             renderUIAgenda(); renderRutero(); processFinancialBalance(); processMaintBalance();
         }
@@ -543,6 +543,13 @@
             }
         }
 
+        window.updateEditPrice = function(selectEl, index) {
+             const costInputs = document.querySelectorAll('.edit-eq-cost');
+             const selectedVal = selectEl.value;
+             if (selectedVal === "PARRILLA BBQ") costInputs[index].value = "29.00";
+             else costInputs[index].value = (COSTOS_EQUIPO[selectedVal] || 0.00).toFixed(2);
+        }
+
         window.saveEditChanges = function() {
             const id = document.getElementById('edit_id').value;
             const selects = document.querySelectorAll('.edit-eq-select');
@@ -603,6 +610,37 @@
             });
         };
 
+        window.openEditFinanceModal = function(id, source, currentMonto, concepto) {
+            document.getElementById('finance_id').value = id; 
+            document.getElementById('finance_source').value = source; 
+            document.getElementById('finance_monto').value = currentMonto; 
+            document.getElementById('finance_concepto').value = concepto; 
+            document.getElementById('editFinanceModal').classList.remove('hidden');
+        };
+
+        window.saveFinanceAdjustment = function() {
+            const id = document.getElementById('finance_id').value; 
+            const source = document.getElementById('finance_source').value; 
+            const nuevoMonto = parseFloat(document.getElementById('finance_monto').value) || 0; 
+            const nuevoConcepto = document.getElementById('finance_concepto').value.toUpperCase();
+            if (source === 'MANUAL') database.ref('movements/' + id).update({ monto: nuevoMonto, concepto: nuevoConcepto.replace('MANUAL: ', '') }).then(() => closeEditFinanceModal());
+            else database.ref('visits/' + id).update({ 'financiera/totalCliente': nuevoMonto }).then(() => closeEditFinanceModal());
+        };
+
+        window.saveManualMovement = function() {
+            const c = document.getElementById('movConcepto').value; 
+            const m = parseFloat(document.getElementById('movMonto').value); 
+            const t = document.getElementById('movType').value; 
+            const p = document.getElementById('movPago').value; 
+            const tech = document.getElementById('movTecnico').value;
+            if(!c || isNaN(m)) return showMessage("⚠️ Incompleto", "fix-accent");
+            const ref = database.ref('movements').push();
+            ref.set({ id: ref.key, concepto: c.toUpperCase(), monto: m, fecha: Date.now(), type: t, formaPago: p, tecnico: tech || 'ADMIN' }).then(() => {
+                document.getElementById('movConcepto').value=''; document.getElementById('movMonto').value='';
+                showMessage("✅ Manual Guardado", "fix-report");
+            });
+        };
+
         function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
         window.closeEditFinanceModal = function() { document.getElementById('editFinanceModal').classList.add('hidden'); };
 
@@ -611,7 +649,7 @@
             ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'cajaDateStart', 'cajaDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoy; });
             startSync();
             LISTA_TECNICOS.forEach(item => { ['selectTecnico', 'ruteroTechFilter', 'selectTecnicoMaint', 'edit_tecnico', 'movTecnico', 'cajaTechFilter', 'pendingTechFilter'].forEach(id => { const el = document.getElementById(id); if(el) el.add(new Option(item || "--- TÉCNICO ---", item)); }); });
-            LUGARES_COMPRA.forEach(i => { ['selectLugar', 'edit_lugarCompra'].forEach(id => { const el = document.getElementById(id); if(el) el.add(new Option(i || "--- LUGAR COMPRA ---", i)); }); });
+            LUGARES_COMPRA.forEach(i => { ['selectLugar', 'edit_lugarCompra'].forEach(id => { const el = document.getElementById(id); if(el && !el.querySelector(`option[value="${i}"]`)) el.add(new Option(i || "--- LUGAR COMPRA ---", i)); }); });
             renderInsumosAdmin(); expandEquipmentUI();
         });
     </script>
@@ -624,7 +662,7 @@
         <header class="mb-4 sm:mb-10 flex flex-col xl:flex-row justify-between items-center gap-2 no-print">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
-                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.6.2</span></div></div>
+                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.6.3</span></div></div>
             </div>
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
                 <button onclick="changeMasterView('reporte_admin')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-fix-blue text-white italic">Registro</button>
@@ -686,9 +724,7 @@
             <div id="mantenimientoView" class="hidden lg:col-span-3 space-y-6">
                 <div class="bg-white p-4 rounded-3xl shadow-lg border-[4px] border-fix-accent/20">
                     <p class="text-[8px] font-black text-fix-accent mb-1 ml-2 italic underline">📅 AGENDAR FECHA PARA MANTENIMIENTO:</p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <input type="date" id="maintScheduleDate" class="bg-slate-50 p-3 rounded-xl text-xl font-black italic text-fix-accent outline-none border-none shadow-inner w-full text-center font-mono">
-                    </div>
+                    <input type="date" id="maintScheduleDate" class="bg-slate-50 p-3 rounded-xl text-xl font-black italic text-fix-accent outline-none border-none shadow-inner w-full text-center font-mono">
                 </div>
                 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     <div class="xl:col-span-2 bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50 font-black italic">
@@ -735,7 +771,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE EDICIÓN ADMINISTRATIVA -->
+    <!-- MODAL DE EDICIÓN -->
     <div id="editModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 font-black">
         <div class="bg-white w-full max-w-3xl rounded-[2rem] shadow-2xl p-8 font-black italic border-[6px] border-slate-50 uppercase overflow-y-auto max-h-[95vh]"><div class="flex justify-between items-start mb-6 border-b-2 pb-2"><h2 class="text-xl font-black uppercase text-fix-blue italic">CORRECCIÓN Y REGISTRO DE SERIES</h2><button onclick="closeEditModal()" class="text-slate-300 hover:text-fix-error">✕</button></div><input type="hidden" id="edit_id"><div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100"><div class="md:col-span-3 text-[10px] text-fix-blue font-black mb-2 underline italic">DATOS GENERALES DEL CLIENTE</div><div><label class="text-[7px] text-slate-400 ml-2">NOMBRE CLIENTE</label><input type="text" id="edit_nombre" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div><div><label class="text-[7px] text-slate-400 ml-2">TELÉFONO</label><input type="text" id="edit_telefono" class="w-full p-2 bg-white rounded-lg border font-mono font-black text-xs"></div><div><label class="text-[7px] text-slate-400 ml-2">CÉDULA</label><input type="text" id="edit_cedula" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div><div><label class="text-[7px] text-slate-400 ml-2">CORREO</label><input type="email" id="edit_email" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div><div><label class="text-[7px] text-slate-400 ml-2">N° FACTURA COMPRA</label><input type="text" id="edit_numFactura" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div><div><label class="text-[7px] text-slate-400 ml-2">LUGAR COMPRA</label><select id="edit_lugarCompra" class="w-full p-2 bg-white rounded-lg border font-black text-[10px]"></select></div><div><label class="text-[7px] text-slate-400 ml-2">FECHA ATENCIÓN</label><input type="date" id="edit_fecha" class="w-full p-2 bg-white rounded-lg border font-black text-xs font-mono"></div><div><label class="text-[7px] text-slate-400 ml-2">TÉCNICO ASIGNADO</label><select id="edit_tecnico" class="w-full p-2 bg-white rounded-lg border font-black text-[10px]"></select></div><div><label class="text-[7px] text-slate-400 ml-2">ORDEN/PRIORIDAD</label><input type="number" id="edit_priority" class="w-full p-2 bg-yellow-50 rounded-lg border font-black text-xs font-mono"></div><div class="md:col-span-3"><label class="text-[7px] text-slate-400 ml-2">LINK GPS / DIRECCIÓN</label><input type="text" id="edit_direccion" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div></div><div class="p-5 bg-fix-blue/5 rounded-3xl border-2 border-fix-blue/10 mb-8"><div class="flex justify-between items-center mb-4"><h3 class="text-sm font-black text-fix-blue italic underline tracking-tighter uppercase">REGISTRO TÉCNICO DE EQUIPOS (CÓDIGO Y SERIE)</h3><div class="flex items-center gap-2 bg-white px-3 py-1 rounded-full border shadow-sm"><label class="text-[8px] font-black">CANT. EQUIPOS:</label><input type="number" id="edit_numEquipos" min="1" oninput="rebuildEditEquipmentInputs([])" class="w-10 text-center bg-transparent font-black text-xs outline-none"></div></div><div id="editEquiposContainer" class="space-y-4 max-h-[400px] overflow-y-auto pr-2"></div></div><div class="grid grid-cols-2 gap-4 sticky bottom-0 bg-white pt-4"><button onclick="saveEditChanges()" class="bg-fix-report text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all text-lg uppercase italic tracking-tighter">💾 GUARDAR CAMBIOS</button><button onclick="closeEditModal()" class="bg-slate-200 text-slate-600 py-4 rounded-2xl font-black">DESCARTAR</button></div></div>
     </div>
