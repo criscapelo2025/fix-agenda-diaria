@@ -435,6 +435,20 @@
             database.ref('visits/' + id).update({ fechaInstalacion: newDate, razonNoAtencion: newNote.toUpperCase(), estado: 'PENDIENTE', priority: 0 }).then(() => { showMessage("✅ RE-AGENDADO", "fix-report"); renderPendientes(); }).catch(() => { showMessage("❌ ERROR", "fix-error"); });
         };
 
+        window.closeVisitByAdmin = function(id) {
+            if(!confirm("¿CONFIRMAR ESTE CASO COMO ATENDIDO DESDE OFICINA? SE GUARDARÁ EN EL MAESTRO AUTOMÁTICAMENTE.")) return;
+            database.ref('visits/' + id).update({
+                estado: 'Atendido',
+                attendedDate: new Date().toISOString(),
+                razonNoAtencion: 'SOLUCIONADO DIRECTO DESDE OFICINA / ADMINISTRADOR'
+            }).then(() => {
+                showMessage("✅ CASO CERRADO POR ADMIN", "fix-report");
+                renderPendientes();
+            }).catch(() => {
+                showMessage("❌ ERROR AL CERRAR", "fix-error");
+            });
+        };
+
         function renderPendientes() {
             const container = document.getElementById('pendientesList'); if(!container) return;
             const techFilter = document.getElementById('pendingTechFilter').value;
@@ -452,6 +466,7 @@
                             <span class="text-[9px] font-bold text-slate-400">ESTADO ACTUAL: ${v.estado.toUpperCase()} • TÉCNICO: ${v.tecnico}</span>
                         </div>
                         <div class="flex gap-2">
+                            <button onclick="closeVisitByAdmin('${v.id}')" class="bg-green-600 text-white px-3 py-1 rounded-full text-[8px] font-black italic shadow-md">✅ SOLUCIONADO (ADMIN)</button>
                             <button onclick="openEditModal('${v.id}')" class="bg-slate-100 text-slate-400 px-3 py-1 rounded-full text-[8px] font-black italic">MODIFICAR DATOS</button>
                             <button onclick="deleteVisit('${v.id}')" class="text-fix-error text-sm">🗑️</button>
                         </div>
@@ -547,11 +562,36 @@
 
         function renderReporteTeka() {
             const body = document.getElementById('tekaReporteBody'); if(!body) return;
-            const start = document.getElementById('maestroDateStart').value; const end = document.getElementById('maestroDateEnd').value;
+            const start = document.getElementById('maestroDateStart').value; 
+            const end = document.getElementById('maestroDateEnd').value;
+            
+            // FILTRO BASE
             let filtered = visitsArray.filter(v => !v.esMantenimiento && v.estado === 'Atendido');
             if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
+            
+            // ORDENAR POR FECHA DE ATENCIÓN (CRONOLÓGICO)
+            filtered.sort((a, b) => a.fechaInstalacion.localeCompare(b.fechaInstalacion));
+
+            // SEGMENTACIÓN
+            const garantias = filtered.filter(v => v.tipoAtencion === 'Garantía');
+            const bbqs = filtered.filter(v => v.tipoAtencion !== 'Garantía' && (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ"));
+            const multis = filtered.filter(v => v.tipoAtencion !== 'Garantía' && !(v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ") && (v.equipos || []).length > 1);
+            const singles = filtered.filter(v => v.tipoAtencion !== 'Garantía' && !(v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ") && (v.equipos || []).length === 1);
+
             let rowCount = 1;
-            body.innerHTML = filtered.flatMap(v => (v.equipos || []).map(eq => `<tr class="border-b row-hover font-black uppercase"><td class="report-cell text-center font-mono bg-slate-50">${rowCount++}</td><td class="report-cell font-mono">${v.fechaEmision || ''}</td><td class="report-cell">${v.lugarCompra || 'OTRO'}</td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${eq.codProducto || '-'}</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono tracking-widest">${eq.serieEquipo || '-'}</td><td class="report-cell font-black">SAP</td><td class="report-cell">CAPELO</td><td class="report-cell">CUENCA</td><td class="report-cell font-mono">${v.fechaInstalacion}</td><td class="report-cell font-black italic">${v.nombreCliente}</td><td class="report-cell max-w-[150px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell font-black text-right font-mono">$${(eq.costoBase || 0).toFixed(2)}</td><td class="report-cell">CLIENTE FINAL</td><td class="report-cell">CAPELO</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${v.cedula || '-'}</td><td class="report-cell lowercase">${v.email || '-'}</td><td class="report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td></tr>`)).join('');
+
+            const renderSection = (title, list) => {
+                if (list.length === 0) return "";
+                let html = `<tr><td colspan="22" class="p-4 bg-slate-200 text-fix-blue text-[11px] font-black italic border-y-4 border-white tracking-widest uppercase">${title} (${list.length} SERVICIOS)</td></tr>`;
+                html += list.flatMap(v => (v.equipos || []).map(eq => `<tr class="border-b row-hover font-black uppercase"><td class="report-cell text-center font-mono bg-slate-50">${rowCount++}</td><td class="report-cell font-mono">${v.fechaEmision || ''}</td><td class="report-cell">${v.lugarCompra || 'OTRO'}</td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${eq.codProducto || '-'}</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono tracking-widest">${eq.serieEquipo || '-'}</td><td class="report-cell font-black">SAP</td><td class="report-cell">CAPELO</td><td class="report-cell">CUENCA</td><td class="report-cell font-mono">${v.fechaInstalacion}</td><td class="report-cell font-black italic">${v.nombreCliente}</td><td class="report-cell max-w-[150px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell font-black text-right font-mono">$${(eq.costoBase || 0).toFixed(2)}</td><td class="report-cell">CLIENTE FINAL</td><td class="report-cell">CAPELO</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${v.cedula || '-'}</td><td class="report-cell lowercase">${v.email || '-'}</td><td class="report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td></tr>`)).join('');
+                return html;
+            };
+
+            body.innerHTML = 
+                renderSection("📋 REPORTE UN PRODUCTO", singles) +
+                renderSection("📚 REPORTE MULTI-PRODUCTO", multis) +
+                renderSection("🔥 REPORTE PARRILLAS BBQ", bbqs) +
+                renderSection("🛡️ REPORTE GARANTÍAS", garantias);
         }
 
         function renderInventoryView() {
@@ -621,7 +661,7 @@
             if(techFilter) todos = todos.filter(m => m.tecnico === techFilter);
             todos.sort((a,b) => b.fecha - a.fecha);
             const tb = document.getElementById('contabilidadTableBody');
-            if(tb) tb.innerHTML = todos.map(m => `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${new Date(m.fecha).toLocaleDateString()}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-green-600 text-xs font-black" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
+            if(tb) tb.innerHTML = todos.map(m => `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${new Date(m.fecha).toLocaleDateString()}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-error text-xs font-black" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
             let tIn = 0, tOut = 0, tCashIn = 0, tTransIn = 0;
             todos.forEach(m => { if(m.type === 'INGRESO') { tIn += m.monto; if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; else tTransIn += m.monto; } else { tOut += m.monto; } });
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
@@ -807,7 +847,7 @@
         <header class="mb-4 sm:mb-10 flex flex-col xl:flex-row justify-between items-center gap-2 no-print">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
-                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.7.7</span></div></div>
+                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.7.9</span></div></div>
             </div>
             <!-- MENU ADMIN -->
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
