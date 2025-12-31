@@ -699,7 +699,7 @@
             }).then(() => { showMessage("✅ Actualizado", "fix-report"); closeEditModal(); });
         };
 
-        window.saveVisit = function() {
+        window.saveVisit = function(isPending = false) {
             try {
                 const form = document.getElementById('visitForm');
                 const data = Object.fromEntries(new FormData(form));
@@ -714,8 +714,11 @@
                 let accs = [];
                 document.querySelectorAll('.form-acc-qty').forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) accs.push({ nombre: i.dataset.name, cantidad: q, precio: parseFloat(i.dataset.price) || 0 }); });
                 const totalFinal = parseFloat(document.getElementById('displayTotalFinal').textContent.replace(/[^\d.]/g, '')) || 0;
+                const status = isPending ? 'Pendiente (Tramite)' : 'PENDIENTE';
+                const note = isPending ? 'INGRESADO DIRECTO A PENDIENTES - REVISAR TEMA' : (data.observacionesAdmin || '').toUpperCase();
+                
                 const ref = database.ref('visits').push();
-                ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), telefono: data.telefono || '', callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', cedula: data.cedula || '', lugarCompra: data.lugarCompra || 'OTRO', fechaInstalacion: document.getElementById('filterDateInput').value, tecnico: data.tecnico || '', tipoAtencion: data.tipoServicioGlobal, estado: 'PENDIENTE', createdAt: Date.now(), equipos: eqs, accesoriosVendidos: accs, financiera: { totalCliente: totalFinal }, priority: 0, observacionesAdmin: (data.observacionesAdmin || '').toUpperCase() }).then(() => { showMessage("🚀 Agendado", "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
+                ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), telefono: data.telefono || '', callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', cedula: data.cedula || '', lugarCompra: data.lugarCompra || 'OTRO', fechaInstalacion: document.getElementById('filterDateInput').value, tecnico: data.tecnico || '', tipoAtencion: data.tipoServicioGlobal, estado: status, createdAt: Date.now(), equipos: eqs, accesoriosVendidos: accs, financiera: { totalCliente: totalFinal }, priority: 0, observacionesAdmin: note }).then(() => { showMessage(isPending ? "⏳ Guardado en Pendientes" : "🚀 Agendado", isPending ? "fix-pending" : "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
             } catch (err) { showMessage("❌ Error Crítico", "fix-error"); }
         };
 
@@ -729,12 +732,13 @@
             database.ref('inventory_entries').on('value', snap => { inventoryEntries = snap.val() ? Object.values(snap.val()) : []; renderInventoryView(); });
         }
 
-        window.saveMantenimiento = function() {
+        window.saveMantenimiento = function(isPending = false) {
             try {
                 const form = document.getElementById('maintForm'); const data = Object.fromEntries(new FormData(form));
                 if(!data.mNombre || !data.mCalle) { showMessage("⚠️ Datos obligatorios", "fix-error"); return; }
+                const status = isPending ? 'Pendiente (Tramite)' : 'PENDIENTE';
                 const ref = database.ref('visits').push();
-                ref.set({ id: ref.key, nombreCliente: data.mNombre.toUpperCase(), telefono: data.mTelefono || '', callePrincipal: data.mCalle.toUpperCase(), mantenimientoEquipo: data.mEquipo.toUpperCase(), tecnico: data.mTecnico || '', tipoAtencion: "Mantenimiento", estado: 'PENDIENTE', createdAt: Date.now(), fechaInstalacion: document.getElementById('maintScheduleDate').value, esMantenimiento: true, financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago || 'EFECTIVO' }, priority: 999 }).then(() => { showMessage("✅ Mantenimiento Guardado", "fix-report"); form.reset(); });
+                ref.set({ id: ref.key, nombreCliente: data.mNombre.toUpperCase(), telefono: data.mTelefono || '', callePrincipal: data.mCalle.toUpperCase(), mantenimientoEquipo: data.mEquipo.toUpperCase(), tecnico: data.mTecnico || '', tipoAtencion: "Mantenimiento", estado: status, createdAt: Date.now(), fechaInstalacion: document.getElementById('maintScheduleDate').value, esMantenimiento: true, financiera: { totalCliente: parseFloat(data.mPrecio) || 0, formaPago: data.mPago || 'EFECTIVO' }, priority: 999, razonNoAtencion: isPending ? 'MANTENIMIENTO PENDIENTE DE COORDINAR' : '' }).then(() => { showMessage(isPending ? "⏳ Guardado en Pendientes" : "✅ Mantenimiento Guardado", isPending ? "fix-pending" : "fix-report"); form.reset(); });
             } catch (err) { showMessage("❌ Error", "fix-error"); }
         };
 
@@ -803,7 +807,7 @@
         <header class="mb-4 sm:mb-10 flex flex-col xl:flex-row justify-between items-center gap-2 no-print">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
-                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.7.6</span></div></div>
+                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.7.7</span></div></div>
             </div>
             <!-- MENU ADMIN -->
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
@@ -823,7 +827,7 @@
             <div id="formContainer" class="lg:col-span-2 space-y-4 admin-only no-print">
                 <div class="bg-white p-4 rounded-3xl shadow-lg"><input type="date" id="filterDateInput" onchange="syncDates('filterDateInput')" class="bg-slate-50 p-3 rounded-xl text-xl font-black italic text-fix-blue outline-none border-none shadow-inner w-full text-center font-mono"></div>
                 <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50">
-                    <form id="visitForm" onsubmit="event.preventDefault(); saveVisit();">
+                    <form id="visitForm" onsubmit="event.preventDefault();">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
                             <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black"><input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black"><input type="text" name="cedula" placeholder="CÉDULA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono"><input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black"><input type="email" name="email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner"><input type="text" name="numFactura" placeholder="N° FACTURA COMPRA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center uppercase font-black"><input type="text" name="direccion" placeholder="LINK GPS (OPCIONAL EN REGISTRO)" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner md:col-span-2"><select name="tecnico" id="selectTecnico" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><select id="selectLugar" name="lugarCompra" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><div class="flex flex-col"><span class="text-[8px] font-black text-slate-400 ml-2 italic">EMISIÓN FACTURA</span><input type="date" name="fechaEmision" id="inputEmision" class="p-3 bg-slate-50 rounded-xl font-bold text-xs outline-none shadow-inner text-center font-mono"></div><select name="tipoServicioGlobal" id="tipoServicioGlobal" onchange="toggleServiceTypeUI()" class="p-3 bg-white border-2 border-fix-blue/10 rounded-xl font-black text-[10px] uppercase text-fix-blue italic"><option value="Instalación">Instalación Estándar</option><option value="Garantía">Garantía de Fábrica</option><option value="Fuera de Garantía">Fuera de Garantía</option><option value="Reparación">Reparación/Serv.Tecnico</option><option value="Visita Técnica">Visita Técnica</option></select>
                         </div>
@@ -834,7 +838,12 @@
                         <div id="standardServiceFields" class="space-y-4"><div class="bg-slate-50 p-3 rounded-xl flex items-center justify-between shadow-inner"><span class="text-[10px] font-black italic">CANTIDAD EQUIPOS:</span><input type="number" id="numEquipos" name="numEquipos" value="1" min="1" oninput="expandEquipmentUI()" class="w-10 text-center text-xl text-fix-blue bg-transparent outline-none font-black font-mono"></div><div id="productInputsContainer" class="space-y-2"></div><div id="accesoriosContainerAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 italic font-black"></div></div>
                         <div id="warrantyFields" class="hidden space-y-4 p-4 bg-fix-blue/5 rounded-3xl border-2 border-fix-blue/10 italic"><p class="text-[10px] font-black text-fix-blue underline uppercase">DATOS DE GARANTÍA (SIN COSTO)</p><select id="warrantyEquipmentSelect" class="w-full p-3 bg-white rounded-xl font-black text-xs uppercase shadow-sm outline-none"></select><textarea id="warrantyDamageDesc" placeholder="DESCRIBA LA FALLA O MOTIVO DE LA GARANTÍA..." class="w-full p-4 bg-white rounded-2xl font-black text-xs uppercase shadow-inner min-h-[100px] outline-none border-none"></textarea></div>
                         <div id="financialDashboardRegistration" class="mt-8 grid grid-cols-3 gap-2 text-center"><div class="bg-slate-50 p-2 rounded-xl italic text-[8px]">M.O. (MAESTRO)<br><span id="displayCostoInstalacion" class="text-sm font-black">$0.00</span></div><div class="bg-slate-50 p-2 rounded-xl italic text-[8px]">INSUMOS<br><span id="displayTotalAccesorios" class="text-sm font-black">$0.00</span></div><div class="bg-fix-accent p-2 rounded-xl font-black text-white shadow-lg uppercase">TOTAL CAJA<br><span id="displayTotalFinal" class="text-lg font-mono">$0.00</span></div></div>
-                        <button type="submit" class="w-full bg-fix-blue text-white py-4 rounded-2xl mt-4 text-lg font-black uppercase italic shadow-lg active:scale-95 transition-all">🚀 AGENDAR VISITA</button>
+                        
+                        <!-- BOTONES DE ACCIÓN MEJORADOS -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <button type="button" onclick="saveVisit(false)" class="bg-fix-blue text-white py-4 rounded-2xl text-lg font-black uppercase italic shadow-lg active:scale-95 transition-all">🚀 AGENDAR VISITA</button>
+                            <button type="button" onclick="saveVisit(true)" class="bg-fix-pending text-white py-4 rounded-2xl text-lg font-black uppercase italic shadow-lg active:scale-95 transition-all">⏳ A PENDIENTES</button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -875,11 +884,15 @@
                 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     <div class="xl:col-span-2 bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50 font-black italic">
                         <h2 class="text-xl font-black uppercase mb-6 border-b-4 border-fix-blue pb-2 font-sans italic">MANTENIMIENTOS FIX - REGISTRO</h2>
-                        <form id="maintForm" onsubmit="event.preventDefault(); saveMantenimiento();">
+                        <form id="maintForm" onsubmit="event.preventDefault();">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 uppercase font-black">
                                 <input type="text" name="mNombre" placeholder="CLIENTE*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase text-sm"><input type="tel" name="mTelefono" placeholder="TELÉFONO*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner font-mono text-sm"><input type="text" name="mCalle" placeholder="CALLE*" required class="p-4 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-sm"><input type="text" name="mDireccion" placeholder="LINK GPS (OPCIONAL)" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner text-sm"><input type="text" name="mEquipo" placeholder="EQUIPO*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner text-sm"><select name="mTecnico" id="selectTecnicoMaint" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase italic text-sm"></select><input type="number" name="mPrecio" placeholder="VALOR ESTIMADO $ (OPCIONAL)" step="0.01" class="p-4 bg-blue-50 border border-fix-blue/20 rounded-xl font-black text-fix-blue font-mono text-sm"><select name="mPago" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner italic text-sm"><option value="EFECTIVO">EFECTIVO</option><option value="TRANSFERENCIA">TRANSFERENCIA</option></select>
                             </div>
-                            <button type="submit" class="w-full bg-fix-blue text-white py-4 rounded-2xl mt-6 text-lg font-black uppercase italic shadow-lg">🚀 AGENDAR MANTENIMIENTO</button>
+                            <!-- BOTONES DE MANTENIMIENTO -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                                <button type="button" onclick="saveMantenimiento(false)" class="bg-fix-blue text-white py-4 rounded-2xl text-lg font-black uppercase italic shadow-lg">🚀 AGENDAR MANTENIMIENTO</button>
+                                <button type="button" onclick="saveMantenimiento(true)" class="bg-fix-pending text-white py-4 rounded-2xl text-lg font-black uppercase italic shadow-lg">⏳ A PENDIENTES</button>
+                            </div>
                         </form>
                     </div>
                     <div class="bg-slate-900 p-6 rounded-[2rem] shadow-2xl text-white font-black flex flex-col justify-between italic">
