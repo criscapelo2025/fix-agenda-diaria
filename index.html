@@ -100,10 +100,10 @@
         const LUGARES_COMPRA = ["", "COMERCIAL KYWI", "COMERCIAL SOLIS", "COMO HOGAR", "SUKASA", "LUNA PAZMIÑO", "MACAOFERTAS", "HOME VEGA", "MERCARD", "TEKA DIRECTO", "ALMACENES BOYACÁ", "VTORIA HOGAR", "OTRO"];
         const TIPOS_SERVICIO = ["Instalación", "Garantía", "Fuera de Garantía", "Mantenimiento", "Reparación", "Visita Técnica"];
         
-        const TIPOS_EQUIPO = ["Horno Eléctrico", "Horno a Gas", "Cocina Inducción", "Cocina a Gas", "Microondas", "Campana Tradicional", "Campana Decorativa", "Campana Isla", "Refrigerador", "Triturador", "Grifería", "Fregadero", "Lavavajillas", "Cafetera", "PARRILLA BBQ"];
+        const TIPOS_EQUIPO = ["Horno Eléctrico", "Horno a Gas", "Cocina Inducción", "Cocina a Gas", "Microondas", "Campana Tradicional", "Campana Decorativa", "Campana Isla", "Refrigerador", "Triturador", "Grifería", "Fregadero", "Lavavajillas", "Cafetera", "PARRILLA BBQ", "Vinera"];
         
         const COSTOS_EQUIPO = {
-            "Horno Eléctrico": 25.00, "Horno a Gas": 29.00, "Cocina Inducción": 25.00, "Cocina a Gas": 29.00, "Microondas": 25.00, "Campana Tradicional": 15.00, "Campana Decorativa": 36.00, "Campana Isla": 45.00, "Refrigerador": 30.00, "Triturador": 15.00, "Grifería": 13.00, "Fregadero": 13.00, "Lavavajillas": 25.00, "Cafetera": 25.00, "PARRILLA BBQ": 29.00
+            "Horno Eléctrico": 25.00, "Horno a Gas": 29.00, "Cocina Inducción": 25.00, "Cocina a Gas": 29.00, "Microondas": 25.00, "Campana Tradicional": 15.00, "Campana Decorativa": 36.00, "Campana Isla": 45.00, "Refrigerador": 30.00, "Triturador": 15.00, "Grifería": 13.00, "Fregadero": 13.00, "Lavavajillas": 25.00, "Cafetera": 25.00, "PARRILLA BBQ": 29.00, "Vinera": 25.00
         };
 
         const ACCESORIOS_DEFAULT = { 
@@ -419,6 +419,8 @@
                 </tr>
                 <tr id="detail-${v.id}" class="hidden detail-row uppercase font-black"><td colspan="9" class="p-4 bg-slate-50 border-y border-slate-200"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="bg-white p-4 rounded-xl shadow-sm"><p class="text-[10px] font-black text-fix-blue uppercase mb-2 italic tracking-tighter">📄 Información para Orden Manual</p>
                 <p class="text-xs uppercase mb-1"><b>CÉDULA:</b> <span class="text-fix-blue font-mono">${v.cedula || '---'}</span></p>
+                <p class="text-xs uppercase mb-1"><b>EMAIL:</b> <span class="text-fix-blue font-mono">${v.email || '---'}</span></p>
+                <p class="text-xs uppercase mb-1"><b>FECHA COMPRA:</b> <span class="text-fix-blue font-mono">${v.fechaEmision || '---'}</span></p>
                 <p class="text-xs uppercase mb-1"><b>EQUIPOS:</b> ${v.esMantenimiento ? v.mantenimientoEquipo : (v.equipos || []).map(e=>e.descProducto).join(', ')}</p>
                 <p class="text-xs uppercase mb-1"><b>FACTURA COMPRA:</b> <span class="text-fix-report font-mono">${v.numFactura || '---'}</span></p>
                 <p class="text-xs uppercase mb-1"><b>LUGAR COMPRA:</b> <span class="text-fix-accent font-bold">${v.lugarCompra || '---'}</span></p>
@@ -695,6 +697,7 @@
             document.getElementById('edit_email').value = v.email || "";
             document.getElementById('edit_cedula').value = v.cedula || "";
             document.getElementById('edit_fecha').value = v.fechaInstalacion || "";
+            document.getElementById('edit_fechaEmision').value = v.fechaEmision || "";
             document.getElementById('edit_direccion').value = v.direccion || "";
             document.getElementById('edit_priority').value = v.priority || 0;
             document.getElementById('edit_tecnico').value = v.tecnico || "";
@@ -712,6 +715,24 @@
             const count = parseInt(countInput ? countInput.value : 1) || 1;
             const container = document.getElementById('editEquiposContainer');
             if(!container) return;
+            
+            // Si el argumento 'equipos' viene vacío (por ejemplo desde oninput), intentamos leer lo que ya hay en pantalla
+            if (!equipos || equipos.length === 0) {
+                equipos = [];
+                const selects = document.querySelectorAll('.edit-eq-select');
+                const codes = document.querySelectorAll('.edit-eq-code');
+                const series = document.querySelectorAll('.edit-eq-serie');
+                const costs = document.querySelectorAll('.edit-eq-cost');
+                for (let j = 0; j < selects.length; j++) {
+                    equipos.push({
+                        descProducto: selects[j].value,
+                        codProducto: codes[j].value,
+                        serieEquipo: series[j].value,
+                        costoBase: parseFloat(costs[j].value) || 0
+                    });
+                }
+            }
+
             let unitPrice = 0; if (count === 2) unitPrice = 20.00; else if (count >= 3) unitPrice = 15.00;
             container.innerHTML = '';
             for(let i=0; i<count; i++) {
@@ -741,7 +762,20 @@
             let updatedAccs = [];
             document.querySelectorAll('.edit-acc-qty').forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) { updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: parseFloat(i.dataset.price) || 0 }); } });
             database.ref('visits/' + id).update({
-                nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), telefono: document.getElementById('edit_telefono').value, email: document.getElementById('edit_email').value.toLowerCase(), cedula: document.getElementById('edit_cedula').value, fechaInstalacion: document.getElementById('edit_fecha').value, direccion: document.getElementById('edit_direccion').value, tecnico: document.getElementById('edit_tecnico').value, numFactura: document.getElementById('edit_numFactura').value.toUpperCase(), lugarCompra: document.getElementById('edit_lugarCompra').value, priority: parseInt(document.getElementById('edit_priority').value) || 0, equipos: updatedEquipos, accesoriosVendidos: updatedAccs, observacionesAdmin: document.getElementById('edit_observaciones').value.toUpperCase()
+                nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), 
+                telefono: document.getElementById('edit_telefono').value, 
+                email: document.getElementById('edit_email').value.toLowerCase(), 
+                cedula: document.getElementById('edit_cedula').value, 
+                fechaInstalacion: document.getElementById('edit_fecha').value, 
+                fechaEmision: document.getElementById('edit_fechaEmision').value,
+                direccion: document.getElementById('edit_direccion').value, 
+                tecnico: document.getElementById('edit_tecnico').value, 
+                numFactura: document.getElementById('edit_numFactura').value.toUpperCase(), 
+                lugarCompra: document.getElementById('edit_lugarCompra').value, 
+                priority: parseInt(document.getElementById('edit_priority').value) || 0, 
+                equipos: updatedEquipos, 
+                accesoriosVendidos: updatedAccs, 
+                observacionesAdmin: document.getElementById('edit_observaciones').value.toUpperCase()
             }).then(() => { showMessage("✅ Actualizado", "fix-report"); closeEditModal(); });
         };
 
@@ -764,7 +798,7 @@
                 const note = isPending ? 'INGRESADO DIRECTO A PENDIENTES - REVISAR TEMA' : (data.observacionesAdmin || '').toUpperCase();
                 
                 const ref = database.ref('visits').push();
-                ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), telefono: data.telefono || '', callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', cedula: data.cedula || '', lugarCompra: data.lugarCompra || 'OTRO', fechaInstalacion: document.getElementById('filterDateInput').value, tecnico: data.tecnico || '', tipoAtencion: data.tipoServicioGlobal, estado: status, createdAt: Date.now(), equipos: eqs, accesoriosVendidos: accs, financiera: { totalCliente: totalFinal }, priority: 0, observacionesAdmin: note }).then(() => { showMessage(isPending ? "⏳ Guardado en Pendientes" : "🚀 Agendado", isPending ? "fix-pending" : "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
+                ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), telefono: data.telefono || '', callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', cedula: data.cedula || '', email: data.email || '', lugarCompra: data.lugarCompra || 'OTRO', fechaInstalacion: document.getElementById('filterDateInput').value, fechaEmision: data.fechaEmision || '', tecnico: data.tecnico || '', tipoAtencion: data.tipoServicioGlobal, estado: status, createdAt: Date.now(), equipos: eqs, accesoriosVendidos: accs, financiera: { totalCliente: totalFinal }, priority: 0, observacionesAdmin: note }).then(() => { showMessage(isPending ? "⏳ Guardado en Pendientes" : "🚀 Agendado", isPending ? "fix-pending" : "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
             } catch (err) { showMessage("❌ Error Crítico", "fix-error"); }
         };
 
@@ -841,6 +875,15 @@
             const elLugar = document.getElementById('selectLugar');
             const elLugarEdit = document.getElementById('edit_lugarCompra');
             LUGARES_COMPRA.forEach(i => { if(elLugar) elLugar.add(new Option(i || "--- LUGAR COMPRA ---", i)); if(elLugarEdit) elLugarEdit.add(new Option(i || "--- LUGAR COMPRA ---", i)); });
+            
+            // Llenar Vinera a la lista de garantías opcionalmente si es necesario
+            const warrantySelect = document.getElementById('warrantyEquipmentSelect');
+            if(warrantySelect) {
+                TIPOS_EQUIPO.forEach(e => {
+                    if(e) warrantySelect.add(new Option(e, e));
+                });
+            }
+
             renderInsumosAdmin(); expandEquipmentUI();
         });
     </script>
@@ -1061,6 +1104,7 @@
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">N° FACTURA COMPRA</label><input type="text" id="edit_numFactura" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">LUGAR COMPRA</label><select id="edit_lugarCompra" class="w-full p-2 bg-white rounded-lg border font-black text-[10px] uppercase"></select></div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">FECHA ATENCIÓN</label><input type="date" id="edit_fecha" class="w-full p-2 bg-white rounded-lg border font-black text-xs font-mono"></div>
+                <div><label class="text-[7px] text-slate-400 ml-2 uppercase">FECHA EMISIÓN (COMPRA)</label><input type="date" id="edit_fechaEmision" class="w-full p-2 bg-white rounded-lg border font-black text-xs font-mono"></div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">TÉCNICO</label><select id="edit_tecnico" class="w-full p-2 bg-white rounded-lg border font-black text-[10px] uppercase"></select></div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">PRIORIDAD (RUTA)</label><input type="number" id="edit_priority" class="w-full p-2 bg-yellow-50 rounded-lg border font-black text-xs font-mono"></div>
                 <div class="md:col-span-3"><label class="text-[7px] text-slate-400 ml-2 uppercase">LINK GPS / DIRECCIÓN</label><input type="text" id="edit_direccion" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
@@ -1071,7 +1115,7 @@
             <div class="p-4 bg-blue-50/50 border border-blue-100 rounded-3xl mb-6">
                 <div class="flex justify-between items-center mb-3">
                     <h3 class="text-xs font-black text-fix-blue uppercase underline italic">Equipos registrados</h3>
-                    <div class="flex items-center gap-2 bg-white px-2 py-1 rounded-full shadow-sm border"><label class="text-[8px] font-black uppercase">CANTIDAD:</label><input type="number" id="edit_numEquipos" min="1" oninput="rebuildEditEquipmentInputs([])" class="w-8 text-center bg-transparent font-black text-xs outline-none"></div>
+                    <div class="flex items-center gap-2 bg-white px-2 py-1 rounded-full shadow-sm border"><label class="text-[8px] font-black uppercase">CANTIDAD:</label><input type="number" id="edit_numEquipos" min="1" oninput="rebuildEditEquipmentInputs()" class="w-8 text-center bg-transparent font-black text-xs outline-none"></div>
                 </div>
                 <div id="editEquiposContainer" class="space-y-3"></div>
             </div>
