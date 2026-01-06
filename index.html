@@ -296,6 +296,7 @@
                 renderUIAgenda(); renderRutero(); processFinancialBalance(); processMaintBalance(); renderInventoryView(); renderPendientes();
                 if(currentView === 'reporte_teka') renderReporteTeka();
                 if(currentView === 'mantenimiento') renderReporteMantenimiento();
+                if(currentView === 'buscador') renderBuscador();
                 showMessage("✅ Actualizado", "fix-report");
             });
         }
@@ -313,7 +314,7 @@
                 return;
             }
             currentView = view;
-            const sections = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView'];
+            const sections = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView'];
             sections.forEach(function(id) { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
 
             if(view === 'reporte_admin') { 
@@ -323,6 +324,7 @@
             else if(view === 'reporte_teka') { const rtv = document.getElementById('reporteTekaView'); if(rtv) rtv.classList.remove('hidden'); renderReporteTeka(); }
             else if(view === 'mantenimiento') { const mv = document.getElementById('mantenimientoView'); if(mv) mv.classList.remove('hidden'); renderReporteMantenimiento(); processMaintBalance(); }
             else if(view === 'pendientes') { const pv = document.getElementById('pendientesView'); if(pv) pv.classList.remove('hidden'); renderPendientes(); }
+            else if(view === 'buscador') { const bv = document.getElementById('buscadorView'); if(bv) bv.classList.remove('hidden'); renderBuscador(); }
             else { const el = document.getElementById(view + 'View'); if(el) el.classList.remove('hidden'); }
             
             if(view === 'rutero') renderRutero();
@@ -401,7 +403,6 @@
                 const tipoServ = v.esMantenimiento ? '⚙️ MANT.' : (v.tipoAtencion === 'Garantía' ? '🛡️ GARANTÍA' : '🛠️ SERV.TEC');
                 const colorTipo = v.esMantenimiento ? 'text-fix-accent' : (v.tipoAtencion === 'Garantía' ? 'text-fix-blue' : 'text-fix-report');
                 
-                // MEJORA: Validación de dirección para evitar error 404 en el Mapa
                 const mapLink = (v.direccion && v.direccion.toString().includes('http')) 
                                 ? v.direccion 
                                 : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(v.direccion || v.callePrincipal || '');
@@ -547,40 +548,15 @@
             const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "REPORTE_SAP_" + start + ".csv"); link.click();
         }
 
-        function downloadMantenimientoCSV() {
-            let csv = "FECHA,CLIENTE,TELÉFONO,CALLE,EQUIPO,VALOR,ESTADO\n";
-            document.querySelectorAll('#mantenimientoReporteBody tr').forEach(row => { const cols = row.querySelectorAll('td'); if(cols.length >= 7) { csv += Array.from(cols).slice(0,7).map(c => '"' + c.innerText + '"').join(",") + "\n"; } });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "MANTENIMIENTOS.csv"); link.click();
-        }
-
-        function downloadCajaCSV() {
-            let csv = "FECHA,TIPO,DETALLE,MONTO\n";
-            document.querySelectorAll('#contabilidadTableBody tr').forEach(row => { const cols = row.querySelectorAll('td'); if(cols.length >= 4) { csv += Array.from(cols).slice(0,4).map(c => '"' + c.innerText + '"').join(",") + "\n"; } });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "CAJA_FIX.csv"); link.click();
-        }
-
-        function downloadInventoryCSV() {
-            let csv = "INSUMO,ENTRADAS,UTILIZADO,STOCK,PVP\n";
-            document.querySelectorAll('#inventoryTableBody tr').forEach(row => { const cols = row.querySelectorAll('td'); if(cols.length >= 5) { csv += Array.from(cols).map(c => '"' + c.innerText + '"').join(",") + "\n"; } });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "STOCK_FIX.csv"); link.click();
-        }
-
         function renderReporteTeka() {
             const body = document.getElementById('tekaReporteBody'); if(!body) return;
             const start = document.getElementById('maestroDateStart').value; 
             const end = document.getElementById('maestroDateEnd').value;
             
-            // FILTRO BASE
             let filtered = visitsArray.filter(v => !v.esMantenimiento && v.estado === 'Atendido');
             if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
-            
-            // ORDENAR POR FECHA DE ATENCIÓN (CRONOLÓGICO)
             filtered.sort((a, b) => a.fechaInstalacion.localeCompare(b.fechaInstalacion));
 
-            // SEGMENTACIÓN
             const garantias = filtered.filter(v => v.tipoAtencion === 'Garantía');
             const bbqs = filtered.filter(v => v.tipoAtencion !== 'Garantía' && (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ"));
             const multis = filtered.filter(v => v.tipoAtencion !== 'Garantía' && !(v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ") && (v.equipos || []).length > 1);
@@ -596,9 +572,9 @@
             };
 
             body.innerHTML = 
-                renderSection("📋 REPORTE UN PRODUCTO", singles) +
-                renderSection("📚 REPORTE MULTI-PRODUCTO", multis) +
-                renderSection("🔥 REPORTE PARRILLAS BBQ", bbqs) +
+                renderSection("📋 REPORTE UN PRODUCTO", singles) + 
+                renderSection("📚 REPORTE MULTI-PRODUCTO", multis) + 
+                renderSection("🔥 REPORTE PARRILLAS BBQ", bbqs) + 
                 renderSection("🛡️ REPORTE GARANTÍAS", garantias);
         }
 
@@ -703,42 +679,73 @@
             document.getElementById('edit_tecnico').value = v.tecnico || "";
             document.getElementById('edit_numFactura').value = v.numFactura || "";
             document.getElementById('edit_lugarCompra').value = v.lugarCompra || "";
-            document.getElementById('edit_numEquipos').value = v.equipos ? v.equipos.length : 1;
             document.getElementById('edit_observaciones').value = v.observacionesAdmin || "";
+            document.getElementById('edit_numEquipos').value = v.equipos ? v.equipos.length : 1;
+            
             rebuildEditEquipmentInputs(v.equipos || []);
             rebuildEditAccessoriesInputs(v.accesoriosVendidos || []);
+            
             document.getElementById('editModal').classList.remove('hidden');
         };
 
-        function rebuildEditEquipmentInputs(equipos) {
+        function rebuildEditEquipmentInputs(inputEquipos = null) {
             const countInput = document.getElementById('edit_numEquipos');
             const count = parseInt(countInput ? countInput.value : 1) || 1;
             const container = document.getElementById('editEquiposContainer');
             if(!container) return;
-            
-            // Si el argumento 'equipos' viene vacío (por ejemplo desde oninput), intentamos leer lo que ya hay en pantalla
-            if (!equipos || equipos.length === 0) {
-                equipos = [];
-                const selects = document.querySelectorAll('.edit-eq-select');
-                const codes = document.querySelectorAll('.edit-eq-code');
-                const series = document.querySelectorAll('.edit-eq-serie');
-                const costs = document.querySelectorAll('.edit-eq-cost');
-                for (let j = 0; j < selects.length; j++) {
-                    equipos.push({
-                        descProducto: selects[j].value,
-                        codProducto: codes[j].value,
-                        serieEquipo: series[j].value,
-                        costoBase: parseFloat(costs[j].value) || 0
+
+            let equiposActuales = [];
+
+            if (inputEquipos === null) {
+                const currentRows = container.querySelectorAll('.equipment-edit-row');
+                currentRows.forEach(row => {
+                    equiposActuales.push({
+                        descProducto: row.querySelector('.edit-eq-select').value,
+                        codProducto: row.querySelector('.edit-eq-code').value,
+                        serieEquipo: row.querySelector('.edit-eq-serie').value,
+                        costoBase: parseFloat(row.querySelector('.edit-eq-cost').value) || 0
                     });
-                }
+                });
+            } else {
+                equiposActuales = [...inputEquipos];
             }
 
-            let unitPrice = 0; if (count === 2) unitPrice = 20.00; else if (count >= 3) unitPrice = 15.00;
             container.innerHTML = '';
-            for(let i=0; i<count; i++) {
-                const eq = equipos[i] || { descProducto: "", costoBase: unitPrice, codProducto: "", serieEquipo: "" };
-                container.innerHTML += `<div class="p-3 border rounded-xl bg-slate-50 mb-3 shadow-sm"><p class="text-[9px] font-black mb-2 text-fix-blue">EQUIPO ${i+1}</p><div class="grid grid-cols-1 gap-2"><select class="edit-eq-select w-full p-2 text-[10px] font-black uppercase rounded border" onchange="updateEditPrice(this, ${i})"><option value="">-- ELEGIR PRODUCTO --</option>${TIPOS_EQUIPO.map(t=>`<option value="${t}" ${eq.descProducto === t ? 'selected' : ''}>${t}</option>`).join('')}</select><div class="grid grid-cols-2 gap-2"><div><label class="text-[7px] text-slate-400">CÓDIGO SAP</label><input type="text" class="edit-eq-code w-full p-2 text-[10px] font-black rounded border" value="${eq.codProducto || ''}"></div><div><label class="text-[7px] text-slate-400">NÚMERO SERIE</label><input type="text" class="edit-eq-serie w-full p-2 text-[10px] font-black rounded border" value="${eq.serieEquipo || ''}"></div></div><div><label class="text-[7px] text-slate-400">VALOR MO $</label><input type="number" step="0.01" value="${(eq.costoBase || 0).toFixed(2)}" class="edit-eq-cost w-full p-2 text-[10px] font-mono font-black rounded border"></div></div></div>`;
+
+            for(let i = 0; i < count; i++) {
+                const eq = equiposActuales[i] || { descProducto: "", costoBase: 0, codProducto: "", serieEquipo: "" };
+                let currentDesc = (eq.descProducto || "").toUpperCase();
+                let defaultCost = eq.costoBase;
+                
+                if (eq.costoBase === 0 && !eq.descProducto) {
+                    if (count === 1) defaultCost = 25; 
+                    else if (count === 2) defaultCost = 20;
+                    else defaultCost = 15;
+                }
+
+                container.innerHTML += `
+                <div class="equipment-edit-row p-3 border rounded-xl bg-slate-50 mb-3 shadow-sm">
+                    <p class="text-[9px] font-black mb-2 text-fix-blue uppercase italic">EQUIPO REGISTRADO ${i+1}</p>
+                    <div class="grid grid-cols-1 gap-2">
+                        <select class="edit-eq-select w-full p-2 text-[10px] font-black uppercase rounded border border-slate-200 outline-none">
+                            <option value="">-- ELEGIR PRODUCTO --</option>
+                            ${TIPOS_EQUIPO.map(t => {
+                                const isSelected = (currentDesc === t.toUpperCase()) ? 'selected' : '';
+                                return `<option value="${t}" ${isSelected}>${t}</option>`;
+                            }).join('')}
+                        </select>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><label class="text-[7px] text-slate-400 font-black">CÓDIGO SAP</label><input type="text" class="edit-eq-code w-full p-2 text-[10px] font-black rounded border border-slate-200 uppercase" value="${eq.codProducto || ''}"></div>
+                            <div><label class="text-[7px] text-slate-400 font-black">NÚMERO SERIE</label><input type="text" class="edit-eq-serie w-full p-2 text-[10px] font-black rounded border border-slate-200 uppercase" value="${eq.serieEquipo || ''}"></div>
+                        </div>
+                        <div><label class="text-[7px] text-fix-blue font-black italic">💰 PRECIO LIQUIDACIÓN:</label><input type="number" step="0.01" value="${defaultCost.toFixed(2)}" class="edit-eq-cost w-full p-2 text-[11px] font-mono font-black rounded border border-blue-100 bg-blue-50/30 text-fix-report"></div>
+                    </div>
+                </div>`;
             }
+
+            container.querySelectorAll('.edit-eq-select').forEach((sel, idx) => {
+                sel.onchange = function() { updateEditPrice(this, idx); };
+            });
         }
 
         window.updateEditPrice = function(selectEl, index) {
@@ -755,12 +762,24 @@
             const codes = document.querySelectorAll('.edit-eq-code');
             const series = document.querySelectorAll('.edit-eq-serie');
             const selectsCosts = document.querySelectorAll('.edit-eq-cost');
+            
             let updatedEquipos = []; 
+            let moTotal = 0;
+
             for(let i=0; i<selects.length; i++) {
-                updatedEquipos.push({ descProducto: selects[i].value.toUpperCase(), costoBase: parseFloat(selectsCosts[i].value) || 0, codProducto: codes[i].value.toUpperCase(), serieEquipo: series[i].value.toUpperCase() });
+                const cost = parseFloat(selectsCosts[i].value) || 0;
+                updatedEquipos.push({ descProducto: selects[i].value.toUpperCase(), costoBase: cost, codProducto: codes[i].value.toUpperCase(), serieEquipo: series[i].value.toUpperCase() });
+                moTotal += cost;
             }
+
             let updatedAccs = [];
-            document.querySelectorAll('.edit-acc-qty').forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) { updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: parseFloat(i.dataset.price) || 0 }); } });
+            let accTotal = 0;
+            document.querySelectorAll('.edit-acc-qty').forEach(function(i) { 
+                const q = parseInt(i.value) || 0; 
+                const p = parseFloat(i.dataset.price) || 0;
+                if(q > 0) { updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); accTotal += (q * p); } 
+            });
+
             database.ref('visits/' + id).update({
                 nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), 
                 telefono: document.getElementById('edit_telefono').value, 
@@ -775,8 +794,9 @@
                 priority: parseInt(document.getElementById('edit_priority').value) || 0, 
                 equipos: updatedEquipos, 
                 accesoriosVendidos: updatedAccs, 
-                observacionesAdmin: document.getElementById('edit_observaciones').value.toUpperCase()
-            }).then(() => { showMessage("✅ Actualizado", "fix-report"); closeEditModal(); });
+                observacionesAdmin: document.getElementById('edit_observaciones').value.toUpperCase(),
+                'financiera/totalCliente': (moTotal + accTotal)
+            }).then(() => { showMessage("✅ Datos Actualizados", "fix-report"); closeEditModal(); });
         };
 
         window.saveVisit = function(isPending = false) {
@@ -806,7 +826,7 @@
             database.ref('visits').on('value', snap => {
                 visitsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : [];
                 renderUIAgenda(); renderRutero(); renderInventoryView(); renderPendientes();
-                if(currentView === 'reporte_teka') renderReporteTeka(); if(currentView === 'mantenimiento') renderReporteMantenimiento(); if(currentView === 'contabilidad') processFinancialBalance();
+                if(currentView === 'reporte_teka') renderReporteTeka(); if(currentView === 'mantenimiento') renderReporteMantenimiento(); if(currentView === 'contabilidad') processFinancialBalance(); if(currentView === 'buscador') renderBuscador();
             });
             database.ref('movements').on('value', snap => { movementsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : []; if(currentView === 'contabilidad') processFinancialBalance(); });
             database.ref('inventory_entries').on('value', snap => { inventoryEntries = snap.val() ? Object.values(snap.val()) : []; renderInventoryView(); });
@@ -861,28 +881,95 @@
             ref.set({ id: ref.key, concepto: c.toUpperCase(), monto: m, fecha: timestamp, type: t, formaPago: p, tecnico: tech || 'ADMIN' }).then(() => { document.getElementById('movConcepto').value=''; document.getElementById('movMonto').value=''; showMessage("✅ Manual Guardado", "fix-report"); });
         };
 
+        /**
+         * LÓGICA DE BUSCADOR PRO:
+         * Filtra visitsArray basado en texto global y filtros de fecha/tecnico.
+         */
+        function renderBuscador() {
+            const query = document.getElementById('searchGlobalInput').value.toUpperCase();
+            const start = document.getElementById('searchDateStart').value;
+            const end = document.getElementById('searchDateEnd').value;
+            const tech = document.getElementById('searchTechFilter').value;
+            const type = document.getElementById('searchTypeFilter').value;
+
+            let filtered = visitsArray.filter(v => {
+                // 1. Filtro de Texto (Global)
+                const textMatch = !query || 
+                    (v.nombreCliente && v.nombreCliente.toUpperCase().includes(query)) ||
+                    (v.cedula && v.cedula.includes(query)) ||
+                    (v.numFactura && v.numFactura.toUpperCase().includes(query)) ||
+                    (v.telefono && v.telefono.includes(query)) ||
+                    (v.equipos && v.equipos.some(e => 
+                        (e.codProducto && e.codProducto.toUpperCase().includes(query)) || 
+                        (e.serieEquipo && e.serieEquipo.toUpperCase().includes(query)) ||
+                        (e.descProducto && e.descProducto.toUpperCase().includes(query))
+                    ));
+                
+                // 2. Filtro de Fechas
+                const dateMatch = (!start || v.fechaInstalacion >= start) && (!end || v.fechaInstalacion <= end);
+                
+                // 3. Filtro de Técnico
+                const techMatch = !tech || v.tecnico === tech;
+
+                // 4. Filtro de Tipo de Servicio
+                const typeMatch = (type === 'TODOS') || 
+                                  (type === 'MANTENIMIENTO' && v.esMantenimiento) ||
+                                  (type === 'NORMAL' && !v.esMantenimiento);
+
+                return textMatch && dateMatch && techMatch && typeMatch;
+            });
+
+            // Ordenar por fecha descendente
+            filtered.sort((a,b) => b.fechaInstalacion.localeCompare(a.fechaInstalacion));
+
+            const body = document.getElementById('buscadorResultsBody');
+            if(body) {
+                if(filtered.length === 0) {
+                    body.innerHTML = '<tr><td colspan="8" class="p-10 text-center text-slate-300 font-black italic">Sin resultados</td></tr>';
+                    return;
+                }
+                body.innerHTML = filtered.map(v => `
+                    <tr class="border-b row-hover uppercase font-black">
+                        <td class="p-3 text-[9px] font-mono text-slate-400">${v.fechaInstalacion}</td>
+                        <td class="p-3 text-xs text-fix-blue underline cursor-pointer" onclick="openEditModal('${v.id}')">${v.nombreCliente}</td>
+                        <td class="p-3 text-[9px] font-mono">${v.cedula || '-'}</td>
+                        <td class="p-3 text-[9px]">${v.tecnico || '-'}</td>
+                        <td class="p-3 text-[8px] max-w-[200px] truncate">${v.esMantenimiento ? 'MANT: ' + v.mantenimientoEquipo : (v.equipos || []).map(e=>e.descProducto).join(', ')}</td>
+                        <td class="p-3 text-[9px] font-mono text-fix-report">${v.numFactura || '-'}</td>
+                        <td class="p-3 text-center">
+                            <span class="px-2 py-0.5 rounded-full text-[7px] ${v.estado === 'Atendido' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${v.estado}</span>
+                        </td>
+                        <td class="p-3 text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td>
+                    </tr>
+                `).join('');
+            }
+        }
+
         function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
         window.closeEditFinanceModal = function() { document.getElementById('editFinanceModal').classList.add('hidden'); };
 
         document.addEventListener('DOMContentLoaded', function() {
             const hoy = new Date().toISOString().split('T')[0];
-            ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'cajaDateStart', 'cajaDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoy; });
+            ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'cajaDateStart', 'cajaDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoy; });
+            
+            // Cargar histórico en buscador por defecto (6 meses atrás)
+            const date6Months = new Date(); date6Months.setMonth(date6Months.getMonth() - 6);
+            if(document.getElementById('searchDateStart')) document.getElementById('searchDateStart').value = date6Months.toISOString().split('T')[0];
+
             const p = new URLSearchParams(window.location.search); 
             const t = p.get('tech');
             if(t && LISTA_TECNICOS.indexOf(t) !== -1) { currentTechUser = t; document.body.classList.add('technician-mode'); document.getElementById('userDisplayLabel').textContent = "RUTA: " + t.toUpperCase(); document.getElementById('adminNav').classList.add('hidden'); changeMasterView('rutero'); } 
+            
             startSync();
-            LISTA_TECNICOS.forEach(item => { ['selectTecnico', 'ruteroTechFilter', 'selectTecnicoMaint', 'edit_tecnico', 'movTecnico', 'cajaTechFilter', 'pendingTechFilter'].forEach(id => { const el = document.getElementById(id); if(el) el.add(new Option(item || (id === 'cajaTechFilter' ? "TODOS LOS TÉCNICOS" : "--- TÉCNICO ---"), item)); }); });
+            
+            LISTA_TECNICOS.forEach(item => { ['selectTecnico', 'ruteroTechFilter', 'selectTecnicoMaint', 'edit_tecnico', 'movTecnico', 'cajaTechFilter', 'pendingTechFilter', 'searchTechFilter'].forEach(id => { const el = document.getElementById(id); if(el) el.add(new Option(item || (id.includes('Filter') ? "TODOS LOS TÉCNICOS" : "--- TÉCNICO ---"), item)); }); });
+            
             const elLugar = document.getElementById('selectLugar');
             const elLugarEdit = document.getElementById('edit_lugarCompra');
             LUGARES_COMPRA.forEach(i => { if(elLugar) elLugar.add(new Option(i || "--- LUGAR COMPRA ---", i)); if(elLugarEdit) elLugarEdit.add(new Option(i || "--- LUGAR COMPRA ---", i)); });
             
-            // Llenar Vinera a la lista de garantías opcionalmente si es necesario
             const warrantySelect = document.getElementById('warrantyEquipmentSelect');
-            if(warrantySelect) {
-                TIPOS_EQUIPO.forEach(e => {
-                    if(e) warrantySelect.add(new Option(e, e));
-                });
-            }
+            if(warrantySelect) { TIPOS_EQUIPO.forEach(e => { if(e) warrantySelect.add(new Option(e, e)); }); }
 
             renderInsumosAdmin(); expandEquipmentUI();
         });
@@ -896,9 +983,9 @@
         <header class="mb-4 sm:mb-10 flex flex-col xl:flex-row justify-between items-center gap-2 no-print">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
-                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.7.9</span></div></div>
+                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.8.5</span></div></div>
             </div>
-            <!-- MENU ADMIN -->
+            <!-- MENU ADMIN MEJORADO -->
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
                 <button onclick="changeMasterView('reporte_admin')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-fix-blue text-white italic">Registro</button>
                 <button onclick="changeMasterView('mantenimiento')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Mantenimiento</button>
@@ -907,11 +994,68 @@
                 <button onclick="changeMasterView('rutero')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Logística</button>
                 <button onclick="changeMasterView('reporte_teka')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Maestro</button>
                 <button onclick="changeMasterView('contabilidad')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Caja</button>
+                <button onclick="changeMasterView('buscador')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">🔍 Buscador Pro</button>
             </nav>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
             
+            <!-- BUSCADOR PRO (NUEVA SECCIÓN) -->
+            <div id="buscadorView" class="hidden lg:col-span-3 space-y-6 admin-only">
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-xl border-[8px] border-slate-50">
+                    <h2 class="text-xl font-black uppercase italic underline text-fix-blue mb-6 tracking-tighter">Buscador Inteligente Global</h2>
+                    
+                    <!-- PANEL DE FILTROS -->
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 items-end italic">
+                        <div class="md:col-span-2">
+                            <label class="text-[8px] ml-2 font-black uppercase">Búsqueda (Nombre, Factura, Cédula, Código SAP, Serie):</label>
+                            <input type="text" id="searchGlobalInput" oninput="renderBuscador()" placeholder="ESCRIBA CUALQUIER DATO..." class="w-full p-4 bg-slate-50 rounded-2xl border-none shadow-inner font-black text-xs uppercase focus:ring-2 focus:ring-fix-blue outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[8px] ml-2 font-black uppercase">Desde:</label>
+                            <input type="date" id="searchDateStart" onchange="renderBuscador()" class="w-full p-4 bg-slate-50 rounded-2xl border-none shadow-inner font-black text-xs font-mono">
+                        </div>
+                        <div>
+                            <label class="text-[8px] ml-2 font-black uppercase">Hasta:</label>
+                            <input type="date" id="searchDateEnd" onchange="renderBuscador()" class="w-full p-4 bg-slate-50 rounded-2xl border-none shadow-inner font-black text-xs font-mono">
+                        </div>
+                        <div>
+                            <label class="text-[8px] ml-2 font-black uppercase">Técnico:</label>
+                            <select id="searchTechFilter" onchange="renderBuscador()" class="w-full p-4 bg-slate-50 rounded-2xl border-none shadow-inner font-black text-[10px] uppercase outline-none"></select>
+                        </div>
+                        <div>
+                            <label class="text-[8px] ml-2 font-black uppercase">Filtro Rápido:</label>
+                            <select id="searchTypeFilter" onchange="renderBuscador()" class="w-full p-4 bg-slate-50 rounded-2xl border-none shadow-inner font-black text-[10px] uppercase outline-none">
+                                <option value="TODOS">TODOS LOS SERVICIOS</option>
+                                <option value="NORMAL">INSTALACIONES / REPARACIONES</option>
+                                <option value="MANTENIMIENTO">SOLO MANTENIMIENTOS</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- TABLA DE RESULTADOS -->
+                    <div class="overflow-x-auto rounded-3xl border-4 border-slate-50">
+                        <table class="w-full text-left admin-table font-black uppercase">
+                            <thead>
+                                <tr class="text-[9px] bg-slate-900 text-white">
+                                    <th class="p-4">FECHA</th>
+                                    <th class="p-4">CLIENTE</th>
+                                    <th class="p-4">CÉDULA</th>
+                                    <th class="p-4">TÉCNICO</th>
+                                    <th class="p-4">EQUIPOS / DETALLE</th>
+                                    <th class="p-4">FACTURA</th>
+                                    <th class="p-4 text-center">ESTADO</th>
+                                    <th class="p-4 text-center">X</th>
+                                </tr>
+                            </thead>
+                            <tbody id="buscadorResultsBody" class="italic">
+                                <!-- Resultados dinámicos -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- REGISTRO (ADMIN ONLY) -->
             <div id="formContainer" class="lg:col-span-2 space-y-4 admin-only no-print">
                 <div class="bg-white p-4 rounded-3xl shadow-lg"><input type="date" id="filterDateInput" onchange="syncDates('filterDateInput')" class="bg-slate-50 p-3 rounded-xl text-xl font-black italic text-fix-blue outline-none border-none shadow-inner w-full text-center font-mono"></div>
@@ -921,14 +1065,12 @@
                             <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black"><input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black"><input type="text" name="cedula" placeholder="CÉDULA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono"><input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black"><input type="email" name="email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner"><input type="text" name="numFactura" placeholder="N° FACTURA COMPRA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center uppercase font-black"><input type="text" name="direccion" placeholder="LINK GPS (OPCIONAL EN REGISTRO)" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner md:col-span-2"><select name="tecnico" id="selectTecnico" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><select id="selectLugar" name="lugarCompra" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><div class="flex flex-col"><span class="text-[8px] font-black text-slate-400 ml-2 italic">EMISIÓN FACTURA</span><input type="date" name="fechaEmision" id="inputEmision" class="p-3 bg-slate-50 rounded-xl font-bold text-xs outline-none shadow-inner text-center font-mono"></div><select name="tipoServicioGlobal" id="tipoServicioGlobal" onchange="toggleServiceTypeUI()" class="p-3 bg-white border-2 border-fix-blue/10 rounded-xl font-black text-[10px] uppercase text-fix-blue italic"><option value="Instalación">Instalación Estándar</option><option value="Garantía">Garantía de Fábrica</option><option value="Fuera de Garantía">Fuera de Garantía</option><option value="Reparación">Reparación/Serv.Tecnico</option><option value="Visita Técnica">Visita Técnica</option></select>
                         </div>
                         
-                        <!-- NUEVO CAMPO DE OBSERVACIONES ADMINISTRATIVAS -->
                         <div class="mb-6"><textarea name="observacionesAdmin" placeholder="OBSERVACIONES O NOVEDADES PARA EL TÉCNICO (OPCIONAL)..." class="w-full p-4 bg-blue-50/50 border-2 border-fix-blue/10 rounded-2xl font-black text-xs uppercase shadow-inner min-h-[100px] outline-none border-none"></textarea></div>
 
                         <div id="standardServiceFields" class="space-y-4"><div class="bg-slate-50 p-3 rounded-xl flex items-center justify-between shadow-inner"><span class="text-[10px] font-black italic">CANTIDAD EQUIPOS:</span><input type="number" id="numEquipos" name="numEquipos" value="1" min="1" oninput="expandEquipmentUI()" class="w-10 text-center text-xl text-fix-blue bg-transparent outline-none font-black font-mono"></div><div id="productInputsContainer" class="space-y-2"></div><div id="accesoriosContainerAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 italic font-black"></div></div>
                         <div id="warrantyFields" class="hidden space-y-4 p-4 bg-fix-blue/5 rounded-3xl border-2 border-fix-blue/10 italic"><p class="text-[10px] font-black text-fix-blue underline uppercase">DATOS DE GARANTÍA (SIN COSTO)</p><select id="warrantyEquipmentSelect" class="w-full p-3 bg-white rounded-xl font-black text-xs uppercase shadow-sm outline-none"></select><textarea id="warrantyDamageDesc" placeholder="DESCRIBA LA FALLA O MOTIVO DE LA GARANTÍA..." class="w-full p-4 bg-white rounded-2xl font-black text-xs uppercase shadow-inner min-h-[100px] outline-none border-none"></textarea></div>
                         <div id="financialDashboardRegistration" class="mt-8 grid grid-cols-3 gap-2 text-center"><div class="bg-slate-50 p-2 rounded-xl italic text-[8px]">M.O. (MAESTRO)<br><span id="displayCostoInstalacion" class="text-sm font-black">$0.00</span></div><div class="bg-slate-50 p-2 rounded-xl italic text-[8px]">INSUMOS<br><span id="displayTotalAccesorios" class="text-sm font-black">$0.00</span></div><div class="bg-fix-accent p-2 rounded-xl font-black text-white shadow-lg uppercase">TOTAL CAJA<br><span id="displayTotalFinal" class="text-lg font-mono">$0.00</span></div></div>
                         
-                        <!-- BOTONES DE ACCIÓN MEJORADOS -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                             <button type="button" onclick="saveVisit(false)" class="bg-fix-blue text-white py-4 rounded-2xl text-lg font-black uppercase italic shadow-lg active:scale-95 transition-all">🚀 AGENDAR VISITA</button>
                             <button type="button" onclick="saveVisit(true)" class="bg-fix-pending text-white py-4 rounded-2xl text-lg font-black uppercase italic shadow-lg active:scale-95 transition-all">⏳ A PENDIENTES</button>
@@ -977,7 +1119,6 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 uppercase font-black">
                                 <input type="text" name="mNombre" placeholder="CLIENTE*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase text-sm"><input type="tel" name="mTelefono" placeholder="TELÉFONO*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner font-mono text-sm"><input type="text" name="mCalle" placeholder="CALLE*" required class="p-4 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-sm"><input type="text" name="mDireccion" placeholder="LINK GPS (OPCIONAL)" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner text-sm"><input type="text" name="mEquipo" placeholder="EQUIPO*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner text-sm"><select name="mTecnico" id="selectTecnicoMaint" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase italic text-sm"></select><input type="number" name="mPrecio" placeholder="VALOR ESTIMADO $ (OPCIONAL)" step="0.01" class="p-4 bg-blue-50 border border-fix-blue/20 rounded-xl font-black text-fix-blue font-mono text-sm"><select name="mPago" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner italic text-sm"><option value="EFECTIVO">EFECTIVO</option><option value="TRANSFERENCIA">TRANSFERENCIA</option></select>
                             </div>
-                            <!-- BOTONES DE MANTENIMIENTO -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                                 <button type="button" onclick="saveMantenimiento(false)" class="bg-fix-blue text-white py-4 rounded-2xl text-lg font-black uppercase italic shadow-lg">🚀 AGENDAR MANTENIMIENTO</button>
                                 <button type="button" onclick="saveMantenimiento(true)" class="bg-fix-pending text-white py-4 rounded-2xl text-lg font-black uppercase italic shadow-lg">⏳ A PENDIENTES</button>
@@ -1054,7 +1195,6 @@
                         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-60"><span class="text-[8px] uppercase text-slate-500">VENTA TOTAL PERIODO</span><div id="totalIngresosDisplay" class="text-lg font-black text-slate-600">$0.00</div></div>
                     </div>
 
-                    <!-- REGISTRO MANUAL DE CAJA -->
                     <div class="bg-slate-50 p-4 rounded-xl mb-6 grid grid-cols-1 md:grid-cols-6 gap-2 items-end italic font-black border border-slate-200">
                         <div class="md:col-span-1"><label class="text-[7px] ml-2">FECHA MOV.</label><input type="date" id="movFecha" class="w-full p-2 rounded-lg font-black border text-[10px] font-mono shadow-inner"></div>
                         <div class="md:col-span-1"><label class="text-[7px] ml-2">CONCEPTO</label><input type="text" id="movConcepto" placeholder="CONCEPTO..." class="w-full p-2 rounded-lg font-bold outline-none border text-xs shadow-inner"></div>
@@ -1086,7 +1226,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE EDICIÓN ADMINISTRATIVA -->
+    <!-- MODAL DE EDICIÓN ADMINISTRATIVA CORREGIDO -->
     <div id="editModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 font-black admin-only">
         <div class="bg-white w-full max-w-3xl rounded-[2rem] shadow-2xl p-8 font-black italic border-[6px] border-slate-50 uppercase overflow-y-auto max-h-[95vh]">
             <div class="flex justify-between items-start mb-6 border-b-2 pb-2">
@@ -1115,7 +1255,10 @@
             <div class="p-4 bg-blue-50/50 border border-blue-100 rounded-3xl mb-6">
                 <div class="flex justify-between items-center mb-3">
                     <h3 class="text-xs font-black text-fix-blue uppercase underline italic">Equipos registrados</h3>
-                    <div class="flex items-center gap-2 bg-white px-2 py-1 rounded-full shadow-sm border"><label class="text-[8px] font-black uppercase">CANTIDAD:</label><input type="number" id="edit_numEquipos" min="1" oninput="rebuildEditEquipmentInputs()" class="w-8 text-center bg-transparent font-black text-xs outline-none"></div>
+                    <div class="flex items-center gap-2 bg-white px-2 py-1 rounded-full shadow-sm border">
+                        <label class="text-[8px] font-black uppercase tracking-tighter">CANT. EQUIPOS:</label>
+                        <input type="number" id="edit_numEquipos" min="1" oninput="rebuildEditEquipmentInputs()" class="w-10 text-center bg-transparent font-black text-sm outline-none text-fix-blue">
+                    </div>
                 </div>
                 <div id="editEquiposContainer" class="space-y-3"></div>
             </div>
@@ -1123,7 +1266,7 @@
                 <h3 class="text-[10px] font-black text-fix-report mb-2 uppercase italic underline">Insumos y accesorios</h3>
                 <div id="editAccesoriosContainer" class="grid grid-cols-1 md:grid-cols-2 gap-x-4"></div>
             </div>
-            <div class="grid grid-cols-2 gap-4 sticky bottom-0 bg-white pt-4 border-t-2 border-dashed">
+            <div class="grid grid-cols-2 gap-4 sticky bottom-0 bg-white pt-4 border-t-2 border-dashed border-slate-200">
                 <button onclick="saveEditChanges()" class="bg-fix-report text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all text-lg tracking-tighter uppercase italic">💾 Guardar Cambios</button>
                 <button onclick="closeEditModal()" class="bg-slate-200 text-slate-600 py-4 rounded-2xl font-black uppercase italic">Descartar</button>
             </div>
