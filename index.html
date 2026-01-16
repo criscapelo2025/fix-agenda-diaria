@@ -568,6 +568,43 @@
             const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "REPORTE_SAP_" + start + ".csv"); link.click();
         }
 
+        function downloadCajaCSV() {
+            let csv = "FECHA,TECNICO,TIPO,FORMA PAGO,CONCEPTO,MONTO\n";
+            document.querySelectorAll('#contabilidadTableBody tr').forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if(cols.length >= 4) {
+                    const rowData = [
+                        cols[0].innerText.split('\n')[0],
+                        cols[0].innerText.split('\n')[1],
+                        cols[1].innerText.split('\n')[0],
+                        cols[1].innerText.split('\n')[1],
+                        cols[2].innerText,
+                        cols[3].innerText.replace('$', '')
+                    ];
+                    csv += rowData.map(d => `"${d}"`).join(",") + "\n";
+                }
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "CAJA_FILTRADA.csv"); link.click();
+        }
+
+        function downloadMantenimientoCSV() {
+            let csv = "FECHA,CLIENTE,TELEFONO,CALLE,DESCRIPCION,VALOR,ESTADO\n";
+            document.querySelectorAll('#mantenimientoReporteBody tr').forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if(cols.length >= 7) {
+                    let rowData = [];
+                    for(let i=0; i<7; i++) {
+                        rowData.push('"' + cols[i].innerText.replace(/"/g, '""') + '"');
+                    }
+                    csv += rowData.join(",") + "\n";
+                }
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "REPORTE_MANTENIMIENTOS.csv"); link.click();
+            showMessage("📊 Reporte descargado", "fix-report");
+        }
+
         function renderReporteTeka() {
             const body = document.getElementById('tekaReporteBody'); if(!body) return;
             const start = document.getElementById('maestroDateStart').value; 
@@ -583,11 +620,16 @@
             const singles = filtered.filter(v => v.tipoAtencion !== 'Garantía' && !(v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ") && (v.equipos || []).length === 1);
 
             let rowCount = 1;
+            let granTotalMO = 0;
 
             const renderSection = (title, list) => {
                 if (list.length === 0) return "";
                 let html = `<tr><td colspan="22" class="p-4 bg-slate-200 text-fix-blue text-[11px] font-black italic border-y-4 border-white tracking-widest uppercase">${title} (${list.length} SERVICIOS)</td></tr>`;
-                html += list.flatMap(v => (v.equipos || []).map(eq => `<tr class="border-b row-hover font-black uppercase"><td class="report-cell text-center font-mono bg-slate-50">${rowCount++}</td><td class="report-cell font-mono">${v.fechaEmision || ''}</td><td class="report-cell">${v.lugarCompra || 'OTRO'}</td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${eq.codProducto || '-'}</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono tracking-widest">${eq.serieEquipo || '-'}</td><td class="report-cell font-black">SAP</td><td class="report-cell">CAPELO</td><td class="report-cell">CUENCA</td><td class="report-cell font-mono">${v.fechaInstalacion}</td><td class="report-cell font-black italic">${v.nombreCliente}</td><td class="report-cell max-w-[150px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell font-black text-right font-mono">$${(eq.costoBase || 0).toFixed(2)}</td><td class="report-cell">CLIENTE FINAL</td><td class="report-cell">CAPELO</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${v.cedula || '-'}</td><td class="report-cell lowercase">${v.email || '-'}</td><td class="report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td></tr>`)).join('');
+                html += list.flatMap(v => (v.equipos || []).map(eq => {
+                    const costo = (eq.costoBase || 0);
+                    granTotalMO += costo;
+                    return `<tr class="border-b row-hover font-black uppercase"><td class="report-cell text-center font-mono bg-slate-50">${rowCount++}</td><td class="report-cell font-mono">${v.fechaEmision || ''}</td><td class="report-cell">${v.lugarCompra || 'OTRO'}</td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${eq.codProducto || '-'}</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono tracking-widest">${eq.serieEquipo || '-'}</td><td class="report-cell font-black">SAP</td><td class="report-cell">CAPELO</td><td class="report-cell">CUENCA</td><td class="report-cell font-mono">${v.fechaInstalacion}</td><td class="report-cell font-black italic">${v.nombreCliente}</td><td class="report-cell max-w-[150px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell font-black text-right font-mono">$${costo.toFixed(2)}</td><td class="report-cell">CLIENTE FINAL</td><td class="report-cell">CAPELO</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${v.cedula || '-'}</td><td class="report-cell lowercase">${v.email || '-'}</td><td class="report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td></tr>`;
+                })).join('');
                 return html;
             };
 
@@ -596,6 +638,10 @@
                 renderSection("📚 REPORTE MULTI-PRODUCTO", multis) + 
                 renderSection("🔥 REPORTE PARRILLAS BBQ", bbqs) + 
                 renderSection("🛡️ REPORTE GARANTÍAS", garantias);
+
+            // Actualizar cuadro de resumen maestro
+            const summaryBox = document.getElementById('tekaSummaryTotal');
+            if(summaryBox) summaryBox.textContent = "$" + granTotalMO.toFixed(2);
         }
 
         function renderInventoryView() {
@@ -870,7 +916,7 @@
                     createdAt: Date.now(), 
                     fechaInstalacion: document.getElementById('maintScheduleDate').value, 
                     esMantenimiento: true, 
-                    financiera: { totalCliente: 0, formaPago: data.mPago || 'EFECTIVO' }, 
+                    financiera: { totalCliente: 0, formaPago: 'EFECTIVO' }, 
                     priority: 999, 
                     razonNoAtencion: isPending ? 'MANTENIMIENTO PENDIENTE DE COORDINAR' : '' 
                 }).then(() => { showMessage(isPending ? "⏳ Guardado en Pendientes" : "✅ Mantenimiento Guardado", isPending ? "fix-pending" : "fix-report"); form.reset(); });
@@ -898,8 +944,23 @@
             const source = document.getElementById('finance_source').value; 
             const nuevoMonto = parseFloat(document.getElementById('finance_monto').value) || 0; 
             const nuevoConcepto = document.getElementById('finance_concepto').value.toUpperCase();
-            if (source === 'MANUAL') database.ref('movements/' + id).update({ monto: nuevoMonto, concepto: nuevoConcepto.replace('MANUAL: ', '') }).then(() => closeEditFinanceModal());
-            else database.ref('visits/' + id).update({ 'financiera/totalCliente': nuevoMonto }).then(() => closeEditFinanceModal());
+            
+            if (source === 'MANUAL') {
+                database.ref('movements/' + id).update({ 
+                    monto: nuevoMonto, 
+                    concepto: nuevoConcepto.replace('MANUAL: ', '') 
+                }).then(() => {
+                    showMessage("✅ Movimiento Actualizado", "fix-report");
+                    closeEditFinanceModal();
+                }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
+            } else {
+                database.ref('visits/' + id).update({ 
+                    'financiera/totalCliente': nuevoMonto 
+                }).then(() => {
+                    showMessage("✅ Liquidación Actualizada", "fix-report");
+                    closeEditFinanceModal();
+                }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
+            }
         };
 
         window.saveManualMovement = function() {
@@ -1018,7 +1079,7 @@
         <header class="mb-4 sm:mb-10 flex flex-col xl:flex-row justify-between items-center gap-2 no-print">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
-                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.8.5</span></div></div>
+                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.8.7</span></div></div>
             </div>
             <!-- MENU ADMIN MEJORADO -->
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
@@ -1153,8 +1214,7 @@
                         <form id="maintForm" onsubmit="event.preventDefault();">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 uppercase font-black">
                                 <input type="text" name="mNombre" placeholder="CLIENTE*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase text-sm"><input type="tel" name="mTelefono" placeholder="TELÉFONO*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner font-mono text-sm"><input type="text" name="mCalle" placeholder="CALLE*" required class="p-4 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-sm"><input type="text" name="mDireccion" placeholder="LINK GPS (OPCIONAL)" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner text-sm">
-                                <select name="mTecnico" id="selectTecnicoMaint" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase italic text-sm"></select>
-                                <select name="mPago" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner italic text-sm"><option value="EFECTIVO">EFECTIVO</option><option value="TRANSFERENCIA">TRANSFERENCIA</option></select>
+                                <select name="mTecnico" id="selectTecnicoMaint" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase italic text-sm md:col-span-2"></select>
                                 <textarea name="mDescripcion" placeholder="DESCRIPCIÓN DEL MANTENIMIENTO (MÁS AMPLIO)...*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase text-sm md:col-span-2 min-h-[100px]"></textarea>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
@@ -1208,7 +1268,28 @@
             </div>
 
             <!-- MAESTRO (ADMIN ONLY) -->
-            <div id="reporteTekaView" class="hidden lg:col-span-3 bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase admin-only"><div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6"><div><h2 class="text-lg font-black uppercase italic font-sans italic underline text-fix-blue">Maestro SAP</h2><div class="flex gap-2 mt-2 font-black"><input type="date" id="maestroDateStart" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black"><input type="date" id="maestroDateEnd" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black"><button onclick="renderReporteTeka()" class="bg-fix-blue text-white px-2 rounded text-[10px]">VER</button></div></div><button onclick="downloadCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic">📊 DESCARGAR SAP FINAL</button></div><div class="overflow-x-auto border-2 border-slate-50 rounded-xl"><table class="w-full border-collapse admin-table"><thead><tr class="bg-slate-900 text-white text-[7px] uppercase"><th class="bg-slate-800">NRO</th><th>FECHA DE EMISIÓN</th><th>LUGAR DE COMPRA</th><th>FACTURA</th><th>CÓDIGO</th><th>DESCRIPCIÓN</th><th>SERIE</th><th>SAP</th><th>TÉCNICO</th><th>CIUDAD</th><th>FECHA ATENCIÓN</th><th>CLIENTE</th><th>CALLE</th><th>TELÉFONO</th><th>PRECIO</th><th>LLEGADA INFO</th><th>TÉCNICO ATENDIÓ</th><th>VIÁTICO</th><th>FACTURA REP</th><th>CÉDULA</th><th>CORREO</th><th>X</th></tr></thead><tbody id="tekaReporteBody" class="uppercase font-bold"></tbody></table></div></div>
+            <div id="reporteTekaView" class="hidden lg:col-span-3 bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase admin-only">
+                <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+                    <div><h2 class="text-lg font-black uppercase italic font-sans italic underline text-fix-blue">Maestro SAP</h2><div class="flex gap-2 mt-2 font-black"><input type="date" id="maestroDateStart" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black"><input type="date" id="maestroDateEnd" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black"><button onclick="renderReporteTeka()" class="bg-fix-blue text-white px-2 rounded text-[10px]">VER</button></div></div><button onclick="downloadCSV()" class="bg-fix-report text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic">📊 DESCARGAR SAP FINAL</button>
+                </div>
+                <div class="overflow-x-auto border-2 border-slate-50 rounded-xl mb-6">
+                    <table class="w-full border-collapse admin-table">
+                        <thead><tr class="bg-slate-900 text-white text-[7px] uppercase"><th class="bg-slate-800">NRO</th><th>FECHA DE EMISIÓN</th><th>LUGAR DE COMPRA</th><th>FACTURA</th><th>CÓDIGO</th><th>DESCRIPCIÓN</th><th>SERIE</th><th>SAP</th><th>TÉCNICO</th><th>CIUDAD</th><th>FECHA ATENCION</th><th>CLIENTE</th><th>CALLE</th><th>TELEFONO</th><th>PRECIO</th><th>LLEGADA INFO</th><th>TECNICO ATENDIO</th><th>VIATICO</th><th>FACTURA REP</th><th>CEDULA</th><th>CORREO</th><th>X</th></tr></thead>
+                        <tbody id="tekaReporteBody" class="uppercase font-bold"></tbody>
+                    </table>
+                </div>
+                <!-- RECUADRO DE VALOR DIARIO/FILTRADO -->
+                <div class="flex justify-end no-print">
+                    <div class="bg-slate-900 text-white p-6 rounded-[2rem] shadow-2xl border-4 border-fix-report inline-block min-w-[300px]">
+                        <p class="text-[10px] text-fix-report uppercase tracking-widest font-black italic mb-2 underline">Resumen Financiero Maestro (M.O.):</p>
+                        <div class="flex justify-between items-end">
+                            <span class="text-xs text-slate-400">TOTAL SAP FILTRADO:</span>
+                            <span id="tekaSummaryTotal" class="text-3xl font-mono font-black text-white">$0.00</span>
+                        </div>
+                        <p class="text-[8px] text-slate-500 mt-2 italic font-normal">* Suma total de Mano de Obra (SAP) de los registros visibles.</p>
+                    </div>
+                </div>
+            </div>
 
             <!-- CAJA (ADMIN ONLY) -->
             <div id="contabilidadView" class="hidden lg:col-span-3 space-y-6 admin-only">
@@ -1312,7 +1393,23 @@
     </div>
 
     <!-- MODAL AJUSTE FINANCIERO (ADMIN ONLY) -->
-    <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 admin-only"><div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic"><h2 class="text-xl font-black uppercase text-fix-blue mb-4 border-b-2 pb-2">VALOR REAL</h2><input type="hidden" id="finance_id"><input type="hidden" id="finance_source"><div class="space-y-4"><input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs"><input type="number" step="0.01" id="finance_monto" class="w-full p-3 bg-yellow-50 rounded-xl border font-mono font-black text-xl text-right"></div><div class="grid grid-cols-2 gap-3 mt-6"><button onclick="saveFinanceAdjustment()" class="bg-fix-report text-white py-3 rounded-xl font-black shadow-lg">💾 AJUSTAR</button><button onclick="closeEditFinanceModal()" class="bg-slate-200 text-slate-600 py-3 rounded-xl font-black">SALIR</button></div></div></div>
+    <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 admin-only">
+        <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic text-center">
+            <h2 class="text-xl font-black uppercase text-fix-blue mb-4 border-b-2 pb-2">VALOR REAL</h2>
+            <input type="hidden" id="finance_id">
+            <input type="hidden" id="finance_source">
+            <div class="space-y-4">
+                <label class="text-[10px] text-slate-400 block -mb-2">DESCRIPCIÓN DEL CONCEPTO:</label>
+                <input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs text-center uppercase">
+                <label class="text-[10px] text-fix-accent block -mb-2">MONTO A REGISTRAR $:</label>
+                <input type="number" step="0.01" id="finance_monto" class="w-full p-3 bg-yellow-50 rounded-xl border font-mono font-black text-3xl text-right text-fix-blue">
+            </div>
+            <div class="grid grid-cols-2 gap-3 mt-8">
+                <button onclick="saveFinanceAdjustment()" class="bg-fix-report text-white py-4 rounded-xl font-black shadow-lg active:scale-95 transition-all uppercase">💾 AJUSTAR</button>
+                <button onclick="closeEditFinanceModal()" class="bg-slate-200 text-slate-600 py-4 rounded-xl font-black uppercase">SALIR</button>
+            </div>
+        </div>
+    </div>
 
     <button onclick="refreshData()" class="btn-refresh-float no-print" title="Actualizar"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></button>
     <div id="messageBox" class="opacity-0 fixed transition-opacity duration-500 pointer-events-none z-[99999] font-black uppercase text-center"></div>
