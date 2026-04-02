@@ -106,8 +106,19 @@
             "Horno Eléctrico": 25.00, "Horno a Gas": 29.00, "Cocina Inducción": 25.00, "Cocina a Gas": 29.00, "Microondas": 25.00, "Campana Tradicional": 15.00, "Campana Decorativa": 36.00, "Campana Isla": 45.00, "Refrigerador": 30.00, "Triturador": 15.00, "Grifería": 13.00, "Fregadero": 13.00, "Lavavajillas": 25.00, "Cafetera": 25.00, "PARRILLA BBQ": 29.00, "Vinera": 25.00
         };
 
+        // ACTUALIZACIÓN DE PRECIOS Y ADICIÓN DE MOVILIZACIONES
         const ACCESORIOS_DEFAULT = { 
-            'Enchufe 110V': 5.00, 'Enchufe 220V 20V': 7.00, 'Enchufe 220V 50V': 10.00, 'Manguera c/bridas': 4.00, 'Ducto 4 pulgadas metro': 5.00, 'Enchufe chinito': 5.00, 'Acople': 5.00, 'Segunda visita': 12.00, 'Visita fuera de garantía': 20.00 
+            'Enchufe 110V': 5.00, 
+            'Enchufe 220V 20V': 7.00, 
+            'Enchufe 220V 50V': 10.00, 
+            'Manguera c/bridas': 5.00, // Ajustado de 4 a 5
+            'Ducto 4 pulgadas metro': 5.00, 
+            'Enchufe chinito': 5.00, 
+            'Acople': 5.00, 
+            'Segunda visita': 12.00, 
+            'Visita fuera de garantía': 20.00,
+            'Movilización $20': 20.00, // Nueva movilización
+            'Movilización $10': 10.00  // Nueva movilización
         };
 
         let visitsArray = [];      
@@ -611,6 +622,11 @@
             database.ref('visits/' + id).update({ fechaInstalacion: newDate, razonNoAtencion: newNote.toUpperCase(), estado: 'PENDIENTE', priority: 0 }).then(() => { showMessage("✅ RE-AGENDADO", "fix-report"); renderPendientes(); }).catch(() => { showMessage("❌ ERROR", "fix-error"); });
         };
 
+        window.savePendingNote = function(id) {
+            const newNote = document.getElementById('note_pend_' + id).value;
+            database.ref('visits/' + id).update({ razonNoAtencion: newNote.toUpperCase() }).then(() => { showMessage("💾 NOVEDAD GUARDADA", "fix-report"); renderPendientes(); }).catch(() => { showMessage("❌ ERROR", "fix-error"); });
+        };
+
         window.closeVisitByAdmin = function(id) {
             if(!confirm("¿CONFIRMAR ESTE CASO COMO ATENDIDO DESDE OFICINA? SE GUARDARÁ EN EL MAESTRO AUTOMÁNICAMENTE.")) return;
             database.ref('visits/' + id).update({
@@ -629,35 +645,45 @@
             const container = document.getElementById('pendientesList'); if(!container) return;
             const techFilter = document.getElementById('pendingTechFilter').value;
             const typeFilter = document.getElementById('pendingTypeFilter').value;
+            const query = document.getElementById('pendingSearchInput')?.value.toUpperCase() || "";
+
             let filtered = visitsArray.filter(v => v.estado !== 'Atendido' && v.estado !== 'PENDIENTE');
+            
+            if(query) filtered = filtered.filter(v => v.nombreCliente.toUpperCase().includes(query));
             if(techFilter) filtered = filtered.filter(v => v.tecnico === techFilter);
             if(typeFilter !== 'TODOS') filtered = filtered.filter(v => v.estado === typeFilter);
+
+            // ORDEN ASCENDENTE: De más antiguo a más nuevo
+            filtered.sort((a, b) => (a.fechaInstalacion || "").localeCompare(b.fechaInstalacion || ""));
+
             if(filtered.length === 0) { container.innerHTML = '<p class="p-10 text-center text-slate-300 font-black uppercase italic">No hay casos pendientes</p>'; return; }
+            
             container.innerHTML = filtered.map(v => {
                 const color = v.estado.includes('Pendiente') ? 'border-fix-pending' : 'border-fix-accent';
                 return `<div class="bg-white p-5 rounded-[2rem] shadow-lg border-l-[12px] ${color} mb-4">
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex flex-col">
                             <h3 class="text-sm font-black text-slate-800 italic underline uppercase">${v.nombreCliente}</h3>
-                            <span class="text-[9px] font-bold text-slate-400">ESTADO ACTUAL: ${v.estado.toUpperCase()} • TÉCNICO: ${v.tecnico}</span>
+                            <span class="text-[9px] font-bold text-slate-400 tracking-tighter">FECHA REGISTRO: ${v.fechaInstalacion} • TÉCNICO: ${v.tecnico} • ESTADO: ${v.estado.toUpperCase()}</span>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="closeVisitByAdmin('${v.id}')" class="bg-green-600 text-white px-3 py-1 rounded-full text-[8px] font-black italic shadow-md">✅ SOLUCIONADO (ADMIN)</button>
-                            <button onclick="openEditModal('${v.id}')" class="bg-slate-100 text-slate-400 px-3 py-1 rounded-full text-[8px] font-black italic">MODIFICAR DATOS</button>
+                            <button onclick="openEditModal('${v.id}')" class="bg-slate-100 text-slate-400 px-3 py-1 rounded-full text-[8px] font-black italic">MODIFICAR</button>
                             <button onclick="deleteVisit('${v.id}')" class="text-fix-error text-sm">🗑️</button>
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <p class="text-[8px] font-black text-slate-400 uppercase italic">Historial:</p>
-                            <p class="text-[10px] font-black text-red-600 bg-red-50 p-2 rounded-xl italic uppercase border border-red-100">${v.razonNoAtencion || 'SIN NOVEDAD'}</p>
-                        </div>
+                    <div class="grid grid-cols-1 gap-4">
                         <div class="bg-slate-50 p-4 rounded-3xl border border-slate-200">
-                            <p class="text-[8px] font-black text-fix-blue mb-2 uppercase italic underline">Re-Agendar:</p>
-                            <textarea id="note_pend_${v.id}" placeholder="NOTA DE SEGUIMIENTO..." class="w-full p-2 text-[10px] font-black uppercase border-none rounded-xl mb-2 shadow-inner">${v.razonNoAtencion || ''}</textarea>
+                            <p class="text-[8px] font-black text-fix-blue mb-2 uppercase italic underline">Escribir Novedades / Seguimiento:</p>
+                            <textarea id="note_pend_${v.id}" placeholder="ESCRIBA AQUÍ LAS NOVEDADES..." class="w-full p-2 text-[10px] font-black uppercase border-none rounded-xl mb-2 shadow-inner min-h-[80px]">${v.razonNoAtencion || ''}</textarea>
+                            <div class="flex gap-2 items-center mb-4">
+                                <button onclick="savePendingNote('${v.id}')" class="w-full bg-fix-blue text-white py-2 rounded-xl text-[10px] font-black shadow-lg active:scale-95 transition-all">💾 GRABAR NOVEDAD</button>
+                            </div>
+                            
+                            <p class="text-[8px] font-black text-fix-accent mb-2 uppercase italic underline">Re-Agendar Visita:</p>
                             <div class="flex gap-2 items-center">
                                 <input type="date" id="date_pend_${v.id}" class="flex-grow p-2 rounded-xl text-[10px] font-mono font-black border-none shadow-inner bg-white">
-                                <button onclick="reScheduleVisit('${v.id}')" class="bg-fix-report text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg">🚀 AGENDAR</button>
+                                <button onclick="reScheduleVisit('${v.id}')" class="bg-fix-report text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg active:scale-95 transition-all">🚀 RE-AGENDAR</button>
                             </div>
                         </div>
                     </div>
@@ -885,6 +911,7 @@
             document.getElementById('edit_telefono').value = v.telefono || "";
             document.getElementById('edit_email').value = v.email || "";
             document.getElementById('edit_cedula').value = v.cedula || "";
+            document.getElementById('edit_calle').value = v.callePrincipal || "";
             document.getElementById('edit_fecha').value = v.fechaInstalacion || "";
             document.getElementById('edit_fechaEmision').value = v.fechaEmision || "";
             document.getElementById('edit_direccion').value = v.direccion || "";
@@ -969,8 +996,7 @@
              else costInputs[index].value = (COSTOS_EQUIPO[selectedVal] || 0.00).toFixed(2);
         }
 
-        window.saveEditChanges = function() {
-            const id = document.getElementById('edit_id').value;
+        function getEditModalData() {
             const selects = document.querySelectorAll('.edit-eq-select');
             const codes = document.querySelectorAll('.edit-eq-code');
             const series = document.querySelectorAll('.edit-eq-serie');
@@ -993,11 +1019,12 @@
                 if(q > 0) { updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); accTotal += (q * p); } 
             });
 
-            database.ref('visits/' + id).update({
+            return {
                 nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), 
                 telefono: document.getElementById('edit_telefono').value, 
                 email: document.getElementById('edit_email').value.toLowerCase(), 
                 cedula: document.getElementById('edit_cedula').value, 
+                callePrincipal: document.getElementById('edit_calle').value.toUpperCase(), 
                 fechaInstalacion: document.getElementById('edit_fecha').value, 
                 fechaEmision: document.getElementById('edit_fechaEmision').value,
                 direccion: document.getElementById('edit_direccion').value, 
@@ -1009,7 +1036,30 @@
                 accesoriosVendidos: updatedAccs, 
                 observacionesAdmin: document.getElementById('edit_observaciones').value.toUpperCase(),
                 'financiera/totalCliente': (moTotal + accTotal)
-            }).then(() => { showMessage("✅ Datos Actualizados", "fix-report"); closeEditModal(); });
+            };
+        }
+
+        window.saveEditChanges = function() {
+            const id = document.getElementById('edit_id').value;
+            const data = getEditModalData();
+            database.ref('visits/' + id).update(data).then(() => { 
+                showMessage("✅ Datos Actualizados", "fix-report"); 
+                closeEditModal(); 
+            });
+        };
+
+        window.duplicateVisitRecord = function() {
+            if(!confirm("¿CONFIRMAR DUPLICACIÓN DE ESTE REGISTRO COMO UNO NUEVO?")) return;
+            const data = getEditModalData();
+            const newRef = database.ref('visits').push();
+            data.id = newRef.key;
+            data.createdAt = Date.now();
+            data.estado = 'PENDIENTE';
+            
+            newRef.set(data).then(() => {
+                showMessage("🚀 REGISTRO DUPLICADO CON ÉXITO", "fix-report");
+                closeEditModal();
+            }).catch(e => showMessage("❌ ERROR AL DUPLICAR", "fix-error"));
         };
 
         window.saveVisit = function(isPending = false) {
@@ -1183,146 +1233,6 @@
         function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
         window.closeEditFinanceModal = function() { document.getElementById('editFinanceModal').classList.add('hidden'); };
 
-        /**
-         * LÓGICA DE IMPRESIÓN MEJORADA (A4 VERTICAL - DOS ÓRDENES APILADAS)
-         * Versión 2.9.1 - Encabezado FIX GESTIÓN - TÍTULO - TEKA (Rojo)
-         */
-        window.printServiceOrder = function(id) {
-            const v = visitsArray.find(item => item.id === id);
-            if (!v) return showMessage("❌ ERROR: NO ENCONTRADO", "fix-error");
-
-            const printWindow = window.open('', '_blank');
-            const eqList = v.esMantenimiento ? `<tr><td colspan="3"><b>MANTENIMIENTO:</b> ${v.mantenimientoEquipo}</td></tr>` : (v.equipos || []).map(e => `<tr><td><b>MOD:</b> ${e.descProducto}</td><td><b>SAP:</b> ${e.codProducto || '-'}</td><td><b>SERIE:</b> ${e.serieEquipo || '-'}</td></tr>`).join('');
-            
-            const template = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>ORDEN FIX TEKA - ${v.nombreCliente}</title>
-                <style>
-                    @page { size: A4; margin: 0; }
-                    body { font-family: 'Arial Narrow', sans-serif; margin: 0; padding: 0; color: #000; font-size: 10px; font-weight: bold; text-transform: uppercase; }
-                    .page-container { display: flex; flex-direction: column; width: 210mm; height: 297mm; box-sizing: border-box; }
-                    .order-sheet { 
-                        height: 50%; width: 100%; border-bottom: 2px dashed #000; 
-                        padding: 8mm 12mm; box-sizing: border-box; 
-                        display: flex; flex-direction: column; overflow: hidden;
-                    }
-                    .order-sheet:last-child { border-bottom: none; }
-                    
-                    .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
-                    .header-left { font-size: 16px; font-weight: 900; color: #1e3a8a; }
-                    .header-center { font-size: 13px; font-weight: 900; text-decoration: underline; text-align: center; }
-                    .header-right { font-size: 26px; font-weight: 900; color: #dc2626; }
-                    
-                    .capelo-info { text-align: center; font-size: 8px; font-weight: normal; border-bottom: 1.5px solid #000; padding-bottom: 2px; margin-bottom: 4px; line-height: 1.1; }
-                    
-                    .section { margin-bottom: 3px; border: 1.2px solid #000; padding: 2px; }
-                    .section-title { background: #eee; padding: 1px 6px; border-bottom: 1.2px solid #000; font-size: 10.5px; display: flex; justify-content: space-between; }
-                    
-                    table { width: 100%; border-collapse: collapse; }
-                    td { padding: 2px 4px; border: 1px solid #ccc; vertical-align: top; font-size: 9.5px; }
-                    
-                    .grid-data { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 4px; padding: 1px; }
-                    .field { margin-bottom: 0.5px; line-height: 1.1; }
-                    .field span { font-weight: normal; border-bottom: 1px dotted #000; display: inline-block; min-width: 45%; }
-
-                    .checkbox-group { display: flex; gap: 8px; font-size: 8.5px; }
-                    .checkbox { border: 1.2px solid #000; width: 10px; height: 10px; display: inline-block; vertical-align: middle; margin-right: 2px; }
-                    .checked { background: #dc2626 !important; border-color: #dc2626 !important; }
-
-                    .footer { margin-top: auto; display: flex; justify-content: space-between; padding-top: 8px; }
-                    .sig-box { width: 45%; border-top: 1.2px solid #000; text-align: center; font-size: 9.5px; padding-top: 2px; }
-
-                    .extra-info { font-size: 8.5px; font-weight: normal; text-align: right; margin-top: 2px; }
-                    @media print { .no-print { display: none; } }
-                </style>
-            </head>
-            <body>
-                <div class="page-container">
-                    ${['CLIENTE', 'OFICINA'].map(dest => `
-                    <div class="order-sheet">
-                        <div class="header-row">
-                            <div class="header-left">FIX GESTIÓN</div>
-                            <div class="header-center">SOLICITUD DE SERVICIO TÉCNICO</div>
-                            <div class="header-right">TEKA</div>
-                        </div>
-                        <div class="capelo-info">
-                            <b>CRISTIAN CAPELO</b> - DIRECCIÓN: SAN PEDRO (SIDCAY) / CUENCA ECUADOR<br>
-                            EMAIL: CRISCAPELO.FIX@GMAIL.COM - COPIA ${dest} - ID: ${v.id.substring(0,8)}
-                        </div>
-
-                        <div class="section-title" style="background:transparent; border:none; margin-bottom:2px;">
-                            <span>TIPO DE SERVICIO:</span>
-                            <div class="checkbox-group">
-                                <div><div class="checkbox ${v.tipoAtencion === 'Instalación' ? 'checked' : ''}"></div> INSTALACIÓN</div>
-                                <div><div class="checkbox ${v.tipoAtencion === 'Garantía' ? 'checked' : ''}"></div> GARANTÍA</div>
-                                <div><div class="checkbox ${v.tipoAtencion === 'Reparación' ? 'checked' : ''}"></div> REPARACIÓN</div>
-                                <div><div class="checkbox ${v.tipoAtencion === 'Mantenimiento' ? 'checked' : ''}"></div> MANTENIMIENTO</div>
-                            </div>
-                        </div>
-
-                        <div class="section">
-                            <div class="grid-data">
-                                <div class="field"><b>CLIENTE:</b> <span>${v.nombreCliente}</span></div>
-                                <div class="field"><b>CÉDULA:</b> <span>${v.cedula || '-'}</span></div>
-                                <div class="field" style="grid-column: span 2"><b>DIRECCIÓN:</b> <span>${v.callePrincipal}</span></div>
-                                <div class="field"><b>TELÉFONO:</b> <span>${v.telefono}</span></div>
-                                <div class="field"><b>EMAIL:</b> <span style="text-transform:lowercase">${v.email || '-'}</span></div>
-                            </div>
-                        </div>
-
-                        <div class="section">
-                            <div class="section-title">DETALLE TÉCNICO DE EQUIPOS</div>
-                            <table>${eqList}</table>
-                        </div>
-
-                        <div class="section">
-                            <div class="section-title">DATOS DE COMPRA / LOGÍSTICA</div>
-                            <div class="grid-data">
-                                <div class="field"><b>NRO. DOCUMENTO:</b> <span>${v.numFactura || '-'}</span></div>
-                                <div class="field"><b>LUGAR COMPRA:</b> <span>${v.lugarCompra || '-'}</span></div>
-                                <div class="field"><b>FECHA COMPRA:</b> <span>${v.fechaEmision || '-'}</span></div>
-                                <div class="field"><b>FECHA VISITA:</b> <span>${v.fechaInstalacion}</span></div>
-                            </div>
-                        </div>
-
-                        <div class="section" style="min-height: 25px">
-                            <div class="section-title">FALLA REPORTADA</div>
-                            <div style="font-size: 10px; font-weight: normal; padding: 2px;">
-                                ${v.descFalla || ''}
-                            </div>
-                        </div>
-
-                        <div class="section" style="min-height: 45px">
-                            <div class="section-title">OBSERVACIONES / REPUESTOS UTILIZADOS</div>
-                            <div style="font-size: 10px; font-weight: normal; padding: 2px; line-height: 1.2;">
-                                ${v.razonNoAtencion || ''} / ${v.commentarioCliente || ''}
-                            </div>
-                        </div>
-
-                        <div class="extra-info">
-                            FORMA PAGO REGISTRADA: ${v.financiera?.formaPago || 'EFECTIVO'} / TÉCNICO: ${v.tecnico}
-                        </div>
-
-                        <div class="footer">
-                            <div class="sig-box">FIRMA DEL CLIENTE / AUTORIZADO</div>
-                            <div class="sig-box">CRISTIAN CAPELO (TEKA FIX)</div>
-                        </div>
-                    </div>
-                    `).join('')}
-                </div>
-                <div style="text-align:center; padding: 20px;" class="no-print">
-                    <button onclick="window.print()" style="padding: 15px 50px; background: #1e3a8a; color: #fff; font-weight: 900; border-radius: 10px; cursor: pointer; border:none; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">🖨️ IMPRIMIR AHORA (A4 VERTICAL)</button>
-                </div>
-            </body>
-            </html>
-            `;
-
-            printWindow.document.write(template);
-            printWindow.document.close();
-        };
-
         document.addEventListener('DOMContentLoaded', function() {
             const hoy = new Date().toISOString().split('T')[0];
             ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'cajaDateStart', 'cajaDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoy; });
@@ -1379,7 +1289,7 @@
                     
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 items-end italic">
                         <div class="md:col-span-2">
-                            <label class="text-[8px] ml-2 font-black uppercase">Búsqueda (Nombre, Factura, Cédula, Código SAP, Serie):</label>
+                            <label class="text-[8px] ml-2 font-black uppercase">Búsqueda:</label>
                             <input type="text" id="searchGlobalInput" oninput="renderBuscador()" placeholder="ESCRIBA CUALQUIER DATO..." class="w-full p-4 bg-slate-50 rounded-2xl border-none shadow-inner font-black text-xs uppercase focus:ring-2 focus:ring-fix-blue outline-none">
                         </div>
                         <div>
@@ -1395,7 +1305,7 @@
                             <select id="searchTechFilter" onchange="renderBuscador()" class="w-full p-4 bg-slate-50 rounded-2xl border-none shadow-inner font-black text-[10px] uppercase outline-none"></select>
                         </div>
                         <div>
-                            <label class="text-[8px] ml-2 font-black uppercase">Filtro Rápido:</label>
+                            <label class="text-[8px] ml-2 font-black uppercase">Filtro:</label>
                             <select id="searchTypeFilter" onchange="renderBuscador()" class="w-full p-4 bg-slate-50 rounded-2xl border-none shadow-inner font-black text-[10px] uppercase outline-none">
                                 <option value="TODOS">TODOS LOS SERVICIOS</option>
                                 <option value="NORMAL">INSTALACIONES / REPARACIONES</option>
@@ -1430,13 +1340,13 @@
                 <div class="bg-white p-6 rounded-[2rem] shadow-xl border-[8px] border-slate-50">
                     <form id="visitForm" onsubmit="event.preventDefault();">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
-                            <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black"><input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black"><input type="text" name="cedula" placeholder="CÉDULA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono"><input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black"><input type="email" name="email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner"><input type="text" name="numFactura" placeholder="N° FACTURA COMPRA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center uppercase font-black"><input type="text" name="direccion" placeholder="LINK GPS (OPCIONAL EN REGISTRO)" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner md:col-span-2"><select name="tecnico" id="selectTecnico" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><select id="selectLugar" name="lugarCompra" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><div class="flex flex-col"><span class="text-[8px] font-black text-slate-400 ml-2 italic">EMISIÓN FACTURA</span><input type="date" name="fechaEmision" id="inputEmision" class="p-3 bg-slate-50 rounded-xl font-bold text-xs outline-none shadow-inner text-center font-mono"></div><select name="tipoServicioGlobal" id="tipoServicioGlobal" onchange="toggleServiceTypeUI()" class="p-3 bg-white border-2 border-fix-blue/10 rounded-xl font-black text-[10px] uppercase text-fix-blue italic"><option value="Instalación">Instalación Estándar</option><option value="Garantía">Garantía de Fábrica</option><option value="Fuera de Garantía">Fuera de Garantía</option><option value="Reparación">Reparación/Serv.Tecnico</option><option value="Visita Técnica">Visita Técnica</option></select>
+                            <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black uppercase"><input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black uppercase"><input type="text" name="cedula" placeholder="CÉDULA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono"><input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black"><input type="email" name="email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner"><input type="text" name="numFactura" placeholder="N° FACTURA COMPRA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center uppercase font-black"><input type="text" name="direccion" placeholder="LINK GPS (OPCIONAL)" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner md:col-span-2"><select name="tecnico" id="selectTecnico" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><select id="selectLugar" name="lugarCompra" class="p-3 bg-slate-50 rounded-xl font-bold text-[10px] uppercase italic font-black"></select><div class="flex flex-col"><span class="text-[8px] font-black text-slate-400 ml-2 italic">EMISIÓN FACTURA</span><input type="date" name="fechaEmision" id="inputEmision" class="p-3 bg-slate-50 rounded-xl font-bold text-xs outline-none shadow-inner text-center font-mono"></div><select name="tipoServicioGlobal" id="tipoServicioGlobal" onchange="toggleServiceTypeUI()" class="p-3 bg-white border-2 border-fix-blue/10 rounded-xl font-black text-[10px] uppercase text-fix-blue italic"><option value="Instalación">Instalación Estándar</option><option value="Garantía">Garantía de Fábrica</option><option value="Fuera de Garantía">Fuera de Garantía</option><option value="Reparación">Reparación/Serv.Tecnico</option><option value="Visita Técnica">Visita Técnica</option></select>
                         </div>
                         
                         <div class="mb-6"><textarea name="observacionesAdmin" placeholder="OBSERVACIONES O NOVEDADES PARA EL TÉCNICO (OPCIONAL)..." class="w-full p-4 bg-blue-50/50 border-2 border-fix-blue/10 rounded-2xl font-black text-xs uppercase shadow-inner min-h-[100px] outline-none border-none"></textarea></div>
 
                         <div id="standardServiceFields" class="space-y-4"><div class="bg-slate-50 p-3 rounded-xl flex items-center justify-between shadow-inner"><span class="text-[10px] font-black italic">CANTIDAD EQUIPOS:</span><input type="number" id="numEquipos" name="numEquipos" value="1" min="1" oninput="expandEquipmentUI()" class="w-10 text-center text-xl text-fix-blue bg-transparent outline-none font-black font-mono"></div><div id="productInputsContainer" class="space-y-2"></div><div id="accesoriosContainerAdmin" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 italic font-black"></div></div>
-                        <div id="warrantyFields" class="hidden space-y-4 p-4 bg-fix-blue/5 rounded-3xl border-2 border-fix-blue/10 italic"><p class="text-[10px] font-black text-fix-blue underline uppercase">DATOS DE GARANTÍA (SIN COSTO)</p><select id="warrantyEquipmentSelect" class="w-full p-3 bg-white rounded-xl font-black text-xs uppercase shadow-sm outline-none"></select><textarea id="warrantyDamageDesc" placeholder="DESCRIBA LA FALLA O MOTIVO DE LA GARANTÍA..." class="w-full p-4 bg-white rounded-2xl font-black text-xs uppercase shadow-inner min-h-[100px] outline-none border-none"></textarea></div>
+                        <div id="warrantyFields" class="hidden space-y-4 p-4 bg-fix-blue/5 rounded-3xl border-2 border-fix-blue/10 italic"><p class="text-[10px] font-black text-fix-blue underline uppercase">DATOS DE GARANTÍA (SIN COSTO)</p><select id="warrantyEquipmentSelect" class="w-full p-3 bg-white rounded-xl font-black text-xs uppercase shadow-sm outline-none"></select><textarea id="warrantyDamageDesc" placeholder="DESCRIBA LA FALLA..." class="w-full p-4 bg-white rounded-2xl font-black text-xs uppercase shadow-inner min-h-[100px] outline-none border-none"></textarea></div>
                         <div id="financialDashboardRegistration" class="mt-8 grid grid-cols-3 gap-2 text-center"><div class="bg-slate-50 p-2 rounded-xl italic text-[8px]">M.O. (MAESTRO)<br><span id="displayCostoInstalacion" class="text-sm font-black">$0.00</span></div><div class="bg-slate-50 p-2 rounded-xl italic text-[8px]">INSUMOS<br><span id="displayTotalAccesorios" class="text-sm font-black">$0.00</span></div><div class="bg-fix-accent p-2 rounded-xl font-black text-white shadow-lg uppercase">TOTAL CAJA<br><span id="displayTotalFinal" class="text-lg font-mono">$0.00</span></div></div>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -1460,6 +1370,7 @@
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                         <h2 class="text-xl font-black uppercase italic font-sans italic underline text-fix-pending tracking-tighter">Seguimiento de Pendientes</h2>
                         <div class="flex flex-wrap gap-2 w-full md:w-auto">
+                            <input type="text" id="pendingSearchInput" oninput="renderPendientes()" placeholder="🔍 BUSCAR CLIENTE..." class="p-2 bg-slate-50 border rounded text-[10px] font-black uppercase w-full md:w-48 shadow-inner">
                             <select id="pendingTypeFilter" onchange="renderPendientes()" class="p-2 bg-slate-50 border rounded text-[10px] font-black uppercase">
                                 <option value="TODOS">TODOS LOS CASOS</option>
                                 <option value="Pendiente (Tramite)">SOLO PENDIENTES</option>
@@ -1484,7 +1395,7 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 uppercase font-black">
                                 <input type="text" name="mNombre" placeholder="CLIENTE*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase text-sm"><input type="tel" name="mTelefono" placeholder="TELÉFONO*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner font-mono text-sm"><input type="text" name="mCalle" placeholder="CALLE*" required class="p-4 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-sm"><input type="text" name="mDireccion" placeholder="LINK GPS (OPCIONAL)" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner text-sm">
                                 <select name="mTecnico" id="selectTecnicoMaint" class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase italic text-sm md:col-span-2"></select>
-                                <textarea name="mDescripcion" placeholder="DESCRIPCIÓN DEL MANTENIMIENTO (MÁS AMPLIO)...*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase text-sm md:col-span-2 min-h-[100px]"></textarea>
+                                <textarea name="mDescripcion" placeholder="DESCRIPCIÓN DEL MANTENIMIENTO...*" required class="p-4 bg-slate-50 rounded-xl font-black shadow-inner uppercase text-sm md:col-span-2 min-h-[100px]"></textarea>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                                 <button type="button" onclick="saveMantenimiento(false)" class="bg-fix-blue text-white py-4 rounded-2xl text-lg font-black uppercase italic shadow-lg">🚀 AGENDAR MANTENIMIENTO</button>
@@ -1619,10 +1530,11 @@
             <input type="hidden" id="edit_id">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <div class="md:col-span-3 text-[10px] text-fix-blue font-black mb-1 italic underline uppercase">Información de contacto</div>
-                <div><label class="text-[7px] text-slate-400 ml-2 uppercase">NOMBRE CLIENTE</label><input type="text" id="edit_nombre" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
+                <div><label class="text-[7px] text-slate-400 ml-2 uppercase">NOMBRE CLIENTE</label><input type="text" id="edit_nombre" class="w-full p-2 bg-white rounded-lg border font-black text-xs uppercase"></div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">TELÉFONO</label><input type="text" id="edit_telefono" class="w-full p-2 bg-white rounded-lg border font-mono font-black text-xs"></div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">CÉDULA</label><input type="text" id="edit_cedula" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
-                <div><label class="text-[7px] text-slate-400 ml-2 uppercase">CORREO</label><input type="email" id="edit_email" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
+                <div><label class="text-[7px] text-slate-400 ml-2 uppercase">CORREO</label><input type="email" id="edit_email" class="w-full p-2 bg-white rounded-lg border font-black text-xs lowercase"></div>
+                <div><label class="text-[7px] text-slate-400 ml-2 uppercase">CALLE PRINCIPAL</label><input type="text" id="edit_calle" class="w-full p-2 bg-white rounded-lg border font-black text-xs uppercase"></div>
                 <div class="md:col-span-3 text-[10px] text-fix-blue font-black mt-2 mb-1 italic underline uppercase">Logística y Venta</div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">N° DOCUMENTO COMPRA</label><input type="text" id="edit_numFactura" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">LUGAR COMPRA</label><select id="edit_lugarCompra" class="w-full p-2 bg-white rounded-lg border font-black text-[10px] uppercase"></select></div>
@@ -1649,9 +1561,11 @@
                 <h3 class="text-[10px] font-black text-fix-report mb-2 uppercase italic underline">Insumos y accesorios</h3>
                 <div id="editAccesoriosContainer" class="grid grid-cols-1 md:grid-cols-2 gap-x-4"></div>
             </div>
-            <div class="grid grid-cols-2 gap-4 sticky bottom-0 bg-white pt-4 border-t-2 border-dashed border-slate-200">
-                <button onclick="saveEditChanges()" class="bg-fix-report text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all text-lg tracking-tighter uppercase italic">💾 Guardar Cambios</button>
-                <button onclick="closeEditModal()" class="bg-slate-200 text-slate-600 py-4 rounded-2xl font-black uppercase italic">Descartar</button>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sticky bottom-0 bg-white pt-4 border-t-2 border-dashed border-slate-200">
+                <button onclick="saveEditChanges()" class="bg-fix-report text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all text-sm uppercase italic">💾 Guardar Cambios</button>
+                <button onclick="duplicateVisitRecord()" class="bg-fix-accent text-white py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all text-sm uppercase italic">🚀 Duplicar (Nueva Fecha)</button>
+                <button onclick="closeEditModal()" class="bg-slate-200 text-slate-600 py-4 rounded-2xl font-black uppercase italic text-sm">Descartar</button>
             </div>
         </div>
     </div>
