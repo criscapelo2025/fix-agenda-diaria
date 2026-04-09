@@ -99,13 +99,13 @@
         const database = firebase.database();
 
         const LISTA_TECNICOS = ["", "Andres Cardenas", "Cristian Capelo", "Juan Carlos Pando", "Allan Skykaz", "Juana Cardenas"];
-        const LUGARES_COMPRA = ["", "COMERCIAL KYWI", "COMERCIAL SOLIS", "COMO HOGAR", "SUKASA", "LUNA PAZMIÑO", "MACAOFERTAS", "HOME VEGA", "MERCARD", "TEKA DIRECTO", "ALMACENES BOYACÁ", "VTORIA HOGAR", "OTRO"];
+        const LUGARES_COMPRA = ["", "COMERCIAL KYWI", "COMERCIAL SOLIS", "COMO HOGAR", "SUKASA", "LUNA PAZMIÑO", "MACAOFERTAS", "HOME VEGA", "MERCARD", "TEKA DIRECTO", "ALMACENES BOYACÁ", "VTORIA HOGAR", "ALMACENES CHORDELEG", "OTRO"];
         const TIPOS_SERVICIO = ["Instalación", "Garantía", "Fuera de Garantía", "Mantenimiento", "Reparación", "Visita Técnica"];
         
-        const TIPOS_EQUIPO = ["Horno Eléctrico", "Horno a Gas", "Cocina Inducción", "Cocina a Gas", "Microondas", "Campana Tradicional", "Campana Decorativa", "Campana Isla", "Refrigerador", "Triturador", "Grifería", "Fregadero", "Lavavajillas", "Cafetera", "PARRILLA BBQ", "Vinera"];
+        const TIPOS_EQUIPO = ["Horno Eléctrico", "Horno a Gas", "Cocina Inducción", "Cocina a Gas", "Cocina Mixta", "Microondas", "Microcampana", "Campana Tradicional", "Campana Decorativa", "Campana Isla", "Refrigerador", "Triturador", "Grifería", "Fregadero", "Lavavajillas", "Cafetera", "PARRILLA BBQ", "Vinera"];
         
         const COSTOS_EQUIPO = {
-            "Horno Eléctrico": 25.00, "Horno a Gas": 29.00, "Cocina Inducción": 25.00, "Cocina a Gas": 29.00, "Microondas": 25.00, "Campana Tradicional": 15.00, "Campana Decorativa": 36.00, "Campana Isla": 45.00, "Refrigerador": 30.00, "Triturador": 15.00, "Grifería": 13.00, "Fregadero": 13.00, "Lavavajillas": 25.00, "Cafetera": 25.00, "PARRILLA BBQ": 29.00, "Vinera": 25.00
+            "Horno Eléctrico": 25.00, "Horno a Gas": 29.00, "Cocina Inducción": 25.00, "Cocina a Gas": 29.00, "Cocina Mixta": 29.00, "Microondas": 25.00, "Microcampana": 39.00, "Campana Tradicional": 15.00, "Campana Decorativa": 36.00, "Campana Isla": 45.00, "Refrigerador": 30.00, "Triturador": 15.00, "Grifería": 13.00, "Fregadero": 13.00, "Lavavajillas": 25.00, "Cafetera": 25.00, "PARRILLA BBQ": 29.00, "Vinera": 25.00
         };
 
         // ACTUALIZACIÓN DE PRECIOS Y ADICIÓN DE MOVILIZACIONES
@@ -578,25 +578,36 @@
             const list = document.getElementById('ruteroListBody'); if(!list) return;
             const date = document.getElementById('filterDateInputRutero').value;
             let tech = currentTechUser || (document.getElementById('ruteroTechFilter') ? document.getElementById('ruteroTechFilter').value : "");
-            let filtered = visitsArray.filter(v => v.fechaInstalacion === date && (v.estado === 'PENDIENTE' || v.estado === 'Atendido' || v.estado === 'A Taller' || v.estado === 'No Atendido' || v.estado === 'Pendiente (Tramite)'));
+            
+            // Filtro dinámico: Mostrar si la instalación es hoy O si la entrega de taller está programada para hoy
+            let filtered = visitsArray.filter(v => 
+                (v.fechaInstalacion === date || v.fechaEntregaProgramada === date) && 
+                (v.estado === 'PENDIENTE' || v.estado === 'Atendido' || v.estado === 'A Taller' || v.estado === 'No Atendido' || v.estado === 'Pendiente (Tramite)')
+            );
+            
             if(tech) filtered = filtered.filter(v => v.tecnico === tech);
             if(filtered.length === 0) { list.innerHTML = '<tr><td colspan="9" class="p-10 text-center text-slate-300 italic font-black uppercase text-sm">Sin servicios hoy</td></tr>'; return; }
             let sorted = filtered.slice().sort((a,b) => (parseInt(a.priority) || 0) - (parseInt(b.priority) || 0));
             let currentMinutes = 9 * 60;
+            
             list.innerHTML = sorted.map((v, index) => {
                 const h = Math.floor(currentMinutes / 60); const m = currentMinutes % 60;
                 const timeStr = (h > 12 ? h - 12 : (h === 0 ? 12 : h)) + ":" + m.toString().padStart(2, '0') + " " + (h >= 12 ? 'PM' : 'AM');
                 currentMinutes += (60 + (Math.max(0, (v.equipos || []).length - 1) * 20)) + 15;
                 const initials = v.tecnico ? v.tecnico.split(' ').map(n => n[0]).join('').toUpperCase() : '---';
                 
+                // Lógica de visualización especial para Entregas de Taller
+                const isDelivery = v.estado === 'A Taller' && v.fechaEntregaProgramada === date;
+                
                 let colClass = 'bg-slate-200 text-slate-600';
                 if(v.estado === 'Atendido') colClass = 'bg-green-100 text-green-700';
-                else if(v.estado === 'A Taller') colClass = 'bg-orange-100 text-orange-700';
+                else if(v.estado === 'A Taller') colClass = isDelivery ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700';
                 else if(v.estado.includes('Pendiente')) colClass = 'bg-purple-100 text-purple-700';
 
                 let statusBadge = `<span class="px-2 py-0.5 rounded-full text-[7px] font-black ${colClass}">${v.estado.toUpperCase()}</span>`;
-                const tipoServ = v.esMantenimiento ? '⚙️ MANT.' : (v.tipoAtencion === 'Garantía' ? '🛡️ GARANTÍA' : '🛠️ SERV.TEC');
-                const colorTipo = v.esMantenimiento ? 'text-fix-accent' : (v.tipoAtencion === 'Garantía' ? 'text-fix-blue' : 'text-fix-report');
+                
+                let tipoServ = isDelivery ? '🚚 ENTREGA TALLER' : (v.esMantenimiento ? '⚙️ MANT.' : (v.tipoAtencion === 'Garantía' ? '🛡️ GARANTÍA' : '🛠️ SERV.TEC'));
+                const colorTipo = isDelivery ? 'text-blue-600' : (v.esMantenimiento ? 'text-fix-accent' : (v.tipoAtencion === 'Garantía' ? 'text-fix-blue' : 'text-fix-report'));
                 
                 const mapLink = (v.direccion && v.direccion.toString().includes('http')) 
                                 ? v.direccion 
@@ -768,6 +779,10 @@
                                             <input type="number" step="0.01" id="taller_costo_${v.id}" value="${v.costoRepuestoTaller || ''}" placeholder="0.00" class="w-full p-2 bg-white rounded-lg text-[10px] border shadow-inner font-mono font-black text-fix-report text-right">
                                         </div>
                                     </div>
+                                    <div class="mb-2">
+                                        <label class="text-[8px] font-black text-fix-blue uppercase block mb-1">📅 Agendar día de entrega en Logística:</label>
+                                        <input type="date" id="taller_fecha_entrega_prog_${v.id}" value="${v.fechaEntregaProgramada || ''}" class="w-full p-2 bg-blue-50 border-2 border-blue-200 rounded-lg text-[10px] font-black shadow-inner">
+                                    </div>
                                     <label class="text-[8px] font-black uppercase block mb-1">Repuestos Solicitados / Trabajo Realizado:</label>
                                     <textarea id="taller_repuestos_${v.id}" placeholder="ESPECIFIQUE REPUESTOS..." class="w-full p-2 bg-white rounded-lg text-[10px] border shadow-inner font-black uppercase min-h-[60px]">${v.repuestosSolicitadosTaller || ''}</textarea>
                                     <button onclick="saveTallerUpdate('${v.id}')" class="w-full mt-2 bg-fix-blue text-white py-2 rounded-xl text-[9px] font-black uppercase active:scale-95 shadow-lg">💾 ACTUALIZAR DATOS TALLER</button>
@@ -779,7 +794,7 @@
                                 <p class="text-[8px] uppercase text-fix-accent font-black tracking-widest mb-1 italic">Venta Total Estimada</p>
                                 <p class="text-2xl font-mono font-black">$${(v.financiera?.totalCliente || 0).toFixed(2)}</p>
                             </div>
-                            <button onclick="markAsDelivered('${v.id}')" class="bg-green-600 text-white py-4 rounded-3xl text-xs font-black uppercase italic shadow-lg hover:bg-green-700 active:scale-95 transition-all">🚀 ENTREGAR EQUIPO</button>
+                            <button onclick="markAsDelivered('${v.id}')" class="bg-green-600 text-white py-4 rounded-3xl text-xs font-black uppercase italic shadow-lg hover:bg-green-700 active:scale-95 transition-all">🚀 ENTREGAR AL CLIENTE</button>
                         </div>
                     </div>
                 </div>`;
@@ -790,14 +805,17 @@
             const fecha = document.getElementById('taller_fecha_' + id).value;
             const costo = parseFloat(document.getElementById('taller_costo_' + id).value) || 0;
             const repuestos = document.getElementById('taller_repuestos_' + id).value.toUpperCase();
+            const fechaEntregaProg = document.getElementById('taller_fecha_entrega_prog_' + id).value;
 
             database.ref('visits/' + id).update({
                 fechaIngresoTaller: fecha,
                 costoRepuestoTaller: costo,
-                repuestosSolicitadosTaller: repuestos
+                repuestosSolicitadosTaller: repuestos,
+                fechaEntregaProgramada: fechaEntregaProg
             }).then(() => {
                 showMessage("💾 DATOS ACTUALIZADOS", "fix-report");
                 renderTaller();
+                renderRutero();
             }).catch(() => showMessage("❌ ERROR AL GUARDAR", "fix-error"));
         };
 
@@ -1741,3 +1759,4 @@
 
 </body>
 </html>
+        
