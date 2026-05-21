@@ -128,6 +128,32 @@
         let currentView = 'reporte_admin';
         let currentTechUser = null; 
 
+        // Modales de confirmación personalizados para cumplir con las directivas de seguridad
+        window.showConfirmModal = function(message, onConfirm) {
+            const modalId = 'confirm_modal_dynamic';
+            let existing = document.getElementById(modalId);
+            if(existing) existing.remove();
+            
+            const modalHtml = `
+            <div id="${modalId}" class="fixed inset-0 z-[50000] modal-overlay flex items-center justify-center p-4">
+                <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 border-[6px] border-slate-50 uppercase italic font-black text-center">
+                    <p class="text-xs text-slate-700 mb-6 font-black uppercase tracking-tight">${message}</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="${modalId}_yes" class="bg-fix-report text-white py-3 rounded-xl font-black uppercase active:scale-95 shadow-md">SÍ, PROCEDER</button>
+                        <button id="${modalId}_no" class="bg-slate-200 text-slate-600 py-3 rounded-xl font-black uppercase active:scale-95">CANCELAR</button>
+                    </div>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            document.getElementById(`${modalId}_yes`).onclick = function() {
+                onConfirm();
+                document.getElementById(modalId).remove();
+            };
+            document.getElementById(`${modalId}_no`).onclick = function() {
+                document.getElementById(modalId).remove();
+            };
+        };
+
         function showMessage(msg, colorClass) {
             const box = document.getElementById('messageBox');
             if(!box) return;
@@ -311,7 +337,7 @@
         function refreshData() {
             showMessage("🔄 Sincronizando...", "fix-blue");
             database.ref('visits').once('value', function() {
-                renderUIAgenda(); renderRutero(); processFinancialBalance(); processMaintBalance(); renderInventoryView(); renderPendientes(); renderTaller();
+                renderUIAgenda(); renderRutero(); processFinancialBalance(); processMaintBalance(); renderInventoryView(); renderPendientes(); renderTaller(); renderGarantias();
                 if(currentView === 'reporte_teka') renderReporteTeka();
                 if(currentView === 'mantenimiento') renderReporteMantenimiento();
                 if(currentView === 'buscador') renderBuscador();
@@ -332,7 +358,7 @@
                 return;
             }
             currentView = view;
-            const sections = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView'];
+            const sections = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView'];
             sections.forEach(function(id) { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
 
             if(view === 'reporte_admin') { 
@@ -342,6 +368,7 @@
             else if(view === 'reporte_teka') { const rtv = document.getElementById('reporteTekaView'); if(rtv) rtv.classList.remove('hidden'); renderReporteTeka(); }
             else if(view === 'mantenimiento') { const mv = document.getElementById('mantenimientoView'); if(mv) mv.classList.remove('hidden'); renderReporteMantenimiento(); processMaintBalance(); }
             else if(view === 'pendientes') { const pv = document.getElementById('pendientesView'); if(pv) pv.classList.remove('hidden'); renderPendientes(); }
+            else if(view === 'garantias') { const gv = document.getElementById('garantiasView'); if(gv) gv.classList.remove('hidden'); renderGarantias(); }
             else if(view === 'taller') { const tv = document.getElementById('tallerView'); if(tv) tv.classList.remove('hidden'); renderTaller(); }
             else if(view === 'buscador') { const bv = document.getElementById('buscadorView'); if(bv) bv.classList.remove('hidden'); renderBuscador(); }
             else { const el = document.getElementById(view + 'View'); if(el) el.classList.remove('hidden'); }
@@ -410,19 +437,29 @@
                 if (s === 'A Taller') {
                     updateObj.fechaIngresoTaller = new Date().toISOString().split('T')[0];
                 }
+                if (s === 'Garantia en Tramite') {
+                    updateObj.fechaIngresoGarantia = new Date().toISOString().split('T')[0];
+                }
 
                 database.ref('visits/' + id).update(updateObj).then(function() { 
                     showMessage("✅ Guardado", "fix-report"); 
                     renderRutero(); 
                     renderPendientes(); 
                     renderTaller();
+                    renderGarantias();
                 }).catch(function() { 
                     showMessage("❌ Error", "fix-error"); 
                 });
             } catch(e) { console.error(e); showMessage("❌ Error Crítico", "fix-error"); }
         }
 
-        function deleteVisit(id) { if(confirm("¿ELIMINAR ESTE REGISTRO?")) { database.ref('visits/' + id).remove().then(function() { showMessage("🗑️ Eliminado", "fix-error"); }); } }
+        function deleteVisit(id) { 
+            showConfirmModal("¿ELIMINAR ESTE REGISTRO?", function() { 
+                database.ref('visits/' + id).remove().then(function() { 
+                    showMessage("🗑️ Eliminado", "fix-error"); 
+                }); 
+            }); 
+        }
 
         function renderUIAgenda() {
             const list = document.getElementById('visitsList'); if(!list) return;
@@ -580,8 +617,8 @@
             let tech = currentTechUser || (document.getElementById('ruteroTechFilter') ? document.getElementById('ruteroTechFilter').value : "");
             
             let filtered = visitsArray.filter(v => 
-                (v.fechaInstalacion === date || v.fechaEntregaProgramada === date) && 
-                (v.estado === 'PENDIENTE' || v.estado === 'Atendido' || v.estado === 'A Taller' || v.estado === 'No Atendido' || v.estado === 'Pendiente (Tramite)')
+                (v.fechaInstalacion === date || v.fechaEntregaProgramada === date || v.fechaNuevaVisita === date) && 
+                (v.estado === 'PENDIENTE' || v.estado === 'Atendido' || v.estado === 'A Taller' || v.estado === 'No Atendido' || v.estado === 'Pendiente (Tramite)' || v.estado === 'Garantia en Tramite')
             );
             
             if(tech) filtered = filtered.filter(v => v.tecnico === tech);
@@ -596,16 +633,18 @@
                 const initials = v.tecnico ? v.tecnico.split(' ').map(n => n[0]).join('').toUpperCase() : '---';
                 
                 const isDelivery = v.estado === 'A Taller' && v.fechaEntregaProgramada === date;
+                const isGarantiaVisit = v.estado === 'Garantia en Tramite' && v.fechaNuevaVisita === date;
                 
                 let colClass = 'bg-slate-200 text-slate-600';
                 if(v.estado === 'Atendido') colClass = 'bg-green-100 text-green-700';
                 else if(v.estado === 'A Taller') colClass = isDelivery ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700';
+                else if(v.estado === 'Garantia en Tramite') colClass = isGarantiaVisit ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-800';
                 else if(v.estado.includes('Pendiente')) colClass = 'bg-purple-100 text-purple-700';
 
                 let statusBadge = `<span class="px-2 py-0.5 rounded-full text-[7px] font-black ${colClass}">${v.estado.toUpperCase()}</span>`;
                 
-                let tipoServ = isDelivery ? '🚚 ENTREGA TALLER' : (v.esMantenimiento ? '⚙️ MANT.' : (v.tipoAtencion === 'Garantía' ? '🛡️ GARANTÍA' : '🛠️ SERV.TEC'));
-                const colorTipo = isDelivery ? 'text-blue-600' : (v.esMantenimiento ? 'text-fix-accent' : (v.tipoAtencion === 'Garantía' ? 'text-fix-blue' : 'text-fix-report'));
+                let tipoServ = isDelivery ? '🚚 ENTREGA TALLER' : (isGarantiaVisit ? '🛡️ VISITA GARANTÍA' : (v.esMantenimiento ? '⚙️ MANT.' : (v.tipoAtencion === 'Garantía' ? '🛡️ GARANTÍA' : '🛠️ SERV.TEC')));
+                const colorTipo = isDelivery ? 'text-blue-600' : (isGarantiaVisit ? 'text-indigo-600' : (v.esMantenimiento ? 'text-fix-accent' : (v.tipoAtencion === 'Garantía' ? 'text-fix-blue' : 'text-fix-report')));
                 
                 const mapLink = (v.direccion && v.direccion.toString().includes('http')) 
                                 ? v.direccion 
@@ -649,9 +688,10 @@
                     <option value="PENDIENTE">--- ESTADO CIERRE ---</option>
                     <option value="Atendido" ${v.estado === 'Atendido' ? 'selected' : ''}>✅ ATENDIDO/FINALIZADO</option>
                     <option value="A Taller" ${v.estado === 'A Taller' ? 'selected' : ''}>🏢 A TALLER (REPARACIÓN)</option>
+                    <option value="Garantia en Tramite" ${v.estado === 'Garantia en Tramite' ? 'selected' : ''}>🛡️ GARANTÍA EN TRÁMITE</option>
                     <option value="No Atendido" ${v.estado === 'No Atendido' ? 'selected' : ''}>❌ NO ATENDIDO (FALLIDO)</option>
                     <option value="Pendiente (Tramite)" ${v.estado === 'Pendiente (Tramite)' ? 'selected' : ''}>⏳ PENDIENTE (REPUESTO)</option>
-                </select><select id="type_${v.id}" class="p-2 bg-slate-100 rounded text-[10px] font-black uppercase">${TIPOS_SERVICIO.map(t=>`<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div><select id="payment_${v.id}" class="w-full p-2 bg-slate-100 rounded mb-2 text-[10px] font-black uppercase"><option value="EFECTIVO" ${v.financiera && v.financiera.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option><option value="TRANSFERENCIA" ${v.financiera && v.financiera.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option></select><div class="p-2 bg-blue-50 border border-blue-100 rounded-xl mb-2"><p class="text-[8px] font-black text-fix-blue mb-1">📸 FOTOS Y COMENTARIO TÉCNICO:</p><input type="file" accept="image/*" multiple onchange="handleImageSelect(event, '${v.id}')" class="w-full text-[8px] mb-2"><textarea id="client_comment_${v.id}" placeholder="TESTIMONIO O NOVEDAD FINAL..." class="w-full p-2 text-[10px] font-black uppercase bg-white rounded border-none"></textarea></div><div class="max-h-24 overflow-y-auto mb-2 border rounded p-1 bg-slate-50">
+                </select><select id="type_${v.id}" class="w-full p-2 bg-slate-100 rounded text-[10px] font-black uppercase">${TIPOS_SERVICIO.map(t=>`<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div><select id="payment_${v.id}" class="w-full p-2 bg-slate-100 rounded mb-2 text-[10px] font-black uppercase"><option value="EFECTIVO" ${v.financiera && v.financiera.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option><option value="TRANSFERENCIA" ${v.financiera && v.financiera.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option></select><div class="p-2 bg-blue-50 border border-blue-100 rounded-xl mb-2"><p class="text-[8px] font-black text-fix-blue mb-1">📸 FOTOS Y COMENTARIO TÉCNICO:</p><input type="file" accept="image/*" multiple onchange="handleImageSelect(event, '${v.id}')" class="w-full text-[8px] mb-2"><textarea id="client_comment_${v.id}" placeholder="TESTIMONIO O NOVEDAD FINAL..." class="w-full p-2 text-[10px] font-black uppercase bg-white rounded border-none"></textarea></div><div class="max-h-24 overflow-y-auto mb-2 border rounded p-1 bg-slate-50">
                     ${Object.entries(ACCESORIOS_DEFAULT).map(function(item){
                         const n = item[0]; const p = item[1];
                         const existing = (v.accesoriosVendidos || []).find(a => a.nombre === n);
@@ -674,16 +714,17 @@
         };
 
         window.closeVisitByAdmin = function(id) {
-            if(!confirm("¿CONFIRMAR ESTE CASO COMO ATENDIDO DESDE OFICINA? SE GUARDARÁ EN EL MAESTRO AUTOMÁNICAMENTE.")) return;
-            database.ref('visits/' + id).update({
-                estado: 'Atendido',
-                attendedDate: new Date().toISOString(),
-                razonNoAtencion: 'SOLUCIONADO DIRECTO DESDE OFICINA / ADMINISTRADOR'
-            }).then(() => {
-                showMessage("✅ CASO CERRADO POR ADMIN", "fix-report");
-                renderPendientes();
-            }).catch(() => {
-                showMessage("❌ ERROR AL CERRAR", "fix-error");
+            showConfirmModal("¿CONFIRMAR ESTE CASO COMO ATENDIDO DESDE OFICINA? SE GUARDARÁ EN EL MAESTRO AUTOMÁTICAMENTE.", function() {
+                database.ref('visits/' + id).update({
+                    estado: 'Atendido',
+                    attendedDate: new Date().toISOString(),
+                    razonNoAtencion: 'SOLUCIONADO DIRECTO DESDE OFICINA / ADMINISTRADOR'
+                }).then(() => {
+                    showMessage("✅ CASO CERRADO POR ADMIN", "fix-report");
+                    renderPendientes();
+                }).catch(() => {
+                    showMessage("❌ ERROR AL CERRAR", "fix-error");
+                });
             });
         };
 
@@ -693,7 +734,7 @@
             const typeFilter = document.getElementById('pendingTypeFilter').value;
             const query = document.getElementById('pendingSearchInput')?.value.toUpperCase() || "";
 
-            let filtered = visitsArray.filter(v => v.estado !== 'Atendido' && v.estado !== 'PENDIENTE' && v.estado !== 'A Taller');
+            let filtered = visitsArray.filter(v => v.estado !== 'Atendido' && v.estado !== 'PENDIENTE' && v.estado !== 'A Taller' && v.estado !== 'Garantia en Tramite');
             
             if(query) filtered = filtered.filter(v => v.nombreCliente.toUpperCase().includes(query));
             if(techFilter) filtered = filtered.filter(v => v.tecnico === techFilter);
@@ -841,16 +882,116 @@
         };
 
         window.markAsDelivered = function(id) {
-            if(!confirm("¿CONFIRMAR ENTREGA DEL EQUIPO AL CLIENTE? EL EQUIPO SE MARCARÁ COMO ATENDIDO Y SALDRÁ DEL TALLER.")) return;
+            showConfirmModal("¿CONFIRMAR ENTREGA DEL EQUIPO AL CLIENTE? EL EQUIPO SE MARCARÁ COMO ATENDIDO Y SALDRÁ DEL TALLER.", function() {
+                database.ref('visits/' + id).update({
+                    estado: 'Atendido',
+                    fechaEntregaTaller: new Date().toISOString().split('T')[0],
+                    attendedDate: new Date().toISOString(),
+                    razonNoAtencion: 'EQUIPO REPARADO EN TALLER Y ENTREGADO SATISFACTORIAMENTE'
+                }).then(() => {
+                    showMessage("🚀 EQUIPO ENTREGADO", "fix-report");
+                    renderTaller();
+                }).catch(() => showMessage("❌ ERROR AL ENTREGAR", "fix-error"));
+            });
+        };
+
+        function renderGarantias() {
+            const container = document.getElementById('garantiasList'); if(!container) return;
+            const query = document.getElementById('garantiasSearchInput')?.value.toUpperCase() || "";
+            let filtered = visitsArray.filter(v => v.estado === 'Garantia en Tramite');
+            if(query) filtered = filtered.filter(v => v.nombreCliente.toUpperCase().includes(query));
+
+            if(filtered.length === 0) { container.innerHTML = '<p class="p-10 text-center text-slate-300 font-black uppercase italic">No hay garantías en trámite</p>'; return; }
+
+            container.innerHTML = filtered.map(v => {
+                return `<div class="bg-white p-6 shadow-xl mb-4" style="border-left: 12px solid #1e3a8a; border-radius: 2rem;">
+                    <div class="flex flex-col md:flex-row justify-between gap-4 font-black">
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="text-sm font-black text-fix-blue underline italic uppercase">${v.nombreCliente}</h3>
+                                    <p class="text-[8px] font-bold text-slate-400 mt-1 uppercase">TÉCNICO INGRESO: ${v.tecnico || '---'} • FECHA VISITA ORIGINAL: ${v.fechaInstalacion}</p>
+                                </div>
+                                <button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="bg-slate-50 p-4 rounded-3xl border border-slate-100 italic">
+                                    <p class="text-[9px] font-black text-fix-blue uppercase mb-2 italic underline">Nota / Comentario del Técnico:</p>
+                                    <div class="text-[10px] text-slate-700 italic border-b border-dashed border-slate-200 pb-2 mb-2 uppercase">${v.commentarioCliente || 'Sin comentario del técnico'}</div>
+                                    <p class="text-[9px] font-black text-fix-accent uppercase mb-2 italic underline">Detalle Falla/Novedad:</p>
+                                    <div class="text-[10px] text-slate-700 italic border-b border-dashed border-slate-200 pb-2 mb-2 uppercase">${v.razonNoAtencion || 'Sin observación'}</div>
+                                    <p class="text-[9px] font-black text-slate-500 uppercase mb-2 italic underline">Equipo(s) de Ruta:</p>
+                                    <div class="text-[10px] font-black uppercase text-slate-500">${(v.equipos || []).map(e => '• ' + e.descProducto).join('<br>')}</div>
+                                </div>
+
+                                <div class="bg-blue-50/30 p-4 rounded-3xl border border-blue-100 font-black italic">
+                                    <div class="grid grid-cols-1 gap-3 mb-4">
+                                        <div>
+                                            <label class="text-[8px] uppercase block mb-1">1. REPUESTO O PARTE A SOLICITAR:</label>
+                                            <textarea id="garantias_repuesto_${v.id}" placeholder="Especifique los repuestos o códigos a solicitar..." class="w-full p-2 bg-white rounded-lg text-[10px] border shadow-inner font-black uppercase min-h-[60px]">${v.repuestoSolicitadoGarantia || ''}</textarea>
+                                        </div>
+                                        <div>
+                                            <label class="text-[8px] uppercase block mb-1">2. OBSERVACIÓN / TRÁMITE INTERNO:</label>
+                                            <textarea id="garantias_obs_${v.id}" placeholder="Notas sobre el estado del trámite en fábrica..." class="w-full p-2 bg-white rounded-lg text-[10px] border shadow-inner font-black uppercase min-h-[60px]">${v.observacionGarantia || ''}</textarea>
+                                        </div>
+                                        <div>
+                                            <label class="text-[8px] font-black text-fix-blue uppercase block mb-1 tracking-tighter">📅 PLANIFICAR FECHA NUEVA VISITA (AL RECIBIR REPUESTO):</label>
+                                            <input type="date" id="garantias_fecha_prog_${v.id}" value="${v.fechaNuevaVisita || ''}" class="w-full p-2 bg-blue-50 border-2 border-blue-200 rounded-lg text-[10px] font-black shadow-inner">
+                                        </div>
+                                    </div>
+                                    <button onclick="saveGarantiaUpdate('${v.id}')" class="w-full mt-3 bg-fix-blue text-white py-3 rounded-xl text-[9px] font-black uppercase active:scale-95 shadow-lg">💾 ACTUALIZAR DATOS TRÁMITE</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-full md:w-48 flex flex-col justify-center gap-2">
+                            <div class="bg-slate-900 text-white p-4 rounded-3xl text-center shadow-lg border-2 border-fix-accent/20">
+                                <p class="text-[8px] uppercase text-fix-accent font-black tracking-widest mb-1 italic">ESTADO DEL CASO</p>
+                                <p class="text-xs font-mono font-black">SOLICITADO</p>
+                            </div>
+                            <button onclick="reScheduleGarantia('${v.id}')" class="bg-green-600 text-white py-5 rounded-3xl text-xs font-black uppercase italic shadow-lg hover:bg-green-700 active:scale-95 transition-all">🚀 RE-AGENDAR / ENVIAR A RUTA</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        window.saveGarantiaUpdate = function(id) {
+            const repuesto = document.getElementById('garantias_repuesto_' + id).value.toUpperCase();
+            const obs = document.getElementById('garantias_obs_' + id).value.toUpperCase();
+            const fechaProg = document.getElementById('garantias_fecha_prog_' + id).value;
+
             database.ref('visits/' + id).update({
-                estado: 'Atendido',
-                fechaEntregaTaller: new Date().toISOString().split('T')[0],
-                attendedDate: new Date().toISOString(),
-                razonNoAtencion: 'EQUIPO REPARADO EN TALLER Y ENTREGADO SATISFACTORIAMENTE'
+                repuestoSolicitadoGarantia: repuesto,
+                observacionGarantia: obs,
+                fechaNuevaVisita: fechaProg
             }).then(() => {
-                showMessage("🚀 EQUIPO ENTREGADO", "fix-report");
-                renderTaller();
-            }).catch(() => showMessage("❌ ERROR AL ENTREGAR", "fix-error"));
+                showMessage("💾 TRÁMITE ACTUALIZADO", "fix-report");
+                renderGarantias();
+                renderRutero();
+            }).catch(() => showMessage("❌ ERROR AL GUARDAR", "fix-error"));
+        };
+
+        window.reScheduleGarantia = function(id) {
+            const fechaProg = document.getElementById('garantias_fecha_prog_' + id).value;
+            const obs = document.getElementById('garantias_obs_' + id).value.toUpperCase();
+            if(!fechaProg) {
+                showMessage("⚠️ SELECCIONE UNA FECHA DE NUEVA VISITA", "fix-accent");
+                return;
+            }
+            showConfirmModal("¿DESEA RE-AGENDAR ESTE CLIENTE? EL ESTADO VOLVERÁ A 'PENDIENTE' EN LA FECHA SELECCIONADA Y SALDRÁ DE ESTA BANDEJA.", function() {
+                database.ref('visits/' + id).update({
+                    estado: 'PENDIENTE',
+                    fechaInstalacion: fechaProg,
+                    observacionGarantia: obs,
+                    priority: 0
+                }).then(() => {
+                    showMessage("🚀 RE-AGENDADO CON ÉXITO", "fix-report");
+                    renderGarantias();
+                    renderRutero();
+                    renderUIAgenda();
+                }).catch(() => showMessage("❌ ERROR AL RE-AGENDAR", "fix-error"));
+            });
         };
 
         function renderReporteMantenimiento() {
@@ -1223,17 +1364,18 @@
         };
 
         window.duplicateVisitRecord = function() {
-            if(!confirm("¿CONFIRMAR DUPLICACIÓN DE ESTE REGISTRO COMO UNO NUEVO?")) return;
-            const data = getEditModalData();
-            const newRef = database.ref('visits').push();
-            data.id = newRef.key;
-            data.createdAt = Date.now();
-            data.estado = 'PENDIENTE';
-            
-            newRef.set(data).then(() => {
-                showMessage("🚀 REGISTRO DUPLICADO CON ÉXITO", "fix-report");
-                closeEditModal();
-            }).catch(e => showMessage("❌ ERROR AL DUPLICAR", "fix-error"));
+            showConfirmModal("¿CONFIRMAR DUPLICACIÓN DE ESTE REGISTRO COMO UNO NUEVO?", function() {
+                const data = getEditModalData();
+                const newRef = database.ref('visits').push();
+                data.id = newRef.key;
+                data.createdAt = Date.now();
+                data.estado = 'PENDIENTE';
+                
+                newRef.set(data).then(() => {
+                    showMessage("🚀 REGISTRO DUPLICADO CON ÉXITO", "fix-report");
+                    closeEditModal();
+                }).catch(e => showMessage("❌ ERROR AL DUPLICAR", "fix-error"));
+            });
         };
 
         window.saveVisit = function(isPending = false) {
@@ -1277,7 +1419,7 @@
         function startSync() {
             database.ref('visits').on('value', snap => {
                 visitsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : [];
-                renderUIAgenda(); renderRutero(); renderInventoryView(); renderPendientes(); renderTaller();
+                renderUIAgenda(); renderRutero(); renderInventoryView(); renderPendientes(); renderTaller(); renderGarantias();
                 if(currentView === 'reporte_teka') renderReporteTeka(); if(currentView === 'mantenimiento') renderReporteMantenimiento(); if(currentView === 'contabilidad') processFinancialBalance(); if(currentView === 'buscador') renderBuscador();
             });
             database.ref('movements').on('value', snap => { movementsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : []; if(currentView === 'contabilidad') processFinancialBalance(); });
@@ -1456,12 +1598,13 @@
         <header class="mb-4 sm:mb-10 flex flex-col xl:flex-row justify-between items-center gap-2 no-print">
             <div class="flex items-center">
                 <div class="bg-fix-blue p-3 sm:p-6 rounded-2xl shadow-lg mr-3"><span class="text-2xl sm:text-5xl font-black text-white italic tracking-tighter uppercase">FIX</span></div>
-                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 2.9.3</span></div></div>
+                <div><h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1><div class="flex flex-col"><span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span><span class="version-badge">V. 3.0.0</span></div></div>
             </div>
             <nav id="adminNav" class="flex flex-wrap justify-center bg-white p-1 sm:p-2 rounded-full shadow-md border-2 border-slate-50 gap-1 admin-only">
                 <button onclick="changeMasterView('reporte_admin')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-fix-blue text-white italic">Registro</button>
                 <button onclick="changeMasterView('mantenimiento')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Mantenimiento</button>
                 <button onclick="changeMasterView('pendientes')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Seguimiento</button>
+                <button onclick="changeMasterView('garantias')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Garantías</button>
                 <button onclick="changeMasterView('taller')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Taller</button>
                 <button onclick="changeMasterView('inventory')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Inventario</button>
                 <button onclick="changeMasterView('rutero')" class="view-btn py-1 px-4 rounded-full font-black text-[9px] uppercase bg-gray-100 text-gray-500 italic">Logística</button>
@@ -1601,6 +1744,19 @@
                         <input type="text" id="tallerSearchInput" oninput="renderTaller()" placeholder="🔍 BUSCAR POR CLIENTE..." class="p-4 bg-slate-50 border-none rounded-2xl text-xs font-black uppercase w-full md:w-72 shadow-inner outline-none">
                     </div>
                     <div id="tallerList" class="space-y-4 max-h-[800px] overflow-y-auto pr-2"></div>
+                </div>
+            </div>
+
+            <div id="garantiasView" class="hidden lg:col-span-3 space-y-6 admin-only">
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-xl border-[8px] border-fix-blue/10">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b pb-4">
+                        <div>
+                            <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-blue tracking-tighter">Control de Garantías en Trámite</h2>
+                            <p class="text-[8px] text-slate-400 font-black italic">GESTIÓN DE REPUESTOS SOLICITADOS A FÁBRICA Y COORDINACIONES DE RUTA</p>
+                        </div>
+                        <input type="text" id="garantiasSearchInput" oninput="renderGarantias()" placeholder="🔍 BUSCAR POR CLIENTE..." class="p-4 bg-slate-50 border-none rounded-2xl text-xs font-black uppercase w-full md:w-72 shadow-inner outline-none">
+                    </div>
+                    <div id="garantiasList" class="space-y-4 max-h-[800px] overflow-y-auto pr-2"></div>
                 </div>
             </div>
 
