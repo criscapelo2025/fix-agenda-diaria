@@ -128,7 +128,6 @@
         let currentView = 'reporte_admin';
         let currentTechUser = null; 
 
-        // Modales de confirmación personalizados para cumplir con las directivas de seguridad
         window.showConfirmModal = function(message, onConfirm) {
             const modalId = 'confirm_modal_dynamic';
             let existing = document.getElementById(modalId);
@@ -339,6 +338,7 @@
             database.ref('visits').once('value', function() {
                 renderUIAgenda(); renderRutero(); processFinancialBalance(); processMaintBalance(); renderInventoryView(); renderPendientes(); renderTaller(); renderGarantias();
                 if(currentView === 'reporte_teka') renderReporteTeka();
+                if(currentView === 'garantias') renderMaestroGarantias();
                 if(currentView === 'mantenimiento') renderReporteMantenimiento();
                 if(currentView === 'buscador') renderBuscador();
                 showMessage("✅ Actualizado", "fix-report");
@@ -347,9 +347,10 @@
 
         function syncDates(sourceId) {
             const val = document.getElementById(sourceId).value;
-            const targets = ['filterDateInput', 'filterDateInputRutero', 'cajaDateStart', 'cajaDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd'];
+            const targets = ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'garantiaMaestroStart', 'garantiaMaestroEnd'];
             targets.forEach(function(id) { const el = document.getElementById(id); if(el) el.value = val; });
             renderUIAgenda(); renderRutero(); processFinancialBalance(); processMaintBalance();
+            if(currentView === 'garantias') renderMaestroGarantias();
         }
 
         function changeMasterView(view) {
@@ -368,7 +369,7 @@
             else if(view === 'reporte_teka') { const rtv = document.getElementById('reporteTekaView'); if(rtv) rtv.classList.remove('hidden'); renderReporteTeka(); }
             else if(view === 'mantenimiento') { const mv = document.getElementById('mantenimientoView'); if(mv) mv.classList.remove('hidden'); renderReporteMantenimiento(); processMaintBalance(); }
             else if(view === 'pendientes') { const pv = document.getElementById('pendientesView'); if(pv) pv.classList.remove('hidden'); renderPendientes(); }
-            else if(view === 'garantias') { const gv = document.getElementById('garantiasView'); if(gv) gv.classList.remove('hidden'); renderGarantias(); }
+            else if(view === 'garantias') { const gv = document.getElementById('garantiasView'); if(gv) gv.classList.remove('hidden'); renderGarantias(); renderMaestroGarantias(); }
             else if(view === 'taller') { const tv = document.getElementById('tallerView'); if(tv) tv.classList.remove('hidden'); renderTaller(); }
             else if(view === 'buscador') { const bv = document.getElementById('buscadorView'); if(bv) bv.classList.remove('hidden'); renderBuscador(); }
             else { const el = document.getElementById(view + 'View'); if(el) el.classList.remove('hidden'); }
@@ -895,6 +896,7 @@
             });
         };
 
+        // --- LÓGICA DE GARANTÍAS EN TRÁMITE ---
         function renderGarantias() {
             const container = document.getElementById('garantiasList'); if(!container) return;
             const query = document.getElementById('garantiasSearchInput')?.value.toUpperCase() || "";
@@ -994,6 +996,68 @@
             });
         };
 
+        // --- MAESTRO DE GARANTÍAS FINALIZADAS ---
+        function renderMaestroGarantias() {
+            const body = document.getElementById('maestroGarantiasBody'); if(!body) return;
+            const start = document.getElementById('garantiaMaestroStart').value;
+            const end = document.getElementById('garantiaMaestroEnd').value;
+
+            let filtered = visitsArray.filter(v => v.tipoAtencion === 'Garantía' && v.estado === 'Atendido');
+            if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
+            filtered.sort((a, b) => a.fechaInstalacion.localeCompare(b.fechaInstalacion));
+
+            if(filtered.length === 0) {
+                body.innerHTML = '<tr><td colspan="18" class="p-4 text-center text-slate-400 italic font-black uppercase">No hay garantías finalizadas en este periodo.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = filtered.flatMap(v => (v.equipos || []).map(eq => {
+                const obs = (v.commentarioCliente || v.razonNoAtencion || '').replace(/(\r\n|\n|\r)/gm, " ");
+                const repuesto = (v.repuestoSolicitadoGarantia || '-').replace(/(\r\n|\n|\r)/gm, " ");
+
+                return `<tr class="border-b row-hover font-black uppercase whitespace-nowrap">
+                    <td class="report-cell font-mono">${v.fechaEmision || ''}</td>
+                    <td class="report-cell font-mono">${v.fechaInstalacion}</td>
+                    <td class="report-cell text-center">1</td>
+                    <td class="report-cell font-mono text-slate-500">${repuesto}</td>
+                    <td class="report-cell text-slate-500">-</td>
+                    <td class="report-cell font-mono">${eq.codProducto || '-'}</td>
+                    <td class="report-cell">${eq.descProducto || '-'}</td>
+                    <td class="report-cell font-mono tracking-widest">${eq.serieEquipo || '-'}</td>
+                    <td class="report-cell font-black text-indigo-600">SI</td>
+                    <td class="report-cell">${v.tecnico || '-'}</td>
+                    <td class="report-cell font-black italic">${v.nombreCliente}</td>
+                    <td class="report-cell max-w-[200px] truncate" title="${obs}">${obs || '-'}</td>
+                    <td class="report-cell font-mono text-right">$0.00</td>
+                    <td class="report-cell font-mono">${v.cedula || '-'}</td>
+                    <td class="report-cell lowercase">${v.email || '-'}</td>
+                    <td class="report-cell font-mono">${v.telefono || '-'}</td>
+                    <td class="report-cell"></td>
+                    <td class="report-cell font-mono">${v.numFactura || '-'}</td>
+                </tr>`;
+            })).join('');
+        }
+
+        window.downloadGarantiasCSV = function() {
+            let csv = "Fecha de Compra,Fecha de Intervención,Cantidad,Código del repuesto,Descripción del Repuesto,Codigo del Producto,Descripción del Producto,Serie,Garantía,Técnico,Cliente,Observación,valor a pagar,Cédula,Correo,telefono del cliente,VIÁTICO,FACTURA NUMERO\n";
+            document.querySelectorAll('#maestroGarantiasBody tr').forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if(cols.length >= 18) {
+                    let rowData = [];
+                    for(let i=0; i<18; i++) {
+                        rowData.push('"' + cols[i].innerText.replace(/"/g, '""') + '"');
+                    }
+                    csv += rowData.join(",") + "\n";
+                }
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", "REPORTE_GARANTIAS_FINALIZADAS.csv");
+            link.click();
+            showMessage("📊 Reporte de garantías descargado", "fix-report");
+        };
+
         function renderReporteMantenimiento() {
             const body = document.getElementById('mantenimientoReporteBody'); if(!body) return;
             const start = document.getElementById('maintBalanceStart')?.value;
@@ -1086,14 +1150,14 @@
             const start = document.getElementById('maestroDateStart').value; 
             const end = document.getElementById('maestroDateEnd').value;
             
-            let filtered = visitsArray.filter(v => !v.esMantenimiento && v.estado === 'Atendido');
+            // CAMBIO: Excluir explícitamente el tipoAtencion "Garantía" del maestro principal
+            let filtered = visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Garantía' && v.estado === 'Atendido');
             if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
             filtered.sort((a, b) => a.fechaInstalacion.localeCompare(b.fechaInstalacion));
 
-            const garantias = filtered.filter(v => v.tipoAtencion === 'Garantía');
-            const bbqs = filtered.filter(v => v.tipoAtencion !== 'Garantía' && (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ"));
-            const multis = filtered.filter(v => v.tipoAtencion !== 'Garantía' && !(v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ") && (v.equipos || []).length > 1);
-            const singles = filtered.filter(v => v.tipoAtencion !== 'Garantía' && !(v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ") && (v.equipos || []).length === 1);
+            const bbqs = filtered.filter(v => (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ"));
+            const multis = filtered.filter(v => !(v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ") && (v.equipos || []).length > 1);
+            const singles = filtered.filter(v => !(v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ") && (v.equipos || []).length === 1);
 
             let rowCount = 1;
             let granTotalMO = 0;
@@ -1112,8 +1176,7 @@
             body.innerHTML = 
                 renderSection("📋 REPORTE UN PRODUCTO", singles) + 
                 renderSection("📚 REPORTE MULTI-PRODUCTO", multis) + 
-                renderSection("🔥 REPORTE PARRILLAS BBQ", bbqs) + 
-                renderSection("🛡️ REPORTE GARANTÍAS", garantias);
+                renderSection("🔥 REPORTE PARRILLAS BBQ", bbqs);
 
             const summaryBox = document.getElementById('tekaSummaryTotal');
             if(summaryBox) summaryBox.textContent = "$" + granTotalMO.toFixed(2);
@@ -1172,23 +1235,66 @@
             const start = startInput ? startInput.value : ""; 
             const end = endInput ? endInput.value : "";
             const techFilter = document.getElementById('cajaTechFilter') ? document.getElementById('cajaTechFilter').value : "";
+            
             let todos = [];
+            
+            // 1. Recopilar ingresos de visitas técnicas finalizadas
             visitsArray.filter(v => v.estado === 'Atendido' && v.financiera && !v.esMantenimiento).forEach(v => {
                 let monto = (v.tipoAtencion === 'Garantía') ? 0 : (v.equipos?.length === 1 && !v.equipos.some(e=>e.descProducto==="PARRILLA BBQ") ? (v.financiera.totalCliente || 0) : (v.accesoriosVendidos || []).reduce((s,a)=>s+(a.cantidad*a.precio), 0));
                 todos.push({ id: v.id, monto, type: 'INGRESO', concepto: "VISITA: " + v.nombreCliente, fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt, dateStr: v.fechaInstalacion, source: 'VISITA', tecnico: v.tecnico || '---', formaPago: v.financiera.formaPago || 'EFECTIVO' });
             });
+            
+            // 2. Recopilar movimientos manuales
             movementsArray.forEach(m => {
                 const mDate = new Date(m.fecha);
                 const dStr = mDate.toISOString().split('T')[0];
                 todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: "MANUAL: " + m.concepto, fecha: m.fecha, dateStr: dStr, source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' });
             });
-            if(start && end) todos = todos.filter(m => m.dateStr >= start && m.dateStr <= end);
-            if(techFilter) todos = todos.filter(m => m.tecnico === techFilter);
-            todos.sort((a,b) => b.fecha - a.fecha);
+
+            // 3. CÁLCULO DE CAJA REAL FÍSICA (HISTÓRICA GLOBAL TOTAL)
+            let globalCashIn = 0;
+            let globalCashOut = 0;
+            todos.forEach(m => {
+                if (m.formaPago === 'EFECTIVO') {
+                    if (m.type === 'INGRESO') {
+                        globalCashIn += m.monto;
+                    } else {
+                        globalCashOut += m.monto;
+                    }
+                }
+            });
+            const cajaRealTotal = globalCashIn - globalCashOut;
+            const cajaRealDisplay = document.getElementById('cajaRealTotalDisplay');
+            if (cajaRealDisplay) {
+                cajaRealDisplay.textContent = "$" + cajaRealTotal.toFixed(2);
+                if (cajaRealTotal < 0) {
+                    cajaRealDisplay.className = "text-xl font-black text-fix-error font-mono";
+                } else {
+                    cajaRealDisplay.className = "text-xl font-black text-fix-accent font-mono";
+                }
+            }
+
+            // 4. Aplicar Filtro de Fechas y Técnico solo para visualización del Período
+            let filteredTodos = [...todos];
+            if(start && end) filteredTodos = filteredTodos.filter(m => m.dateStr >= start && m.dateStr <= end);
+            if(techFilter) filteredTodos = filteredTodos.filter(m => m.tecnico === techFilter);
+            
+            filteredTodos.sort((a,b) => b.fecha - a.fecha);
+            
             const tb = document.getElementById('contabilidadTableBody');
-            if(tb) tb.innerHTML = todos.map(m => `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${new Date(m.fecha).toLocaleDateString()}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-error text-xs font-black" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
+            if(tb) tb.innerHTML = filteredTodos.map(m => `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${new Date(m.fecha).toLocaleDateString()}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-error text-xs font-black" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
+            
             let tIn = 0, tOut = 0, tCashIn = 0, tTransIn = 0;
-            todos.forEach(m => { if(m.type === 'INGRESO') { tIn += m.monto; if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; else tTransIn += m.monto; } else { tOut += m.monto; } });
+            filteredTodos.forEach(m => { 
+                if(m.type === 'INGRESO') { 
+                    tIn += m.monto; 
+                    if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; 
+                    else tTransIn += m.monto; 
+                } else { 
+                    tOut += m.monto; 
+                } 
+            });
+            
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
             if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tOut.toFixed(2);
             if(document.getElementById('balanceNetoDisplay')) document.getElementById('balanceNetoDisplay').textContent = "$" + (tCashIn - tOut).toFixed(2);
@@ -1420,7 +1526,11 @@
             database.ref('visits').on('value', snap => {
                 visitsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : [];
                 renderUIAgenda(); renderRutero(); renderInventoryView(); renderPendientes(); renderTaller(); renderGarantias();
-                if(currentView === 'reporte_teka') renderReporteTeka(); if(currentView === 'mantenimiento') renderReporteMantenimiento(); if(currentView === 'contabilidad') processFinancialBalance(); if(currentView === 'buscador') renderBuscador();
+                if(currentView === 'reporte_teka') renderReporteTeka(); 
+                if(currentView === 'garantias') renderMaestroGarantias();
+                if(currentView === 'mantenimiento') renderReporteMantenimiento(); 
+                if(currentView === 'contabilidad') processFinancialBalance(); 
+                if(currentView === 'buscador') renderBuscador();
             });
             database.ref('movements').on('value', snap => { movementsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : []; if(currentView === 'contabilidad') processFinancialBalance(); });
             database.ref('inventory_entries').on('value', snap => { inventoryEntries = snap.val() ? Object.values(snap.val()) : []; renderInventoryView(); });
@@ -1564,12 +1674,38 @@
         function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
         window.closeEditFinanceModal = function() { document.getElementById('editFinanceModal').classList.add('hidden'); };
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const hoy = new Date().toISOString().split('T')[0];
-            ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'cajaDateStart', 'cajaDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoy; });
+        function getMondayAndFriday() {
+            const today = new Date();
+            const day = today.getDay(); // 0 es Domingo, 1 es Lunes, etc.
+            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(today.setDate(diff));
+            const friday = new Date(monday);
+            friday.setDate(monday.getDate() + 4);
             
+            const pad = (n) => String(n).padStart(2, '0');
+            const formatLocal = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            
+            return {
+                monday: formatLocal(monday),
+                friday: formatLocal(friday)
+            };
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const pad = (n) => String(n).padStart(2, '0');
+            const dHoy = new Date();
+            const hoyLocal = `${dHoy.getFullYear()}-${pad(dHoy.getMonth() + 1)}-${pad(dHoy.getDate())}`;
+            
+            ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd', 'garantiaMaestroStart', 'garantiaMaestroEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoyLocal; });
+            
+            // Establecer filtro de Lunes a Viernes por defecto en Contabilidad y Caja
+            const weekDates = getMondayAndFriday();
+            if(document.getElementById('cajaDateStart')) document.getElementById('cajaDateStart').value = weekDates.monday;
+            if(document.getElementById('cajaDateEnd')) document.getElementById('cajaDateEnd').value = weekDates.friday;
+
             const date6Months = new Date(); date6Months.setMonth(date6Months.getMonth() - 6);
-            if(document.getElementById('searchDateStart')) document.getElementById('searchDateStart').value = date6Months.toISOString().split('T')[0];
+            const date6MonthsLocal = `${date6Months.getFullYear()}-${pad(date6Months.getMonth() + 1)}-${pad(date6Months.getDate())}`;
+            if(document.getElementById('searchDateStart')) document.getElementById('searchDateStart').value = date6MonthsLocal;
 
             const p = new URLSearchParams(window.location.search); 
             const t = p.get('tech');
@@ -1748,6 +1884,7 @@
             </div>
 
             <div id="garantiasView" class="hidden lg:col-span-3 space-y-6 admin-only">
+                <!-- Sección de Garantías en Trámite -->
                 <div class="bg-white p-6 rounded-[2.5rem] shadow-xl border-[8px] border-fix-blue/10">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b pb-4">
                         <div>
@@ -1757,6 +1894,48 @@
                         <input type="text" id="garantiasSearchInput" oninput="renderGarantias()" placeholder="🔍 BUSCAR POR CLIENTE..." class="p-4 bg-slate-50 border-none rounded-2xl text-xs font-black uppercase w-full md:w-72 shadow-inner outline-none">
                     </div>
                     <div id="garantiasList" class="space-y-4 max-h-[800px] overflow-y-auto pr-2"></div>
+                </div>
+
+                <!-- NUEVA SECCIÓN: Maestro de Garantías Finalizadas -->
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-xl border-[8px] border-slate-50 font-black uppercase">
+                    <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+                        <div>
+                            <h2 class="text-lg font-black uppercase italic font-sans underline text-indigo-700">Maestro de Garantías Finalizadas</h2>
+                            <div class="flex gap-2 mt-2 font-black">
+                                <input type="date" id="garantiaMaestroStart" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black">
+                                <input type="date" id="garantiaMaestroEnd" class="bg-slate-50 p-1 rounded text-[10px] outline-none border font-black">
+                                <button onclick="renderMaestroGarantias()" class="bg-indigo-700 text-white px-2 rounded text-[10px]">VER</button>
+                            </div>
+                        </div>
+                        <button onclick="downloadGarantiasCSV()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-black text-[9px] uppercase shadow-md italic transition-all">📊 DESCARGAR EXCEL GARANTÍAS</button>
+                    </div>
+                    <div class="overflow-x-auto border-2 border-slate-50 rounded-xl mb-6">
+                        <table class="w-full border-collapse admin-table">
+                            <thead>
+                                <tr class="bg-slate-900 text-white text-[7px] uppercase whitespace-nowrap">
+                                    <th>Fecha de Compra</th>
+                                    <th>Fecha de Intervención</th>
+                                    <th>Cantidad</th>
+                                    <th>Código del repuesto</th>
+                                    <th>Descripción del Repuesto</th>
+                                    <th>Codigo del Producto</th>
+                                    <th>Descripción del Producto</th>
+                                    <th>Serie</th>
+                                    <th>Garantía</th>
+                                    <th>Técnico</th>
+                                    <th>Cliente</th>
+                                    <th>Observación</th>
+                                    <th>valor a pagar</th>
+                                    <th>Cédula</th>
+                                    <th>Correo</th>
+                                    <th>telefono del cliente</th>
+                                    <th>VIÁTICO</th>
+                                    <th>FACTURA NUMERO</th>
+                                </tr>
+                            </thead>
+                            <tbody id="maestroGarantiasBody" class="uppercase font-bold text-[8px]"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -1876,12 +2055,19 @@
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6 text-center italic font-black">
-                        <div class="p-3 bg-green-50 rounded-xl border border-green-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">INGRESOS (EFECTIVO)</span><div id="totalEfectivoDisplay" class="text-lg font-black text-green-700">$0.00</div></div>
-                        <div class="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">EGRESOS / GASTOS</span><div id="totalEgresosDisplay" class="text-lg font-black text-red-700">$0.00</div></div>
-                        <div class="p-3 bg-slate-900 rounded-xl text-white shadow-xl col-span-2 md:col-span-1 flex flex-col justify-center border-2 border-fix-accent"><span class="text-[8px] uppercase text-fix-accent">SALDO NETO (CASH)</span><div id="balanceNetoDisplay" class="text-xl font-black text-fix-accent">$0.00</div></div>
-                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center opacity-80"><span class="text-[8px] uppercase text-slate-500">BANCO (TRANSFER.)</span><div id="totalTransferDisplay" class="text-lg font-black text-blue-700">$0.00</div></div>
-                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-60"><span class="text-[8px] uppercase text-slate-500">VENTA TOTAL PERIODO</span><div id="totalIngresosDisplay" class="text-lg font-black text-slate-600">$0.00</div></div>
+                    <!-- REJILLA DE VALORES CON ADICIÓN DE CAJA REAL DISPONIBLE -->
+                    <div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-6 text-center italic font-black">
+                        <div class="p-3 bg-green-50 rounded-xl border border-green-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">INGRESOS EFECTIVO (PERÍODO)</span><div id="totalEfectivoDisplay" class="text-base font-black text-green-700">$0.00</div></div>
+                        <div class="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">EGRESOS / GASTOS (PERÍODO)</span><div id="totalEgresosDisplay" class="text-base font-black text-red-700">$0.00</div></div>
+                        <div class="p-3 bg-slate-100 rounded-xl border border-slate-200 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">SALDO PERÍODO (CASH)</span><div id="balanceNetoDisplay" class="text-base font-black text-slate-700">$0.00</div></div>
+                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center opacity-80"><span class="text-[8px] uppercase text-slate-500">BANCO (TRANSFER. PERÍODO)</span><div id="totalTransferDisplay" class="text-base font-black text-blue-700">$0.00</div></div>
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-60"><span class="text-[8px] uppercase text-slate-500">VENTA TOTAL PERIODO</span><div id="totalIngresosDisplay" class="text-base font-black text-slate-600">$0.00</div></div>
+                        
+                        <!-- WIDGET CRÍTICO: CAJA FÍSICA HISTÓRICA ACUMULADA TOTAL -->
+                        <div class="p-3 bg-slate-900 rounded-xl text-white shadow-xl flex flex-col justify-center border-2 border-fix-accent col-span-2 md:col-span-1">
+                            <span class="text-[8px] uppercase text-fix-accent tracking-tighter">📦 EFECTIVO REAL EN CAJA (TODO)</span>
+                            <div id="cajaRealTotalDisplay" class="text-xl font-black text-fix-accent font-mono">$0.00</div>
+                        </div>
                     </div>
 
                     <div class="bg-slate-50 p-4 rounded-xl mb-6 grid grid-cols-1 md:grid-cols-6 gap-2 items-end italic font-black border border-slate-200">
