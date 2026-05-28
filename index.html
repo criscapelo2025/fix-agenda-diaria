@@ -659,8 +659,10 @@
                     commentarioCliente: comment.toUpperCase(), 
                     fotosRegistro: photos, 
                     attendedDate: new Date().toISOString(), 
-                    'financiera/totalCliente': totalFinal, 
-                    'financiera/formaPago': pay 
+                    financiera: {
+                        totalCliente: totalFinal, 
+                        formaPago: pay 
+                    }
                 };
 
                 if (s === 'A Taller') {
@@ -1097,11 +1099,15 @@
             const repuestos = document.getElementById('taller_repuestos_' + id).value.toUpperCase();
             const fechaEntregaProg = document.getElementById('taller_fecha_entrega_prog_' + id).value;
 
+            const originalVisit = visitsArray.find(v => v.id === id);
+            const updatedFinanciera = originalVisit && originalVisit.financiera ? Object.assign({}, originalVisit.financiera) : { formaPago: 'EFECTIVO' };
+            updatedFinanciera.totalCliente = costoTotal;
+
             database.ref('visits/' + id).update({
                 fechaIngresoTaller: fecha,
                 taller_equipo_trabajado: equipoSel,
                 taller_tipo_servicio: tipoServ,
-                'financiera/totalCliente': costoTotal,
+                financiera: updatedFinanciera,
                 repuestosSolicitadosTaller: repuestos,
                 fechaEntregaProgramada: fechaEntregaProg
             }).then(() => {
@@ -1492,29 +1498,6 @@
                 todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: m.concepto || '', fecha: m.fecha, dateStr: dStr, source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' });
             });
 
-            // 3. CÁLCULO DE CAJA REAL FÍSICA (HISTÓRICA GLOBAL TOTAL)
-            let globalCashIn = 0;
-            let globalCashOut = 0;
-            todos.forEach(m => {
-                if (m.formaPago === 'EFECTIVO') {
-                    if (m.type === 'INGRESO') {
-                        globalCashIn += m.monto;
-                    } else {
-                        globalCashOut += m.monto;
-                    }
-                }
-            });
-            const cajaRealTotal = globalCashIn - globalCashOut;
-            const cajaRealDisplay = document.getElementById('cajaRealTotalDisplay');
-            if (cajaRealDisplay) {
-                cajaRealDisplay.textContent = "$" + cajaRealTotal.toFixed(2);
-                if (cajaRealTotal < 0) {
-                    cajaRealDisplay.className = "text-xl font-black text-fix-error font-mono";
-                } else {
-                    cajaRealDisplay.className = "text-xl font-black text-fix-accent font-mono";
-                }
-            }
-
             // MEJORA EXCLUSIVA: ARRASTRE DE SALDO ANTERIOR (SOLO EFECTIVO FÍSICO)
             let carriedCash = 0;
             if (start) {
@@ -1522,7 +1505,7 @@
                     if (m.dateStr < start && (!techFilter || m.tecnico === techFilter)) {
                         if (m.formaPago === 'EFECTIVO') {
                             if (m.type === 'INGRESO') carriedCash += m.monto;
-                            else carriedCash -= m.monto; // EGRESO
+                            else if (m.type === 'EGRESO') carriedCash -= m.monto; // EGRESO
                         }
                     }
                 });
@@ -1551,10 +1534,10 @@
                     <tr class="bg-blue-50/50 border-b font-black uppercase text-[10px] text-fix-blue italic">
                         <td class="p-4 font-bold">SALDO ANTERIOR<br><span class="text-[7px] text-slate-400 font-bold">ARRASTRE</span></td>
                         <td class="p-4 font-bold tracking-tight">
-                            <span class="text-green-600">INGRESO</span><br>
-                            <span class="text-slate-400">EFECTIVO</span>
+                            <span class="text-green-600 font-black">ARRASTRE</span><br>
+                            <span class="text-slate-400 font-black">EFECTIVO EN CAJA</span>
                         </td>
-                        <td class="p-4 font-black">--- EFECTIVO ACUMULADO DE DÍAS ANTERIORES ---</td>
+                        <td class="p-4 font-black">--- EFECTIVO DISPONIBLE ACUMULADO DE DÍAS ANTERIORES ---</td>
                         <td class="p-4 text-right font-mono font-black text-slate-700">
                             $${carriedCash.toFixed(2)}
                         </td>
@@ -1567,23 +1550,30 @@
                 tb.innerHTML = htmlRows;
             }
             
-            let tIn = 0, tOut = 0, tCashIn = 0, tTransIn = 0;
+            let tCashIn = 0;
+            let tTransIn = 0;
+            let tCashOut = 0;
+            let tTransOut = 0;
+
             filteredTodos.forEach(m => { 
                 if(m.type === 'INGRESO') { 
-                    tIn += m.monto; 
                     if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; 
                     else tTransIn += m.monto; 
-                } else { 
-                    tOut += m.monto; 
+                } else if(m.type === 'EGRESO') { 
+                    if(m.formaPago === 'EFECTIVO') tCashOut += m.monto;
+                    else tTransOut += m.monto;
                 } 
             });
             
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
-            if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tOut.toFixed(2);
-            // El balance del periodo ahora acumula el Arrastre de Efectivo de los días anteriores de forma matemática pura
-            if(document.getElementById('balanceNetoDisplay')) document.getElementById('balanceNetoDisplay').textContent = "$" + (carriedCash + tCashIn - tOut).toFixed(2);
             if(document.getElementById('totalTransferDisplay')) document.getElementById('totalTransferDisplay').textContent = "$" + tTransIn.toFixed(2);
-            if(document.getElementById('totalIngresosDisplay')) document.getElementById('totalIngresosDisplay').textContent = "$" + tIn.toFixed(2);
+            if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tCashOut.toFixed(2); // Muestra solo egresos en efectivo físico
+            
+            // El balance del periodo ahora acumula el Arrastre de Efectivo de los días anteriores y resta los gastos físicos
+            let realCashAvailable = carriedCash + tCashIn - tCashOut;
+            if(document.getElementById('balanceNetoDisplay')) {
+                document.getElementById('balanceNetoDisplay').textContent = "$" + realCashAvailable.toFixed(2);
+            }
         }
 
         function rebuildEditAccessoriesInputs(vendidos) {
@@ -1693,6 +1683,7 @@
         }
 
         function getEditModalData() {
+            const id = document.getElementById('edit_id').value;
             const selects = document.querySelectorAll('.edit-eq-select');
             const manualNames = document.querySelectorAll('.edit-eq-manual');
             const codes = document.querySelectorAll('.edit-eq-code');
@@ -1724,6 +1715,10 @@
                 if(q > 0) { updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); accTotal += (q * p); } 
             });
 
+            const originalVisit = visitsArray.find(v => v.id === id);
+            const updatedFinanciera = originalVisit && originalVisit.financiera ? Object.assign({}, originalVisit.financiera) : { formaPago: 'EFECTIVO' };
+            updatedFinanciera.totalCliente = (moTotal + accTotal);
+
             return {
                 nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), 
                 telefono: document.getElementById('edit_telefono').value, 
@@ -1740,27 +1735,18 @@
                 equipos: updatedEquipos, 
                 accesoriosVendidos: updatedAccs, 
                 observacionesAdmin: document.getElementById('edit_observaciones').value.toUpperCase(),
-                'financiera/totalCliente': (moTotal + accTotal)
+                financiera: updatedFinanciera
             };
         }
 
         window.saveEditChanges = function() {
             const id = document.getElementById('edit_id').value;
             const data = getEditModalData();
-            
-            // Extraer total de caja de manera que no cause colisiones de claves con barras diagonales
-            const totalClienteVal = data['financiera/totalCliente'];
-            delete data['financiera/totalCliente'];
-            
-            database.ref('visits/' + id).update(data).then(() => {
-                return database.ref('visits/' + id + '/financiera').update({
-                    totalCliente: totalClienteVal
-                });
-            }).then(() => { 
+            database.ref('visits/' + id).update(data).then(() => { 
                 showMessage("✅ Datos Actualizados", "fix-report"); 
                 closeEditModal(); 
             }).catch(err => {
-                console.error("Error al actualizar cliente:", err);
+                console.error("Error al guardar cambios de cliente:", err);
                 showMessage("❌ Error al guardar cambios", "fix-error");
             });
         };
@@ -1771,8 +1757,7 @@
                 const newRef = database.ref('visits').push();
                 const newId = newRef.key;
                 
-                const totalClienteVal = data['financiera/totalCliente'];
-                delete data['financiera/totalCliente'];
+                const totalClienteVal = data.financiera ? data.financiera.totalCliente : 0;
                 
                 data.id = newId;
                 data.createdAt = Date.now();
@@ -1823,7 +1808,7 @@
                 const note = isPending ? 'INGRESADO DIRECTO A PENDIENTES - REVISAR TEMA' : (data.observacionesAdmin || '').toUpperCase();
                 
                 const ref = database.ref('visits').push();
-                ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), telefono: data.telefono || '', callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', lugarCompra: data.lugarCompra || 'OTRO', fechaInstalacion: document.getElementById('filterDateInput').value, fechaEmision: data.fechaEmision || '', tecnico: data.tecnico || '', tipoAtencion: data.tipoServicioGlobal, estado: status, createdAt: Date.now(), equipos: eqs, accesoriosVendidos: accs, financiera: { totalCliente: totalFinal }, priority: 0, observacionesAdmin: note }).then(() => { showMessage(isPending ? "⏳ Guardado en Pendientes" : "🚀 Agendado", isPending ? "fix-pending" : "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
+                ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), telefono: data.telefono || '', callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', lugarCompra: data.lugarCompra || 'OTRO', fechaInstalacion: document.getElementById('filterDateInput').value, fechaEmision: data.fechaEmision || '', tecnico: data.tecnico || '', tipoAtencion: data.tipoServicioGlobal, estado: status, createdAt: Date.now(), equipos: eqs, accesoriosVendidos: accs, financiera: { totalCliente: totalFinal, formaPago: 'EFECTIVO' }, priority: 0, observacionesAdmin: note }).then(() => { showMessage(isPending ? "⏳ Guardado en Pendientes" : "🚀 Agendado", isPending ? "fix-pending" : "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
             } catch (err) { showMessage("❌ Error Crítico", "fix-error"); }
         };
 
@@ -1932,14 +1917,14 @@
                     closeEditFinanceModal();
                 }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
             } else {
-                // Súper seguro y compatible con cualquier versión de Firebase y persistencia local:
+                const originalVisit = visitsArray.find(v => v.id === id);
+                const updatedFinanciera = originalVisit && originalVisit.financiera ? Object.assign({}, originalVisit.financiera) : { formaPago: 'EFECTIVO' };
+                updatedFinanciera.totalCliente = nuevoMonto;
+                updatedFinanciera.formaPago = nuevaFormaPago;
+
                 database.ref('visits/' + id).update({ 
-                    conceptoPersonalizado: nuevoConcepto
-                }).then(() => {
-                    return database.ref('visits/' + id + '/financiera').update({
-                        totalCliente: nuevoMonto,
-                        formaPago: nuevaFormaPago
-                    });
+                    conceptoPersonalizado: nuevoConcepto,
+                    financiera: updatedFinanciera
                 }).then(() => {
                     showMessage("✅ Liquidación Actualizada", "fix-report");
                     closeEditFinanceModal();
@@ -2196,7 +2181,7 @@
                             <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black">
                             <input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black">
                             <input type="text" name="cedula" placeholder="CÉDULA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono">
-                            <input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black">
+                            <input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black font-mono">
                             <input type="email" name="email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner">
                             <input type="text" name="numFactura" placeholder="N° FACTURA COMPRA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center uppercase font-black">
                             <input type="text" name="direccion" placeholder="LINK GPS (OPCIONAL)" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner md:col-span-2">
@@ -2439,18 +2424,27 @@
                         </div>
                     </div>
                     
-                    <!-- REJILLA DE VALORES CON ADICIÓN DE CAJA REAL DISPONIBLE -->
-                    <div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-6 text-center italic font-black">
-                        <div class="p-3 bg-green-50 rounded-xl border border-green-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">INGRESOS EFECTIVO (PERÍODO)</span><div id="totalEfectivoDisplay" class="text-base font-black text-green-700">$0.00</div></div>
-                        <div class="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">EGRESOS / GASTOS (PERÍODO)</span><div id="totalEgresosDisplay" class="text-base font-black text-red-700">$0.00</div></div>
-                        <div class="p-3 bg-slate-100 rounded-xl border border-slate-200 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">EFECTIVO DISPONIBLE (CON ARRASTRE)</span><div id="balanceNetoDisplay" class="text-base font-black text-slate-700">$0.00</div></div>
-                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center opacity-80"><span class="text-[8px] uppercase text-slate-500">BANCO (TRANSFER. PERÍODO)</span><div id="totalTransferDisplay" class="text-base font-black text-blue-700">$0.00</div></div>
-                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-60"><span class="text-[8px] uppercase text-slate-500">VENTA TOTAL PERIODO</span><div id="totalIngresosDisplay" class="text-base font-black text-slate-600">$0.00</div></div>
-                        
-                        <!-- WIDGET CRÍTICO: CAJA FÍSICA HISTÓRICA ACUMULADA TOTAL -->
-                        <div class="p-3 bg-slate-900 rounded-xl text-white shadow-xl flex flex-col justify-center border-2 border-fix-accent col-span-2 md:col-span-1">
-                            <span class="text-[8px] uppercase text-fix-accent tracking-tighter">📦 EFECTIVO REAL EN CAJA (TODO)</span>
-                            <div id="cajaRealTotalDisplay" class="text-xl font-black text-fix-accent font-mono">$0.00</div>
+                    <!-- REJILLA DE VALORES DE CAJA OPTIMIZADA - EXCLUSIVA PARA EL CONTROL DIARIO FÍSICO REAL -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 text-center italic font-black">
+                        <!-- INGRESOS EFECTIVO -->
+                        <div class="p-4 bg-green-50 rounded-2xl border border-green-200 flex flex-col justify-center">
+                            <span class="text-[9px] uppercase text-slate-500 tracking-tight">💵 INGRESOS EFECTIVO (HOY)</span>
+                            <div id="totalEfectivoDisplay" class="text-xl font-black text-green-700 font-mono">$0.00</div>
+                        </div>
+                        <!-- INGRESOS TRANSFERENCIA -->
+                        <div class="p-4 bg-blue-50 rounded-2xl border border-blue-200 flex flex-col justify-center">
+                            <span class="text-[9px] uppercase text-slate-500 tracking-tight">🏦 INGRESOS TRANSFERENCIA (HOY)</span>
+                            <div id="totalTransferDisplay" class="text-xl font-black text-blue-700 font-mono">$0.00</div>
+                        </div>
+                        <!-- EGRESOS EFECTIVO -->
+                        <div class="p-4 bg-red-50 rounded-2xl border border-red-200 flex flex-col justify-center">
+                            <span class="text-[9px] uppercase text-slate-500 tracking-tight">💸 GASTOS / EGRESOS EFECTIVO (HOY)</span>
+                            <div id="totalEgresosDisplay" class="text-xl font-black text-red-700 font-mono">$0.00</div>
+                        </div>
+                        <!-- EFECTIVO REAL DISPONIBLE (CON ARRASTRE DIARIO) -->
+                        <div class="p-4 bg-slate-950 rounded-2xl text-white shadow-xl flex flex-col justify-center border-2 border-fix-accent">
+                            <span class="text-[10px] uppercase text-fix-accent tracking-wider">📦 EFECTIVO DISPONIBLE EN CAJA (REAL)</span>
+                            <div id="balanceNetoDisplay" class="text-2xl font-black text-fix-accent font-mono">$0.00</div>
                         </div>
                     </div>
 
