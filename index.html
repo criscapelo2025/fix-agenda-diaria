@@ -1478,6 +1478,9 @@
                 let monto = (v.tipoAtencion === 'Garantía') ? 0 : (v.financiera.totalCliente || 0);
                 let concepto = v.conceptoPersonalizado || (v.esMantenimiento ? "MANTENIMIENTO: " + v.nombreCliente : "VISITA: " + v.nombreCliente);
                 
+                // MEJORA EXCLUSIVA: Si es de Teka (Instalación), se registra como TRANSFERENCIA por defecto (banco) para no alterar tu efectivo físico real.
+                let defaultFormaPago = v.financiera.formaPago || (v.tipoAtencion === 'Instalación' ? 'TRANSFERENCIA' : 'EFECTIVO');
+
                 todos.push({ 
                     id: v.id, 
                     monto, 
@@ -1487,7 +1490,7 @@
                     dateStr: v.fechaInstalacion, 
                     source: 'VISITA', 
                     tecnico: v.tecnico || '---', 
-                    formaPago: v.financiera.formaPago || 'EFECTIVO' 
+                    formaPago: defaultFormaPago 
                 });
             });
             
@@ -1497,6 +1500,29 @@
                 const dStr = mDate.toISOString().split('T')[0];
                 todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: m.concepto || '', fecha: m.fecha, dateStr: dStr, source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' });
             });
+
+            // 3. CÁLCULO DE CAJA REAL FÍSICA (HISTÓRICA GLOBAL TOTAL)
+            let globalCashIn = 0;
+            let globalCashOut = 0;
+            todos.forEach(m => {
+                if (m.formaPago === 'EFECTIVO') {
+                    if (m.type === 'INGRESO') {
+                        globalCashIn += m.monto;
+                    } else {
+                        globalCashOut += m.monto;
+                    }
+                }
+            });
+            const cajaRealTotal = globalCashIn - globalCashOut;
+            const cajaRealDisplay = document.getElementById('cajaRealTotalDisplay');
+            if (cajaRealDisplay) {
+                cajaRealDisplay.textContent = "$" + cajaRealTotal.toFixed(2);
+                if (cajaRealTotal < 0) {
+                    cajaRealDisplay.className = "text-xl font-black text-fix-error font-mono";
+                } else {
+                    cajaRealDisplay.className = "text-xl font-black text-fix-accent font-mono";
+                }
+            }
 
             // MEJORA EXCLUSIVA: ARRASTRE DE SALDO ANTERIOR (SOLO EFECTIVO FÍSICO)
             let carriedCash = 0;
@@ -1550,16 +1576,21 @@
                 tb.innerHTML = htmlRows;
             }
             
-            let tCashIn = 0;
+            // CORRECCIÓN CRÍTICA DE VARIABLES NO DECLARADAS
+            let tIn = 0;
+            let tOut = 0; 
+            let tCashIn = 0; 
             let tTransIn = 0;
             let tCashOut = 0;
             let tTransOut = 0;
 
             filteredTodos.forEach(m => { 
                 if(m.type === 'INGRESO') { 
+                    tIn += m.monto;
                     if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; 
                     else tTransIn += m.monto; 
                 } else if(m.type === 'EGRESO') { 
+                    tOut += m.monto;
                     if(m.formaPago === 'EFECTIVO') tCashOut += m.monto;
                     else tTransOut += m.monto;
                 } 
@@ -1569,7 +1600,7 @@
             if(document.getElementById('totalTransferDisplay')) document.getElementById('totalTransferDisplay').textContent = "$" + tTransIn.toFixed(2);
             if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tCashOut.toFixed(2); // Muestra solo egresos en efectivo físico
             
-            // El balance del periodo ahora acumula el Arrastre de Efectivo de los días anteriores y resta los gastos físicos
+            // El balance del periodo ahora acumula el Arrastre de Efectivo de los días anteriores y resta los gastos físicos de forma perfecta
             let realCashAvailable = carriedCash + tCashIn - tCashOut;
             if(document.getElementById('balanceNetoDisplay')) {
                 document.getElementById('balanceNetoDisplay').textContent = "$" + realCashAvailable.toFixed(2);
@@ -2437,7 +2468,7 @@
                             <div id="totalTransferDisplay" class="text-xl font-black text-blue-700 font-mono">$0.00</div>
                         </div>
                         <!-- EGRESOS EFECTIVO -->
-                        <div class="p-4 bg-red-50 rounded-2xl border border-red-200 flex flex-col justify-center">
+                        <div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex flex-col justify-center">
                             <span class="text-[9px] uppercase text-slate-500 tracking-tight">💸 GASTOS / EGRESOS EFECTIVO (HOY)</span>
                             <div id="totalEgresosDisplay" class="text-xl font-black text-red-700 font-mono">$0.00</div>
                         </div>
