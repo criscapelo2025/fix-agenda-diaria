@@ -95,7 +95,7 @@
           appId: "1:98719439808:web:66576c19c8b5233a718625",
         };
         
-        // SISTEMA DE CONTINGENCIA LOCAL (PREVIENE CAIDAS DE LA INTERFAZ EN EL VISUALIZADOR)
+        // SISTEMA DE CONTINGENCIA LOCAL CON RESOLVEDOR DE RUTAS AVANZADO (PREVIENE CAIDAS)
         let database;
         let isFirebaseFallback = false;
 
@@ -119,12 +119,12 @@
 
             database = {
                 ref: function(path) {
-                    const parts = path.split('/');
+                    const cleanPath = path.replace(/^\/|\/$/g, '');
+                    const parts = cleanPath.split('/');
                     const baseKey = parts[0];
-                    const subId = parts[1];
                     
                     return {
-                        on: function(event, callback, errorCallback) {
+                        on: function(event, callback) {
                             window.addEventListener('storage', () => {
                                 callback({ val: () => getLocal(baseKey) });
                             });
@@ -152,12 +152,21 @@
                         },
                         update: function(updates) {
                             const current = getLocal(baseKey);
-                            const targetObj = subId ? (current[subId] || {}) : current;
+                            let target = current;
                             
-                            // MEJORA: Resuelve dinámicamente claves con barras "/" en simulación para no romper el guardado
+                            // Navegar de forma segura hasta el nodo correspondiente
+                            for (let i = 1; i < parts.length; i++) {
+                                const part = parts[i];
+                                if (!target[part] || typeof target[part] !== 'object') {
+                                    target[part] = {};
+                                }
+                                target = target[part];
+                            }
+                            
+                            // Escribir los valores planos o anidados
                             Object.entries(updates).forEach(([keyPath, val]) => {
                                 const pathParts = keyPath.split('/');
-                                let temp = targetObj;
+                                let temp = target;
                                 for (let i = 0; i < pathParts.length - 1; i++) {
                                     const part = pathParts[i];
                                     if (!temp[part] || typeof temp[part] !== 'object') {
@@ -168,29 +177,46 @@
                                 temp[pathParts[pathParts.length - 1]] = val;
                             });
                             
-                            if (subId) {
-                                current[subId] = targetObj;
-                            }
                             setLocal(baseKey, current);
                             window.dispatchEvent(new Event('storage'));
                             return Promise.resolve();
                         },
                         set: function(data) {
-                            setLocal(baseKey, data);
+                            const current = getLocal(baseKey);
+                            if (parts.length === 1) {
+                                setLocal(baseKey, data);
+                            } else {
+                                let target = current;
+                                for (let i = 1; i < parts.length - 1; i++) {
+                                    const part = parts[i];
+                                    if (!target[part] || typeof target[part] !== 'object') {
+                                        target[part] = {};
+                                    }
+                                    target = target[part];
+                                }
+                                target[parts[parts.length - 1]] = data;
+                                setLocal(baseKey, current);
+                            }
                             window.dispatchEvent(new Event('storage'));
                             return Promise.resolve();
                         },
                         remove: function() {
                             const current = getLocal(baseKey);
-                            if (subId) {
-                                delete current[subId];
+                            if (parts.length > 1) {
+                                let target = current;
+                                for (let i = 1; i < parts.length - 1; i++) {
+                                    const part = parts[i];
+                                    if (!target[part]) return Promise.resolve();
+                                    target = target[part];
+                                }
+                                delete target[parts[parts.length - 1]];
+                                setLocal(baseKey, current);
                             }
-                            setLocal(baseKey, current);
                             window.dispatchEvent(new Event('storage'));
                             return Promise.resolve();
                         },
                         child: function(childId) {
-                            return database.ref(baseKey + '/' + childId);
+                            return database.ref(cleanPath + '/' + childId);
                         }
                     };
                 }
@@ -1489,18 +1515,14 @@
                 }
             }
 
-            // MEJORA: ARRASTRE DE SALDOS (Calcular todos los valores previos a la fecha start seleccionada)
+            // MEJORA EXCLUSIVA: ARRASTRE DE SALDO ANTERIOR (SOLO EFECTIVO FÍSICO)
             let carriedCash = 0;
-            let carriedTrans = 0;
             if (start) {
                 todos.forEach(m => {
                     if (m.dateStr < start && (!techFilter || m.tecnico === techFilter)) {
-                        if (m.type === 'INGRESO') {
-                            if (m.formaPago === 'EFECTIVO') carriedCash += m.monto;
-                            else carriedTrans += m.monto;
-                        } else { // EGRESO
-                            if (m.formaPago === 'EFECTIVO') carriedCash -= m.monto;
-                            else carriedTrans -= m.monto;
+                        if (m.formaPago === 'EFECTIVO') {
+                            if (m.type === 'INGRESO') carriedCash += m.monto;
+                            else carriedCash -= m.monto; // EGRESO
                         }
                     }
                 });
@@ -1523,19 +1545,18 @@
             if(tb) {
                 let htmlRows = "";
                 
-                // MEJORA: Fila interactiva superior de arrastre de caja
-                if (start && (carriedCash !== 0 || carriedTrans !== 0)) {
+                // MEJORA: Fila interactiva superior de arrastre de caja (SOLO EFECTIVO)
+                if (start) {
                     htmlRows += `
                     <tr class="bg-blue-50/50 border-b font-black uppercase text-[10px] text-fix-blue italic">
-                        <td class="p-4 font-bold">SALDO ANTERIOR<br><span class="text-[7px] text-slate-400 font-bold">HISTÓRICO</span></td>
+                        <td class="p-4 font-bold">SALDO ANTERIOR<br><span class="text-[7px] text-slate-400 font-bold">ARRASTRE</span></td>
                         <td class="p-4 font-bold tracking-tight">
-                            <span class="text-green-600">ARRASTRE</span><br>
-                            <span class="text-slate-400">EFECTIVO + BANCO</span>
+                            <span class="text-green-600">INGRESO</span><br>
+                            <span class="text-slate-400">EFECTIVO</span>
                         </td>
-                        <td class="p-4 font-black">--- ACUMULADO AUTOMÁTICO DE DÍAS ANTERIORES ---</td>
+                        <td class="p-4 font-black">--- EFECTIVO ACUMULADO DE DÍAS ANTERIORES ---</td>
                         <td class="p-4 text-right font-mono font-black text-slate-700">
-                            CASH: $${carriedCash.toFixed(2)}<br>
-                            BCO: $${carriedTrans.toFixed(2)}
+                            $${carriedCash.toFixed(2)}
                         </td>
                         <td class="text-center p-4">🔒</td>
                     </tr>`;
@@ -1559,7 +1580,7 @@
             
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
             if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tOut.toFixed(2);
-            // MEJORA: Suma el valor arrastrado al saldo del período para mostrar la disponibilidad real sin caer en negativos
+            // El balance del periodo ahora acumula el Arrastre de Efectivo de los días anteriores de forma matemática pura
             if(document.getElementById('balanceNetoDisplay')) document.getElementById('balanceNetoDisplay').textContent = "$" + (carriedCash + tCashIn - tOut).toFixed(2);
             if(document.getElementById('totalTransferDisplay')) document.getElementById('totalTransferDisplay').textContent = "$" + tTransIn.toFixed(2);
             if(document.getElementById('totalIngresosDisplay')) document.getElementById('totalIngresosDisplay').textContent = "$" + tIn.toFixed(2);
@@ -1726,9 +1747,21 @@
         window.saveEditChanges = function() {
             const id = document.getElementById('edit_id').value;
             const data = getEditModalData();
-            database.ref('visits/' + id).update(data).then(() => { 
+            
+            // Extraer total de caja de manera que no cause colisiones de claves con barras diagonales
+            const totalClienteVal = data['financiera/totalCliente'];
+            delete data['financiera/totalCliente'];
+            
+            database.ref('visits/' + id).update(data).then(() => {
+                return database.ref('visits/' + id + '/financiera').update({
+                    totalCliente: totalClienteVal
+                });
+            }).then(() => { 
                 showMessage("✅ Datos Actualizados", "fix-report"); 
                 closeEditModal(); 
+            }).catch(err => {
+                console.error("Error al actualizar cliente:", err);
+                showMessage("❌ Error al guardar cambios", "fix-error");
             });
         };
 
@@ -1736,9 +1769,18 @@
             showConfirmModal("¿CONFIRMAR DUPLICACIÓN DE ESTE REGISTRO COMO UNO NUEVO?", function() {
                 const data = getEditModalData();
                 const newRef = database.ref('visits').push();
-                data.id = newRef.key;
+                const newId = newRef.key;
+                
+                const totalClienteVal = data['financiera/totalCliente'];
+                delete data['financiera/totalCliente'];
+                
+                data.id = newId;
                 data.createdAt = Date.now();
                 data.estado = 'PENDIENTE';
+                data.financiera = {
+                    totalCliente: totalClienteVal,
+                    formaPago: 'EFECTIVO'
+                };
                 
                 newRef.set(data).then(() => {
                     showMessage("🚀 REGISTRO DUPLICADO CON ÉXITO", "fix-report");
@@ -1781,7 +1823,7 @@
                 const note = isPending ? 'INGRESADO DIRECTO A PENDIENTES - REVISAR TEMA' : (data.observacionesAdmin || '').toUpperCase();
                 
                 const ref = database.ref('visits').push();
-                ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), telefono: data.telefono || '', callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', cedula: data.cedula || '', email: data.email || '', lugarCompra: data.lugarCompra || 'OTRO', fechaInstalacion: document.getElementById('filterDateInput').value, fechaEmision: data.fechaEmision || '', tecnico: data.tecnico || '', tipoAtencion: data.tipoServicioGlobal, estado: status, createdAt: Date.now(), equipos: eqs, accesoriosVendidos: accs, financiera: { totalCliente: totalFinal }, priority: 0, observacionesAdmin: note }).then(() => { showMessage(isPending ? "⏳ Guardado en Pendientes" : "🚀 Agendado", isPending ? "fix-pending" : "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
+                ref.set({ id: ref.key, nombreCliente: data.nombreCliente.toUpperCase(), telefono: data.telefono || '', callePrincipal: data.callePrincipal.toUpperCase(), numFactura: data.numFactura || '', lugarCompra: data.lugarCompra || 'OTRO', fechaInstalacion: document.getElementById('filterDateInput').value, fechaEmision: data.fechaEmision || '', tecnico: data.tecnico || '', tipoAtencion: data.tipoServicioGlobal, estado: status, createdAt: Date.now(), equipos: eqs, accesoriosVendidos: accs, financiera: { totalCliente: totalFinal }, priority: 0, observacionesAdmin: note }).then(() => { showMessage(isPending ? "⏳ Guardado en Pendientes" : "🚀 Agendado", isPending ? "fix-pending" : "fix-report"); form.reset(); expandEquipmentUI(); renderInsumosAdmin(); });
             } catch (err) { showMessage("❌ Error Crítico", "fix-error"); }
         };
 
@@ -1883,21 +1925,28 @@
             if (source === 'MANUAL') {
                 database.ref('movements/' + id).update({ 
                     monto: nuevoMonto, 
-                    concepto: nuevoConcepto, // MEJORA: Permite modificar el concepto manual libremente
+                    concepto: nuevoConcepto, // Permite modificar el concepto manual libremente
                     formaPago: nuevaFormaPago
                 }).then(() => {
                     showMessage("✅ Movimiento Actualizado", "fix-report");
                     closeEditFinanceModal();
                 }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
             } else {
+                // Súper seguro y compatible con cualquier versión de Firebase y persistencia local:
                 database.ref('visits/' + id).update({ 
-                    'financiera/totalCliente': nuevoMonto,
-                    'financiera/formaPago': nuevaFormaPago,
-                    'conceptoPersonalizado': nuevoConcepto // MEJORA: Guarda concepto personalizado para visitas en la base de datos
+                    conceptoPersonalizado: nuevoConcepto
+                }).then(() => {
+                    return database.ref('visits/' + id + '/financiera').update({
+                        totalCliente: nuevoMonto,
+                        formaPago: nuevaFormaPago
+                    });
                 }).then(() => {
                     showMessage("✅ Liquidación Actualizada", "fix-report");
                     closeEditFinanceModal();
-                }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
+                }).catch((err) => {
+                    console.error("Error al guardar ajuste de caja:", err);
+                    showMessage("❌ Error al guardar", "fix-error");
+                });
             }
         };
 
@@ -1998,16 +2047,13 @@
             
             ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd', 'garantiaMaestroStart', 'garantiaMaestroEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoyLocal; });
             
-            // MEJORA: Establecer filtro de caja a "solo hoy" por defecto para cumplir el requerimiento de arrastre diario directo
+            // Establecer filtro de caja a "solo hoy" por defecto para cumplir el requerimiento de arrastre diario directo
             if(document.getElementById('cajaDateStart')) document.getElementById('cajaDateStart').value = hoyLocal;
             if(document.getElementById('cajaDateEnd')) document.getElementById('cajaDateEnd').value = hoyLocal;
 
             const date6Months = new Date(); date6Months.setMonth(date6Months.getMonth() - 6);
             const date6MonthsLocal = `${date6Months.getFullYear()}-${pad(date6Months.getMonth() + 1)}-${pad(date6Months.getDate())}`;
             if(document.getElementById('searchDateStart')) document.getElementById('searchDateStart').value = date6MonthsLocal;
-
-            // Inicializar datos en la vista seleccionada
-            startSync();
 
             // Sincronizar parámetros de técnico en URL
             const p = new URLSearchParams(window.location.search); 
@@ -2495,7 +2541,7 @@
             <input type="hidden" id="finance_source">
             <div class="space-y-4">
                 <label class="text-[10px] text-slate-400 block -mb-2">DESCRIPCIÓN DEL CONCEPTO:</label>
-                <!-- MEJORA: Removido el atributo 'readonly' para permitir modificación libre de cualquier cobro o registro -->
+                <!-- Campo de descripción 100% editable -->
                 <input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs text-center uppercase">
                 <label class="text-[10px] text-fix-accent block -mb-2">MONTO A REGISTRAR $:</label>
                 <input type="number" step="0.01" id="finance_monto" class="w-full p-3 bg-yellow-50 rounded-xl border font-mono font-black text-3xl text-right text-fix-blue">
