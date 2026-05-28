@@ -152,19 +152,24 @@
                         },
                         update: function(updates) {
                             const current = getLocal(baseKey);
-                            if (subId) {
-                                current[subId] = Object.assign({}, current[subId] || {}, updates);
-                            } else {
-                                Object.entries(updates).forEach(([keyPath, val]) => {
-                                    const pathParts = keyPath.split('/');
-                                    if (pathParts.length === 2) {
-                                        const [id, field] = pathParts;
-                                        if (!current[id]) current[id] = {};
-                                        current[id][field] = val;
-                                    } else {
-                                        current[keyPath] = val;
+                            const targetObj = subId ? (current[subId] || {}) : current;
+                            
+                            // MEJORA: Resuelve dinámicamente claves con barras "/" en simulación para no romper el guardado
+                            Object.entries(updates).forEach(([keyPath, val]) => {
+                                const pathParts = keyPath.split('/');
+                                let temp = targetObj;
+                                for (let i = 0; i < pathParts.length - 1; i++) {
+                                    const part = pathParts[i];
+                                    if (!temp[part] || typeof temp[part] !== 'object') {
+                                        temp[part] = {};
                                     }
-                                });
+                                    temp = temp[part];
+                                }
+                                temp[pathParts[pathParts.length - 1]] = val;
+                            });
+                            
+                            if (subId) {
+                                current[subId] = targetObj;
                             }
                             setLocal(baseKey, current);
                             window.dispatchEvent(new Event('storage'));
@@ -1439,7 +1444,7 @@
             visitsArray.filter(v => v.estado === 'Atendido' && v.financiera).forEach(v => {
                 // Si es Garantía el cliente paga 0, en caso contrario, se registra el totalCliente cobrado de verdad (M.O + Accesorios)
                 let monto = (v.tipoAtencion === 'Garantía') ? 0 : (v.financiera.totalCliente || 0);
-                let concepto = v.esMantenimiento ? "MANTENIMIENTO: " + v.nombreCliente : "VISITA: " + v.nombreCliente;
+                let concepto = v.conceptoPersonalizado || (v.esMantenimiento ? "MANTENIMIENTO: " + v.nombreCliente : "VISITA: " + v.nombreCliente);
                 
                 todos.push({ 
                     id: v.id, 
@@ -1458,7 +1463,7 @@
             movementsArray.forEach(m => {
                 const mDate = new Date(m.fecha);
                 const dStr = mDate.toISOString().split('T')[0];
-                todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: "MANUAL: " + m.concepto, fecha: m.fecha, dateStr: dStr, source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' });
+                todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: m.concepto || '', fecha: m.fecha, dateStr: dStr, source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' });
             });
 
             // 3. CÁLCULO DE CAJA REAL FÍSICA (HISTÓRICA GLOBAL TOTAL)
@@ -1484,6 +1489,23 @@
                 }
             }
 
+            // MEJORA: ARRASTRE DE SALDOS (Calcular todos los valores previos a la fecha start seleccionada)
+            let carriedCash = 0;
+            let carriedTrans = 0;
+            if (start) {
+                todos.forEach(m => {
+                    if (m.dateStr < start && (!techFilter || m.tecnico === techFilter)) {
+                        if (m.type === 'INGRESO') {
+                            if (m.formaPago === 'EFECTIVO') carriedCash += m.monto;
+                            else carriedTrans += m.monto;
+                        } else { // EGRESO
+                            if (m.formaPago === 'EFECTIVO') carriedCash -= m.monto;
+                            else carriedTrans -= m.monto;
+                        }
+                    }
+                });
+            }
+
             // 4. Aplicar Filtro de Fechas y Técnico solo para visualización del Período
             let filteredTodos = [...todos];
             if(start && end) filteredTodos = filteredTodos.filter(m => m.dateStr >= start && m.dateStr <= end);
@@ -1498,7 +1520,31 @@
             };
             
             const tb = document.getElementById('contabilidadTableBody');
-            if(tb) tb.innerHTML = filteredTodos.map(m => `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${parseDateString(m.fecha)}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-error text-xs font-black" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
+            if(tb) {
+                let htmlRows = "";
+                
+                // MEJORA: Fila interactiva superior de arrastre de caja
+                if (start && (carriedCash !== 0 || carriedTrans !== 0)) {
+                    htmlRows += `
+                    <tr class="bg-blue-50/50 border-b font-black uppercase text-[10px] text-fix-blue italic">
+                        <td class="p-4 font-bold">SALDO ANTERIOR<br><span class="text-[7px] text-slate-400 font-bold">HISTÓRICO</span></td>
+                        <td class="p-4 font-bold tracking-tight">
+                            <span class="text-green-600">ARRASTRE</span><br>
+                            <span class="text-slate-400">EFECTIVO + BANCO</span>
+                        </td>
+                        <td class="p-4 font-black">--- ACUMULADO AUTOMÁTICO DE DÍAS ANTERIORES ---</td>
+                        <td class="p-4 text-right font-mono font-black text-slate-700">
+                            CASH: $${carriedCash.toFixed(2)}<br>
+                            BCO: $${carriedTrans.toFixed(2)}
+                        </td>
+                        <td class="text-center p-4">🔒</td>
+                    </tr>`;
+                }
+
+                htmlRows += filteredTodos.map(m => `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${parseDateString(m.fecha)}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-error text-xs font-black" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
+                
+                tb.innerHTML = htmlRows;
+            }
             
             let tIn = 0, tOut = 0, tCashIn = 0, tTransIn = 0;
             filteredTodos.forEach(m => { 
@@ -1513,7 +1559,8 @@
             
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
             if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tOut.toFixed(2);
-            if(document.getElementById('balanceNetoDisplay')) document.getElementById('balanceNetoDisplay').textContent = "$" + (tCashIn - tOut).toFixed(2);
+            // MEJORA: Suma el valor arrastrado al saldo del período para mostrar la disponibilidad real sin caer en negativos
+            if(document.getElementById('balanceNetoDisplay')) document.getElementById('balanceNetoDisplay').textContent = "$" + (carriedCash + tCashIn - tOut).toFixed(2);
             if(document.getElementById('totalTransferDisplay')) document.getElementById('totalTransferDisplay').textContent = "$" + tTransIn.toFixed(2);
             if(document.getElementById('totalIngresosDisplay')) document.getElementById('totalIngresosDisplay').textContent = "$" + tIn.toFixed(2);
         }
@@ -1806,7 +1853,7 @@
             const formaPagoSelect = document.getElementById('finance_forma_pago');
             const paymentContainer = document.getElementById('finance_payment_container');
             
-            // NUEVO: Permite corregir la forma de pago (Efectivo/Transferencia) de forma directa desde la caja
+            // Permite corregir la forma de pago (Efectivo/Transferencia) de forma directa desde la caja
             if (source === 'VISITA') {
                 paymentContainer.classList.remove('hidden');
                 const v = visitsArray.find(item => item.id === id);
@@ -1836,7 +1883,7 @@
             if (source === 'MANUAL') {
                 database.ref('movements/' + id).update({ 
                     monto: nuevoMonto, 
-                    concepto: nuevoConcepto.replace('MANUAL: ', ''),
+                    concepto: nuevoConcepto, // MEJORA: Permite modificar el concepto manual libremente
                     formaPago: nuevaFormaPago
                 }).then(() => {
                     showMessage("✅ Movimiento Actualizado", "fix-report");
@@ -1845,7 +1892,8 @@
             } else {
                 database.ref('visits/' + id).update({ 
                     'financiera/totalCliente': nuevoMonto,
-                    'financiera/formaPago': nuevaFormaPago
+                    'financiera/formaPago': nuevaFormaPago,
+                    'conceptoPersonalizado': nuevoConcepto // MEJORA: Guarda concepto personalizado para visitas en la base de datos
                 }).then(() => {
                     showMessage("✅ Liquidación Actualizada", "fix-report");
                     closeEditFinanceModal();
@@ -1950,10 +1998,9 @@
             
             ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd', 'garantiaMaestroStart', 'garantiaMaestroEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoyLocal; });
             
-            // Establecer filtro de Lunes a Viernes por defecto en Contabilidad y Caja
-            const weekDates = getMondayAndFriday();
-            if(document.getElementById('cajaDateStart')) document.getElementById('cajaDateStart').value = weekDates.monday;
-            if(document.getElementById('cajaDateEnd')) document.getElementById('cajaDateEnd').value = weekDates.friday;
+            // MEJORA: Establecer filtro de caja a "solo hoy" por defecto para cumplir el requerimiento de arrastre diario directo
+            if(document.getElementById('cajaDateStart')) document.getElementById('cajaDateStart').value = hoyLocal;
+            if(document.getElementById('cajaDateEnd')) document.getElementById('cajaDateEnd').value = hoyLocal;
 
             const date6Months = new Date(); date6Months.setMonth(date6Months.getMonth() - 6);
             const date6MonthsLocal = `${date6Months.getFullYear()}-${pad(date6Months.getMonth() + 1)}-${pad(date6Months.getDate())}`;
@@ -1990,6 +2037,9 @@
                 setTimeout(() => {
                     showMessage("🔌 MODO SIN CONEXIÓN (MOCK DE RESERVA ACTIVO)", "fix-accent");
                 }, 1500);
+            } else {
+                // Sincronización completa al inicio
+                startSync();
             }
         });
     </script>
@@ -2006,7 +2056,11 @@
                     <h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1>
                     <div class="flex flex-col">
                         <span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span>
-                        <span class="version-badge">V. 3.0.0</span>
+                        <span class="version-badge">V. 3.0.1</span>
+                        <span class="text-[8px] font-bold text-emerald-500 lowercase mt-1 flex items-center gap-1">
+                            <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            • nube activa
+                        </span>
                         <button id="exitTechModeBtn" onclick="exitTechMode()" class="hidden bg-fix-error text-white text-[9px] font-black px-3 py-1 rounded-full mt-2 uppercase tracking-tighter w-max shadow-md active:scale-95 transition-transform">🔓 Salir de Ruta (Admin)</button>
                         
                         <!-- BOTONES DE RESPALDO RÁPIDO SÍNCRONO -->
@@ -2343,7 +2397,7 @@
                     <div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-6 text-center italic font-black">
                         <div class="p-3 bg-green-50 rounded-xl border border-green-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">INGRESOS EFECTIVO (PERÍODO)</span><div id="totalEfectivoDisplay" class="text-base font-black text-green-700">$0.00</div></div>
                         <div class="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">EGRESOS / GASTOS (PERÍODO)</span><div id="totalEgresosDisplay" class="text-base font-black text-red-700">$0.00</div></div>
-                        <div class="p-3 bg-slate-100 rounded-xl border border-slate-200 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">SALDO PERÍODO (CASH)</span><div id="balanceNetoDisplay" class="text-base font-black text-slate-700">$0.00</div></div>
+                        <div class="p-3 bg-slate-100 rounded-xl border border-slate-200 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">EFECTIVO DISPONIBLE (CON ARRASTRE)</span><div id="balanceNetoDisplay" class="text-base font-black text-slate-700">$0.00</div></div>
                         <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center opacity-80"><span class="text-[8px] uppercase text-slate-500">BANCO (TRANSFER. PERÍODO)</span><div id="totalTransferDisplay" class="text-base font-black text-blue-700">$0.00</div></div>
                         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-60"><span class="text-[8px] uppercase text-slate-500">VENTA TOTAL PERIODO</span><div id="totalIngresosDisplay" class="text-base font-black text-slate-600">$0.00</div></div>
                         
@@ -2441,11 +2495,12 @@
             <input type="hidden" id="finance_source">
             <div class="space-y-4">
                 <label class="text-[10px] text-slate-400 block -mb-2">DESCRIPCIÓN DEL CONCEPTO:</label>
-                <input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs text-center uppercase" readonly>
+                <!-- MEJORA: Removido el atributo 'readonly' para permitir modificación libre de cualquier cobro o registro -->
+                <input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs text-center uppercase">
                 <label class="text-[10px] text-fix-accent block -mb-2">MONTO A REGISTRAR $:</label>
                 <input type="number" step="0.01" id="finance_monto" class="w-full p-3 bg-yellow-50 rounded-xl border font-mono font-black text-3xl text-right text-fix-blue">
                 
-                <!-- NUEVA OPCION EN CAJA: CORREGIR FORMA DE PAGO DIRECTAMENTE -->
+                <!-- OPCION EN CAJA: CORREGIR FORMA DE PAGO DIRECTAMENTE -->
                 <div id="finance_payment_container">
                     <label class="text-[10px] text-slate-400 block mb-1">FORMA DE PAGO:</label>
                     <select id="finance_forma_pago" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs text-center uppercase">
