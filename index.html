@@ -500,14 +500,32 @@
             container.innerHTML = html;
         }
 
+        // --- MANEJO DE ERRORES BLINDADO PARA INICIALIZACIÓN ---
+        function safeRender(renderFunc, name) {
+            try {
+                renderFunc();
+            } catch (error) {
+                console.error(`Error crítico evitado en el módulo: ${name}`, error);
+            }
+        }
+
         function refreshData() {
             showMessage("🔄 Sincronizando...", "fix-blue");
             database.ref('visits').once('value', function() {
-                renderUIAgenda(); renderRutero(); processFinancialBalance(); processMaintBalance(); renderInventoryView(); renderPendientes(); renderTaller(); renderGarantias();
-                if(currentView === 'reporte_teka') renderReporteTeka();
-                if(currentView === 'garantias') renderMaestroGarantias();
-                if(currentView === 'mantenimiento') renderReporteMantenimiento();
-                if(currentView === 'buscador') renderBuscador();
+                safeRender(renderUIAgenda, 'Agenda'); 
+                safeRender(renderRutero, 'Rutero'); 
+                safeRender(processFinancialBalance, 'Finanzas'); 
+                safeRender(processMaintBalance, 'BalanceMantenimiento'); 
+                safeRender(renderInventoryView, 'Inventario'); 
+                safeRender(renderPendientes, 'Pendientes'); 
+                safeRender(renderTaller, 'Taller'); 
+                safeRender(renderGarantias, 'Garantias');
+                
+                if(currentView === 'reporte_teka') safeRender(renderReporteTeka, 'ReporteTeka');
+                if(currentView === 'garantias') safeRender(renderMaestroGarantias, 'MaestroGarantias');
+                if(currentView === 'mantenimiento') safeRender(renderReporteMantenimiento, 'ReporteMantenimiento');
+                if(currentView === 'buscador') safeRender(renderBuscador, 'Buscador');
+                
                 showMessage("✅ Actualizado", "fix-report");
             }, error => { showMessage("⚠️ Error al sincronizar", "fix-error"); });
         }
@@ -516,8 +534,11 @@
             const val = document.getElementById(sourceId).value;
             const targets = ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'garantiaMaestroStart', 'garantiaMaestroEnd'];
             targets.forEach(function(id) { const el = document.getElementById(id); if(el) el.value = val; });
-            renderUIAgenda(); renderRutero(); processFinancialBalance(); processMaintBalance();
-            if(currentView === 'garantias') renderMaestroGarantias();
+            safeRender(renderUIAgenda, 'Agenda'); 
+            safeRender(renderRutero, 'Rutero'); 
+            safeRender(processFinancialBalance, 'Finanzas'); 
+            safeRender(processMaintBalance, 'BalanceMantenimiento');
+            if(currentView === 'garantias') safeRender(renderMaestroGarantias, 'MaestroGarantias');
         }
 
         function changeMasterView(view) {
@@ -530,17 +551,17 @@
                 document.getElementById('formContainer').classList.remove('hidden'); 
                 document.getElementById('agendaContainer').classList.remove('hidden'); 
             }
-            else if(view === 'reporte_teka') { document.getElementById('reporteTekaView').classList.remove('hidden'); renderReporteTeka(); }
-            else if(view === 'mantenimiento') { document.getElementById('mantenimientoView').classList.remove('hidden'); renderReporteMantenimiento(); processMaintBalance(); }
-            else if(view === 'pendientes') { document.getElementById('pendientesView').classList.remove('hidden'); renderPendientes(); }
-            else if(view === 'garantias') { document.getElementById('garantiasView').classList.remove('hidden'); renderGarantias(); renderMaestroGarantias(); }
-            else if(view === 'taller') { document.getElementById('tallerView').classList.remove('hidden'); renderTaller(); }
-            else if(view === 'buscador') { document.getElementById('buscadorView').classList.remove('hidden'); renderBuscador(); }
+            else if(view === 'reporte_teka') { document.getElementById('reporteTekaView').classList.remove('hidden'); safeRender(renderReporteTeka, 'ReporteTeka'); }
+            else if(view === 'mantenimiento') { document.getElementById('mantenimientoView').classList.remove('hidden'); safeRender(renderReporteMantenimiento, 'ReporteMantenimiento'); safeRender(processMaintBalance, 'BalanceMantenimiento'); }
+            else if(view === 'pendientes') { document.getElementById('pendientesView').classList.remove('hidden'); safeRender(renderPendientes, 'Pendientes'); }
+            else if(view === 'garantias') { document.getElementById('garantiasView').classList.remove('hidden'); safeRender(renderGarantias, 'Garantias'); safeRender(renderMaestroGarantias, 'MaestroGarantias'); }
+            else if(view === 'taller') { document.getElementById('tallerView').classList.remove('hidden'); safeRender(renderTaller, 'Taller'); }
+            else if(view === 'buscador') { document.getElementById('buscadorView').classList.remove('hidden'); safeRender(renderBuscador, 'Buscador'); }
             else { const el = document.getElementById(view + 'View'); if(el) el.classList.remove('hidden'); }
             
-            if(view === 'rutero') renderRutero();
-            if(view === 'contabilidad') processFinancialBalance();
-            if(view === 'inventory') renderInventoryView();
+            if(view === 'rutero') safeRender(renderRutero, 'Rutero');
+            if(view === 'contabilidad') safeRender(processFinancialBalance, 'Finanzas');
+            if(view === 'inventory') safeRender(renderInventoryView, 'Inventario');
             
             document.querySelectorAll('.view-btn').forEach(btn => { btn.classList.remove('bg-fix-blue', 'text-white'); btn.classList.add('bg-gray-100', 'text-gray-500'); });
             const act = document.querySelector("[onclick*=\"'" + view + "'\"]");
@@ -575,7 +596,7 @@
                 let moParaCaja = 0; let totalAccs = 0; const accs = [];
                 document.querySelectorAll(".acc-" + id).forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) { const p = parseFloat(i.dataset.price); accs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); totalAccs += q * p; } });
                 const mDescEl = document.getElementById("manual_acc_desc_" + id); const mPriceEl = document.getElementById("manual_acc_price_" + id);
-                if(mDescEl && mPriceEl && mDescEl.value && parseFloat(mPriceEl.value) > 0) { accs.push({ nombre: mDescEl.value.toUpperCase(), cantidad: 1, precio: parseFloat(mPriceEl.value) }); totalAccs += parseFloat(mPriceEl.value); }
+                if(mDescEl && mPriceEl && mDescEl.value && parseFloat(mPriceEl.value) > 0) { accs.push({ nombre: String(mDescEl.value).toUpperCase(), cantidad: 1, precio: parseFloat(mPriceEl.value) }); totalAccs += parseFloat(mPriceEl.value); }
                 
                 const eqCount = v.esMantenimiento ? 1 : (v.equipos || []).length;
                 
@@ -590,11 +611,17 @@
                 }
                 
                 const totalFinal = moParaCaja + totalAccs;
-                const updateObj = { estado: s, tipoAtencion: t, razonNoAtencion: r.toUpperCase(), accesoriosVendidos: accs, commentarioCliente: comment.toUpperCase(), fotosRegistro: photos, attendedDate: new Date().toISOString(), financiera: { totalCliente: totalFinal, formaPago: pay } };
+                const updateObj = { estado: s, tipoAtencion: t, razonNoAtencion: String(r).toUpperCase(), accesoriosVendidos: accs, commentarioCliente: String(comment).toUpperCase(), fotosRegistro: photos, attendedDate: new Date().toISOString(), financiera: { totalCliente: totalFinal, formaPago: pay } };
                 if (s === 'A Taller') updateObj.fechaIngresoTaller = new Date().toISOString().split('T')[0];
                 if (s === 'Garantia en Tramite') updateObj.fechaIngresoGarantia = new Date().toISOString().split('T')[0];
 
-                database.ref('visits/' + id).update(updateObj).then(function() { showMessage("✅ Guardado", "fix-report"); renderRutero(); renderPendientes(); renderTaller(); renderGarantias(); }).catch(function() { showMessage("❌ Error", "fix-error"); });
+                database.ref('visits/' + id).update(updateObj).then(function() { 
+                    showMessage("✅ Guardado", "fix-report"); 
+                    safeRender(renderRutero, 'Rutero'); 
+                    safeRender(renderPendientes, 'Pendientes'); 
+                    safeRender(renderTaller, 'Taller'); 
+                    safeRender(renderGarantias, 'Garantias'); 
+                }).catch(function() { showMessage("❌ Error", "fix-error"); });
             } catch(e) { showMessage("❌ Error Crítico", "fix-error"); }
         }
 
@@ -603,9 +630,14 @@
         function renderUIAgenda() {
             const list = document.getElementById('visitsList'); if(!list) return;
             const df = document.getElementById('filterDateInput').value;
-            const searchQuery = document.getElementById('searchClientInput') ? document.getElementById('searchClientInput').value.toLowerCase() : "";
+            const searchInputEl = document.getElementById('searchClientInput');
+            const searchQuery = searchInputEl ? String(searchInputEl.value).toLowerCase() : "";
+            
             let filtered = visitsArray.filter(v => v.fechaInstalacion === df && (v.estado === 'PENDIENTE' || v.estado === 'Atendido'));
-            if(searchQuery) filtered = filtered.filter(v => v.nombreCliente && v.nombreCliente.toLowerCase().includes(searchQuery));
+            if(searchQuery) {
+                filtered = filtered.filter(v => v.nombreCliente && String(v.nombreCliente).toLowerCase().includes(searchQuery));
+            }
+            
             list.innerHTML = filtered.map(v => {
                 let col = v.estado === 'Atendido' ? 'border-fix-report' : 'border-fix-accent';
                 return `<div class="bg-white p-4 rounded-2xl shadow-md border-l-[10px] ${col} mb-4 uppercase"><div class="flex justify-between items-start mb-1"><p class="font-black text-fix-blue text-sm italic">${v.nombreCliente}</p><button onclick="deleteVisit('${v.id}')" class="text-fix-error text-[10px]">🗑️</button></div><div class="text-slate-400 text-[9px] font-black uppercase">${v.esMantenimiento ? 'MANTENIMIENTO' : (v.equipos || []).map(e => '• ' + e.descProducto).join('<br>')}</div></div>`;
@@ -616,6 +648,7 @@
             const v = visitsArray.find(item => item.id === id); if (!v) return;
             const printWindow = window.open('', '_blank');
             const eqList = v.esMantenimiento ? `<tr><td colspan="3"><b>MANTENIMIENTO:</b> ${v.mantenimientoEquipo}</td></tr>` : (v.equipos || []).map(e => `<tr><td><b>MOD:</b> ${e.descProducto}</td><td><b>SAP:</b> ${e.codProducto || '-'}</td><td><b>SERIE:</b> ${e.serieEquipo || '-'}</td></tr>`).join('');
+            
             const template = `
             <!DOCTYPE html><html><head><title>ORDEN FIX TEKA - ${v.nombreCliente}</title><style>
             @page { size: A4; margin: 0; } body { font-family: 'Arial Narrow', sans-serif; margin: 0; padding: 0; font-size: 10.5px; font-weight: bold; text-transform: uppercase; }
@@ -640,7 +673,8 @@
         function renderRutero() {
             const list = document.getElementById('ruteroListBody'); if(!list) return;
             const date = document.getElementById('filterDateInputRutero').value;
-            let tech = currentTechUser || (document.getElementById('ruteroTechFilter') ? document.getElementById('ruteroTechFilter').value : "");
+            const techEl = document.getElementById('ruteroTechFilter');
+            let tech = currentTechUser || (techEl ? techEl.value : "");
             
             let filtered = visitsArray.filter(v => v.estado && (v.fechaInstalacion === date || v.fechaEntregaProgramada === date || v.fechaNuevaVisita === date) && (v.estado === 'PENDIENTE' || v.estado === 'Atendido' || v.estado === 'A Taller' || v.estado === 'No Atendido' || v.estado === 'Pendiente (Tramite)' || v.estado === 'Garantia en Tramite'));
             
@@ -653,13 +687,13 @@
                 const h = Math.floor(currentMinutes / 60); const m = currentMinutes % 60;
                 const timeStr = (h > 12 ? h - 12 : (h === 0 ? 12 : h)) + ":" + m.toString().padStart(2, '0') + " " + (h >= 12 ? 'PM' : 'AM');
                 currentMinutes += (60 + (Math.max(0, (v.equipos || []).length - 1) * 20)) + 15;
-                const initials = v.tecnico ? v.tecnico.split(' ').map(n => n[0]).join('').toUpperCase() : '---';
+                const initials = v.tecnico ? String(v.tecnico).split(' ').map(n => n[0]).join('').toUpperCase() : '---';
                 
                 const isDelivery = v.estado === 'A Taller' && v.fechaEntregaProgramada === date;
                 const isGarantiaVisit = v.estado === 'Garantia en Tramite' && v.fechaNuevaVisita === date;
                 
                 let colClass = 'bg-slate-200 text-slate-600';
-                const estadoUpper = (v.estado || "").toUpperCase();
+                const estadoUpper = String(v.estado || "").toUpperCase();
                 if(estadoUpper === 'ATENDIDO') colClass = 'bg-green-100 text-green-700';
                 else if(estadoUpper === 'A TALLER') colClass = isDelivery ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700';
                 else if(estadoUpper === 'GARANTIA EN TRAMITE') colClass = isGarantiaVisit ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-800';
@@ -668,7 +702,7 @@
                 let statusBadge = `<span class="px-2 py-0.5 rounded-full text-[7px] font-black ${colClass}">${estadoUpper}</span>`;
                 let tipoServ = isDelivery ? '🚚 ENTREGA TALLER' : (isGarantiaVisit ? '🛡️ VISITA GARANTÍA' : (v.esMantenimiento ? '⚙️ MANT.' : (v.tipoAtencion === 'Garantía' ? '🛡️ GARANTÍA' : '🛠️ SERV.TEC')));
                 const colorTipo = isDelivery ? 'text-blue-600' : (isGarantiaVisit ? 'text-indigo-600' : (v.esMantenimiento ? 'text-fix-accent' : (v.tipoAtencion === 'Garantía' ? 'text-fix-blue' : 'text-fix-report')));
-                const mapLink = (v.direccion && v.direccion.toString().includes('http')) ? v.direccion : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(v.direccion || v.callePrincipal || '');
+                const mapLink = (v.direccion && String(v.direccion).includes('http')) ? v.direccion : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(v.direccion || v.callePrincipal || '');
 
                 return `<tr class="border-b row-hover uppercase font-black">
                     <td class="border-r text-center px-1"><div class="flex flex-col items-center gap-1 admin-only"><div onclick="movePriority('${v.id}', -1)" class="move-btn ${index === 0 ? 'opacity-20 pointer-events-none' : ''}">↑</div><span class="time-badge font-mono">${timeStr}</span><div onclick="movePriority('${v.id}', 1)" class="move-btn ${index === sorted.length - 1 ? 'opacity-20 pointer-events-none' : ''}">↓</div></div><div class="technician-mode-only text-center block md:hidden"><span class="time-badge font-mono">${timeStr}</span></div></td>
@@ -678,7 +712,7 @@
                     <td class="border-r text-center font-mono text-slate-400 text-[9px] italic">${initials}</td>
                     <td class="border-r text-center">${statusBadge}</td>
                     <td class="border-r text-center"><a href="${mapLink}" target="_blank" class="bg-fix-light text-white px-3 py-2 rounded-lg text-[8px] font-black shadow-md italic inline-block w-full text-center">📍 MAPA</a></td>
-                    <td class="text-center"><div class="flex justify-center gap-2 items-center p-1"><a href="tel:${v.telefono}" class="text-2xl">📞</a><a href="https://wa.me/593${v.telefono?.replace(/\D/g,'')}" target="_blank" class="text-2xl">💬</a></div></td>
+                    <td class="text-center"><div class="flex justify-center gap-2 items-center p-1"><a href="tel:${v.telefono}" class="text-2xl">📞</a><a href="https://wa.me/593${String(v.telefono || '').replace(/\D/g,'')}" target="_blank" class="text-2xl">💬</a></div></td>
                     ${!currentTechUser ? `<td class="text-center admin-only"><button onclick="openEditModal('${v.id}')" class="bg-fix-blue text-white px-2 py-1 rounded text-[7px] font-black uppercase">EDIT</button></td>` : ''}
                 </tr>
                 <tr id="detail-${v.id}" class="hidden detail-row uppercase font-black"><td colspan="9" class="p-4 bg-slate-50 border-y border-slate-200"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="bg-white p-4 rounded-xl shadow-sm"><p class="text-[10px] font-black text-fix-blue uppercase mb-2 italic tracking-tighter">📄 Información para Orden Manual</p>
@@ -695,46 +729,56 @@
         }
 
         window.reScheduleVisit = function(id) {
-            const newDate = document.getElementById('date_pend_' + id).value; const newNote = document.getElementById('note_pend_' + id).value;
+            const newDate = document.getElementById('date_pend_' + id).value; 
+            const newNote = document.getElementById('note_pend_' + id).value;
             if(!newDate) return showMessage("⚠️ SELECCIONE UNA FECHA", "fix-accent");
-            database.ref('visits/' + id).update({ fechaInstalacion: newDate, razonNoAtencion: newNote.toUpperCase(), estado: 'PENDIENTE', priority: 0 }).then(() => { showMessage("✅ RE-AGENDADO", "fix-report"); renderPendientes(); });
+            database.ref('visits/' + id).update({ fechaInstalacion: newDate, razonNoAtencion: String(newNote).toUpperCase(), estado: 'PENDIENTE', priority: 0 }).then(() => { showMessage("✅ RE-AGENDADO", "fix-report"); safeRender(renderPendientes, 'Pendientes'); });
         };
 
         window.savePendingNote = function(id) {
             const newNote = document.getElementById('note_pend_' + id).value;
-            database.ref('visits/' + id).update({ razonNoAtencion: newNote.toUpperCase() }).then(() => { showMessage("💾 NOVEDAD GUARDADA", "fix-report"); renderPendientes(); });
+            database.ref('visits/' + id).update({ razonNoAtencion: String(newNote).toUpperCase() }).then(() => { showMessage("💾 NOVEDAD GUARDADA", "fix-report"); safeRender(renderPendientes, 'Pendientes'); });
         };
 
         window.closeVisitByAdmin = function(id) {
             showConfirmModal("¿CONFIRMAR ESTE CASO COMO ATENDIDO DESDE OFICINA? SE GUARDARÁ EN EL MAESTRO AUTOMÁTICAMENTE.", function() {
-                database.ref('visits/' + id).update({ estado: 'Atendido', attendedDate: new Date().toISOString(), razonNoAtencion: 'SOLUCIONADO DIRECTO DESDE OFICINA / ADMINISTRADOR' }).then(() => { showMessage("✅ CASO CERRADO POR ADMIN", "fix-report"); renderPendientes(); });
+                database.ref('visits/' + id).update({ estado: 'Atendido', attendedDate: new Date().toISOString(), razonNoAtencion: 'SOLUCIONADO DIRECTO DESDE OFICINA / ADMINISTRADOR' }).then(() => { showMessage("✅ CASO CERRADO POR ADMIN", "fix-report"); safeRender(renderPendientes, 'Pendientes'); });
             });
         };
 
         function renderPendientes() {
             const container = document.getElementById('pendientesList'); if(!container) return;
-            const techFilter = document.getElementById('pendingTechFilter').value; const typeFilter = document.getElementById('pendingTypeFilter').value; const query = document.getElementById('pendingSearchInput')?.value.toUpperCase() || "";
+            const techEl = document.getElementById('pendingTechFilter');
+            const typeEl = document.getElementById('pendingTypeFilter');
+            const searchEl = document.getElementById('pendingSearchInput');
+            
+            const techFilter = techEl ? techEl.value : ""; 
+            const typeFilter = typeEl ? typeEl.value : "TODOS"; 
+            const query = searchEl ? String(searchEl.value).toUpperCase() : "";
+            
             let filtered = visitsArray.filter(v => v.estado && v.estado !== 'Atendido' && v.estado !== 'PENDIENTE' && v.estado !== 'A Taller' && v.estado !== 'Garantia en Tramite');
-            if(query) filtered = filtered.filter(v => v.nombreCliente && v.nombreCliente.toUpperCase().includes(query));
+            if(query) filtered = filtered.filter(v => v.nombreCliente && String(v.nombreCliente).toUpperCase().includes(query));
             if(techFilter) filtered = filtered.filter(v => v.tecnico === techFilter);
             if(typeFilter !== 'TODOS') filtered = filtered.filter(v => v.estado === typeFilter);
-            filtered.sort((a, b) => (a.fechaInstalacion || "").localeCompare(b.fechaInstalacion || ""));
+            filtered.sort((a, b) => String(a.fechaInstalacion || "").localeCompare(String(b.fechaInstalacion || "")));
 
             if(filtered.length === 0) { container.innerHTML = '<p class="p-10 text-center text-slate-300 font-black uppercase italic">No hay casos pendientes</p>'; return; }
             
             container.innerHTML = filtered.map(v => {
-                const color = v.estado && v.estado.includes('Pendiente') ? 'border-fix-pending' : 'border-fix-accent';
-                return `<div class="bg-white p-5 rounded-[2rem] shadow-lg border-l-[12px] ${color} mb-4"><div class="flex justify-between items-start mb-4"><div class="flex flex-col"><h3 class="text-sm font-black text-slate-800 italic underline uppercase">${v.nombreCliente}</h3><span class="text-[9px] font-bold text-slate-400 tracking-tighter">FECHA REGISTRO: ${v.fechaInstalacion} • TÉCNICO: ${v.tecnico} • ESTADO: ${(v.estado || '').toUpperCase()}</span></div><div class="flex gap-2"><button onclick="closeVisitByAdmin('${v.id}')" class="bg-green-600 text-white px-3 py-1 rounded-full text-[8px] font-black italic shadow-md text-center">✅ SOLUCIONADO (ADMIN)</button><button onclick="openEditModal('${v.id}')" class="bg-slate-100 text-slate-400 px-3 py-1 rounded-full text-[8px] font-black italic text-center">MODIFICAR</button><button onclick="deleteVisit('${v.id}')" class="text-fix-error text-sm">🗑️</button></div></div><div class="grid grid-cols-1 gap-4"><div class="bg-slate-50 p-4 rounded-3xl border border-slate-200"><p class="text-[8px] font-black text-fix-blue mb-2 uppercase italic underline">Escribir Novedades / Seguimiento:</p><textarea id="note_pend_${v.id}" placeholder="ESCRIBA AQUÍ LAS NOVEDADES..." class="w-full p-2 text-[10px] font-black uppercase border-none rounded-xl mb-2 shadow-inner min-h-[80px]">${v.razonNoAtencion || ''}</textarea><div class="flex gap-2 items-center mb-4"><button onclick="savePendingNote('${v.id}')" class="w-full bg-fix-blue text-white py-2 rounded-xl text-[10px] font-black shadow-lg active:scale-95 transition-all text-center">💾 GRABAR NOVEDAD</button></div><p class="text-[8px] font-black text-fix-accent mb-2 uppercase italic underline">Re-Agendar Visita:</p><div class="flex gap-2 items-center"><input type="date" id="date_pend_${v.id}" class="flex-grow p-2 rounded-xl text-[10px] font-mono font-black border-none shadow-inner bg-white"><button onclick="reScheduleVisit('${v.id}')" class="bg-fix-report text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg active:scale-95 transition-all text-center">🚀 RE-AGENDAR</button></div></div></div></div>`;
+                const color = v.estado && String(v.estado).includes('Pendiente') ? 'border-fix-pending' : 'border-fix-accent';
+                return `<div class="bg-white p-5 rounded-[2rem] shadow-lg border-l-[12px] ${color} mb-4"><div class="flex justify-between items-start mb-4"><div class="flex flex-col"><h3 class="text-sm font-black text-slate-800 italic underline uppercase">${v.nombreCliente}</h3><span class="text-[9px] font-bold text-slate-400 tracking-tighter">FECHA REGISTRO: ${v.fechaInstalacion} • TÉCNICO: ${v.tecnico} • ESTADO: ${String(v.estado || '').toUpperCase()}</span></div><div class="flex gap-2"><button onclick="closeVisitByAdmin('${v.id}')" class="bg-green-600 text-white px-3 py-1 rounded-full text-[8px] font-black italic shadow-md text-center">✅ SOLUCIONADO (ADMIN)</button><button onclick="openEditModal('${v.id}')" class="bg-slate-100 text-slate-400 px-3 py-1 rounded-full text-[8px] font-black italic text-center">MODIFICAR</button><button onclick="deleteVisit('${v.id}')" class="text-fix-error text-sm">🗑️</button></div></div><div class="grid grid-cols-1 gap-4"><div class="bg-slate-50 p-4 rounded-3xl border border-slate-200"><p class="text-[8px] font-black text-fix-blue mb-2 uppercase italic underline">Escribir Novedades / Seguimiento:</p><textarea id="note_pend_${v.id}" placeholder="ESCRIBA AQUÍ LAS NOVEDADES..." class="w-full p-2 text-[10px] font-black uppercase border-none rounded-xl mb-2 shadow-inner min-h-[80px]">${v.razonNoAtencion || ''}</textarea><div class="flex gap-2 items-center mb-4"><button onclick="savePendingNote('${v.id}')" class="w-full bg-fix-blue text-white py-2 rounded-xl text-[10px] font-black shadow-lg active:scale-95 transition-all text-center">💾 GRABAR NOVEDAD</button></div><p class="text-[8px] font-black text-fix-accent mb-2 uppercase italic underline">Re-Agendar Visita:</p><div class="flex gap-2 items-center"><input type="date" id="date_pend_${v.id}" class="flex-grow p-2 rounded-xl text-[10px] font-mono font-black border-none shadow-inner bg-white"><button onclick="reScheduleVisit('${v.id}')" class="bg-fix-report text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg active:scale-95 transition-all text-center">🚀 RE-AGENDAR</button></div></div></div></div>`;
             }).join('');
         }
 
         // --- LÓGICA DE TALLER ---
         function renderTaller() {
             const container = document.getElementById('tallerList'); if(!container) return;
-            const query = document.getElementById('tallerSearchInput')?.value.toUpperCase() || "";
+            const searchEl = document.getElementById('tallerSearchInput');
+            const query = searchEl ? String(searchEl.value).toUpperCase() : "";
             let filtered = visitsArray.filter(v => v.estado === 'A Taller');
-            if(query) filtered = filtered.filter(v => v.nombreCliente && v.nombreCliente.toUpperCase().includes(query));
+            if(query) filtered = filtered.filter(v => v.nombreCliente && String(v.nombreCliente).toUpperCase().includes(query));
             if(filtered.length === 0) { container.innerHTML = '<p class="p-10 text-center text-slate-300 font-black uppercase italic">No hay equipos en taller</p>'; return; }
+            
             const equiposTallerList = ["Cocina", "Refrigerador", "Microondas", "Horno", "Campana", "Campana Decorativa", "Campana de Isla", "Lavadora", "Secadora", "Barbecue", "Triturador", "Lavavajillas", "Calefón", "Otros"];
 
             container.innerHTML = filtered.map(v => {
@@ -743,22 +787,32 @@
         }
 
         window.saveTallerUpdate = function(id) {
-            const fecha = document.getElementById('taller_fecha_' + id).value; const equipoSel = document.getElementById('taller_equipo_sel_' + id).value; const tipoServ = document.getElementById('taller_tipo_serv_' + id).value; const costoTotal = parseFloat(document.getElementById('taller_costo_total_' + id).value) || 0; const repuestos = document.getElementById('taller_repuestos_' + id).value.toUpperCase(); const fechaEntregaProg = document.getElementById('taller_fecha_entrega_prog_' + id).value;
-            const originalVisit = visitsArray.find(v => v.id === id); const updatedFinanciera = originalVisit && originalVisit.financiera ? Object.assign({}, originalVisit.financiera) : { formaPago: 'EFECTIVO' }; updatedFinanciera.totalCliente = costoTotal;
-            database.ref('visits/' + id).update({ fechaIngresoTaller: fecha, taller_equipo_trabajado: equipoSel, taller_tipo_servicio: tipoServ, financiera: updatedFinanciera, repuestosSolicitadosTaller: repuestos, fechaEntregaProgramada: fechaEntregaProg }).then(() => { showMessage("💾 DATOS ACTUALIZADOS", "fix-report"); renderTaller(); renderRutero(); });
+            const fecha = document.getElementById('taller_fecha_' + id).value; 
+            const equipoSel = document.getElementById('taller_equipo_sel_' + id).value; 
+            const tipoServ = document.getElementById('taller_tipo_serv_' + id).value; 
+            const costoTotal = parseFloat(document.getElementById('taller_costo_total_' + id).value) || 0; 
+            const repuestos = String(document.getElementById('taller_repuestos_' + id).value).toUpperCase(); 
+            const fechaEntregaProg = document.getElementById('taller_fecha_entrega_prog_' + id).value;
+            
+            const originalVisit = visitsArray.find(v => v.id === id); 
+            const updatedFinanciera = originalVisit && originalVisit.financiera ? Object.assign({}, originalVisit.financiera) : { formaPago: 'EFECTIVO' }; 
+            updatedFinanciera.totalCliente = costoTotal;
+            
+            database.ref('visits/' + id).update({ fechaIngresoTaller: fecha, taller_equipo_trabajado: equipoSel, taller_tipo_servicio: tipoServ, financiera: updatedFinanciera, repuestosSolicitadosTaller: repuestos, fechaEntregaProgramada: fechaEntregaProg }).then(() => { showMessage("💾 DATOS ACTUALIZADOS", "fix-report"); safeRender(renderTaller, 'Taller'); safeRender(renderRutero, 'Rutero'); });
         };
 
         window.markAsDelivered = function(id) {
             showConfirmModal("¿CONFIRMAR ENTREGA DEL EQUIPO AL CLIENTE? EL EQUIPO SE MARCARÁ COMO ATENDIDO Y SALDRÁ DEL TALLER.", function() {
-                database.ref('visits/' + id).update({ estado: 'Atendido', fechaEntregaTaller: new Date().toISOString().split('T')[0], attendedDate: new Date().toISOString(), razonNoAtencion: 'EQUIPO REPARADO EN TALLER Y ENTREGADO SATISFACTORIAMENTE' }).then(() => { showMessage("🚀 EQUIPO ENTREGADO", "fix-report"); renderTaller(); });
+                database.ref('visits/' + id).update({ estado: 'Atendido', fechaEntregaTaller: new Date().toISOString().split('T')[0], attendedDate: new Date().toISOString(), razonNoAtencion: 'EQUIPO REPARADO EN TALLER Y ENTREGADO SATISFACTORIAMENTE' }).then(() => { showMessage("🚀 EQUIPO ENTREGADO", "fix-report"); safeRender(renderTaller, 'Taller'); });
             });
         };
 
         function renderGarantias() {
             const container = document.getElementById('garantiasList'); if(!container) return;
-            const query = document.getElementById('garantiasSearchInput')?.value.toUpperCase() || "";
+            const searchEl = document.getElementById('garantiasSearchInput');
+            const query = searchEl ? String(searchEl.value).toUpperCase() : "";
             let filtered = visitsArray.filter(v => v.estado === 'Garantia en Tramite');
-            if(query) filtered = filtered.filter(v => v.nombreCliente && v.nombreCliente.toUpperCase().includes(query));
+            if(query) filtered = filtered.filter(v => v.nombreCliente && String(v.nombreCliente).toUpperCase().includes(query));
             if(filtered.length === 0) { container.innerHTML = '<p class="p-10 text-center text-slate-300 font-black uppercase italic">No hay garantías en trámite</p>'; return; }
 
             container.innerHTML = filtered.map(v => {
@@ -767,27 +821,37 @@
         }
 
         window.saveGarantiaUpdate = function(id) {
-            const repuesto = document.getElementById('garantias_repuesto_' + id).value.toUpperCase(); const obs = document.getElementById('garantias_obs_' + id).value.toUpperCase(); const fechaProg = document.getElementById('garantias_fecha_prog_' + id).value;
-            database.ref('visits/' + id).update({ repuestoSolicitadoGarantia: repuesto, observacionGarantia: obs, fechaNuevaVisita: fechaProg }).then(() => { showMessage("💾 TRÁMITE ACTUALIZADO", "fix-report"); renderGarantias(); renderRutero(); });
+            const repuesto = String(document.getElementById('garantias_repuesto_' + id).value).toUpperCase(); 
+            const obs = String(document.getElementById('garantias_obs_' + id).value).toUpperCase(); 
+            const fechaProg = document.getElementById('garantias_fecha_prog_' + id).value;
+            database.ref('visits/' + id).update({ repuestoSolicitadoGarantia: repuesto, observacionGarantia: obs, fechaNuevaVisita: fechaProg }).then(() => { showMessage("💾 TRÁMITE ACTUALIZADO", "fix-report"); safeRender(renderGarantias, 'Garantias'); safeRender(renderRutero, 'Rutero'); });
         };
 
         window.reScheduleGarantia = function(id) {
-            const fechaProg = document.getElementById('garantias_fecha_prog_' + id).value; const obs = document.getElementById('garantias_obs_' + id).value.toUpperCase();
+            const fechaProg = document.getElementById('garantias_fecha_prog_' + id).value; 
+            const obs = String(document.getElementById('garantias_obs_' + id).value).toUpperCase();
             if(!fechaProg) return showMessage("⚠️ SELECCIONE UNA FECHA DE NUEVA VISITA", "fix-accent");
             showConfirmModal("¿DESEA RE-AGENDAR ESTE CLIENTE? EL ESTADO VOLVERÁ A 'PENDIENTE' EN LA FECHA SELECCIONADA Y SALDRÁ DE ESTA BANDEJA.", function() {
-                database.ref('visits/' + id).update({ estado: 'PENDIENTE', fechaInstalacion: fechaProg, observacionGarantia: obs, priority: 0 }).then(() => { showMessage("🚀 RE-AGENDADO CON ÉXITO", "fix-report"); renderGarantias(); renderRutero(); renderUIAgenda(); });
+                database.ref('visits/' + id).update({ estado: 'PENDIENTE', fechaInstalacion: fechaProg, observacionGarantia: obs, priority: 0 }).then(() => { showMessage("🚀 RE-AGENDADO CON ÉXITO", "fix-report"); safeRender(renderGarantias, 'Garantias'); safeRender(renderRutero, 'Rutero'); safeRender(renderUIAgenda, 'Agenda'); });
             });
         };
 
         function renderMaestroGarantias() {
             const body = document.getElementById('maestroGarantiasBody'); if(!body) return;
-            const start = document.getElementById('garantiaMaestroStart').value; const end = document.getElementById('garantiaMaestroEnd').value;
+            const startEl = document.getElementById('garantiaMaestroStart');
+            const endEl = document.getElementById('garantiaMaestroEnd');
+            const start = startEl ? startEl.value : "";
+            const end = endEl ? endEl.value : "";
+            
             let filtered = visitsArray.filter(v => v.tipoAtencion === 'Garantía' && v.estado === 'Atendido');
             if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
-            filtered.sort((a, b) => (a.fechaInstalacion || "").localeCompare(b.fechaInstalacion || ""));
+            filtered.sort((a, b) => String(a.fechaInstalacion || "").localeCompare(String(b.fechaInstalacion || "")));
+            
             if(filtered.length === 0) { body.innerHTML = '<tr><td colspan="18" class="p-4 text-center text-slate-400 italic font-black uppercase">No hay garantías finalizadas en este periodo.</td></tr>'; return; }
+            
             body.innerHTML = filtered.flatMap(v => (v.equipos || []).map(eq => {
-                const obs = (v.commentarioCliente || v.razonNoAtencion || '').replace(/(\r\n|\n|\r)/gm, " "); const repuesto = (v.repuestoSolicitadoGarantia || '-').replace(/(\r\n|\n|\r)/gm, " ");
+                const obs = String(v.commentarioCliente || v.razonNoAtencion || '').replace(/(\r\n|\n|\r)/gm, " "); 
+                const repuesto = String(v.repuestoSolicitadoGarantia || '-').replace(/(\r\n|\n|\r)/gm, " ");
                 return `<tr class="border-b row-hover font-black uppercase whitespace-nowrap"><td class="report-cell font-mono">${v.fechaEmision || ''}</td><td class="report-cell font-mono">${v.fechaInstalacion}</td><td class="report-cell text-center">1</td><td class="report-cell font-mono text-slate-500">${repuesto}</td><td class="report-cell text-slate-500">-</td><td class="report-cell font-mono">${eq.codProducto || '-'}</td><td class="report-cell">${eq.descProducto || '-'}</td><td class="report-cell font-mono tracking-widest">${eq.serieEquipo || '-'}</td><td class="report-cell font-black text-indigo-600">SI</td><td class="report-cell">${v.tecnico || '-'}</td><td class="report-cell font-black italic">${v.nombreCliente}</td><td class="report-cell max-w-[200px] truncate" title="${obs}">${obs || '-'}</td><td class="report-cell font-mono text-right">$0.00</td><td class="report-cell font-mono">${v.cedula || '-'}</td><td class="report-cell lowercase">${v.email || '-'}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell"></td><td class="report-cell font-mono">${v.numFactura || '-'}</td></tr>`;
             })).join('');
         }
@@ -800,18 +864,26 @@
 
         function renderReporteMantenimiento() {
             const body = document.getElementById('mantenimientoReporteBody'); if(!body) return;
-            const start = document.getElementById('maintBalanceStart')?.value; const end = document.getElementById('maintBalanceEnd')?.value;
+            const startEl = document.getElementById('maintBalanceStart');
+            const endEl = document.getElementById('maintBalanceEnd');
+            const start = startEl ? startEl.value : "";
+            const end = endEl ? endEl.value : "";
+            
             let filtered = visitsArray.filter(v => v.esMantenimiento);
             if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
             body.innerHTML = filtered.map(v => `<tr class="border-b row-hover font-black uppercase"><td class="report-cell font-mono font-black">${v.fechaInstalacion}</td><td class="report-cell font-black text-fix-blue">${v.nombreCliente}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell uppercase text-[7px] max-w-[100px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell uppercase text-[7px] font-bold text-fix-accent">${v.mantenimientoEquipo || 'General'}</td><td class="report-cell font-black text-right text-fix-report">$${(v.financiera ? v.financiera.totalCliente : 0).toFixed(2)}</td><td class="report-cell text-center font-black">${v.estado === 'Atendido' ? '✅' : '⏳'}</td><td class="report-cell text-center font-black"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td></tr>`).join('');
         }
 
         function processMaintBalance() {
-            const start = document.getElementById('maintBalanceStart')?.value; const end = document.getElementById('maintBalanceEnd')?.value;
+            const startEl = document.getElementById('maintBalanceStart');
+            const endEl = document.getElementById('maintBalanceEnd');
+            const start = startEl ? startEl.value : "";
+            const end = endEl ? endEl.value : "";
+            
             let filtered = visitsArray.filter(v => v.esMantenimiento && v.estado === 'Atendido' && v.financiera);
             if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
             let cash = 0, trans = 0;
-            filtered.forEach(v => { const monto = v.financiera.totalCliente || 0; if(v.financiera.formaPago === 'TRANSFERENCIA') trans += monto; else cash += monto; });
+            filtered.forEach(v => { const monto = parseFloat(v.financiera.totalCliente) || 0; if(v.financiera.formaPago === 'TRANSFERENCIA') trans += monto; else cash += monto; });
             if(document.getElementById('maintTotalCash')) document.getElementById('maintTotalCash').textContent = "$" + cash.toFixed(2);
             if(document.getElementById('maintTotalTrans')) document.getElementById('maintTotalTrans').textContent = "$" + trans.toFixed(2);
             if(document.getElementById('maintTotalGeneral')) document.getElementById('maintTotalGeneral').textContent = "$" + (cash + trans).toFixed(2);
@@ -823,11 +895,12 @@
             else if (type === 'month') { start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]; end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]; }
             if(document.getElementById('maintBalanceStart')) document.getElementById('maintBalanceStart').value = start;
             if(document.getElementById('maintBalanceEnd')) document.getElementById('maintBalanceEnd').value = end;
-            processMaintBalance(); renderReporteMantenimiento();
+            safeRender(processMaintBalance, 'BalanceMantenimiento'); safeRender(renderReporteMantenimiento, 'ReporteMantenimiento');
         };
 
         function downloadCSV() {
-            const start = document.getElementById('maestroDateStart').value || "HISTORICO";
+            const startEl = document.getElementById('maestroDateStart');
+            const start = startEl ? startEl.value : "HISTORICO";
             let csv = "NRO,FECHA DE EMISION,LUGAR DE COMPRA,FACTURA,CODIGO,DESCRIPCION,SERIE,SAP,TECNICO,CIUDAD,FECHA ATENCION,CLIENTE,CALLE,TELEFONO,PRECIO,LLEGADA INFO,TECNICO QUE ATENDIO,VIATICO,FACTURA REP,CEDULA,CORREO\n";
             document.querySelectorAll('#tekaReporteBody tr').forEach(row => { const cols = row.querySelectorAll('td'); if(cols.length >= 21) { let rowData = []; for(let i=0; i<21; i++) { rowData.push('"' + cols[i].innerText.replace(/"/g, '""') + '"'); } csv += rowData.join(",") + "\n"; } });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "REPORTE_SAP_" + start + ".csv"); link.click();
@@ -844,10 +917,14 @@
 
         function renderReporteTeka() {
             const body = document.getElementById('tekaReporteBody'); if(!body) return;
-            const start = document.getElementById('maestroDateStart').value; const end = document.getElementById('maestroDateEnd').value;
+            const startEl = document.getElementById('maestroDateStart');
+            const endEl = document.getElementById('maestroDateEnd');
+            const start = startEl ? startEl.value : "";
+            const end = endEl ? endEl.value : "";
+            
             let filtered = visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Garantía' && v.estado === 'Atendido');
             if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
-            filtered.sort((a, b) => (a.fechaInstalacion || "").localeCompare(b.fechaInstalacion || ""));
+            filtered.sort((a, b) => String(a.fechaInstalacion || "").localeCompare(String(b.fechaInstalacion || "")));
 
             const bbqs = filtered.filter(v => (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ"));
             const multis = filtered.filter(v => !(v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ") && (v.equipos || []).length > 1);
@@ -858,7 +935,7 @@
                 if (list.length === 0) return "";
                 let html = `<tr><td colspan="22" class="p-4 bg-slate-200 text-fix-blue text-[11px] font-black italic border-y-4 border-white tracking-widest uppercase">${title} (${list.length} SERVICIOS)</td></tr>`;
                 html += list.flatMap(v => (v.equipos || []).map(eq => {
-                    const costo = (eq.costoBase || 0); granTotalMO += costo;
+                    const costo = (parseFloat(eq.costoBase) || 0); granTotalMO += costo;
                     return `<tr class="border-b row-hover font-black uppercase"><td class="report-cell text-center font-mono bg-slate-50">${rowCount++}</td><td class="report-cell font-mono">${v.fechaEmision || ''}</td><td class="report-cell">${v.lugarCompra || 'OTRO'}</td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${eq.codProducto || '-'}</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono tracking-widest">${eq.serieEquipo || '-'}</td><td class="report-cell font-black">SAP</td><td class="report-cell">CAPELO</td><td class="report-cell">CUENCA</td><td class="report-cell font-mono">${v.fechaInstalacion}</td><td class="report-cell font-black italic">${v.nombreCliente}</td><td class="report-cell max-w-[150px] truncate">${v.callePrincipal || '-'}</td><td class="report-cell font-mono">${v.telefono || '-'}</td><td class="report-cell font-black text-right font-mono">$${costo.toFixed(2)}</td><td class="report-cell">CLIENTE FINAL</td><td class="report-cell">CAPELO</td><td class="report-cell italic text-slate-400"></td><td class="report-cell font-mono">${v.numFactura || '-'}</td><td class="report-cell font-mono">${v.cedula || '-'}</td><td class="report-cell lowercase">${v.email || '-'}</td><td class="report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error">🗑️</button></td></tr>`;
                 })).join(''); return html;
             };
@@ -874,7 +951,7 @@
             if (v.tipoAtencion !== 'Garantía') {
                 const hasBBQ = (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ"); const eqCount = (v.equipos || []).length;
                 if (eqCount === 1 && !hasBBQ) {
-                    const mo = (v.equipos || []).reduce((sum, eq) => sum + (eq.costoBase || 0), 0);
+                    const mo = (v.equipos || []).reduce((sum, eq) => sum + (parseFloat(eq.costoBase) || 0), 0);
                     if(mo > 0) { html += `<div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100"><span class="text-xs font-black text-slate-500 uppercase tracking-tighter">🛠️ MANO DE OBRA</span><span class="font-mono font-black text-fix-blue text-sm">$${mo.toFixed(2)}</span></div>`; totalGeneral += mo; }
                 }
             }
@@ -899,14 +976,12 @@
             
             let todos = [];
             
-            // 1. INGRESOS (VISITAS, MANTENIMIENTOS, ACCESORIOS) - PROTEGIDO CON TRY...CATCH
             visitsArray.filter(v => v.estado === 'Atendido' && v.financiera).forEach(v => {
                 try {
                     let monto = (v.tipoAtencion === 'Garantía') ? 0 : (parseFloat(v.financiera.totalCliente) || 0);
                     let concepto = v.conceptoPersonalizado || (v.esMantenimiento ? "MANTENIMIENTO: " + v.nombreCliente : "VISITA: " + v.nombreCliente);
                     let defaultFormaPago = v.financiera.formaPago || (v.tipoAtencion === 'Instalación' ? 'TRANSFERENCIA' : 'EFECTIVO');
 
-                    // Reparación de fecha inteligente
                     let dateStrTransaction = v.fechaInstalacion || ""; 
                     if (v.attendedDate && typeof v.attendedDate === 'string' && v.attendedDate.includes('T')) {
                         dateStrTransaction = v.attendedDate.split('T')[0];
@@ -922,33 +997,31 @@
                 } catch(e) { console.error("Error al procesar visita en caja:", e); }
             });
             
-            // 2. MOVIMIENTOS MANUALES (EGRESOS / INGRESOS EXTRA) - BLINDADO CONTRA FECHAS INVALIDAS
             movementsArray.forEach(m => {
                 try {
                     let dStr = "";
                     if (m.fecha) {
                         const mDate = new Date(m.fecha);
-                        if (!isNaN(mDate.getTime())) { // Evita el RangeError de toISOString
+                        if (!isNaN(mDate.getTime())) { 
                             dStr = mDate.toISOString().split('T')[0];
                         }
                     }
-                    if (!dStr) dStr = m.dateStr || "1970-01-01"; // Fallback seguro por si no hay fecha válida
+                    if (!dStr) dStr = m.dateStr || "1970-01-01"; 
 
                     todos.push({ 
                         id: m.id, 
                         monto: parseFloat(m.monto) || 0, 
-                        type: (m.type || "").toUpperCase(), 
-                        concepto: m.concepto || '', 
+                        type: String(m.type || "").toUpperCase(), 
+                        concepto: String(m.concepto || ''), 
                         fecha: m.fecha || Date.now(), 
                         dateStr: dStr, 
                         source: 'MANUAL', 
                         tecnico: m.tecnico || '---', 
-                        formaPago: (m.formaPago || 'EFECTIVO').toUpperCase() 
+                        formaPago: String(m.formaPago || 'EFECTIVO').toUpperCase() 
                     });
                 } catch(e) { console.error("Error al procesar movimiento manual:", e); }
             });
 
-            // 3. FILTRO ESTRICTO AL RANGO SOLICITADO
             let filteredTodos = [...todos];
             if(start && end) filteredTodos = filteredTodos.filter(m => m.dateStr >= start && m.dateStr <= end);
             if(techFilter) filteredTodos = filteredTodos.filter(m => m.tecnico === techFilter);
@@ -961,25 +1034,20 @@
                 return isNaN(d.getTime()) ? '---' : d.toLocaleDateString();
             };
             
-            // 4. PINTAR LA TABLA (Solo lo de ese día/rango)
             const tb = document.getElementById('contabilidadTableBody');
             if(tb) {
                 tb.innerHTML = filteredTodos.map(m => `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${parseDateString(m.fecha)}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-error text-xs font-black" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
             }
             
-            // 5. CÁLCULO DE CAJA EXACTA DEL DÍA/RANGO (Reconoce "GASTO" o "EGRESO")
-            let tCashIn = 0; 
-            let tTransIn = 0;
-            let tCashOut = 0;
+            let tCashIn = 0; let tTransIn = 0; let tCashOut = 0;
 
             filteredTodos.forEach(m => { 
-                const tipo = m.type; // Ya viene en uppercase por el try/catch arriba
+                const tipo = m.type; 
                 const pago = m.formaPago;
-
                 if(tipo === 'INGRESO') { 
                     if(pago === 'EFECTIVO') tCashIn += m.monto; 
                     else tTransIn += m.monto; 
-                } else if(tipo === 'EGRESO' || tipo === 'GASTO') { // <-- Solución adicional por si habían typos históricos
+                } else if(tipo === 'EGRESO' || tipo === 'GASTO') {
                     if(pago === 'EFECTIVO') tCashOut += m.monto;
                 } 
             });
@@ -988,20 +1056,13 @@
             if(document.getElementById('totalTransferDisplay')) document.getElementById('totalTransferDisplay').textContent = "$" + tTransIn.toFixed(2);
             if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tCashOut.toFixed(2);
             
-            // RESTA SIMPLE MATEMÁTICA
             let realCashAvailable = tCashIn - tCashOut;
             if(document.getElementById('balanceNetoDisplay')) {
                 document.getElementById('balanceNetoDisplay').textContent = "$" + realCashAvailable.toFixed(2);
-                
-                // Color dinámico
                 const el = document.getElementById('balanceNetoDisplay');
-                if(realCashAvailable < 0) {
-                    el.className = "text-2xl font-black text-fix-error font-mono tracking-tighter";
-                } else if (realCashAvailable > 0) {
-                    el.className = "text-2xl font-black text-green-400 font-mono tracking-tighter";
-                } else {
-                    el.className = "text-2xl font-black text-fix-accent font-mono tracking-tighter";
-                }
+                if(realCashAvailable < 0) { el.className = "text-2xl font-black text-fix-error font-mono tracking-tighter"; } 
+                else if (realCashAvailable > 0) { el.className = "text-2xl font-black text-green-400 font-mono tracking-tighter"; } 
+                else { el.className = "text-2xl font-black text-fix-accent font-mono tracking-tighter"; }
             }
         }
 
@@ -1022,16 +1083,16 @@
         };
 
         window.saveFinanceAdjustment = function() {
-            const id = document.getElementById('finance_id').value; const source = document.getElementById('finance_source').value; const nuevoMonto = parseFloat(document.getElementById('finance_monto').value) || 0; const nuevoConcepto = document.getElementById('finance_concepto').value.toUpperCase(); const nuevaFormaPago = document.getElementById('finance_forma_pago').value; const nuevaFechaStr = document.getElementById('finance_fecha').value;
+            const id = document.getElementById('finance_id').value; const source = document.getElementById('finance_source').value; const nuevoMonto = parseFloat(document.getElementById('finance_monto').value) || 0; const nuevoConcepto = String(document.getElementById('finance_concepto').value).toUpperCase(); const nuevaFormaPago = document.getElementById('finance_forma_pago').value; const nuevaFechaStr = document.getElementById('finance_fecha').value;
             
             if (source === 'MANUAL') {
                 const dateObj = new Date(nuevaFechaStr + "T12:00:00"); const timestamp = dateObj.getTime();
-                database.ref('movements/' + id).update({ monto: nuevoMonto, concepto: nuevoConcepto, formaPago: nuevaFormaPago, fecha: timestamp }).then(() => { showMessage("✅ Movimiento Actualizado", "fix-report"); closeEditFinanceModal(); processFinancialBalance(); });
+                database.ref('movements/' + id).update({ monto: nuevoMonto, concepto: nuevoConcepto, formaPago: nuevaFormaPago, fecha: timestamp }).then(() => { showMessage("✅ Movimiento Actualizado", "fix-report"); closeEditFinanceModal(); safeRender(processFinancialBalance, 'Finanzas'); });
             } else {
                 const originalVisit = visitsArray.find(v => v.id === id); const updatedFinanciera = originalVisit && originalVisit.financiera ? Object.assign({}, originalVisit.financiera) : { formaPago: 'EFECTIVO' }; updatedFinanciera.totalCliente = nuevoMonto; updatedFinanciera.formaPago = nuevaFormaPago;
                 const updateFields = { conceptoPersonalizado: nuevoConcepto, financiera: updatedFinanciera };
                 if (originalVisit && originalVisit.estado === 'Atendido') { const originalTime = originalVisit.attendedDate ? originalVisit.attendedDate.split('T')[1] : "12:00:00.000Z"; updateFields.attendedDate = nuevaFechaStr + "T" + originalTime; } else { updateFields.fechaInstalacion = nuevaFechaStr; }
-                database.ref('visits/' + id).update(updateFields).then(() => { showMessage("✅ Liquidación Actualizada", "fix-report"); closeEditFinanceModal(); processFinancialBalance(); });
+                database.ref('visits/' + id).update(updateFields).then(() => { showMessage("✅ Liquidación Actualizada", "fix-report"); closeEditFinanceModal(); safeRender(processFinancialBalance, 'Finanzas'); });
             }
         };
 
@@ -1039,26 +1100,31 @@
             const c = document.getElementById('movConcepto').value; const m = parseFloat(document.getElementById('movMonto').value); const t = document.getElementById('movType').value; const p = document.getElementById('movPago').value; const tech = document.getElementById('movTecnico').value; const d = document.getElementById('movFecha').value;
             if(!c || isNaN(m) || !d) return showMessage("⚠️ Incompleto", "fix-accent");
             const dateObj = new Date(d + "T12:00:00"); const timestamp = dateObj.getTime();
-            database.ref('movements').push().set({ id: database.ref().push().key, concepto: c.toUpperCase(), monto: m, fecha: timestamp, type: t, formaPago: p, tecnico: tech || 'ADMIN' }).then(() => { document.getElementById('movConcepto').value=''; document.getElementById('movMonto').value=''; showMessage("✅ Manual Guardado", "fix-report"); });
+            database.ref('movements').push().set({ id: database.ref().push().key, concepto: String(c).toUpperCase(), monto: m, fecha: timestamp, type: t, formaPago: p, tecnico: tech || 'ADMIN' }).then(() => { document.getElementById('movConcepto').value=''; document.getElementById('movMonto').value=''; showMessage("✅ Manual Guardado", "fix-report"); });
         };
 
         function renderBuscador() {
-            const query = document.getElementById('searchGlobalInput').value.toUpperCase();
-            const start = document.getElementById('searchDateStart').value;
-            const end = document.getElementById('searchDateEnd').value;
-            const tech = document.getElementById('searchTechFilter').value;
-            const type = document.getElementById('searchTypeFilter').value;
+            const queryEl = document.getElementById('searchGlobalInput');
+            const query = queryEl ? String(queryEl.value).toUpperCase() : "";
+            const startEl = document.getElementById('searchDateStart');
+            const start = startEl ? startEl.value : "";
+            const endEl = document.getElementById('searchDateEnd');
+            const end = endEl ? endEl.value : "";
+            const techEl = document.getElementById('searchTechFilter');
+            const tech = techEl ? techEl.value : "";
+            const typeEl = document.getElementById('searchTypeFilter');
+            const type = typeEl ? typeEl.value : "TODOS";
 
             let filtered = visitsArray.filter(v => {
                 const textMatch = !query || 
-                    (v.nombreCliente && v.nombreCliente.toUpperCase().includes(query)) ||
-                    (v.cedula && v.cedula.includes(query)) ||
-                    (v.numFactura && v.numFactura.toUpperCase().includes(query)) ||
-                    (v.telefono && v.telefono.includes(query)) ||
+                    (v.nombreCliente && String(v.nombreCliente).toUpperCase().includes(query)) ||
+                    (v.cedula && String(v.cedula).includes(query)) ||
+                    (v.numFactura && String(v.numFactura).toUpperCase().includes(query)) ||
+                    (v.telefono && String(v.telefono).includes(query)) ||
                     (v.equipos && v.equipos.some(e => 
-                        (e.codProducto && e.codProducto.toUpperCase().includes(query)) || 
-                        (e.serieEquipo && e.serieEquipo.toUpperCase().includes(query)) ||
-                        (e.descProducto && e.descProducto.toUpperCase().includes(query))
+                        (e.codProducto && String(e.codProducto).toUpperCase().includes(query)) || 
+                        (e.serieEquipo && String(e.serieEquipo).toUpperCase().includes(query)) ||
+                        (e.descProducto && String(e.descProducto).toUpperCase().includes(query))
                     ));
                 
                 const dateMatch = (!start || v.fechaInstalacion >= start) && (!end || v.fechaInstalacion <= end);
@@ -1070,7 +1136,7 @@
                 return textMatch && dateMatch && techMatch && typeMatch;
             });
 
-            filtered.sort((a,b) => (b.fechaInstalacion || "").localeCompare(a.fechaInstalacion || ""));
+            filtered.sort((a,b) => String(b.fechaInstalacion || "").localeCompare(String(a.fechaInstalacion || "")));
 
             const body = document.getElementById('buscadorResultsBody');
             if(body) {
@@ -1137,12 +1203,24 @@
             const warrantySelect = document.getElementById('warrantyEquipmentSelect');
             if(warrantySelect) { TIPOS_EQUIPO.forEach(e => { if(e) warrantySelect.add(new Option(e, e)); }); }
 
-            renderInsumosAdmin(); expandEquipmentUI();
+            safeRender(renderInsumosAdmin, 'InsumosInit'); 
+            safeRender(expandEquipmentUI, 'EquiposInit');
 
             if (isFirebaseFallback) {
                 setTimeout(() => { showMessage("🔌 MODO SIN CONEXIÓN (MOCK DE RESERVA ACTIVO)", "fix-accent"); }, 1500);
             } else {
-                startSync();
+                refreshData(); // Llama directo a la misma función del botón recargar (que es 100% segura)
+                
+                // Mantenemos los listeners silenciosos en segundo plano para no interrumpir nada
+                database.ref('visits').on('value', snap => {
+                    visitsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : [];
+                });
+                database.ref('movements').on('value', snap => { 
+                    movementsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : []; 
+                });
+                database.ref('inventory_entries').on('value', snap => { 
+                    inventoryEntries = snap.val() ? Object.values(snap.val()) : []; 
+                });
             }
         });
     </script>
@@ -1159,7 +1237,7 @@
                     <h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1>
                     <div class="flex flex-col">
                         <span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span>
-                        <span class="version-badge">V. 3.1.6 (Cash Fix)</span>
+                        <span class="version-badge">V. 3.1.8 (Safe Load)</span>
                         <span class="text-[8px] font-bold text-emerald-500 lowercase mt-1 flex items-center gap-1">
                             <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             • nube activa
@@ -1258,7 +1336,7 @@
                 <div id="visitsList" class="space-y-3 max-h-[700px] overflow-y-auto pr-2"></div>
             </div>
 
-            <!-- CONTABILIDAD VIEW (LIMPIA Y BLINDADA) -->
+            <!-- CONTABILIDAD VIEW -->
             <div id="contabilidadView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase">
                     <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
@@ -1273,24 +1351,19 @@
                         </div>
                     </div>
                     
-                    <!-- REJILLA DE VALORES PURA -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 text-center italic font-black">
-                        <!-- INGRESOS EFECTIVO -->
                         <div class="p-4 bg-green-50 rounded-2xl border border-green-200 flex flex-col justify-center shadow-sm">
                             <span class="text-[9px] uppercase text-slate-500 tracking-tight">💵 INGRESOS EFECTIVO HOY/PERÍODO</span>
                             <div id="totalEfectivoDisplay" class="text-xl font-black text-green-700 font-mono tracking-tighter">$0.00</div>
                         </div>
-                        <!-- INGRESOS TRANSFERENCIA -->
                         <div class="p-4 bg-blue-50 rounded-2xl border border-blue-200 flex flex-col justify-center shadow-sm">
                             <span class="text-[9px] uppercase text-slate-500 tracking-tight">🏦 INGRESOS TRANSFERENCIA HOY/PERÍODO</span>
                             <div id="totalTransferDisplay" class="text-xl font-black text-blue-700 font-mono tracking-tighter">$0.00</div>
                         </div>
-                        <!-- EGRESOS EFECTIVO -->
                         <div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex flex-col justify-center shadow-sm">
                             <span class="text-[9px] uppercase text-slate-500 tracking-tight">💸 GASTOS/EGRESOS EFECTIVO HOY/PERÍODO</span>
                             <div id="totalEgresosDisplay" class="text-xl font-black text-red-700 font-mono tracking-tighter">$0.00</div>
                         </div>
-                        <!-- RESTA (NETO) -->
                         <div class="p-4 bg-slate-900 rounded-2xl text-white shadow-xl flex flex-col justify-center border-2 border-fix-accent">
                             <span class="text-[10px] uppercase text-fix-accent tracking-wider">📦 EFECTIVO NETO (RESTA)</span>
                             <div id="balanceNetoDisplay" class="text-2xl font-black text-fix-accent font-mono tracking-tighter">$0.00</div>
@@ -1310,7 +1383,7 @@
                 </div>
             </div>
 
-            <!-- OTRAS VISTAS -->
+            <!-- OTRAS VISTAS (Buscador, Mantenimiento, Taller, Garantias, Rutero, Maestro) -->
             <div id="buscadorView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="bg-white p-6 rounded-[2.5rem] shadow-xl border-[8px] border-slate-50">
                     <h2 class="text-xl font-black uppercase italic underline text-fix-blue mb-6 tracking-tighter">Buscador Inteligente Global</h2>
@@ -1479,7 +1552,6 @@
         </div>
     </div>
 
-    <!-- MODAL DE AJUSTE FINANCIERO OPTIMIZADO -->
     <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 admin-only">
         <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic text-center text-slate-800">
             <h2 class="text-xl font-black uppercase text-fix-blue mb-4 border-b-2 pb-2">VALOR REAL / EDITAR CAJA</h2>
