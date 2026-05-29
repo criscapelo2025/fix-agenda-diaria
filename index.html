@@ -510,24 +510,45 @@
         }
 
         function refreshData() {
-            showMessage("🔄 Sincronizando...", "fix-blue");
-            database.ref('visits').once('value', function() {
-                safeRender(renderUIAgenda, 'Agenda'); 
-                safeRender(renderRutero, 'Rutero'); 
-                safeRender(processFinancialBalance, 'Finanzas'); 
-                safeRender(processMaintBalance, 'BalanceMantenimiento'); 
+            safeRender(renderUIAgenda, 'Agenda'); 
+            safeRender(renderRutero, 'Rutero'); 
+            safeRender(processFinancialBalance, 'Finanzas'); 
+            safeRender(processMaintBalance, 'BalanceMantenimiento'); 
+            safeRender(renderInventoryView, 'Inventario'); 
+            safeRender(renderPendientes, 'Pendientes'); 
+            safeRender(renderTaller, 'Taller'); 
+            safeRender(renderGarantias, 'Garantias');
+            
+            if(currentView === 'reporte_teka') safeRender(renderReporteTeka, 'ReporteTeka');
+            if(currentView === 'garantias') safeRender(renderMaestroGarantias, 'MaestroGarantias');
+            if(currentView === 'mantenimiento') safeRender(renderReporteMantenimiento, 'ReporteMantenimiento');
+            if(currentView === 'buscador') safeRender(renderBuscador, 'Buscador');
+        }
+
+        function startSync() {
+            showMessage("🔄 Conectando con servidor...", "fix-blue");
+            database.ref('visits').on('value', snap => {
+                visitsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : [];
+                refreshData();
+                showMessage("✅ Base de Datos Lista", "fix-report");
+            }, error => {
+                console.error("Database error (visits):", error);
+                showMessage("⚠️ Error al sincronizar", "fix-error");
+            });
+
+            database.ref('movements').on('value', snap => { 
+                movementsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : []; 
+                if(currentView === 'contabilidad') safeRender(processFinancialBalance, 'Finanzas'); 
+            }, error => {
+                console.error("Database error (movements):", error);
+            });
+
+            database.ref('inventory_entries').on('value', snap => { 
+                inventoryEntries = snap.val() ? Object.values(snap.val()) : []; 
                 safeRender(renderInventoryView, 'Inventario'); 
-                safeRender(renderPendientes, 'Pendientes'); 
-                safeRender(renderTaller, 'Taller'); 
-                safeRender(renderGarantias, 'Garantias');
-                
-                if(currentView === 'reporte_teka') safeRender(renderReporteTeka, 'ReporteTeka');
-                if(currentView === 'garantias') safeRender(renderMaestroGarantias, 'MaestroGarantias');
-                if(currentView === 'mantenimiento') safeRender(renderReporteMantenimiento, 'ReporteMantenimiento');
-                if(currentView === 'buscador') safeRender(renderBuscador, 'Buscador');
-                
-                showMessage("✅ Actualizado", "fix-report");
-            }, error => { showMessage("⚠️ Error al sincronizar", "fix-error"); });
+            }, error => {
+                console.error("Database error (inventory_entries):", error);
+            });
         }
 
         function syncDates(sourceId) {
@@ -978,6 +999,12 @@
             
             visitsArray.filter(v => v.estado === 'Atendido' && v.financiera).forEach(v => {
                 try {
+                    // --- REGLAS DE EXCLUSIÓN DE CAJA SOLICITADAS ---
+                    // 1. No contar ingresos del técnico Cristian Capelo
+                    if (v.tecnico === 'Cristian Capelo') return;
+                    // 2. No contar Mantenimientos
+                    if (v.esMantenimiento || v.tipoAtencion === 'Mantenimiento') return;
+
                     let monto = (v.tipoAtencion === 'Garantía') ? 0 : (parseFloat(v.financiera.totalCliente) || 0);
                     let concepto = v.conceptoPersonalizado || (v.esMantenimiento ? "MANTENIMIENTO: " + v.nombreCliente : "VISITA: " + v.nombreCliente);
                     let defaultFormaPago = v.financiera.formaPago || (v.tipoAtencion === 'Instalación' ? 'TRANSFERENCIA' : 'EFECTIVO');
@@ -999,6 +1026,10 @@
             
             movementsArray.forEach(m => {
                 try {
+                    // --- EXCLUIR INGRESOS MANUALES DE CRISTIAN CAPELO ---
+                    // (Los egresos / gastos de Cristian Capelo sí se cuentan, solo ignoramos sus ingresos)
+                    if (String(m.type || "").toUpperCase() === 'INGRESO' && m.tecnico === 'Cristian Capelo') return;
+
                     let dStr = "";
                     if (m.fecha) {
                         const mDate = new Date(m.fecha);
@@ -1209,18 +1240,7 @@
             if (isFirebaseFallback) {
                 setTimeout(() => { showMessage("🔌 MODO SIN CONEXIÓN (MOCK DE RESERVA ACTIVO)", "fix-accent"); }, 1500);
             } else {
-                refreshData(); // Llama directo a la misma función del botón recargar (que es 100% segura)
-                
-                // Mantenemos los listeners silenciosos en segundo plano para no interrumpir nada
-                database.ref('visits').on('value', snap => {
-                    visitsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : [];
-                });
-                database.ref('movements').on('value', snap => { 
-                    movementsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : []; 
-                });
-                database.ref('inventory_entries').on('value', snap => { 
-                    inventoryEntries = snap.val() ? Object.values(snap.val()) : []; 
-                });
+                startSync(); 
             }
         });
     </script>
@@ -1584,4 +1604,6 @@
 
 </body>
 </html>
+
+
 
