@@ -1376,7 +1376,10 @@
                 }
             });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "REPORTE_MANTENIMIENTOS.csv"); link.click();
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", "REPORTE_MANTENIMIENTOS.csv");
+            link.click();
             showMessage("📊 Reporte descargado", "fix-report");
         }
 
@@ -1474,12 +1477,19 @@
             
             // 1. RECOPILACIÓN UNIFICADA DE INGRESOS (SERVICIOS ESTÁNDAR Y MANTENIMIENTOS FINALIZADOS)
             visitsArray.filter(v => v.estado === 'Atendido' && v.financiera).forEach(v => {
-                // Si es Garantía el cliente paga 0, en caso contrario, se registra el totalCliente cobrado de verdad (M.O + Accesorios)
                 let monto = (v.tipoAtencion === 'Garantía') ? 0 : (v.financiera.totalCliente || 0);
                 let concepto = v.conceptoPersonalizado || (v.esMantenimiento ? "MANTENIMIENTO: " + v.nombreCliente : "VISITA: " + v.nombreCliente);
                 
-                // MEJORA EXCLUSIVA: Si es de Teka (Instalación), se registra como TRANSFERENCIA por defecto (banco) para no alterar tu efectivo físico real.
+                // Si es de Teka (Instalación), se registra como TRANSFERENCIA por defecto para no alterar tu efectivo físico real.
                 let defaultFormaPago = v.financiera.formaPago || (v.tipoAtencion === 'Instalación' ? 'TRANSFERENCIA' : 'EFECTIVO');
+
+                // Determinar la fecha real de la transacción para cuadrar perfectamente el efectivo por día de cierre
+                let dateStrTransaction = v.fechaInstalacion; // Fallback
+                if (v.attendedDate) {
+                    dateStrTransaction = v.attendedDate.split('T')[0];
+                } else if (v.fechaEntregaTaller) {
+                    dateStrTransaction = v.fechaEntregaTaller;
+                }
 
                 todos.push({ 
                     id: v.id, 
@@ -1487,7 +1497,7 @@
                     type: 'INGRESO', 
                     concepto: concepto, 
                     fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt, 
-                    dateStr: v.fechaInstalacion, 
+                    dateStr: dateStrTransaction, 
                     source: 'VISITA', 
                     tecnico: v.tecnico || '---', 
                     formaPago: defaultFormaPago 
@@ -1501,43 +1511,7 @@
                 todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: m.concepto || '', fecha: m.fecha, dateStr: dStr, source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' });
             });
 
-            // 3. CÁLCULO DE CAJA REAL FÍSICA (HISTÓRICA GLOBAL TOTAL)
-            let globalCashIn = 0;
-            let globalCashOut = 0;
-            todos.forEach(m => {
-                if (m.formaPago === 'EFECTIVO') {
-                    if (m.type === 'INGRESO') {
-                        globalCashIn += m.monto;
-                    } else {
-                        globalCashOut += m.monto;
-                    }
-                }
-            });
-            const cajaRealTotal = globalCashIn - globalCashOut;
-            const cajaRealDisplay = document.getElementById('cajaRealTotalDisplay');
-            if (cajaRealDisplay) {
-                cajaRealDisplay.textContent = "$" + cajaRealTotal.toFixed(2);
-                if (cajaRealTotal < 0) {
-                    cajaRealDisplay.className = "text-xl font-black text-fix-error font-mono";
-                } else {
-                    cajaRealDisplay.className = "text-xl font-black text-fix-accent font-mono";
-                }
-            }
-
-            // MEJORA EXCLUSIVA: ARRASTRE DE SALDO ANTERIOR (SOLO EFECTIVO FÍSICO)
-            let carriedCash = 0;
-            if (start) {
-                todos.forEach(m => {
-                    if (m.dateStr < start && (!techFilter || m.tecnico === techFilter)) {
-                        if (m.formaPago === 'EFECTIVO') {
-                            if (m.type === 'INGRESO') carriedCash += m.monto;
-                            else if (m.type === 'EGRESO') carriedCash -= m.monto; // EGRESO
-                        }
-                    }
-                });
-            }
-
-            // 4. Aplicar Filtro de Fechas y Técnico solo para visualización del Período
+            // 3. Aplicar Filtro de Fechas y Técnico para visualización del Período
             let filteredTodos = [...todos];
             if(start && end) filteredTodos = filteredTodos.filter(m => m.dateStr >= start && m.dateStr <= end);
             if(techFilter) filteredTodos = filteredTodos.filter(m => m.tecnico === techFilter);
@@ -1553,55 +1527,33 @@
             const tb = document.getElementById('contabilidadTableBody');
             if(tb) {
                 let htmlRows = "";
-                
-                // MEJORA: Fila interactiva superior de arrastre de caja (SOLO EFECTIVO)
-                if (start) {
-                    htmlRows += `
-                    <tr class="bg-blue-50/50 border-b font-black uppercase text-[10px] text-fix-blue italic">
-                        <td class="p-4 font-bold">SALDO ANTERIOR<br><span class="text-[7px] text-slate-400 font-bold">ARRASTRE</span></td>
-                        <td class="p-4 font-bold tracking-tight">
-                            <span class="text-green-600 font-black">ARRASTRE</span><br>
-                            <span class="text-slate-400 font-black">EFECTIVO EN CAJA</span>
-                        </td>
-                        <td class="p-4 font-black">--- EFECTIVO DISPONIBLE ACUMULADO DE DÍAS ANTERIORES ---</td>
-                        <td class="p-4 text-right font-mono font-black text-slate-700">
-                            $${carriedCash.toFixed(2)}
-                        </td>
-                        <td class="text-center p-4">🔒</td>
-                    </tr>`;
-                }
-
+                // Renderizado simple e histórico limpio (SIN renglón de Arrastre de saldo anterior confuso)
                 htmlRows += filteredTodos.map(m => `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${parseDateString(m.fecha)}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-error text-xs font-black" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
                 
                 tb.innerHTML = htmlRows;
             }
             
-            // CORRECCIÓN CRÍTICA DE VARIABLES NO DECLARADAS
-            let tIn = 0;
-            let tOut = 0; 
+            // CÓMPUTO DE VALORES EXCLUSIVO DE LA FECHA FILTRADA (HOY)
             let tCashIn = 0; 
             let tTransIn = 0;
             let tCashOut = 0;
-            let tTransOut = 0;
 
             filteredTodos.forEach(m => { 
                 if(m.type === 'INGRESO') { 
-                    tIn += m.monto;
                     if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; 
                     else tTransIn += m.monto; 
                 } else if(m.type === 'EGRESO') { 
-                    tOut += m.monto;
                     if(m.formaPago === 'EFECTIVO') tCashOut += m.monto;
-                    else tTransOut += m.monto;
                 } 
             });
             
+            // Sincronizar displays con etiquetas del rango de HOY
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
             if(document.getElementById('totalTransferDisplay')) document.getElementById('totalTransferDisplay').textContent = "$" + tTransIn.toFixed(2);
-            if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tCashOut.toFixed(2); // Muestra solo egresos en efectivo físico
+            if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tCashOut.toFixed(2);
             
-            // El balance del periodo ahora acumula el Arrastre de Efectivo de los días anteriores y resta los gastos físicos de forma perfecta
-            let realCashAvailable = carriedCash + tCashIn - tCashOut;
+            // RESTA DIRECTA Y PURA: Ingresos Efectivo - Egresos Efectivo (sin saldos artificiales ni sumatorias raras)
+            let realCashAvailable = tCashIn - tCashOut;
             if(document.getElementById('balanceNetoDisplay')) {
                 document.getElementById('balanceNetoDisplay').textContent = "$" + realCashAvailable.toFixed(2);
             }
@@ -1910,22 +1862,29 @@
             
             const formaPagoSelect = document.getElementById('finance_forma_pago');
             const paymentContainer = document.getElementById('finance_payment_container');
+            const fechaInput = document.getElementById('finance_fecha');
             
-            // Permite corregir la forma de pago (Efectivo/Transferencia) de forma directa desde la caja
+            let currentDateStr = "";
             if (source === 'VISITA') {
                 paymentContainer.classList.remove('hidden');
                 const v = visitsArray.find(item => item.id === id);
-                if (v && v.financiera) {
-                    formaPagoSelect.value = v.financiera.formaPago || 'EFECTIVO';
+                if (v) {
+                    if (v.financiera) formaPagoSelect.value = v.financiera.formaPago || 'EFECTIVO';
+                    currentDateStr = v.attendedDate ? v.attendedDate.split('T')[0] : v.fechaInstalacion;
                 }
             } else if (source === 'MANUAL') {
                 paymentContainer.classList.remove('hidden');
                 const m = movementsArray.find(item => item.id === id);
                 if (m) {
                     formaPagoSelect.value = m.formaPago || 'EFECTIVO';
+                    currentDateStr = new Date(m.fecha).toISOString().split('T')[0];
                 }
             } else {
                 paymentContainer.classList.add('hidden');
+            }
+            
+            if (fechaInput) {
+                fechaInput.value = currentDateStr || new Date().toISOString().split('T')[0];
             }
             
             document.getElementById('editFinanceModal').classList.remove('hidden');
@@ -1937,15 +1896,21 @@
             const nuevoMonto = parseFloat(document.getElementById('finance_monto').value) || 0; 
             const nuevoConcepto = document.getElementById('finance_concepto').value.toUpperCase();
             const nuevaFormaPago = document.getElementById('finance_forma_pago').value;
+            const nuevaFechaStr = document.getElementById('finance_fecha').value;
             
             if (source === 'MANUAL') {
+                const dateObj = new Date(nuevaFechaStr + "T12:00:00");
+                const timestamp = dateObj.getTime();
+
                 database.ref('movements/' + id).update({ 
                     monto: nuevoMonto, 
-                    concepto: nuevoConcepto, // Permite modificar el concepto manual libremente
-                    formaPago: nuevaFormaPago
+                    concepto: nuevoConcepto, 
+                    formaPago: nuevaFormaPago,
+                    fecha: timestamp
                 }).then(() => {
                     showMessage("✅ Movimiento Actualizado", "fix-report");
                     closeEditFinanceModal();
+                    processFinancialBalance();
                 }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
             } else {
                 const originalVisit = visitsArray.find(v => v.id === id);
@@ -1953,12 +1918,22 @@
                 updatedFinanciera.totalCliente = nuevoMonto;
                 updatedFinanciera.formaPago = nuevaFormaPago;
 
-                database.ref('visits/' + id).update({ 
+                const updateFields = { 
                     conceptoPersonalizado: nuevoConcepto,
                     financiera: updatedFinanciera
-                }).then(() => {
+                };
+
+                if (originalVisit && originalVisit.estado === 'Atendido') {
+                    const originalTime = originalVisit.attendedDate ? originalVisit.attendedDate.split('T')[1] : "12:00:00.000Z";
+                    updateFields.attendedDate = nuevaFechaStr + "T" + originalTime;
+                } else {
+                    updateFields.fechaInstalacion = nuevaFechaStr;
+                }
+
+                database.ref('visits/' + id).update(updateFields).then(() => {
                     showMessage("✅ Liquidación Actualizada", "fix-report");
                     closeEditFinanceModal();
+                    processFinancialBalance();
                 }).catch((err) => {
                     console.error("Error al guardar ajuste de caja:", err);
                     showMessage("❌ Error al guardar", "fix-error");
@@ -2063,7 +2038,7 @@
             
             ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd', 'garantiaMaestroStart', 'garantiaMaestroEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoyLocal; });
             
-            // Establecer filtro de caja a "solo hoy" por defecto para cumplir el requerimiento de arrastre diario directo
+            // Filtro por defecto: HOY para análisis directo sin acarreos
             if(document.getElementById('cajaDateStart')) document.getElementById('cajaDateStart').value = hoyLocal;
             if(document.getElementById('cajaDateEnd')) document.getElementById('cajaDateEnd').value = hoyLocal;
 
@@ -2094,13 +2069,11 @@
 
             renderInsumosAdmin(); expandEquipmentUI();
 
-            // Notificación visual de modo de red
             if (isFirebaseFallback) {
                 setTimeout(() => {
                     showMessage("🔌 MODO SIN CONEXIÓN (MOCK DE RESERVA ACTIVO)", "fix-accent");
                 }, 1500);
             } else {
-                // Sincronización completa al inicio
                 startSync();
             }
         });
@@ -2118,7 +2091,7 @@
                     <h1 class="text-xl sm:text-4xl font-black uppercase italic text-slate-800 tracking-tighter leading-none">Gestión</h1>
                     <div class="flex flex-col">
                         <span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest italic font-mono">Admin</span>
-                        <span class="version-badge">V. 3.0.1</span>
+                        <span class="version-badge">V. 3.1.0</span>
                         <span class="text-[8px] font-bold text-emerald-500 lowercase mt-1 flex items-center gap-1">
                             <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             • nube activa
@@ -2296,7 +2269,7 @@
                     <div id="garantiasList" class="space-y-4 max-h-[800px] overflow-y-auto pr-2"></div>
                 </div>
 
-                <!-- NUEVA SECCIÓN: Maestro de Garantías Finalizadas -->
+                <!-- Maestro de Garantías Finalizadas -->
                 <div class="bg-white p-6 rounded-[2.5rem] shadow-xl border-[8px] border-slate-50 font-black uppercase">
                     <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
                         <div>
@@ -2455,26 +2428,26 @@
                         </div>
                     </div>
                     
-                    <!-- REJILLA DE VALORES DE CAJA OPTIMIZADA - EXCLUSIVA PARA EL CONTROL DIARIO FÍSICO REAL -->
+                    <!-- REJILLA DE VALORES DE CAJA DIARIA DE EFECTIVO REAL FILTRADO (SIN SALDOS ANTERIORES) -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 text-center italic font-black">
                         <!-- INGRESOS EFECTIVO -->
                         <div class="p-4 bg-green-50 rounded-2xl border border-green-200 flex flex-col justify-center">
-                            <span class="text-[9px] uppercase text-slate-500 tracking-tight">💵 INGRESOS EFECTIVO (HOY)</span>
+                            <span class="text-[9px] uppercase text-slate-500 tracking-tight">💵 INGRESOS EFECTIVO</span>
                             <div id="totalEfectivoDisplay" class="text-xl font-black text-green-700 font-mono">$0.00</div>
                         </div>
                         <!-- INGRESOS TRANSFERENCIA -->
                         <div class="p-4 bg-blue-50 rounded-2xl border border-blue-200 flex flex-col justify-center">
-                            <span class="text-[9px] uppercase text-slate-500 tracking-tight">🏦 INGRESOS TRANSFERENCIA (HOY)</span>
+                            <span class="text-[9px] uppercase text-slate-500 tracking-tight">🏦 INGRESOS TRANSFERENCIA</span>
                             <div id="totalTransferDisplay" class="text-xl font-black text-blue-700 font-mono">$0.00</div>
                         </div>
                         <!-- EGRESOS EFECTIVO -->
                         <div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex flex-col justify-center">
-                            <span class="text-[9px] uppercase text-slate-500 tracking-tight">💸 GASTOS / EGRESOS EFECTIVO (HOY)</span>
+                            <span class="text-[9px] uppercase text-slate-500 tracking-tight">💸 GASTOS / EGRESOS EFECTIVO</span>
                             <div id="totalEgresosDisplay" class="text-xl font-black text-red-700 font-mono">$0.00</div>
                         </div>
-                        <!-- EFECTIVO REAL DISPONIBLE (CON ARRASTRE DIARIO) -->
+                        <!-- EFECTIVO NETO (INGRESO - GASTOS) -->
                         <div class="p-4 bg-slate-950 rounded-2xl text-white shadow-xl flex flex-col justify-center border-2 border-fix-accent">
-                            <span class="text-[10px] uppercase text-fix-accent tracking-wider">📦 EFECTIVO DISPONIBLE EN CAJA (REAL)</span>
+                            <span class="text-[10px] uppercase text-fix-accent tracking-wider">📦 EFECTIVO NETO (INGRESOS - EGRESOS)</span>
                             <div id="balanceNetoDisplay" class="text-2xl font-black text-fix-accent font-mono">$0.00</div>
                         </div>
                     </div>
@@ -2558,7 +2531,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE AJUSTE FINANCIERO OPTIMIZADO -->
+    <!-- MODAL DE AJUSTE FINANCIERO OPTIMIZADO (CON CORRECCIÓN DE FECHA) -->
     <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 admin-only">
         <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 font-black border-[6px] border-slate-50 uppercase italic text-center text-slate-800">
             <h2 class="text-xl font-black uppercase text-fix-blue mb-4 border-b-2 pb-2">VALOR REAL / EDITAR CAJA</h2>
@@ -2568,6 +2541,11 @@
                 <label class="text-[10px] text-slate-400 block -mb-2">DESCRIPCIÓN DEL CONCEPTO:</label>
                 <!-- Campo de descripción 100% editable -->
                 <input type="text" id="finance_concepto" class="w-full p-3 bg-slate-50 rounded-xl border font-black text-xs text-center uppercase">
+                
+                <label class="text-[10px] text-slate-400 block -mb-2">FECHA DE REGISTRO / CAJA Chica:</label>
+                <!-- Campo de fecha 100% editable para corrección de saldo del día -->
+                <input type="date" id="finance_fecha" class="w-full p-3 bg-slate-50 rounded-xl border font-mono font-black text-xs text-center">
+
                 <label class="text-[10px] text-fix-accent block -mb-2">MONTO A REGISTRAR $:</label>
                 <input type="number" step="0.01" id="finance_monto" class="w-full p-3 bg-yellow-50 rounded-xl border font-mono font-black text-3xl text-right text-fix-blue">
                 
