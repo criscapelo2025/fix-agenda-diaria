@@ -180,7 +180,7 @@
                             if (subId) {
                                 delete current[subId];
                             }
-                            setLocal(baseKey, current);
+                            setLocal(baseKey, data);
                             window.dispatchEvent(new Event('storage'));
                             return Promise.resolve();
                         },
@@ -1461,30 +1461,7 @@
                 todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: "MANUAL: " + m.concepto, fecha: m.fecha, dateStr: dStr, source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' });
             });
 
-            // 3. CÁLCULO DE CAJA REAL FÍSICA (HISTÓRICA GLOBAL TOTAL)
-            let globalCashIn = 0;
-            let globalCashOut = 0;
-            todos.forEach(m => {
-                if (m.formaPago === 'EFECTIVO') {
-                    if (m.type === 'INGRESO') {
-                        globalCashIn += m.monto;
-                    } else {
-                        globalCashOut += m.monto;
-                    }
-                }
-            });
-            const cajaRealTotal = globalCashIn - globalCashOut;
-            const cajaRealDisplay = document.getElementById('cajaRealTotalDisplay');
-            if (cajaRealDisplay) {
-                cajaRealDisplay.textContent = "$" + cajaRealTotal.toFixed(2);
-                if (cajaRealTotal < 0) {
-                    cajaRealDisplay.className = "text-xl font-black text-fix-error font-mono";
-                } else {
-                    cajaRealDisplay.className = "text-xl font-black text-fix-accent font-mono";
-                }
-            }
-
-            // 4. Aplicar Filtro de Fechas y Técnico solo para visualización del Período
+            // 3. Aplicar Filtro de Fechas y Técnico solo para visualización del Período
             let filteredTodos = [...todos];
             if(start && end) filteredTodos = filteredTodos.filter(m => m.dateStr >= start && m.dateStr <= end);
             if(techFilter) filteredTodos = filteredTodos.filter(m => m.tecnico === techFilter);
@@ -1500,22 +1477,21 @@
             const tb = document.getElementById('contabilidadTableBody');
             if(tb) tb.innerHTML = filteredTodos.map(m => `<tr class="border-b row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic">${parseDateString(m.fecha)}<br><span class="text-[7px] text-slate-400 font-bold">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-green-600' : 'text-red-600'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-500' : 'text-slate-400'}">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter">${m.concepto}</td><td class="p-4 text-right text-[10px] font-mono font-black">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-error text-xs font-black" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-blue text-xs font-black">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-xs">🗑️</button>` : ''}</div></td></tr>`).join('');
             
-            let tIn = 0, tOut = 0, tCashIn = 0, tTransIn = 0;
+            let tCashIn = 0, tOut = 0, tTransIn = 0;
             filteredTodos.forEach(m => { 
                 if(m.type === 'INGRESO') { 
-                    tIn += m.monto; 
                     if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; 
                     else tTransIn += m.monto; 
                 } else { 
-                    tOut += m.monto; 
+                    // Egresos en Efectivo únicamente
+                    if(m.formaPago === 'EFECTIVO') tOut += m.monto; 
                 } 
             });
             
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
             if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tOut.toFixed(2);
-            if(document.getElementById('balanceNetoDisplay')) document.getElementById('balanceNetoDisplay').textContent = "$" + (tCashIn - tOut).toFixed(2);
             if(document.getElementById('totalTransferDisplay')) document.getElementById('totalTransferDisplay').textContent = "$" + tTransIn.toFixed(2);
-            if(document.getElementById('totalIngresosDisplay')) document.getElementById('totalIngresosDisplay').textContent = "$" + tIn.toFixed(2);
+            if(document.getElementById('balanceNetoDisplay')) document.getElementById('balanceNetoDisplay').textContent = "$" + (tCashIn - tOut).toFixed(2);
         }
 
         function rebuildEditAccessoriesInputs(vendidos) {
@@ -1950,10 +1926,9 @@
             
             ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd', 'garantiaMaestroStart', 'garantiaMaestroEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoyLocal; });
             
-            // Establecer filtro de Lunes a Viernes por defecto en Contabilidad y Caja
-            const weekDates = getMondayAndFriday();
-            if(document.getElementById('cajaDateStart')) document.getElementById('cajaDateStart').value = weekDates.monday;
-            if(document.getElementById('cajaDateEnd')) document.getElementById('cajaDateEnd').value = weekDates.friday;
+            // Establecer filtro diario por defecto en Contabilidad y Caja
+            if(document.getElementById('cajaDateStart')) document.getElementById('cajaDateStart').value = hoyLocal;
+            if(document.getElementById('cajaDateEnd')) document.getElementById('cajaDateEnd').value = hoyLocal;
 
             const date6Months = new Date(); date6Months.setMonth(date6Months.getMonth() - 6);
             const date6MonthsLocal = `${date6Months.getFullYear()}-${pad(date6Months.getMonth() + 1)}-${pad(date6Months.getDate())}`;
@@ -2100,7 +2075,7 @@
                             <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-3 bg-slate-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black">
                             <input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-3 bg-yellow-50 rounded-xl font-bold uppercase shadow-inner text-xs font-black">
                             <input type="text" name="cedula" placeholder="CÉDULA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono">
-                            <input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black">
+                            <input type="tel" name="telefono" placeholder="TELÉFONO*" required class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center font-mono font-black font-mono">
                             <input type="email" name="email" placeholder="CORREO" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner">
                             <input type="text" name="numFactura" placeholder="N° FACTURA COMPRA" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner text-center uppercase font-black">
                             <input type="text" name="direccion" placeholder="LINK GPS (OPCIONAL)" class="p-3 bg-slate-50 rounded-xl font-bold text-xs shadow-inner md:col-span-2">
@@ -2304,7 +2279,7 @@
             </div>
 
             <div id="ruteroView" class="hidden lg:col-span-3 bg-white p-4 rounded-[2rem] shadow-xl">
-                <div class="flex flex-col md:flex-row justify-between items-center mb-4 px-2 gap-2"><h2 class="text-sm font-black uppercase italic font-sans">Logística Diaria</h2><div class="flex gap-2 w-full md:w-auto"><select id="ruteroTechFilter" onchange="renderRutero()" class="admin-only flex-grow p-1.5 bg-slate-100 rounded-lg text-[9px] font-black outline-none border-none italic uppercase"></select><input type="date" id="filterDateInputRutero" onchange="syncDates('filterDateInputRutero')" class="p-1.5 rounded-lg text-xs font-black italic text-fix-blue outline-none shadow-sm border font-mono"></div></div><div class="overflow-x-auto w-full border-2 border-slate-50 rounded-2xl shadow-inner font-black uppercase"><table class="w-full border-collapse rutero-table"><thead><tr class="bg-slate-900 text-white text-[7px] uppercase"><th class="w-12">Hora</th><th class="text-left w-32">Cliente</th><th class="text-left w-40">Calle Principal</th><th class="w-20">Servicio</th><th class="w-10">Téc</th><th class="w-16">Estado</th><th class="w-24">Mapa</th><th class="w-32">Contacto</th><th class="w-10 admin-only">Adm</th></tr></thead><tbody id="ruteroListBody" class="uppercase italic font-black"></tbody></table></div>
+                <div class="flex flex-col md:flex-row justify-between items-center mb-4 px-2 gap-2"><h2 class="text-sm font-black uppercase italic font-sans">Logística Diaria</h2><div class="flex gap-2 w-full md:w-auto"><select id="ruteroTechFilter" onchange="renderRutero()" class="admin-only flex-grow p-1.5 bg-slate-100 rounded-lg text-[9px] font-black outline-none border-none italic uppercase"></select><input type="date" id="filterDateInputRutero" onchange="syncDates('filterDateInputRutero')" class="p-1.5 rounded-lg text-xs font-black italic text-fix-blue outline-none shadow-sm border font-mono font-mono"></div></div><div class="overflow-x-auto w-full border-2 border-slate-50 rounded-2xl shadow-inner font-black uppercase"><table class="w-full border-collapse rutero-table"><thead><tr class="bg-slate-900 text-white text-[7px] uppercase"><th class="w-12">Hora</th><th class="text-left w-32">Cliente</th><th class="text-left w-40">Calle Principal</th><th class="w-20">Servicio</th><th class="w-10">Téc</th><th class="w-16">Estado</th><th class="w-24">Mapa</th><th class="w-32">Contacto</th><th class="w-10 admin-only">Adm</th></tr></thead><tbody id="ruteroListBody" class="uppercase italic font-black"></tbody></table></div>
             </div>
 
             <div id="reporteTekaView" class="hidden lg:col-span-3 bg-white p-6 rounded-[2rem] shadow-xl font-black uppercase admin-only">
@@ -2343,18 +2318,23 @@
                         </div>
                     </div>
                     
-                    <!-- REJILLA DE VALORES CON ADICIÓN DE CAJA REAL DISPONIBLE -->
-                    <div class="grid grid-cols-2 md:grid-cols-6 gap-2 mb-6 text-center italic font-black">
-                        <div class="p-3 bg-green-50 rounded-xl border border-green-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">INGRESOS EFECTIVO (PERÍODO)</span><div id="totalEfectivoDisplay" class="text-base font-black text-green-700">$0.00</div></div>
-                        <div class="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">EGRESOS / GASTOS (PERÍODO)</span><div id="totalEgresosDisplay" class="text-base font-black text-red-700">$0.00</div></div>
-                        <div class="p-3 bg-slate-100 rounded-xl border border-slate-200 flex flex-col justify-center"><span class="text-[8px] uppercase text-slate-500">SALDO PERÍODO (CASH)</span><div id="balanceNetoDisplay" class="text-base font-black text-slate-700">$0.00</div></div>
-                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center opacity-80"><span class="text-[8px] uppercase text-slate-500">BANCO (TRANSFER. PERÍODO)</span><div id="totalTransferDisplay" class="text-base font-black text-blue-700">$0.00</div></div>
-                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center opacity-60"><span class="text-[8px] uppercase text-slate-500">VENTA TOTAL PERIODO</span><div id="totalIngresosDisplay" class="text-base font-black text-slate-600">$0.00</div></div>
-                        
-                        <!-- WIDGET CRÍTICO: CAJA FÍSICA HISTÓRICA ACUMULADA TOTAL -->
-                        <div class="p-3 bg-slate-900 rounded-xl text-white shadow-xl flex flex-col justify-center border-2 border-fix-accent col-span-2 md:col-span-1">
-                            <span class="text-[8px] uppercase text-fix-accent tracking-tighter">📦 EFECTIVO REAL EN CAJA (TODO)</span>
-                            <div id="cajaRealTotalDisplay" class="text-xl font-black text-fix-accent font-mono">$0.00</div>
+                    <!-- REJILLA DE VALORES EXCLUSIVA DE CAJA DIARIA (ÚNICAMENTE 4 RECUADROS SOLICITADOS) -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6 text-center italic font-black">
+                        <div class="p-3 bg-green-50 rounded-xl border border-green-100 flex flex-col justify-center">
+                            <span class="text-[8px] uppercase text-slate-500">INGRESOS EFECTIVO DIARIO</span>
+                            <div id="totalEfectivoDisplay" class="text-base font-black text-green-700">$0.00</div>
+                        </div>
+                        <div class="p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col justify-center">
+                            <span class="text-[8px] uppercase text-slate-500">EGRESOS / GASTOS EFECTIVO DIARIO</span>
+                            <div id="totalEgresosDisplay" class="text-base font-black text-red-700">$0.00</div>
+                        </div>
+                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex flex-col justify-center">
+                            <span class="text-[8px] uppercase text-slate-500">BANCOS / TRANSFERENCIAS DIARIO</span>
+                            <div id="totalTransferDisplay" class="text-base font-black text-blue-700">$0.00</div>
+                        </div>
+                        <div class="p-3 bg-slate-900 rounded-xl text-white shadow-xl flex flex-col justify-center border-2 border-fix-accent">
+                            <span class="text-[8px] uppercase text-fix-accent tracking-tighter">⚖️ RESTA EFECTIVO (INGRESOS vs EGRESOS)</span>
+                            <div id="balanceNetoDisplay" class="text-base font-black text-fix-accent font-mono">$0.00</div>
                         </div>
                     </div>
 
@@ -2405,7 +2385,7 @@
                 <div class="md:col-span-3 text-[10px] text-fix-blue font-black mt-2 mb-1 italic underline uppercase">Logística y Venta</div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">N° DOCUMENTO COMPRA</label><input type="text" id="edit_numFactura" class="w-full p-2 bg-white rounded-lg border font-black text-xs"></div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">LUGAR COMPRA</label><select id="edit_lugarCompra" class="w-full p-2 bg-white rounded-lg border font-black text-[10px] uppercase"></select></div>
-                <div><label class="text-[7px] text-slate-400 ml-2 uppercase">FECHA ATENCIÓN</label><input type="date" id="edit_fecha" class="w-full p-2 bg-white rounded-lg border font-black text-xs font-mono"></div>
+                <div><label class="text-[7px] text-slate-400 ml-2 uppercase">FECHA ATENCION</label><input type="date" id="edit_fecha" class="w-full p-2 bg-white rounded-lg border font-black text-xs font-mono"></div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">FECHA EMISIÓN (COMPRA)</label><input type="date" id="edit_fechaEmision" class="w-full p-2 bg-white rounded-lg border font-black text-xs font-mono"></div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">TÉCNICO</label><select id="edit_tecnico" class="w-full p-2 bg-white rounded-lg border font-black text-[10px] uppercase"></select></div>
                 <div><label class="text-[7px] text-slate-400 ml-2 uppercase">PRIORIDAD (RUTA)</label><input type="number" id="edit_priority" class="w-full p-2 bg-yellow-50 rounded-lg border font-black text-xs font-mono"></div>
