@@ -95,6 +95,21 @@
             box-shadow: 0 -5px 30px rgba(62, 39, 35, 0.1);
         }
 
+        /* EVITAR HIGHLIGHT AZUL DE SAFARI EN MÓVILES */
+        button, a, select, input, textarea {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* PREVENIR TEXTO BLANCO ILEGIBLE EN PESTAÑAS AL MANTENER PRESIONADO */
+        .view-btn:active, .mobile-nav-btn:active {
+            background-color: rgba(62, 39, 35, 0.18) !important;
+            color: #3e2723 !important;
+        }
+        .view-btn.bg-fix-main:active, .mobile-nav-btn.bg-fix-main:active {
+            background-color: #271916 !important;
+            color: #ffffff !important;
+        }
+
         .currency-input { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; }
         @media print { .no-print { display: none !important; } }
         
@@ -481,7 +496,7 @@
                         <input type="text" name="manualName_${i}" placeholder="ESCRIBIR EQUIPO MANUALMENTE (MODELO)" class="p-3.5 glass-input rounded-xl font-black text-xs outline-none uppercase text-stone-800">
                     </div>
                     <div class="flex justify-end items-center gap-3">
-                         <span class="text-[9px] font-black text-stone-600">VALOR LIQUIDACIÓN:</span>
+                         <span class="text-[8px] font-black text-stone-600">VALOR LIQUIDACIÓN:</span>
                          <input type="number" name="costoEquipo_${i}" step="0.01" value="${unitPrice.toFixed(2)}" oninput="calculateFinancials()" class="w-32 p-3.5 glass-input bg-white/80 rounded-xl font-black text-right text-fix-main outline-none font-mono text-base border-stone-300">
                     </div>
                 </div>`;
@@ -496,7 +511,7 @@
                 const n = item[0]; const p = item[1];
                 return `
                 <div class="flex items-center justify-between p-3.5 glass-panel border-white/60">
-                    <span class="text-[10px] font-black text-stone-700 uppercase">${n} ($${p.toFixed(2)})</span>
+                    <span class="text-[9px] font-black text-stone-700 uppercase">${n} ($${p.toFixed(2)})</span>
                     <input type="number" min="0" value="0" data-price="${p}" data-name="${n}" oninput="calculateFinancials()" class="form-acc-qty w-14 text-center glass-input rounded-lg p-2 text-sm font-black outline-none" placeholder="0">
                 </div>`;
             }).join('');
@@ -560,26 +575,26 @@
             if(view === 'contabilidad') processFinancialBalance();
             if(view === 'inventory') renderInventoryView();
             
-            // Desktop Nav
+            // Desktop Nav - Contraste inactivo e activo optimizado
             document.querySelectorAll('.view-btn').forEach(function(btn) { 
                 btn.classList.remove('bg-fix-main', 'text-white', 'shadow-md', 'scale-105'); 
-                btn.classList.add('bg-white/60', 'text-stone-600'); 
+                btn.classList.add('bg-white/60', 'text-stone-700'); 
             });
-            const act = document.querySelector(".view-btn[onclick*=\"'" + view + "'\"]");
+            const act = document.querySelector(".view-btn[data-view='" + view + "']");
             if(act) { 
                 act.classList.add('bg-fix-main', 'text-white', 'shadow-md', 'scale-105'); 
-                act.classList.remove('bg-white/60', 'text-stone-600'); 
+                act.classList.remove('bg-white/60', 'text-stone-700'); 
             }
 
-            // Mobile Nav
+            // Mobile Nav - Pestaña activa Espresso sólido y texto blanco
             document.querySelectorAll('.mobile-nav-btn').forEach(function(btn) {
-                btn.classList.remove('text-fix-main', 'scale-110', 'bg-white/60', 'rounded-2xl', 'shadow-sm', 'border', 'border-white/80');
-                btn.classList.add('text-stone-400');
+                btn.classList.remove('text-white', 'bg-fix-main', 'scale-110', 'rounded-2xl', 'shadow-sm', 'border', 'border-white/20');
+                btn.classList.add('text-stone-600', 'bg-transparent');
             });
             const mobileAct = document.querySelector(".mobile-nav-btn[data-view='" + view + "']");
             if(mobileAct) {
-                mobileAct.classList.add('text-fix-main', 'scale-110', 'bg-white/60', 'rounded-2xl', 'shadow-sm', 'border', 'border-white/80');
-                mobileAct.classList.remove('text-stone-400');
+                mobileAct.classList.add('text-white', 'bg-fix-main', 'scale-110', 'rounded-2xl', 'shadow-sm', 'border', 'border-white/20');
+                mobileAct.classList.remove('text-stone-600', 'bg-transparent');
             }
         };
 
@@ -621,7 +636,7 @@
                 if(!v) return showMessage("❌ No encontrado", "fix-error");
 
                 let moParaCaja = 0; let totalAccs = 0; const accs = [];
-                document.querySelectorAll(".acc-" + id).forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) { const p = parseFloat(i.dataset.price); accs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); totalAccs += q * p; } });
+                document.querySelectorAll(".acc-" + id).forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) { const p = parseFloat(i.dataset.price); accs.push({ nombre: i.dataset.name, font: p, cantidad: q, precio: p }); totalAccs += q * p; } });
                 const mDescEl = document.getElementById("manual_acc_desc_" + id); const mPriceEl = document.getElementById("manual_acc_price_" + id);
                 if(mDescEl && mPriceEl && mDescEl.value && parseFloat(mPriceEl.value) > 0) { accs.push({ nombre: mDescEl.value.toUpperCase(), cantidad: 1, precio: parseFloat(mPriceEl.value) }); totalAccs += parseFloat(mPriceEl.value); }
                 
@@ -862,16 +877,16 @@
 
                 return `<tr class="border-b border-stone-300/30 row-hover uppercase font-black">
                     <td class="border-r border-stone-300/30 text-center px-1"><div class="flex flex-col items-center gap-1 admin-only"><div onclick="movePriority('${v.id}', -1)" class="move-btn ${index === 0 ? 'opacity-20 pointer-events-none' : ''}">↑</div><span class="time-badge font-mono">${timeStr}</span><div onclick="movePriority('${v.id}', 1)" class="move-btn ${index === sorted.length - 1 ? 'opacity-20 pointer-events-none' : ''}">↓</div></div><div class="technician-mode-only text-center block md:hidden"><span class="time-badge font-mono">${timeStr}</span></div></td>
-                    <td class="border-r border-stone-300/30 px-2 text-[13px] font-black text-fix-main cursor-pointer truncate max-w-[150px]" onclick="toggleDetail('${v.id}')">${v.nombreCliente} ${v.estado === 'A Taller' ? '🏢' : ''}</td>
-                    <td class="border-r border-stone-300/30 px-2 text-[8px] text-stone-600 font-normal italic lowercase truncate max-w-[120px]">${v.callePrincipal || '---'}</td>
-                    <td class="border-r border-stone-300/30 px-2 text-center"><div class="text-[6px] ${colorTipo} font-black uppercase tracking-tighter">${tipoServ}</div></td>
-                    <td class="border-r border-stone-300/30 text-center font-mono text-stone-600 text-[9px] italic">${initials}</td>
-                    <td class="border-r border-stone-300/30 text-center">${statusBadge}</td>
-                    <td class="border-r border-stone-300/30 text-center"><a href="${mapLink}" target="_blank" class="glass-card bg-fix-light/90 text-white px-3 py-2 rounded-lg text-[8px] font-black shadow-sm border border-stone-400/50 italic inline-block w-full text-center hover:scale-105 transition-transform">📍 MAPA</a></td>
+                    <td class="border-r px-2 text-[13px] font-black text-fix-main cursor-pointer truncate max-w-[150px]" onclick="toggleDetail('${v.id}')">${v.nombreCliente} ${v.estado === 'A Taller' ? '🏢' : ''}</td>
+                    <td class="border-r px-2 text-[8px] text-stone-600 font-normal italic lowercase truncate max-w-[120px]">${v.callePrincipal || '---'}</td>
+                    <td class="border-r px-2 text-center"><div class="text-[6px] ${colorTipo} font-black uppercase tracking-tighter">${tipoServ}</div></td>
+                    <td class="border-r text-center font-mono text-stone-600 text-[9px] italic">${initials}</td>
+                    <td class="border-r text-center">${statusBadge}</td>
+                    <td class="border-r text-center"><a href="${mapLink}" target="_blank" class="glass-card bg-fix-light/90 text-white px-3 py-2 rounded-lg text-[8px] font-black shadow-sm border border-stone-400/50 italic inline-block w-full text-center hover:scale-105 transition-transform">📍 MAPA</a></td>
                     <td class="text-center border-r border-stone-300/30"><div class="flex justify-center gap-2 items-center p-1"><a href="tel:${v.telefono}" class="text-2xl hover:scale-110 transition-transform">📞</a><a href="https://wa.me/593${v.telefono?.replace(/\D/g,'')}" target="_blank" class="text-2xl hover:scale-110 transition-transform">💬</a></div></td>
                     ${!currentTechUser ? `<td class="text-center admin-only"><button onclick="openEditModal('${v.id}')" class="glass-input bg-white/80 text-fix-main px-2 py-1.5 rounded-lg text-[7px] font-black uppercase shadow-sm border border-white">EDIT</button></td>` : ''}
                 </tr>
-                <tr id="detail-${v.id}" class="hidden detail-row uppercase font-black"><td colspan="9" class="p-4 bg-white/50 backdrop-blur-xl border-y border-white/70 shadow-inner"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="glass-panel p-5"><p class="text-[10px] font-black text-fix-main uppercase mb-2 italic tracking-tighter">📄 Información Orden</p>
+                <tr id="detail-${v.id}" class="hidden detail-row uppercase font-black"><td colspan="9" class="p-4 bg-white/50 backdrop-blur-xl border-y border-white/70 shadow-inner"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="glass-panel p-5"><p class="text-[10px] font-black text-fix-blue uppercase mb-2 italic tracking-tighter">📄 Información Orden</p>
                 <p class="text-xs uppercase mb-1"><b>CÉDULA:</b> <span class="text-fix-main font-mono">${v.cedula || '---'}</span></p>
                 <p class="text-xs uppercase mb-1"><b>EMAIL:</b> <span class="text-fix-main font-mono">${v.email || '---'}</span></p>
                 <p class="text-xs uppercase mb-1"><b>FECHA COMPRA:</b> <span class="text-fix-main font-mono">${v.fechaEmision || '---'}</span></p>
@@ -976,7 +991,7 @@
                                 <button onclick="savePendingNote('${v.id}')" class="w-full glass-card bg-fix-main/90 border-white/50 text-white py-3 rounded-xl text-[10px] font-black shadow-sm active:scale-95 transition-all text-center">💾 GRABAR NOVEDAD</button>
                             </div>
                             
-                            <p class="text-[9px] font-black text-fix-accent mb-2 uppercase italic underline">Re-Agendar Visita:</p>
+                            <p class="text-[8px] font-black text-fix-accent mb-2 uppercase italic underline">Re-Agendar Visita:</p>
                             <div class="flex gap-3 items-center">
                                 <input type="date" id="date_pend_${v.id}" class="flex-grow p-3 rounded-xl text-[10px] font-mono font-black glass-input outline-none text-stone-800">
                                 <button onclick="reScheduleVisit('${v.id}')" class="glass-card bg-fix-report/90 border-emerald-500 text-white px-6 py-3 rounded-xl text-[10px] font-black shadow-sm active:scale-95 transition-all text-center">🚀 RE-AGENDAR</button>
@@ -999,26 +1014,26 @@
             const equiposTallerList = ["Cocina", "Refrigerador", "Microondas", "Horno", "Campana", "Campana Decorativa", "Campana de Isla", "Lavadora", "Secadora", "Barbecue", "Triturador", "Lavavajillas", "Calefón", "Otros"];
 
             container.innerHTML = filtered.map(v => {
-                return `<div class="glass-card p-6 md:p-8 taller-card mb-6 hover:shadow-lg transition-all shadow-md border-white/80">
+                return `<div class="bg-white p-6 md:p-8 taller-card mb-6 hover:shadow-lg transition-all shadow-md border-white/80 glass-card">
                     <div class="flex flex-col md:flex-row justify-between gap-6">
                         <div class="flex-grow">
                             <div class="flex justify-between items-start mb-5 border-b border-white/60 pb-4">
                                 <div>
-                                    <h3 class="text-base font-black text-fix-main underline italic uppercase">${v.nombreCliente}</h3>
+                                    <h3 class="text-sm font-black text-fix-main underline italic uppercase">${v.nombreCliente}</h3>
                                     <p class="text-[9px] font-bold text-stone-600 mt-1 uppercase">TÉCNICO INGRESO: ${v.tecnico} • FECHA REGISTRO: ${v.fechaInstalacion}</p>
                                 </div>
                                 <button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/70 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button>
                             </div>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div class="glass-panel p-5 italic">
+                                <div class="glass-panel p-5 italic border border-white/50 shadow-sm bg-white/50">
                                     <p class="text-[9px] font-black text-fix-taller uppercase mb-2 italic underline">Estado de Ingreso:</p>
                                     <div class="text-[10px] text-stone-700 italic border-b border-white/60 pb-3 mb-3 uppercase">${v.razonNoAtencion || 'Sin observación'}</div>
                                     <p class="text-[9px] font-black text-fix-main uppercase mb-2 italic underline">Equipo(s) de Ruta:</p>
                                     <div class="text-[10px] font-black uppercase text-stone-700">${(v.equipos || []).map(e => '• ' + e.descProducto).join('<br>')}</div>
                                 </div>
 
-                                <div class="glass-panel bg-orange-50/40 border-orange-200/50 p-5 font-black italic">
+                                <div class="glass-panel bg-orange-50/40 border-orange-200/50 p-5 font-black italic shadow-sm">
                                     <div class="grid grid-cols-1 gap-4 mb-4">
                                         <div>
                                             <label class="text-[8px] uppercase block mb-1 text-stone-600">1. SELECCIONAR EQUIPO TRABAJADO:</label>
@@ -1053,13 +1068,13 @@
                                     </div>
                                     <label class="text-[8px] uppercase block mb-1 text-stone-600">3. OBSERVACIONES / REPUESTOS / NOVEDADES:</label>
                                     <textarea id="taller_repuestos_${v.id}" placeholder="ESPECIFIQUE EL TRABAJO REALIZADO..." class="w-full p-4 glass-input rounded-xl text-[10px] font-black uppercase min-h-[80px] text-stone-800 outline-none">${v.repuestosSolicitadosTaller || ''}</textarea>
-                                    <button onclick="saveTallerUpdate('${v.id}')" class="w-full mt-4 glass-card bg-fix-main/90 border-white/50 text-white py-4 rounded-xl text-[10px] font-black uppercase active:scale-95 shadow-md text-center">💾 ACTUALIZAR DATOS TALLER</button>
+                                    <button onclick="saveTallerUpdate('${v.id}')" class="w-full mt-4 glass-card bg-fix-main/90 border-white/50 text-white py-4 rounded-xl text-[9px] font-black uppercase active:scale-95 shadow-lg text-center">💾 ACTUALIZAR DATOS TALLER</button>
                                 </div>
                             </div>
                         </div>
                         <div class="w-full md:w-56 flex flex-col justify-center gap-4">
                             <div class="glass-card bg-stone-900/90 text-white p-6 rounded-3xl text-center shadow-xl border-fix-accent/60">
-                                <p class="text-[9px] uppercase text-fix-accent font-black tracking-widest mb-2 italic">COSTO TOTAL</p>
+                                <p class="text-[8px] uppercase text-fix-accent font-black tracking-widest mb-2 italic">COSTO TOTAL</p>
                                 <p class="text-3xl font-mono font-black drop-shadow-md">$${(v.financiera?.totalCliente || 0).toFixed(2)}</p>
                             </div>
                             <button onclick="markAsDelivered('${v.id}')" class="glass-card bg-emerald-700/90 border-emerald-500 text-white py-6 rounded-3xl text-xs font-black uppercase italic shadow-lg active:scale-95 transition-all text-center hover:bg-emerald-800/90">🚀 ENTREGAR AL CLIENTE</button>
@@ -1127,7 +1142,7 @@
                             </div>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div class="glass-panel p-5 italic">
+                                <div class="glass-panel p-5 italic border border-white/50 shadow-sm bg-white/50">
                                     <p class="text-[9px] font-black text-fix-main uppercase mb-2 italic underline">Nota / Comentario del Técnico:</p>
                                     <div class="text-[10px] text-stone-700 italic border-b border-white/50 pb-3 mb-3 uppercase">${v.commentarioCliente || 'Sin comentario del técnico'}</div>
                                     <p class="text-[9px] font-black text-fix-accent uppercase mb-2 italic underline">Detalle Falla/Novedad:</p>
@@ -1136,7 +1151,7 @@
                                     <div class="text-[10px] font-black uppercase text-stone-800">${(v.equipos || []).map(e => '• ' + e.descProducto).join('<br>')}</div>
                                 </div>
 
-                                <div class="glass-panel bg-stone-100/40 border-stone-200/50 p-5 font-black italic">
+                                <div class="glass-panel bg-stone-100/40 border-stone-200/50 p-5 font-black italic shadow-sm">
                                     <div class="grid grid-cols-1 gap-4 mb-4">
                                         <div>
                                             <label class="text-[8px] uppercase block mb-1 text-stone-600">1. REPUESTO O PARTE A SOLICITAR:</label>
@@ -1151,7 +1166,7 @@
                                             <input type="date" id="garantias_fecha_prog_${v.id}" value="${v.fechaNuevaVisita || ''}" class="w-full p-3 glass-input rounded-lg text-[10px] font-black outline-none text-stone-800">
                                         </div>
                                     </div>
-                                    <button onclick="saveGarantiaUpdate('${v.id}')" class="w-full mt-3 glass-card bg-fix-main/90 border-white/50 text-white py-4 rounded-xl text-[10px] font-black uppercase active:scale-95 shadow-sm text-center">💾 ACTUALIZAR DATOS TRÁMITE</button>
+                                    <button onclick="saveGarantiaUpdate('${v.id}')" class="w-full mt-3 glass-card bg-fix-main/90 border-white/50 text-white py-4 rounded-xl text-[9px] font-black uppercase active:scale-95 shadow-sm text-center">💾 ACTUALIZAR DATOS TRÁMITE</button>
                                 </div>
                             </div>
                         </div>
@@ -1216,7 +1231,7 @@
             filtered.sort((a, b) => (a.fechaInstalacion || "").localeCompare(b.fechaInstalacion || ""));
 
             if(filtered.length === 0) {
-                body.innerHTML = '<tr><td colspan="18" class="p-6 text-center text-stone-500 italic font-black uppercase">No hay garantías finalizadas en este periodo.</td></tr>';
+                body.innerHTML = '<tr><td colspan="18" class="p-4 text-center text-stone-500 italic font-black uppercase">No hay garantías finalizadas en este periodo.</td></tr>';
                 return;
             }
 
@@ -1264,7 +1279,7 @@
             link.href = URL.createObjectURL(blob);
             link.setAttribute("download", "REPORTE_GARANTIAS_FINALIZADAS.csv");
             link.click();
-            showMessage("📊 Reporte descargado", "fix-report");
+            showMessage("📊 Reporte de garantías descargado", "fix-report");
         };
 
         function renderReporteMantenimiento() {
@@ -1273,7 +1288,7 @@
             const end = document.getElementById('maintBalanceEnd')?.value;
             let filtered = visitsArray.filter(v => v.esMantenimiento);
             if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
-            body.innerHTML = filtered.map(v => `<tr class="border-b border-white/50 row-hover font-black uppercase"><td class="report-cell font-mono font-black text-stone-800">${v.fechaInstalacion}</td><td class="report-cell font-black text-fix-main">${v.nombreCliente}</td><td class="report-cell font-mono text-stone-700">${v.telefono || '-'}</td><td class="report-cell uppercase text-[8px] max-w-[120px] truncate text-stone-700">${v.callePrincipal || '-'}</td><td class="report-cell uppercase text-[8px] font-bold text-fix-accent">${v.mantenimientoEquipo || 'General'}</td><td class="report-cell font-black text-right text-fix-report">$${(v.financiera ? v.financiera.totalCliente : 0).toFixed(2)}</td><td class="report-cell text-center font-black">${v.estado === 'Atendido' ? '✅' : '⏳'}</td><td class="report-cell text-center font-black"><button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/70 w-7 h-7 rounded-full flex items-center justify-center hover:scale-110 shadow-sm">🗑️</button></td></tr>`).join('');
+            body.innerHTML = filtered.map(v => `<tr class="border-b border-white/50 row-hover font-black uppercase"><td class="report-cell font-mono font-black text-stone-800">${v.fechaInstalacion}</td><td class="report-cell font-black text-fix-main">${v.nombreCliente}</td><td class="report-cell font-mono text-stone-700">${v.telefono || '-'}</td><td class="report-cell uppercase text-[8px] max-w-[120px] truncate text-stone-700">${v.callePrincipal || '-'}</td><td class="report-cell uppercase text-[8px] font-bold text-fix-accent">${v.mantenimientoEquipo || 'General'}</td><td class="report-cell font-black text-right text-fix-report">$${(v.financiera ? v.financiera.totalCliente : 0).toFixed(2)}</td><td class="report-cell text-center font-black">${v.estado === 'Atendido' ? '✅' : '⏳'}</td><td class="report-cell text-center font-black"><button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/70 w-7 h-7 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button></td></tr>`).join('');
         }
 
         function processMaintBalance() {
@@ -1992,18 +2007,18 @@
 
 <body class="min-h-screen p-2 md:p-8 font-sans selection:bg-fix-main text-stone-800 font-black uppercase overflow-x-hidden">
 
-    <!-- BOTTOM TAB BAR MÓVIL (iOS Style - Solo para ADMIN) -->
+    <!-- BOTTOM TAB BAR MÓVIL (iOS Style - Solo para ADMIN, optimizado para alto contraste y legibilidad) -->
     <nav id="mobileAdminNav" class="admin-only md:hidden fixed bottom-0 left-0 w-full glass-nav-mobile flex justify-around p-2 z-[999] rounded-t-3xl">
-        <button onclick="changeMasterView('reporte_admin')" class="mobile-nav-btn flex flex-col items-center p-2 text-fix-main scale-110 bg-white/60 rounded-2xl shadow-sm border border-white/80 font-black transition-all" data-view="reporte_admin">
+        <button onclick="changeMasterView('reporte_admin')" class="mobile-nav-btn flex flex-col items-center p-2 text-white scale-110 bg-fix-main rounded-2xl shadow-sm border border-white/20 font-black transition-all" data-view="reporte_admin">
             <span class="text-xl leading-none">📝</span><span class="text-[9px] mt-1 font-bold">Registro</span>
         </button>
-        <button onclick="changeMasterView('rutero')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="rutero">
+        <button onclick="changeMasterView('rutero')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-600 transition-all bg-transparent" data-view="rutero">
             <span class="text-xl leading-none">🚚</span><span class="text-[9px] mt-1 font-bold">Logística</span>
         </button>
-        <button onclick="changeMasterView('contabilidad')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="contabilidad">
+        <button onclick="changeMasterView('contabilidad')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-600 transition-all bg-transparent" data-view="contabilidad">
             <span class="text-xl leading-none">💰</span><span class="text-[9px] mt-1 font-bold">Caja</span>
         </button>
-        <button onclick="changeMasterView('buscador')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="buscador">
+        <button onclick="changeMasterView('buscador')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-600 transition-all bg-transparent" data-view="buscador">
             <span class="text-xl leading-none">🔍</span><span class="text-[9px] mt-1 font-bold">Buscador</span>
         </button>
     </nav>
@@ -2036,18 +2051,18 @@
                 </div>
             </div>
             
-            <!-- NAV ESCRITORIO CON ICONOS (Se oculta en móviles para el Admin) -->
+            <!-- NAV ESCRITORIO CON ICONOS (Perfecto contraste activo bg-fix-main / inactivo text-stone-700) -->
             <nav id="adminNav" class="hidden md:flex flex-wrap justify-center glass-card p-2 rounded-full gap-2 admin-only">
-                <button onclick="changeMasterView('reporte_admin')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-fix-main text-white shadow-md scale-105 italic transition-all"><span class="text-xs">📝</span> Registro</button>
-                <button onclick="changeMasterView('mantenimiento')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">⚙️</span> Mant.</button>
-                <button onclick="changeMasterView('pendientes')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">⏳</span> Segui.</button>
-                <button onclick="changeMasterView('garantias')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🛡️</span> Garan.</button>
-                <button onclick="changeMasterView('taller')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🏢</span> Taller</button>
-                <button onclick="changeMasterView('inventory')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">📦</span> Invent.</button>
-                <button onclick="changeMasterView('rutero')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🚚</span> Logist.</button>
-                <button onclick="changeMasterView('reporte_teka')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">📚</span> Maestro</button>
-                <button onclick="changeMasterView('contabilidad')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">💰</span> Caja</button>
-                <button onclick="changeMasterView('buscador')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🔍</span> Buscador</button>
+                <button onclick="changeMasterView('reporte_admin')" data-view="reporte_admin" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-fix-main text-white shadow-md scale-105 italic transition-all"><span class="text-xs">📝</span> Registro</button>
+                <button onclick="changeMasterView('mantenimiento')" data-view="mantenimiento" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">⚙️</span> Mant.</button>
+                <button onclick="changeMasterView('pendientes')" data-view="pendientes" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">⏳</span> Segui.</button>
+                <button onclick="changeMasterView('garantias')" data-view="garantias" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🛡️</span> Garan.</button>
+                <button onclick="changeMasterView('taller')" data-view="taller" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🏢</span> Taller</button>
+                <button onclick="changeMasterView('inventory')" data-view="inventory" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">📦</span> Invent.</button>
+                <button onclick="changeMasterView('rutero')" data-view="rutero" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🚚</span> Logist.</button>
+                <button onclick="changeMasterView('reporte_teka')" data-view="reporte_teka" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">📚</span> Maestro</button>
+                <button onclick="changeMasterView('contabilidad')" data-view="contabilidad" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">💰</span> Caja</button>
+                <button onclick="changeMasterView('buscador')" data-view="buscador" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🔍</span> Buscador</button>
             </nav>
         </header>
 
@@ -2055,7 +2070,7 @@
             
             <div id="buscadorView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem]">
-                    <h2 class="text-xl font-black uppercase italic underline text-fix-main mb-6 tracking-tighter">Buscador Inteligente Global</h2>
+                    <h2 class="text-xl font-black uppercase italic underline text-fix-main mb-6 tracking-tighter">🔍 Buscador Inteligente Global</h2>
                     
                     <div class="glass-panel p-5 grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 items-end italic border border-white/80">
                         <div class="md:col-span-2">
@@ -2095,7 +2110,9 @@
                 </div>
             </div>
 
+            <!-- ENCABEZADO CORREGIDO Y AÑADIDO PARA LA VISTA DE REGISTRO -->
             <div id="formContainer" class="lg:col-span-2 space-y-5 admin-only no-print">
+                <h2 class="text-2xl font-black uppercase italic text-fix-main tracking-tighter underline">📝 REGISTRO GENERAL DE SERVICIOS</h2>
                 <div class="glass-card p-4 rounded-3xl"><input type="date" id="filterDateInput" onchange="syncDates('filterDateInput')" class="bg-transparent w-full text-center text-2xl font-black italic text-fix-main outline-none border-none font-mono drop-shadow-sm"></div>
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem]">
                     <form id="visitForm" onsubmit="event.preventDefault();">
@@ -2139,7 +2156,7 @@
                             <textarea id="warrantyDamageDesc" placeholder="DESCRIBA LA FALLA..." class="w-full p-5 glass-input rounded-2xl font-black text-xs uppercase min-h-[100px] outline-none text-stone-800"></textarea>
                         </div>
                         
-                        <div id="financialDashboardRegistration" class="mt-8 grid grid-cols-3 gap-4 text-center">
+                        <div id="financialDashboardRegistration" class="mt-8 grid grid-cols-3 gap-2 text-center">
                             <div class="glass-panel p-4 italic text-[8px] flex flex-col justify-center border-white/80 shadow-sm text-stone-600">M.O. (MAESTRO)<br><span id="displayCostoInstalacion" class="text-lg font-black text-stone-800">$0.00</span></div>
                             <div class="glass-panel p-4 italic text-[8px] flex flex-col justify-center border-white/80 shadow-sm text-stone-600">INSUMOS<br><span id="displayTotalAccesorios" class="text-lg font-black text-stone-800">$0.00</span></div>
                             <div class="glass-card bg-fix-accent/90 border-white p-4 rounded-2xl font-black text-white uppercase flex flex-col justify-center shadow-xl shadow-amber-700/20">TOTAL CAJA<br><span id="displayTotalFinal" class="text-2xl font-mono text-white drop-shadow-md">$0.00</span></div>
@@ -2165,7 +2182,7 @@
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem]">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-white/60 pb-5">
                         <div>
-                            <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-taller tracking-tighter">Control de Equipos en Taller</h2>
+                            <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-taller tracking-tighter">🏢 Control de Equipos en Taller</h2>
                             <p class="text-[8px] text-stone-600 font-black italic mt-1">GESTIÓN DE REPARACIONES FÍSICAS Y COSTOS TOTALES</p>
                         </div>
                         <input type="text" id="tallerSearchInput" oninput="renderTaller()" placeholder="🔍 BUSCAR CLIENTE..." class="p-4 glass-input rounded-2xl text-xs font-black uppercase w-full md:w-72 shadow-sm outline-none text-stone-800">
@@ -2178,7 +2195,7 @@
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem] border-fix-main/40">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-white/60 pb-5">
                         <div>
-                            <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-main tracking-tighter">Control de Garantías en Trámite</h2>
+                            <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-main tracking-tighter">🛡️ Control de Garantías en Trámite</h2>
                             <p class="text-[8px] text-stone-600 font-black italic mt-1">GESTIÓN DE REPUESTOS A FÁBRICA</p>
                         </div>
                         <input type="text" id="garantiasSearchInput" oninput="renderGarantias()" placeholder="🔍 BUSCAR CLIENTE..." class="p-4 glass-input rounded-2xl text-xs font-black uppercase w-full md:w-72 shadow-sm outline-none text-stone-800">
@@ -2212,7 +2229,7 @@
             <div id="pendientesView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem] border-fix-pending/40">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-white/60 pb-5">
-                        <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-pending tracking-tighter">Seguimiento de Pendientes</h2>
+                        <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-pending tracking-tighter">⏳ Seguimiento de Pendientes</h2>
                         <div class="flex flex-wrap gap-2 w-full md:w-auto">
                             <input type="text" id="pendingSearchInput" oninput="renderPendientes()" placeholder="🔍 BUSCAR..." class="p-3.5 glass-input rounded-xl text-[10px] font-black uppercase w-full md:w-48 shadow-sm outline-none text-stone-800">
                             <select id="pendingTypeFilter" onchange="renderPendientes()" class="p-3.5 glass-input rounded-xl text-[10px] font-black uppercase outline-none shadow-sm text-stone-800"><option value="TODOS">TODOS LOS CASOS</option><option value="Pendiente (Tramite)">SOLO PENDIENTES</option><option value="No Atendido">SOLO NO ATENDIDOS</option></select>
@@ -2223,13 +2240,15 @@
                 </div>
             </div>
 
+            <!-- ENCABEZADO CORREGIDO Y AÑADIDO PARA LA VISTA DE MANTENIMIENTO -->
             <div id="mantenimientoView" class="hidden lg:col-span-3 space-y-6 admin-only">
+                <h2 class="text-2xl font-black uppercase italic text-fix-main tracking-tighter underline">⚙️ GESTIÓN DE MANTENIMIENTOS</h2>
                 <div class="glass-card p-4 rounded-3xl border border-white/80 flex items-center justify-center gap-4 shadow-sm bg-white/40">
                     <p class="text-[10px] font-black text-fix-accent italic underline m-0">📅 FECHA AGENDAMIENTO:</p>
                     <input type="date" id="maintScheduleDate" class="bg-transparent text-2xl font-black italic text-fix-accent outline-none border-none font-mono drop-shadow-sm">
                 </div>
                 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    <div class="xl:col-span-2 glass-card p-6 md:p-8 rounded-[2.5rem] font-black italic">
+                    <div class="glass-card p-6 md:p-8 rounded-[2.5rem] font-black italic">
                         <h2 class="text-xl font-black uppercase mb-6 text-fix-main underline pb-3 font-sans italic tracking-tighter border-b border-white/50">REGISTRO DE MANTENIMIENTOS</h2>
                         <form id="maintForm" onsubmit="event.preventDefault();">
                             <div class="glass-panel p-6 grid grid-cols-1 md:grid-cols-2 gap-4 uppercase font-black border-white/60">
@@ -2272,7 +2291,7 @@
                         <div class="flex flex-wrap gap-2">
                             <input type="date" id="maintBalanceStart" onchange="processMaintBalance(); renderReporteMantenimiento();" class="p-3 glass-input rounded-xl text-[10px] font-black text-stone-800 shadow-sm outline-none">
                             <input type="date" id="maintBalanceEnd" onchange="processMaintBalance(); renderReporteMantenimiento();" class="p-3 glass-input rounded-xl text-[10px] font-black text-stone-800 shadow-sm outline-none">
-                            <button onclick="downloadMantenimientoCSV()" class="glass-card bg-fix-report/90 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase italic border-white/50 shadow-md transition-all hover:scale-105">📊 EXCEL</button>
+                            <button onclick="downloadMantenimientoCSV()" class="bg-fix-report/90 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase italic border-white/50 shadow-md transition-all hover:scale-105">📊 EXCEL</button>
                         </div>
                     </div>
                     <div class="overflow-x-auto rounded-2xl border border-white/80 shadow-sm bg-white/30 backdrop-blur-md"><table class="w-full border-collapse admin-table font-black"><thead><tr><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Calle</th><th>Descripción</th><th>Valor</th><th>Est.</th><th>X</th></tr></thead><tbody id="mantenimientoReporteBody" class="uppercase italic text-stone-800"></tbody></table></div>
@@ -2281,7 +2300,7 @@
 
             <div id="inventoryView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem] font-black italic uppercase">
-                    <h2 class="text-xl font-black uppercase mb-8 border-b-2 border-white/60 pb-4 font-sans italic text-fix-report tracking-tighter">STOCK DE INVENTARIO</h2>
+                    <h2 class="text-xl font-black uppercase mb-8 border-b-2 border-white/60 pb-4 font-sans italic text-fix-report tracking-tighter">📦 STOCK DE INVENTARIO Y STOCK</h2>
                     <div class="glass-panel p-6 md:p-8 mb-8 flex flex-wrap gap-4 items-end border-white/70 shadow-md">
                         <div class="flex-grow">
                             <label class="text-[9px] ml-2 text-stone-600 mb-2 block">ACCESORIO / INSUMO</label>
@@ -2302,9 +2321,9 @@
                 </div>
             </div>
 
-            <div id="ruteroView" class="hidden lg:col-span-3 glass-card p-4 md:p-6 rounded-[2.5rem] admin-only-mobile">
+            <div id="ruteroView" class="hidden lg:col-span-3 glass-card p-4 md:p-6 rounded-[2.5rem]">
                 <div class="flex flex-col md:flex-row justify-between items-center mb-6 px-2 gap-4">
-                    <h2 class="text-lg font-black uppercase italic font-sans text-stone-800 tracking-tighter underline">Logística / Rutero</h2>
+                    <h2 class="text-xl font-black uppercase italic font-sans text-fix-main tracking-tighter underline">🚚 Logística / Rutero de Visitas</h2>
                     <div class="flex gap-2 w-full md:w-auto">
                         <select id="ruteroTechFilter" onchange="renderRutero()" class="admin-only flex-grow p-3 glass-input rounded-xl text-[10px] font-black outline-none italic uppercase text-stone-800 shadow-sm"></select>
                         <input type="date" id="filterDateInputRutero" onchange="syncDates('filterDateInputRutero')" class="p-3 glass-input rounded-xl text-xs font-black italic text-fix-main outline-none font-mono shadow-sm">
@@ -2321,7 +2340,7 @@
             <div id="reporteTekaView" class="hidden lg:col-span-3 glass-card p-6 md:p-8 rounded-[2.5rem] font-black uppercase admin-only">
                 <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
                     <div>
-                        <h2 class="text-lg font-black uppercase italic font-sans underline text-fix-main tracking-tighter">Maestro Consolidado SAP</h2>
+                        <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-main tracking-tighter">📚 Maestro Consolidado SAP</h2>
                         <div class="flex gap-2 mt-4 font-black">
                             <input type="date" id="maestroDateStart" class="glass-input p-2.5 rounded-xl text-[10px] outline-none border font-black text-stone-800">
                             <input type="date" id="maestroDateEnd" class="glass-input p-2.5 rounded-xl text-[10px] outline-none border font-black text-stone-800">
@@ -2338,7 +2357,7 @@
                 </div>
                 <div class="flex justify-end no-print">
                     <div class="glass-card bg-stone-900/90 border-white/20 text-white p-6 md:p-8 rounded-[2rem] inline-block min-w-[300px] shadow-2xl">
-                        <p class="text-[10px] text-fix-report uppercase tracking-widest font-black italic mb-3 underline">Resumen Financiero (M.O.):</p>
+                        <p class="text-[10px] text-fix-report uppercase tracking-widest font-black italic mb-2 underline">Resumen Financiero (M.O.):</p>
                         <div class="flex justify-between items-end mb-2">
                             <span class="text-xs text-stone-300">TOTAL SAP:</span>
                             <span id="tekaSummaryTotal" class="text-4xl font-mono font-black text-white drop-shadow-md">$0.00</span>
@@ -2351,7 +2370,7 @@
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem] font-black uppercase">
                     <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
                         <div>
-                            <h2 class="text-xl font-black uppercase underline font-sans italic text-stone-800 tracking-tighter border-b border-white/50 pb-2">CONTABILIDAD Y CAJA</h2>
+                            <h2 class="text-xl font-black uppercase underline font-sans italic text-fix-main tracking-tighter border-b border-white/50 pb-2">💰 CONTABILIDAD Y CAJA DIARIA</h2>
                             <div class="flex flex-wrap gap-3 mt-5 font-black items-center">
                                 <input type="date" id="cajaDateStart" class="glass-input p-3 rounded-xl text-[10px] text-stone-800 shadow-sm outline-none">
                                 <input type="date" id="cajaDateEnd" class="glass-input p-3 rounded-xl text-[10px] text-stone-800 shadow-sm outline-none">
@@ -2382,10 +2401,10 @@
 
                     <div class="glass-panel p-6 mb-8 grid grid-cols-1 md:grid-cols-6 gap-4 items-end italic font-black bg-white/50 border-white/80 shadow-md">
                         <div class="md:col-span-1"><label class="text-[8px] ml-1 text-stone-600 block mb-1">FECHA</label><input type="date" id="movFecha" class="w-full p-3.5 rounded-xl glass-input text-[10px] font-mono text-stone-800 shadow-inner outline-none"></div>
-                        <div class="md:col-span-1"><label class="text-[8px] ml-1 text-stone-600 block mb-1">CONCEPTO</label><input type="text" id="movConcepto" placeholder="DESCRIPCIÓN..." class="w-full p-3.5 rounded-xl glass-input text-[10px] uppercase text-stone-800 outline-none shadow-inner"></div>
-                        <div><label class="text-[8px] ml-1 text-stone-600 block mb-1">MONTO $</label><input type="number" id="movMonto" placeholder="$0" class="w-full p-3.5 rounded-xl glass-input text-right text-base font-mono text-fix-main outline-none shadow-inner bg-white/80"></div>
-                        <div><label class="text-[8px] ml-1 text-stone-600 block mb-1">TIPO</label><select id="movType" class="w-full p-3.5 rounded-xl glass-input text-[10px] outline-none text-stone-800 shadow-inner"><option value="EGRESO">➖ EGRESO</option><option value="INGRESO">➕ INGRESO</option></select></div>
-                        <div><label class="text-[8px] ml-1 text-stone-600 block mb-1">MÉTODO / TÉCNICO</label><div class="flex gap-2"><select id="movPago" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner"><option value="EFECTIVO">EFEC</option><option value="TRANSFERENCIA">TRANS</option></select><select id="movTecnico" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner"></select></div></div>
+                        <div class="md:col-span-1"><label class="text-[7px] ml-1 text-stone-600 block mb-1">CONCEPTO</label><input type="text" id="movConcepto" placeholder="DESCRIPCIÓN..." class="w-full p-3.5 rounded-xl glass-input text-[10px] uppercase text-stone-800 outline-none shadow-inner"></div>
+                        <div><label class="text-[7px] ml-1 text-stone-600 block mb-1">MONTO $</label><input type="number" id="movMonto" placeholder="$0" class="w-full p-3.5 rounded-xl glass-input text-right text-base font-mono text-fix-main outline-none shadow-inner bg-white/80"></div>
+                        <div><label class="text-[7px] ml-1 text-stone-600 block mb-1">TIPO</label><select id="movType" class="w-full p-3.5 rounded-xl glass-input text-[10px] outline-none text-stone-800 shadow-inner"><option value="EGRESO">➖ EGRESO</option><option value="INGRESO">➕ INGRESO</option></select></div>
+                        <div><label class="text-[7px] ml-1 text-stone-600 block mb-1">MÉTODO / TÉCNICO</label><div class="flex gap-2"><select id="movPago" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner"><option value="EFECTIVO">EFEC</option><option value="TRANSFERENCIA">TRANS</option></select><select id="movTecnico" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner"></select></div></div>
                         <button onclick="saveManualMovement()" class="glass-card bg-fix-main/90 border-white/60 text-white py-4 rounded-xl font-black text-[10px] active:scale-95 transition-all uppercase italic text-center shadow-lg hover:shadow-stone-900/20">Registrar</button>
                     </div>
 
@@ -2436,7 +2455,7 @@
                 <div class="md:col-span-3"><label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">LINK GPS / DIRECCIÓN</label><input type="text" id="edit_direccion" class="w-full p-3 glass-input rounded-xl text-xs text-stone-800 shadow-inner outline-none"></div>
             </div>
             
-            <div class="mb-6"><label class="text-[8px] text-stone-600 ml-2 uppercase font-black block mb-1">Observaciones Oficina</label><textarea id="edit_observaciones" class="w-full p-5 glass-input rounded-[1.5rem] font-black text-xs uppercase min-h-[100px] text-stone-800 outline-none shadow-inner bg-white/60"></textarea></div>
+            <div class="mb-6"><label class="text-[8px] text-stone-600 ml-2 uppercase font-black block mb-1">Observaciones Oficina</label><textarea id="edit_observaciones" placeholder="INDICACIONES ESPECIALES..." class="w-full p-5 glass-input rounded-[1.5rem] font-black text-xs uppercase min-h-[100px] text-stone-800 outline-none shadow-inner bg-white/60"></textarea></div>
 
             <div class="p-6 glass-panel bg-stone-100/40 rounded-[2rem] mb-6 border border-white/70 shadow-sm">
                 <div class="flex justify-between items-center mb-5">
@@ -2496,4 +2515,3 @@
 
 </body>
 </html>
-
