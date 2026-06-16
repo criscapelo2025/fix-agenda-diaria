@@ -100,14 +100,29 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* PREVENIR TEXTO BLANCO ILEGIBLE EN PESTAÑAS AL MANTENER PRESIONADO */
-        .view-btn:active, .mobile-nav-btn:active {
-            background-color: rgba(62, 39, 35, 0.18) !important;
+        /* SOLUCIÓN CRÍTICA: PESTAÑAS INACTIVAS NUNCA DEBEN TENER LETRAS BLANCAS AL PULSAR O HACER HOVER */
+        .view-btn:not(.bg-fix-main):hover,
+        .view-btn:not(.bg-fix-main):active,
+        .view-btn:not(.bg-fix-main):focus,
+        .mobile-nav-btn:not(.bg-fix-main):hover,
+        .mobile-nav-btn:not(.bg-fix-main):active,
+        .mobile-nav-btn:not(.bg-fix-main):focus {
             color: #3e2723 !important;
+            background-color: rgba(255, 255, 255, 0.8) !important;
+            border-color: rgba(62, 39, 35, 0.2) !important;
         }
-        .view-btn.bg-fix-main:active, .mobile-nav-btn.bg-fix-main:active {
-            background-color: #271916 !important;
+
+        /* ESTILO PARA PESTAÑAS ACTIVAS SELECCIONADAS */
+        .view-btn.bg-fix-main,
+        .mobile-nav-btn.bg-fix-main {
             color: #ffffff !important;
+        }
+        .view-btn.bg-fix-main:hover,
+        .view-btn.bg-fix-main:active,
+        .mobile-nav-btn.bg-fix-main:hover,
+        .mobile-nav-btn.bg-fix-main:active {
+            color: #ffffff !important;
+            background-color: #271916 !important; /* Espresso ultra-oscuro */
         }
 
         .currency-input { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; }
@@ -150,7 +165,7 @@
             display: flex; align-items: center; justify-content: center;
             width: 28px; height: 28px; background: rgba(255,255,255,0.9); border-radius: 8px;
             transition: all 0.2s; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); user-select: none;
-            box-shadow: 0 2px 4px rgba(62,39,35,0.08);
+            box-shadow: 0 2px 4px rgba(62, 39, 35, 0.08);
         }
         .move-btn:hover { background: #fff; transform: translateY(-1px); }
         .move-btn:active { background: #3e2723; color: white; transform: scale(0.9); }
@@ -1497,7 +1512,7 @@
             };
             
             const tb = document.getElementById('contabilidadTableBody');
-            if(tb) tb.innerHTML = filteredTodos.map(m => `<tr class="border-b border-white/50 row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic text-stone-700">${parseDateString(m.fecha)}<br><span class="text-[7px] text-stone-500 font-bold mt-1">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-emerald-700' : 'text-rose-700'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-600' : 'text-stone-600'} mt-1">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter text-stone-800">${m.concepto}</td><td class="p-4 text-right text-[12px] font-mono font-black text-stone-900">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-main text-base font-black glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-accent text-base font-black glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-base glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button>` : ''}</div></td></tr>`).join('');
+            if(tb) tb.innerHTML = filteredTodos.map(m => `<tr class="border-b border-white/50 row-hover font-black uppercase"><td class="p-4 text-[9px] font-mono font-black italic text-stone-700">${parseDateString(m.fecha)}<br><span class="text-[7px] text-stone-500 font-bold mt-1">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-emerald-700' : 'text-rose-700'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-600' : 'text-stone-600'} mt-1">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter text-stone-800">${m.concepto}</td><td class="p-4 text-right text-[12px] font-mono font-black text-stone-900">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-main text-base font-black glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-accent text-base font-black glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-base glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button>` : ''}</div></td></tr>`).join('');
             
             let tCashIn = 0, tOut = 0, tTransIn = 0;
             filteredTodos.forEach(m => { 
@@ -1964,7 +1979,14 @@
             const dHoy = new Date();
             const hoyLocal = `${dHoy.getFullYear()}-${pad(dHoy.getMonth() + 1)}-${pad(dHoy.getDate())}`;
             
-            ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd', 'garantiaMaestroStart', 'garantiaMaestroEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoyLocal; });
+            // Set default date to most inputs (except searchDateEnd which we want to default to 1 year in the future)
+            ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'garantiaMaestroStart', 'garantiaMaestroEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoyLocal; });
+            
+            // BUSCADOR PRO: Fecha límite configurada a 1 año en el futuro para abarcar agendas a futuro
+            const dFuture = new Date();
+            dFuture.setFullYear(dFuture.getFullYear() + 1);
+            const futureLocal = `${dFuture.getFullYear()}-${pad(dFuture.getMonth() + 1)}-${pad(dFuture.getDate())}`;
+            if(document.getElementById('searchDateEnd')) document.getElementById('searchDateEnd').value = futureLocal;
             
             if(document.getElementById('cajaDateStart')) document.getElementById('cajaDateStart').value = hoyLocal;
             if(document.getElementById('cajaDateEnd')) document.getElementById('cajaDateEnd').value = hoyLocal;
@@ -2070,7 +2092,7 @@
             
             <div id="buscadorView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem]">
-                    <h2 class="text-xl font-black uppercase italic underline text-fix-main mb-6 tracking-tighter">🔍 Buscador Inteligente Global</h2>
+                    <h2 class="text-xl font-black uppercase italic underline text-fix-main mb-6 tracking-tighter">🔍 Buscador Inteligente Global (Incluye Agenda Futura)</h2>
                     
                     <div class="glass-panel p-5 grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 items-end italic border border-white/80">
                         <div class="md:col-span-2">
@@ -2291,7 +2313,7 @@
                         <div class="flex flex-wrap gap-2">
                             <input type="date" id="maintBalanceStart" onchange="processMaintBalance(); renderReporteMantenimiento();" class="p-3 glass-input rounded-xl text-[10px] font-black text-stone-800 shadow-sm outline-none">
                             <input type="date" id="maintBalanceEnd" onchange="processMaintBalance(); renderReporteMantenimiento();" class="p-3 glass-input rounded-xl text-[10px] font-black text-stone-800 shadow-sm outline-none">
-                            <button onclick="downloadMantenimientoCSV()" class="bg-fix-report/90 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase italic border-white/50 shadow-md transition-all hover:scale-105">📊 EXCEL</button>
+                            <button onclick="downloadMantenimientoCSV()" class="glass-card bg-fix-report/90 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase italic border-white/50 shadow-md transition-all hover:scale-105">📊 EXCEL</button>
                         </div>
                     </div>
                     <div class="overflow-x-auto rounded-2xl border border-white/80 shadow-sm bg-white/30 backdrop-blur-md"><table class="w-full border-collapse admin-table font-black"><thead><tr><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Calle</th><th>Descripción</th><th>Valor</th><th>Est.</th><th>X</th></tr></thead><tbody id="mantenimientoReporteBody" class="uppercase italic text-stone-800"></tbody></table></div>
@@ -2489,29 +2511,4 @@
             <div class="space-y-5 glass-panel bg-white/60 p-6 rounded-[2rem] border border-white/80 shadow-inner">
                 <div>
                     <label class="text-[9px] text-stone-500 block mb-1">DESCRIPCIÓN DEL CONCEPTO:</label>
-                    <input type="text" id="finance_concepto" class="w-full p-3 glass-input bg-white/50 rounded-xl text-xs text-center uppercase text-stone-700 outline-none shadow-sm" readonly>
-                </div>
-                <div>
-                    <label class="text-[10px] text-fix-accent block mb-2">MONTO A REGISTRAR $:</label>
-                    <input type="number" step="0.01" id="finance_monto" class="w-full p-4 glass-input bg-white/90 rounded-xl font-mono font-black text-4xl text-center text-fix-main outline-none border-white shadow-md">
-                </div>
-                <div id="finance_payment_container">
-                    <label class="text-[9px] text-stone-500 block mb-1 mt-2">FORMA DE PAGO:</label>
-                    <select id="finance_forma_pago" class="w-full p-4 glass-input bg-white/80 rounded-xl text-xs text-center uppercase outline-none text-stone-800 shadow-sm border-white">
-                        <option value="EFECTIVO">EFECTIVO</option>
-                        <option value="TRANSFERENCIA">TRANSFERENCIA</option>
-                    </select>
-                </div>
-            </div>
-            <div class="grid grid-cols-2 gap-4 mt-8">
-                <button onclick="saveFinanceAdjustment()" class="glass-card bg-emerald-700/90 border-white/60 text-white py-4 rounded-xl font-black active:scale-95 transition-all uppercase shadow-lg">💾 AJUSTAR</button>
-                <button onclick="closeEditFinanceModal()" class="glass-input bg-white/70 border-white/80 text-stone-600 py-4 rounded-xl font-black uppercase active:scale-95 shadow-sm">SALIR</button>
-            </div>
-        </div>
-    </div>
-
-    <button onclick="refreshData()" class="btn-refresh-float no-print" title="Actualizar"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></button>
-    <div id="messageBox" class="opacity-0 fixed transition-opacity duration-500 pointer-events-none z-[99999] font-black uppercase text-center"></div>
-
-</body>
-</html>
+                    <input type="text" id="finance_concepto" class="w-full p-3 glass-input bg-white/50 rounded-
