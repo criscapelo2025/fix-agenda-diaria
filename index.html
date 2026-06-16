@@ -95,30 +95,6 @@
             box-shadow: 0 -5px 30px rgba(62, 39, 35, 0.1);
         }
 
-        /* EVITAR HIGHLIGHT AZUL DE SAFARI EN MÓVILES */
-        button, a, select, input, textarea {
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        /* PREVENIR TEXTO BLANCO ILEGIBLE EN PESTAÑAS AL MANTENER PRESIONADO */
-        .view-btn:not(.bg-fix-main):hover, 
-        .view-btn:not(.bg-fix-main):active, 
-        .view-btn:not(.bg-fix-main):focus {
-            background-color: rgba(255, 255, 255, 0.85) !important;
-            color: #3e2723 !important;
-        }
-        .mobile-nav-btn:not(.bg-fix-main):hover, 
-        .mobile-nav-btn:not(.bg-fix-main):active, 
-        .mobile-nav-btn:not(.bg-fix-main):focus {
-            background-color: rgba(255, 255, 255, 0.4) !important;
-            color: #3e2723 !important;
-        }
-        
-        .view-btn.bg-fix-main:active, .mobile-nav-btn.bg-fix-main:active {
-            background-color: #271916 !important;
-            color: #ffffff !important;
-        }
-
         .currency-input { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; }
         @media print { .no-print { display: none !important; } }
         
@@ -159,7 +135,7 @@
             display: flex; align-items: center; justify-content: center;
             width: 28px; height: 28px; background: rgba(255,255,255,0.9); border-radius: 8px;
             transition: all 0.2s; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); user-select: none;
-            box-shadow: 0 2px 4px rgba(62, 39, 35, 0.08);
+            box-shadow: 0 2px 4px rgba(62,39,35,0.08);
         }
         .move-btn:hover { background: #fff; transform: translateY(-1px); }
         .move-btn:active { background: #3e2723; color: white; transform: scale(0.9); }
@@ -185,180 +161,86 @@
         let database;
         let isFirebaseFallback = false;
 
-        if (typeof firebase !== 'undefined' && firebase.apps) {
-            try {
+        try {
+            if (typeof firebase !== 'undefined' && firebase.apps) {
                 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-                isFirebaseFallback = false;
-            } catch(e) {
-                isFirebaseFallback = true;
+                database = firebase.database();
+            } else {
+                throw new Error("SDK Firebase Offline.");
             }
-        } else {
+        } catch (e) {
+            console.error("Firebase no disponible. Iniciando en modo simulación local:", e);
             isFirebaseFallback = true;
-        }
+            
+            const getLocal = (key) => { try { return JSON.parse(localStorage.getItem('fix_db_' + key)) || {}; } catch(err) { return {}; } };
+            const setLocal = (key, data) => { try { localStorage.setItem('fix_db_' + key, JSON.stringify(data)); } catch(err) {} };
 
-        // --- SISTEMA DE SINCRONIZACIÓN SMART SYNC (UNIFICA LOCALSTORAGE Y FIREBASE) ---
-        const smartDB = {
-            ref: function(path) {
-                const parts = path.split('/');
-                const baseKey = parts[0]; 
-                const subId = parts[1];    
-                
-                const getLocal = () => {
-                    try { return JSON.parse(localStorage.getItem('fix_db_' + baseKey)) || {}; } catch(e) { return {}; }
-                };
-                const setLocal = (data) => {
-                    try { localStorage.setItem('fix_db_' + baseKey, JSON.stringify(data)); } catch(e) {}
-                };
-
-                return {
-                    on: function(event, callback, errorCallback) {
-                        // Carga instantánea local para que el usuario nunca vea pantallas vacías
-                        setTimeout(() => {
-                            callback({ val: () => getLocal() });
-                        }, 0);
-
-                        window.addEventListener('storage', () => {
-                            callback({ val: () => getLocal() });
-                        });
-
-                        if (!isFirebaseFallback) {
-                            try {
-                                firebase.database().ref(path).on(event, (snap) => {
-                                    const remoteVal = snap.val() || {};
-                                    if (snap.exists()) {
-                                        setLocal(remoteVal);
-                                        callback({ val: () => remoteVal });
-                                    }
-                                }, (err) => {
-                                    console.warn("Límite de permisos Firebase. Operando en contingencia local:", err);
-                                    if (errorCallback) errorCallback(err);
-                                });
-                            } catch(e) {
-                                console.error("Error de enlace Firebase:", e);
-                            }
-                        }
-                    },
-                    once: function(event, callback) {
-                        if (!isFirebaseFallback) {
-                            firebase.database().ref(path).once(event).then(snap => {
-                                if (snap.exists()) {
-                                    setLocal(snap.val());
-                                    callback({ val: () => snap.val() });
-                                } else {
-                                    callback({ val: () => getLocal() });
+            database = {
+                ref: function(path) {
+                    const parts = path.split('/');
+                    const baseKey = parts[0];
+                    const subId = parts[1];
+                    
+                    return {
+                        on: function(event, callback, errorCallback) {
+                            window.addEventListener('storage', () => { callback({ val: () => getLocal(baseKey) }); });
+                            setTimeout(() => { callback({ val: () => getLocal(baseKey) }); }, 100);
+                        },
+                        once: function(event, callback) {
+                            setTimeout(() => { callback({ val: () => getLocal(baseKey) }); }, 50);
+                        },
+                        push: function() {
+                            const newKey = 'mock_' + Date.now() + Math.random().toString(36).substr(2, 5);
+                            return {
+                                key: newKey,
+                                set: function(data) {
+                                    const current = getLocal(baseKey);
+                                    current[newKey] = data;
+                                    setLocal(baseKey, current);
+                                    window.dispatchEvent(new Event('storage'));
+                                    return Promise.resolve();
                                 }
-                            }).catch(err => {
-                                callback({ val: () => getLocal() });
-                            });
-                        } else {
-                            setTimeout(() => {
-                                callback({ val: () => getLocal() });
-                            }, 10);
-                        }
-                    },
-                    push: function() {
-                        const newKey = 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-                        return {
-                            key: newKey,
-                            set: function(data) {
-                                const current = getLocal();
-                                current[newKey] = data;
-                                setLocal(current);
-                                window.dispatchEvent(new Event('storage'));
-
-                                if (!isFirebaseFallback) {
-                                    return firebase.database().ref(baseKey + '/' + newKey).set(data).catch(err => {
-                                        console.warn("Fallo de red. Guardado en contingencia local.");
-                                        return Promise.resolve();
-                                    });
-                                }
-                                return Promise.resolve();
-                            }
-                        };
-                    },
-                    update: function(updates) {
-                        const current = getLocal();
-                        if (subId) {
-                            current[subId] = Object.assign({}, current[subId] || {}, updates);
-                        } else {
-                            Object.entries(updates).forEach(([keyPath, val]) => {
-                                const pathParts = keyPath.split('/');
-                                if (pathParts.length === 2) {
-                                    const [id, field] = pathParts;
-                                    if (!current[id]) current[id] = {};
-                                    
-                                    if (field.includes('/')) {
-                                        const subParts = field.split('/');
-                                        const objName = subParts[0];
-                                        const subProp = subParts[1];
-                                        if (!current[id][objName]) current[id][objName] = {};
-                                        current[id][objName][subProp] = val;
-                                    } else {
+                            };
+                        },
+                        update: function(updates) {
+                            const current = getLocal(baseKey);
+                            if (subId) {
+                                current[subId] = Object.assign({}, current[subId] || {}, updates);
+                            } else {
+                                Object.entries(updates).forEach(([keyPath, val]) => {
+                                    const pathParts = keyPath.split('/');
+                                    if (pathParts.length === 2) {
+                                        const [id, field] = pathParts;
+                                        if (!current[id]) current[id] = {};
                                         current[id][field] = val;
-                                    }
-                                } else {
-                                    if (keyPath.includes('/')) {
-                                        const pathSubParts = keyPath.split('/');
-                                        let temp = current;
-                                        for(let i=0; i<pathSubParts.length - 1; i++) {
-                                            if(!temp[pathSubParts[i]]) temp[pathSubParts[i]] = {};
-                                            temp = temp[pathSubParts[i]];
-                                        }
-                                        temp[pathSubParts[pathSubParts.length - 1]] = val;
                                     } else {
                                         current[keyPath] = val;
                                     }
-                                }
-                            });
+                                });
+                            }
+                            setLocal(baseKey, current);
+                            window.dispatchEvent(new Event('storage'));
+                            return Promise.resolve();
+                        },
+                        set: function(data) {
+                            setLocal(baseKey, data);
+                            window.dispatchEvent(new Event('storage'));
+                            return Promise.resolve();
+                        },
+                        remove: function() {
+                            const current = getLocal(baseKey);
+                            if (subId) { delete current[subId]; }
+                            setLocal(baseKey, current);
+                            window.dispatchEvent(new Event('storage'));
+                            return Promise.resolve();
+                        },
+                        child: function(childId) {
+                            return database.ref(baseKey + '/' + childId);
                         }
-                        setLocal(current);
-                        window.dispatchEvent(new Event('storage'));
-
-                        if (!isFirebaseFallback) {
-                            return firebase.database().ref(path).update(updates).catch(err => {
-                                console.warn("Fallo de red. Guardado en contingencia local.");
-                                return Promise.resolve();
-                            });
-                        }
-                        return Promise.resolve();
-                    },
-                    set: function(data) {
-                        setLocal(data);
-                        window.dispatchEvent(new Event('storage'));
-
-                        if (!isFirebaseFallback) {
-                            return firebase.database().ref(path).set(data).catch(err => {
-                                console.warn("Fallo de red. Guardado en contingencia local.");
-                                return Promise.resolve();
-                            });
-                        }
-                        return Promise.resolve();
-                    },
-                    remove: function() {
-                        const current = getLocal();
-                        if (subId) {
-                            delete current[subId];
-                        }
-                        setLocal(current);
-                        window.dispatchEvent(new Event('storage'));
-
-                        if (!isFirebaseFallback) {
-                            return firebase.database().ref(path).remove().catch(err => {
-                                console.warn("Fallo de red. Guardado en contingencia local.");
-                                return Promise.resolve();
-                            });
-                        }
-                        return Promise.resolve();
-                    },
-                    child: function(childId) {
-                        return smartDB.ref(path + '/' + childId);
-                    }
-                };
-            }
-        };
-
-        // Redirigimos el puntero de la base de datos a nuestro Smart Sync unificado
-        database = smartDB;
+                    };
+                }
+            };
+        }
 
         const LISTA_TECNICOS = ["", "Andres Cardenas", "Cristian Capelo", "Juan Carlos Pando", "Allan Skykaz", "Juana Cardenas"];
         const LUGARES_COMPRA = ["", "COMERCIAL KYWI", "COMERCIAL SOLIS", "COMO HOGAR", "SUKASA", "LUNA PAZMIÑO", "MACAOFERTAS", "HOME VEGA", "MERCARD", "TEKA DIRECTO", "ALMACENES BOYACÁ", "VTORIA HOGAR", "ALMACENES CHORDELEG", "OTRO"];
@@ -599,7 +481,7 @@
                         <input type="text" name="manualName_${i}" placeholder="ESCRIBIR EQUIPO MANUALMENTE (MODELO)" class="p-3.5 glass-input rounded-xl font-black text-xs outline-none uppercase text-stone-800">
                     </div>
                     <div class="flex justify-end items-center gap-3">
-                         <span class="text-[8px] font-black text-stone-600">VALOR LIQUIDACIÓN:</span>
+                         <span class="text-[9px] font-black text-stone-600">VALOR LIQUIDACIÓN:</span>
                          <input type="number" name="costoEquipo_${i}" step="0.01" value="${unitPrice.toFixed(2)}" oninput="calculateFinancials()" class="w-32 p-3.5 glass-input bg-white/80 rounded-xl font-black text-right text-fix-main outline-none font-mono text-base border-stone-300">
                     </div>
                 </div>`;
@@ -614,7 +496,7 @@
                 const n = item[0]; const p = item[1];
                 return `
                 <div class="flex items-center justify-between p-3.5 glass-panel border-white/60">
-                    <span class="text-[9px] font-black text-stone-700 uppercase">${n} ($${p.toFixed(2)})</span>
+                    <span class="text-[10px] font-black text-stone-700 uppercase">${n} ($${p.toFixed(2)})</span>
                     <input type="number" min="0" value="0" data-price="${p}" data-name="${n}" oninput="calculateFinancials()" class="form-acc-qty w-14 text-center glass-input rounded-lg p-2 text-sm font-black outline-none" placeholder="0">
                 </div>`;
             }).join('');
@@ -678,26 +560,26 @@
             if(view === 'contabilidad') processFinancialBalance();
             if(view === 'inventory') renderInventoryView();
             
-            // Desktop Nav - Contraste inactivo e activo optimizado
+            // Desktop Nav
             document.querySelectorAll('.view-btn').forEach(function(btn) { 
                 btn.classList.remove('bg-fix-main', 'text-white', 'shadow-md', 'scale-105'); 
-                btn.classList.add('bg-white/60', 'text-stone-700'); 
+                btn.classList.add('bg-white/60', 'text-stone-600'); 
             });
-            const act = document.querySelector(".view-btn[data-view='" + view + "']");
+            const act = document.querySelector(".view-btn[onclick*=\"'" + view + "'\"]");
             if(act) { 
                 act.classList.add('bg-fix-main', 'text-white', 'shadow-md', 'scale-105'); 
-                act.classList.remove('bg-white/60', 'text-stone-700'); 
+                act.classList.remove('bg-white/60', 'text-stone-600'); 
             }
 
-            // Mobile Nav - Pestaña activa Espresso sólido y texto blanco
+            // Mobile Nav
             document.querySelectorAll('.mobile-nav-btn').forEach(function(btn) {
-                btn.classList.remove('text-white', 'bg-fix-main', 'scale-110', 'rounded-2xl', 'shadow-sm', 'border', 'border-white/20');
-                btn.classList.add('text-stone-600', 'bg-transparent');
+                btn.classList.remove('text-fix-main', 'scale-110', 'bg-white/60', 'rounded-2xl', 'shadow-sm', 'border', 'border-white/80');
+                btn.classList.add('text-stone-400');
             });
             const mobileAct = document.querySelector(".mobile-nav-btn[data-view='" + view + "']");
             if(mobileAct) {
-                mobileAct.classList.add('text-white', 'bg-fix-main', 'scale-110', 'rounded-2xl', 'shadow-sm', 'border', 'border-white/20');
-                mobileAct.classList.remove('text-stone-600', 'bg-transparent');
+                mobileAct.classList.add('text-fix-main', 'scale-110', 'bg-white/60', 'rounded-2xl', 'shadow-sm', 'border', 'border-white/80');
+                mobileAct.classList.remove('text-stone-400');
             }
         };
 
@@ -739,7 +621,7 @@
                 if(!v) return showMessage("❌ No encontrado", "fix-error");
 
                 let moParaCaja = 0; let totalAccs = 0; const accs = [];
-                document.querySelectorAll(".acc-" + id).forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) { const p = parseFloat(i.dataset.price); accs.push({ nombre: i.dataset.name, font: p, cantidad: q, precio: p }); totalAccs += q * p; } });
+                document.querySelectorAll(".acc-" + id).forEach(function(i) { const q = parseInt(i.value) || 0; if(q > 0) { const p = parseFloat(i.dataset.price); accs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); totalAccs += q * p; } });
                 const mDescEl = document.getElementById("manual_acc_desc_" + id); const mPriceEl = document.getElementById("manual_acc_price_" + id);
                 if(mDescEl && mPriceEl && mDescEl.value && parseFloat(mPriceEl.value) > 0) { accs.push({ nombre: mDescEl.value.toUpperCase(), cantidad: 1, precio: parseFloat(mPriceEl.value) }); totalAccs += parseFloat(mPriceEl.value); }
                 
@@ -788,318 +670,991 @@
             }); 
         };
 
-        // --- SISTEMA EXCLUSIVO DE COPIADO / PORTABILIDAD EXPRESS ---
-        window.copyClientBlock = function(id) {
+        function renderUIAgenda() {
+            const list = document.getElementById('visitsList'); if(!list) return;
+            const df = document.getElementById('filterDateInput').value;
+            const searchQuery = document.getElementById('searchClientInput') ? document.getElementById('searchClientInput').value.toLowerCase() : "";
+            let filtered = visitsArray.filter(v => v.fechaInstalacion === df && (v.estado === 'PENDIENTE' || v.estado === 'Atendido'));
+            if(searchQuery) filtered = filtered.filter(v => v.nombreCliente && v.nombreCliente.toLowerCase().includes(searchQuery));
+            list.innerHTML = filtered.map(v => {
+                let col = v.estado === 'Atendido' ? 'border-fix-report' : 'border-fix-accent';
+                return `<div class="glass-panel bg-white/70 p-5 shadow-sm border-l-[8px] ${col} mb-3 uppercase hover:shadow-md transition-all"><div class="flex justify-between items-start mb-1"><p class="font-black text-fix-main text-sm italic">${v.nombreCliente}</p><button onclick="deleteVisit('${v.id}')" class="text-fix-error text-[10px] bg-white/80 w-7 h-7 rounded-full flex items-center justify-center hover:scale-110 shadow-sm border border-white">🗑️</button></div><div class="text-stone-600 text-[9px] font-black uppercase mt-1">${v.esMantenimiento ? 'MANTENIMIENTO' : (v.equipos || []).map(e => '• ' + e.descProducto).join('<br>')}</div></div>`;
+            }).join('');
+        }
+
+        window.printServiceOrder = function(id) {
+            const v = visitsArray.find(item => item.id === id);
+            if (!v) return showMessage("❌ ERROR: NO ENCONTRADO", "fix-error");
+
+            const printWindow = window.open('', '_blank');
+            const eqList = v.esMantenimiento ? `<tr><td colspan="3"><b>MANTENIMIENTO:</b> ${v.mantenimientoEquipo}</td></tr>` : (v.equipos || []).map(e => `<tr><td><b>MOD:</b> ${e.descProducto}</td><td><b>SAP:</b> ${e.codProducto || '-'}</td><td><b>SERIE:</b> ${e.serieEquipo || '-'}</td></tr>`).join('');
+            
+            const template = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>ORDEN FIX TEKA - ${v.nombreCliente}</title>
+                <style>
+                    @page { size: A4; margin: 0; }
+                    body { font-family: 'Arial Narrow', sans-serif; margin: 0; padding: 0; color: #000; font-size: 10.5px; font-weight: bold; text-transform: uppercase; }
+                    .page-container { display: flex; flex-direction: column; width: 210mm; height: 297mm; box-sizing: border-box; }
+                    .order-sheet { 
+                        height: 50%; width: 100%; border-bottom: 2.5px dashed #000; 
+                        padding: 8mm 10mm; box-sizing: border-box; 
+                        display: flex; flex-direction: column; overflow: hidden;
+                    }
+                    .order-sheet:last-child { border-bottom: none; }
+                    
+                    .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; }
+                    .logo-side { font-size: 19px; font-weight: 900; font-style: italic; color: #3e2723; }
+                    .logo-center { text-align: center; flex: 1; font-size: 14px; font-weight: 900; color: #000; text-decoration: underline; margin-top: 5px; }
+                    .logo-right { font-size: 26px; font-weight: 900; color: #dc2626; text-align: right; }
+                    
+                    .contact-bar { text-align: center; font-size: 8.5px; font-weight: normal; border-bottom: 1.5px solid #000; padding-bottom: 3px; margin-bottom: 6px; color: #333; line-height: 1.2; }
+                    
+                    .copy-label { background: #000; color: #fff; padding: 1px 6px; font-size: 9px; display: inline-block; }
+                    
+                    .section { margin-bottom: 3px; border: 1.2px solid #000; padding: 2px; }
+                    .section-title { background: #eee; padding: 1.5px 6px; border-bottom: 1.2px solid #000; font-size: 11px; display: flex; justify-content: space-between; align-items: center; }
+                    
+                    table { width: 100%; border-collapse: collapse; }
+                    td { padding: 2px 4px; border: 1px solid #bbb; vertical-align: top; font-size: 10px; }
+                    
+                    .grid-data { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 5px; padding: 1px; }
+                    .field { margin-bottom: 0.5px; }
+                    .field span { font-weight: normal; border-bottom: 1px dotted #000; display: inline-block; min-width: 40%; }
+
+                    .checkbox-group { display: flex; gap: 8px; font-size: 9px; }
+                    .checkbox { border: 1.2px solid #000; width: 11px; height: 11px; display: inline-block; vertical-align: middle; margin-right: 2px; }
+                    .checked { background: #dc2626 !important; border-color: #dc2626 !important; }
+
+                    .footer { margin-top: auto; display: flex; justify-content: space-between; padding-top: 10px; padding-bottom: 2px; }
+                    .sig-box { width: 45%; border-top: 1.5px solid #000; text-align: center; font-size: 10px; padding-top: 2px; }
+
+                    .id-label { font-size: 9px; font-weight: normal; color: #555; }
+                    @media print { .no-print { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="page-container">
+                    ${['CLIENTE', 'OFICINA'].map(dest => `
+                    <div class="order-sheet">
+                        <div class="header-top">
+                            <div class="logo-side">FIX GESTIÓN</div>
+                            <div class="logo-center">SOLICITUD DE SERVICIO TÉCNICO</div>
+                            <div class="logo-right">TEKA</div>
+                        </div>
+                        <div class="contact-bar">
+                            <b>CRISTIAN CAPELO</b> - DIRECCIÓN: SAN PEDRO (SIDCAY) - CUENCA ECUADOR<br>
+                            EMAIL: CRISCAPELO.FIX@GMAIL.COM - COPIA ${dest} - ID: ${v.id.substring(0,8)}
+                        </div>
+
+                        <div class="section-title" style="background: white; border-bottom: none; margin-bottom: 2px;">
+                            <span>MARQUE EL SERVICIO:</span>
+                            <div class="checkbox-group">
+                                <div><div class="checkbox ${v.tipoAtencion === 'Instalación' ? 'checked' : ''}"></div> INSTALACIÓN</div>
+                                <div><div class="checkbox ${v.tipoAtencion === 'Garantía' ? 'checked' : ''}"></div> GARANTÍA</div>
+                                <div><div class="checkbox ${v.tipoAtencion === 'Reparación' ? 'checked' : ''}"></div> REPARACIÓN</div>
+                                <div><div class="checkbox ${v.tipoAtencion === 'Mantenimiento' ? 'checked' : ''}"></div> MANTENIMIENTO</div>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <div class="grid-data">
+                                <div class="field"><b>CLIENTE:</b> <span>${v.nombreCliente}</span></div>
+                                <div class="field"><b>CÉDULA:</b> <span>${v.cedula || '-'}</span></div>
+                                <div class="field" style="grid-column: span 2"><b>DIRECCIÓN:</b> <span>${v.callePrincipal}</span></div>
+                                <div class="field"><b>TELÉFONO:</b> <span>${v.telefono}</span></div>
+                                <div class="field"><b>EMAIL:</b> <span style="text-transform:lowercase">${v.email || '-'}</span></div>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">1. DETALLE TÉCNICO DE EQUIPOS</div>
+                            <table>${eqList}</table>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">2. DATOS DE COMPRA / LOGÍSTICA</div>
+                            <div class="grid-data">
+                                <div class="field"><b>NRO. DOCUMENTO:</b> <span>${v.numFactura || '-'}</span></div>
+                                <div class="field"><b>LUGAR COMPRA:</b> <span>${v.lugarCompra || '-'}</span></div>
+                                <div class="field"><b>FECHA COMPRA:</b> <span>${v.fechaEmision || '-'}</span></div>
+                                <div class="field"><b>FECHA VISITA:</b> <span>${v.fechaInstalacion}</span></div>
+                            </div>
+                        </div>
+
+                        <div class="section" style="min-height: 25px">
+                            <div class="section-title">3. FALLA REPORTADA</div>
+                            <div style="font-size: 10px; font-weight: normal; padding: 2px;">
+                                ${v.descFalla || ''}
+                            </div>
+                        </div>
+
+                        <div class="section" style="min-height: 45px">
+                            <div class="section-title">4. OBSERVACIONES / REPUESTOS UTILIZADOS</div>
+                            <div style="font-size: 10px; font-weight: normal; padding: 2px; line-height: 1.2;">
+                                ${v.razonNoAtencion || ''} ${v.commentarioCliente ? ' / ' + v.commentarioCliente : ''}
+                            </div>
+                        </div>
+
+                        <div style="text-align: right; font-size: 9px; padding: 2px;">
+                            FORMA PAGO REGISTRADA: ${v.financiera?.formaPago || 'EFECTIVO'} / TÉCNICO RESPONSABLE: ${v.tecnico}
+                        </div>
+
+                        <div class="footer">
+                            <div class="sig-box">FIRMA DEL CLIENTE / AUTORIZADO</div>
+                            <div class="sig-box">CRISTIAN CAPELO (TEKA FIX)</div>
+                        </div>
+                    </div>
+                    `).join('')}
+                </div>
+                <div style="text-align:center; padding: 20px;" class="no-print">
+                    <button onclick="window.print()" style="padding: 12px 60px; background: #3e2723; color: #fff; font-weight: 900; border-radius: 8px; cursor: pointer; border:none; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">🖨️ CONFIRMAR IMPRESIÓN</button>
+                </div>
+            </body>
+            </html>
+            `;
+
+            printWindow.document.write(template);
+            printWindow.document.close();
+        };
+
+        function renderRutero() {
+            const list = document.getElementById('ruteroListBody'); if(!list) return;
+            const date = document.getElementById('filterDateInputRutero').value;
+            let tech = currentTechUser || (document.getElementById('ruteroTechFilter') ? document.getElementById('ruteroTechFilter').value : "");
+            
+            let filtered = visitsArray.filter(v => 
+                v.estado && (v.fechaInstalacion === date || v.fechaEntregaProgramada === date || v.fechaNuevaVisita === date) && 
+                (v.estado === 'PENDIENTE' || v.estado === 'Atendido' || v.estado === 'A Taller' || v.estado === 'No Atendido' || v.estado === 'Pendiente (Tramite)' || v.estado === 'Garantia en Tramite')
+            );
+            
+            if(tech) filtered = filtered.filter(v => v.tecnico === tech);
+            if(filtered.length === 0) { list.innerHTML = '<tr><td colspan="9" class="p-10 text-center text-stone-500 italic font-black uppercase text-sm">Sin servicios hoy</td></tr>'; return; }
+            let sorted = filtered.slice().sort((a,b) => (parseInt(a.priority) || 0) - (parseInt(b.priority) || 0));
+            let currentMinutes = 9 * 60;
+            
+            list.innerHTML = sorted.map((v, index) => {
+                const h = Math.floor(currentMinutes / 60); const m = currentMinutes % 60;
+                const timeStr = (h > 12 ? h - 12 : (h === 0 ? 12 : h)) + ":" + m.toString().padStart(2, '0') + " " + (h >= 12 ? 'PM' : 'AM');
+                currentMinutes += (60 + (Math.max(0, (v.equipos || []).length - 1) * 20)) + 15;
+                const initials = v.tecnico ? v.tecnico.split(' ').map(n => n[0]).join('').toUpperCase() : '---';
+                
+                const isDelivery = v.estado === 'A Taller' && v.fechaEntregaProgramada === date;
+                const isGarantiaVisit = v.estado === 'Garantia en Tramite' && v.fechaNuevaVisita === date;
+                
+                let colClass = 'bg-stone-200/60 text-stone-700 border-white/80';
+                const estadoUpper = (v.estado || "").toUpperCase();
+                if(estadoUpper === 'ATENDIDO') colClass = 'bg-emerald-100/90 text-emerald-800 border-emerald-200';
+                else if(estadoUpper === 'A TALLER') colClass = isDelivery ? 'bg-stone-300/90 text-stone-800 border-stone-400' : 'bg-orange-100/90 text-orange-800 border-orange-200';
+                else if(estadoUpper === 'GARANTIA EN TRAMITE') colClass = isGarantiaVisit ? 'bg-amber-100/90 text-amber-800 border-amber-200' : 'bg-stone-200/90 text-stone-800 border-stone-300';
+                else if(estadoUpper.includes('PENDIENTE')) colClass = 'bg-orange-200/90 text-orange-800 border-orange-300';
+
+                let statusBadge = `<span class="px-2 py-0.5 rounded-md shadow-sm border text-[7px] font-black ${colClass}">${estadoUpper}</span>`;
+                
+                let tipoServ = isDelivery ? '🚚 ENTREGA TALLER' : (isGarantiaVisit ? '🛡️ VISITA GARANTÍA' : (v.esMantenimiento ? '⚙️ MANT.' : (v.tipoAtencion === 'Garantía' ? '🛡️ GARANTÍA' : '🛠️ SERV.TEC')));
+                const colorTipo = isDelivery ? 'text-stone-600' : (isGarantiaVisit ? 'text-amber-700' : (v.esMantenimiento ? 'text-fix-accent' : (v.tipoAtencion === 'Garantía' ? 'text-fix-main' : 'text-fix-report')));
+                
+                const mapLink = (v.direccion && v.direccion.toString().includes('http')) 
+                                ? v.direccion 
+                                : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(v.direccion || v.callePrincipal || '');
+
+                return `<tr class="border-b border-stone-300/30 row-hover uppercase font-black">
+                    <td class="border-r border-stone-300/30 text-center px-1"><div class="flex flex-col items-center gap-1 admin-only"><div onclick="movePriority('${v.id}', -1)" class="move-btn ${index === 0 ? 'opacity-20 pointer-events-none' : ''}">↑</div><span class="time-badge font-mono">${timeStr}</span><div onclick="movePriority('${v.id}', 1)" class="move-btn ${index === sorted.length - 1 ? 'opacity-20 pointer-events-none' : ''}">↓</div></div><div class="technician-mode-only text-center block md:hidden"><span class="time-badge font-mono">${timeStr}</span></div></td>
+                    <td class="border-r border-stone-300/30 px-2 text-[13px] font-black text-fix-main cursor-pointer truncate max-w-[150px]" onclick="toggleDetail('${v.id}')">${v.nombreCliente} ${v.estado === 'A Taller' ? '🏢' : ''}</td>
+                    <td class="border-r border-stone-300/30 px-2 text-[8px] text-stone-600 font-normal italic lowercase truncate max-w-[120px]">${v.callePrincipal || '---'}</td>
+                    <td class="border-r border-stone-300/30 px-2 text-center"><div class="text-[6px] ${colorTipo} font-black uppercase tracking-tighter">${tipoServ}</div></td>
+                    <td class="border-r border-stone-300/30 text-center font-mono text-stone-600 text-[9px] italic">${initials}</td>
+                    <td class="border-r border-stone-300/30 text-center">${statusBadge}</td>
+                    <td class="border-r border-stone-300/30 text-center"><a href="${mapLink}" target="_blank" class="glass-card bg-fix-light/90 text-white px-3 py-2 rounded-lg text-[8px] font-black shadow-sm border border-stone-400/50 italic inline-block w-full text-center hover:scale-105 transition-transform">📍 MAPA</a></td>
+                    <td class="text-center border-r border-stone-300/30"><div class="flex justify-center gap-2 items-center p-1"><a href="tel:${v.telefono}" class="text-2xl hover:scale-110 transition-transform">📞</a><a href="https://wa.me/593${v.telefono?.replace(/\D/g,'')}" target="_blank" class="text-2xl hover:scale-110 transition-transform">💬</a></div></td>
+                    ${!currentTechUser ? `<td class="text-center admin-only"><button onclick="openEditModal('${v.id}')" class="glass-input bg-white/80 text-fix-main px-2 py-1.5 rounded-lg text-[7px] font-black uppercase shadow-sm border border-white">EDIT</button></td>` : ''}
+                </tr>
+                <tr id="detail-${v.id}" class="hidden detail-row uppercase font-black"><td colspan="9" class="p-4 bg-white/50 backdrop-blur-xl border-y border-white/70 shadow-inner"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="glass-panel p-5"><p class="text-[10px] font-black text-fix-main uppercase mb-2 italic tracking-tighter">📄 Información Orden</p>
+                <p class="text-xs uppercase mb-1"><b>CÉDULA:</b> <span class="text-fix-main font-mono">${v.cedula || '---'}</span></p>
+                <p class="text-xs uppercase mb-1"><b>EMAIL:</b> <span class="text-fix-main font-mono">${v.email || '---'}</span></p>
+                <p class="text-xs uppercase mb-1"><b>FECHA COMPRA:</b> <span class="text-fix-main font-mono">${v.fechaEmision || '---'}</span></p>
+                <p class="text-xs uppercase mb-1"><b>EQUIPOS / DESC:</b> ${v.esMantenimiento ? v.mantenimientoEquipo : (v.equipos || []).map(e=>e.descProducto).join(', ')}</p>
+                <p class="text-xs uppercase mb-1"><b>DOCUMENTO COMPRA:</b> <span class="text-fix-report font-mono">${v.numFactura || '---'}</span></p>
+                <p class="text-xs uppercase mb-1"><b>LUGAR COMPRA:</b> <span class="text-fix-accent font-bold">${v.lugarCompra || '---'}</span></p>
+                ${v.observacionesAdmin ? `<div class="mt-3 p-4 bg-amber-50/70 backdrop-blur-sm border border-amber-200/50 rounded-xl shadow-sm"><p class="text-[9px] font-black text-fix-accent underline mb-1 uppercase">🔔 OBSERVACIONES DE OFICINA:</p><p class="text-xs text-stone-800 italic">${v.observacionesAdmin}</p></div>` : ''}
+                ${v.descFalla ? `<p class="text-[10px] text-fix-error mt-3 font-black italic uppercase"><b>FALLA REPORTE:</b> ${v.descFalla}</p>` : ''}
+                
+                <div class="mt-5 pt-4 border-t border-white/60">
+                    <button onclick="printServiceOrder('${v.id}')" class="glass-card bg-stone-800/90 border-stone-600 text-white w-full py-3 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 active:scale-95 transition-all text-center">🖨️ IMPRIMIR ORDEN</button>
+                </div>
+
+                </div><div class="glass-panel p-5"><p class="text-[10px] font-black text-fix-report uppercase mb-3 italic">🛠️ Cierre Técnico</p>
+                
+                ${v.esMantenimiento ? `
+                    <div class="mb-4 p-4 glass-input bg-amber-50/40 rounded-xl">
+                        <label class="text-[9px] font-black text-fix-accent block mb-2 uppercase tracking-tighter">💰 VALOR COBRADO AL CLIENTE $:</label>
+                        <input type="number" step="0.01" id="maint_tech_price_${v.id}" placeholder="0.00" class="w-full p-3 glass-input bg-white/80 rounded-lg font-black text-fix-report text-sm font-mono text-right outline-none" value="${v.financiera?.totalCliente || ''}">
+                    </div>
+                ` : ''}
+
+                <div class="grid grid-cols-2 gap-3 mb-3 italic"><select id="status_${v.id}" class="p-3 glass-input rounded-xl text-[10px] font-black uppercase outline-none text-stone-800">
+                    <option value="PENDIENTE">--- ESTADO CIERRE ---</option>
+                    <option value="Atendido" ${v.estado === 'Atendido' ? 'selected' : ''}>✅ ATENDIDO / FINALIZADO</option>
+                    <option value="A Taller" ${v.estado === 'A Taller' ? 'selected' : ''}>🏢 A TALLER (REPARACIÓN)</option>
+                    <option value="Garantia en Tramite" ${v.estado === 'Garantia en Tramite' ? 'selected' : ''}>🛡️ GARANTÍA EN TRÁMITE</option>
+                    <option value="No Atendido" ${v.estado === 'No Atendido' ? 'selected' : ''}>❌ NO ATENDIDO (FALLIDO)</option>
+                    <option value="Pendiente (Tramite)" ${v.estado === 'Pendiente (Tramite)' ? 'selected' : ''}>⏳ PENDIENTE (REPUESTO)</option>
+                </select><select id="type_${v.id}" class="w-full p-3 glass-input rounded-xl text-[10px] font-black uppercase outline-none text-stone-800">${TIPOS_SERVICIO.map(t=>`<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div><select id="payment_${v.id}" class="w-full p-3 glass-input rounded-xl mb-3 text-[10px] font-black uppercase outline-none text-stone-800"><option value="EFECTIVO" ${v.financiera && v.financiera.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option><option value="TRANSFERENCIA" ${v.financiera && v.financiera.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option></select><div class="p-4 glass-input bg-stone-100/50 rounded-xl mb-3"><p class="text-[8px] font-black text-fix-main mb-2">📸 FOTOS Y COMENTARIO TÉCNICO:</p><input type="file" accept="image/*" multiple onchange="handleImageSelect(event, '${v.id}')" class="w-full text-[8px] mb-3 text-stone-600"><textarea id="client_comment_${v.id}" placeholder="TESTIMONIO O NOVEDAD FINAL..." class="w-full p-3 text-[10px] font-black uppercase glass-input rounded-lg border-none outline-none text-stone-800"></textarea></div><div class="max-h-32 overflow-y-auto mb-4 p-2 glass-input rounded-xl bg-white/40">
+                    ${Object.entries(ACCESORIOS_DEFAULT).map(function(item){
+                        const n = item[0]; const p = item[1];
+                        const existing = (v.accesoriosVendidos || []).find(a => a.nombre === n);
+                        return `<div class="flex justify-between items-center mb-2 glass-input bg-white/80 p-2 rounded-lg font-black border border-white/60"><span class="text-[8px] uppercase text-stone-700">${n} ($${p.toFixed(2)})</span><input type="number" min="0" value="${existing ? existing.cantidad : 0}" data-name="${n}" data-price="${p}" class="acc-${v.id} w-12 text-center text-[10px] font-black text-fix-main glass-input rounded-md shadow-inner outline-none bg-white"></div>`;
+                    }).join('')}
+                </div><textarea id="reason_${v.id}" placeholder="NOTA INTERNA TÉCNICA..." class="w-full p-4 text-xs glass-input rounded-xl mb-4 font-bold uppercase italic outline-none text-stone-800"></textarea><button onclick="closeVisitByTech('${v.id}')" class="w-full glass-card bg-fix-report/90 border-emerald-500 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 text-center">💾 GUARDAR CIERRE</button></div></div></td></tr>`;
+            }).join('');
+        }
+
+        window.reScheduleVisit = function(id) {
+            const newDate = document.getElementById('date_pend_' + id).value;
+            const newNote = document.getElementById('note_pend_' + id).value;
+            if(!newDate) { showMessage("⚠️ SELECCIONE UNA FECHA", "fix-accent"); return; }
+            database.ref('visits/' + id).update({ fechaInstalacion: newDate, razonNoAtencion: newNote.toUpperCase(), estado: 'PENDIENTE', priority: 0 }).then(() => { showMessage("✅ RE-AGENDADO", "fix-report"); renderPendientes(); }).catch(() => { showMessage("❌ ERROR", "fix-error"); });
+        };
+
+        window.savePendingNote = function(id) {
+            const newNote = document.getElementById('note_pend_' + id).value;
+            database.ref('visits/' + id).update({ razonNoAtencion: newNote.toUpperCase() }).then(() => { showMessage("💾 NOVEDAD GUARDADA", "fix-report"); renderPendientes(); }).catch(() => { showMessage("❌ ERROR", "fix-error"); });
+        };
+
+        window.closeVisitByAdmin = function(id) {
+            showConfirmModal("¿CONFIRMAR ESTE CASO COMO ATENDIDO DESDE OFICINA? SE GUARDARÁ EN EL MAESTRO AUTOMÁTICAMENTE.", function() {
+                database.ref('visits/' + id).update({
+                    estado: 'Atendido',
+                    attendedDate: new Date().toISOString(),
+                    razonNoAtencion: 'SOLUCIONADO DIRECTO DESDE OFICINA / ADMINISTRADOR'
+                }).then(() => {
+                    showMessage("✅ CASO CERRADO POR ADMIN", "fix-report");
+                    renderPendientes();
+                }).catch(() => {
+                    showMessage("❌ ERROR AL CERRAR", "fix-error");
+                });
+            });
+        };
+
+        function renderPendientes() {
+            const container = document.getElementById('pendientesList'); if(!container) return;
+            const techFilter = document.getElementById('pendingTechFilter').value;
+            const typeFilter = document.getElementById('pendingTypeFilter').value;
+            const query = document.getElementById('pendingSearchInput')?.value.toUpperCase() || "";
+
+            let filtered = visitsArray.filter(v => v.estado && v.estado !== 'Atendido' && v.estado !== 'PENDIENTE' && v.estado !== 'A Taller' && v.estado !== 'Garantia en Tramite');
+            
+            if(query) filtered = filtered.filter(v => v.nombreCliente && v.nombreCliente.toUpperCase().includes(query));
+            if(techFilter) filtered = filtered.filter(v => v.tecnico === techFilter);
+            if(typeFilter !== 'TODOS') filtered = filtered.filter(v => v.estado === typeFilter);
+
+            filtered.sort((a, b) => (a.fechaInstalacion || "").localeCompare(b.fechaInstalacion || ""));
+
+            if(filtered.length === 0) { container.innerHTML = '<p class="p-10 text-center text-stone-500 font-black uppercase italic">No hay casos pendientes</p>'; return; }
+            
+            container.innerHTML = filtered.map(v => {
+                const color = v.estado && v.estado.includes('Pendiente') ? 'border-fix-pending' : 'border-fix-accent';
+                return `<div class="glass-card p-6 rounded-[2rem] border-l-[12px] ${color} mb-5 hover:shadow-lg transition-all shadow-md">
+                    <div class="flex justify-between items-start mb-4 border-b border-white/60 pb-4">
+                        <div class="flex flex-col">
+                            <h3 class="text-base font-black text-stone-800 italic underline uppercase">${v.nombreCliente}</h3>
+                            <span class="text-[9px] font-bold text-stone-600 tracking-tighter mt-1">FECHA REGISTRO: ${v.fechaInstalacion} • TÉCNICO: ${v.tecnico} • ESTADO: ${(v.estado || '').toUpperCase()}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="closeVisitByAdmin('${v.id}')" class="glass-card bg-emerald-700/90 border-emerald-600 text-white px-4 py-2 rounded-full text-[8px] font-black italic shadow-sm active:scale-95">✅ SOLUCIONADO</button>
+                            <button onclick="openEditModal('${v.id}')" class="glass-input bg-white/80 text-stone-700 px-4 py-2 rounded-full text-[8px] font-black italic shadow-sm active:scale-95">MODIFICAR</button>
+                            <button onclick="deleteVisit('${v.id}')" class="text-fix-error text-lg glass-input bg-white/70 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div class="glass-panel p-5">
+                            <p class="text-[9px] font-black text-fix-main mb-2 uppercase italic underline">Escribir Novedades / Seguimiento:</p>
+                            <textarea id="note_pend_${v.id}" placeholder="ESCRIBA AQUÍ LAS NOVEDADES..." class="w-full p-4 text-[10px] font-black uppercase glass-input rounded-xl mb-4 min-h-[80px] outline-none text-stone-800">${v.razonNoAtencion || ''}</textarea>
+                            <div class="flex gap-2 items-center mb-5">
+                                <button onclick="savePendingNote('${v.id}')" class="w-full glass-card bg-fix-main/90 border-white/50 text-white py-3 rounded-xl text-[10px] font-black shadow-sm active:scale-95 transition-all text-center">💾 GRABAR NOVEDAD</button>
+                            </div>
+                            
+                            <p class="text-[9px] font-black text-fix-accent mb-2 uppercase italic underline">Re-Agendar Visita:</p>
+                            <div class="flex gap-3 items-center">
+                                <input type="date" id="date_pend_${v.id}" class="flex-grow p-3 rounded-xl text-[10px] font-mono font-black glass-input outline-none text-stone-800">
+                                <button onclick="reScheduleVisit('${v.id}')" class="glass-card bg-fix-report/90 border-emerald-500 text-white px-6 py-3 rounded-xl text-[10px] font-black shadow-sm active:scale-95 transition-all text-center">🚀 RE-AGENDAR</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // --- LÓGICA DE TALLER ---
+        function renderTaller() {
+            const container = document.getElementById('tallerList'); if(!container) return;
+            const query = document.getElementById('tallerSearchInput')?.value.toUpperCase() || "";
+            let filtered = visitsArray.filter(v => v.estado === 'A Taller');
+            if(query) filtered = filtered.filter(v => v.nombreCliente && v.nombreCliente.toUpperCase().includes(query));
+
+            if(filtered.length === 0) { container.innerHTML = '<p class="p-10 text-center text-stone-500 font-black uppercase italic">No hay equipos en taller</p>'; return; }
+
+            const equiposTallerList = ["Cocina", "Refrigerador", "Microondas", "Horno", "Campana", "Campana Decorativa", "Campana de Isla", "Lavadora", "Secadora", "Barbecue", "Triturador", "Lavavajillas", "Calefón", "Otros"];
+
+            container.innerHTML = filtered.map(v => {
+                return `<div class="glass-card p-6 md:p-8 taller-card mb-6 hover:shadow-lg transition-all shadow-md border-white/80">
+                    <div class="flex flex-col md:flex-row justify-between gap-6">
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-start mb-5 border-b border-white/60 pb-4">
+                                <div>
+                                    <h3 class="text-base font-black text-fix-main underline italic uppercase">${v.nombreCliente}</h3>
+                                    <p class="text-[9px] font-bold text-stone-600 mt-1 uppercase">TÉCNICO INGRESO: ${v.tecnico} • FECHA REGISTRO: ${v.fechaInstalacion}</p>
+                                </div>
+                                <button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/70 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div class="glass-panel p-5 italic">
+                                    <p class="text-[9px] font-black text-fix-taller uppercase mb-2 italic underline">Estado de Ingreso:</p>
+                                    <div class="text-[10px] text-stone-700 italic border-b border-white/60 pb-3 mb-3 uppercase">${v.razonNoAtencion || 'Sin observación'}</div>
+                                    <p class="text-[9px] font-black text-fix-main uppercase mb-2 italic underline">Equipo(s) de Ruta:</p>
+                                    <div class="text-[10px] font-black uppercase text-stone-700">${(v.equipos || []).map(e => '• ' + e.descProducto).join('<br>')}</div>
+                                </div>
+
+                                <div class="glass-panel bg-orange-50/40 border-orange-200/50 p-5 font-black italic">
+                                    <div class="grid grid-cols-1 gap-4 mb-4">
+                                        <div>
+                                            <label class="text-[8px] uppercase block mb-1 text-stone-600">1. SELECCIONAR EQUIPO TRABAJADO:</label>
+                                            <select id="taller_equipo_sel_${v.id}" class="w-full p-3 glass-input rounded-xl text-[10px] font-black uppercase outline-none text-stone-800">
+                                                <option value="">--- ELEGIR EQUIPO ---</option>
+                                                ${equiposTallerList.map(eq => `<option value="${eq}" ${v.taller_equipo_trabajado === eq ? 'selected' : ''}>${eq}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="text-[8px] uppercase block mb-1 text-stone-600">2. TIPO DE SERVICIO EN TALLER:</label>
+                                            <select id="taller_tipo_serv_${v.id}" class="w-full p-3 glass-input rounded-xl text-[10px] font-black uppercase outline-none text-stone-800">
+                                                <option value="">--- ELEGIR TIPO ---</option>
+                                                <option value="Garantía" ${v.taller_tipo_servicio === 'Garantía' ? 'selected' : ''}>🛡️ GARANTÍA</option>
+                                                <option value="Reparación" ${v.taller_tipo_servicio === 'Reparación' ? 'selected' : ''}>🛠️ REPARACIÓN</option>
+                                                <option value="Mantenimiento" ${v.taller_tipo_servicio === 'Mantenimiento' ? 'selected' : ''}>⚙️ MANTENIMIENTO</option>
+                                            </select>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="text-[8px] uppercase text-stone-600">Fecha Ingreso Taller:</label>
+                                                <input type="date" id="taller_fecha_${v.id}" value="${v.fechaIngresoTaller || ''}" class="w-full p-3 glass-input rounded-xl text-[10px] font-black text-stone-800 outline-none">
+                                            </div>
+                                            <div>
+                                                <label class="text-[8px] font-black text-fix-report uppercase">VALOR TOTAL TRABAJO $:</label>
+                                                <input type="number" step="0.01" id="taller_costo_total_${v.id}" value="${v.financiera?.totalCliente || ''}" placeholder="0.00" class="w-full p-3 glass-input border-emerald-300/60 rounded-xl text-[12px] font-mono font-black text-fix-report text-right bg-white/80 outline-none">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-4 p-4 glass-input bg-stone-100/50 rounded-xl border-stone-200/50">
+                                        <label class="text-[8px] font-black text-fix-main uppercase block mb-2 tracking-tighter">📅 AGENDAR DÍA DE ENTREGA LOGÍSTICA:</label>
+                                        <input type="date" id="taller_fecha_entrega_prog_${v.id}" value="${v.fechaEntregaProgramada || ''}" class="w-full p-3 glass-input rounded-xl text-[10px] font-black text-stone-800 outline-none">
+                                    </div>
+                                    <label class="text-[8px] uppercase block mb-1 text-stone-600">3. OBSERVACIONES / REPUESTOS / NOVEDADES:</label>
+                                    <textarea id="taller_repuestos_${v.id}" placeholder="ESPECIFIQUE EL TRABAJO REALIZADO..." class="w-full p-4 glass-input rounded-xl text-[10px] font-black uppercase min-h-[80px] text-stone-800 outline-none">${v.repuestosSolicitadosTaller || ''}</textarea>
+                                    <button onclick="saveTallerUpdate('${v.id}')" class="w-full mt-4 glass-card bg-fix-main/90 border-white/50 text-white py-4 rounded-xl text-[10px] font-black uppercase active:scale-95 shadow-md text-center">💾 ACTUALIZAR DATOS TALLER</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-full md:w-56 flex flex-col justify-center gap-4">
+                            <div class="glass-card bg-stone-900/90 text-white p-6 rounded-3xl text-center shadow-xl border-fix-accent/60">
+                                <p class="text-[9px] uppercase text-fix-accent font-black tracking-widest mb-2 italic">COSTO TOTAL</p>
+                                <p class="text-3xl font-mono font-black drop-shadow-md">$${(v.financiera?.totalCliente || 0).toFixed(2)}</p>
+                            </div>
+                            <button onclick="markAsDelivered('${v.id}')" class="glass-card bg-emerald-700/90 border-emerald-500 text-white py-6 rounded-3xl text-xs font-black uppercase italic shadow-lg active:scale-95 transition-all text-center hover:bg-emerald-800/90">🚀 ENTREGAR AL CLIENTE</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        window.saveTallerUpdate = function(id) {
+            const fecha = document.getElementById('taller_fecha_' + id).value;
+            const equipoSel = document.getElementById('taller_equipo_sel_' + id).value;
+            const tipoServ = document.getElementById('taller_tipo_serv_' + id).value;
+            const costoTotal = parseFloat(document.getElementById('taller_costo_total_' + id).value) || 0;
+            const repuestos = document.getElementById('taller_repuestos_' + id).value.toUpperCase();
+            const fechaEntregaProg = document.getElementById('taller_fecha_entrega_prog_' + id).value;
+
+            database.ref('visits/' + id).update({
+                fechaIngresoTaller: fecha,
+                taller_equipo_trabajado: equipoSel,
+                taller_tipo_servicio: tipoServ,
+                'financiera/totalCliente': costoTotal,
+                repuestosSolicitadosTaller: repuestos,
+                fechaEntregaProgramada: fechaEntregaProg
+            }).then(() => {
+                showMessage("💾 DATOS ACTUALIZADOS", "fix-report");
+                renderTaller();
+                renderRutero();
+            }).catch(() => showMessage("❌ ERROR AL GUARDAR", "fix-error"));
+        };
+
+        window.markAsDelivered = function(id) {
+            showConfirmModal("¿CONFIRMAR ENTREGA DEL EQUIPO AL CLIENTE? EL EQUIPO SE MARCARÁ COMO ATENDIDO Y SALDRÁ DEL TALLER.", function() {
+                database.ref('visits/' + id).update({
+                    estado: 'Atendido',
+                    fechaEntregaTaller: new Date().toISOString().split('T')[0],
+                    attendedDate: new Date().toISOString(),
+                    razonNoAtencion: 'EQUIPO REPARADO EN TALLER Y ENTREGADO SATISFACTORIAMENTE'
+                }).then(() => {
+                    showMessage("🚀 EQUIPO ENTREGADO", "fix-report");
+                    renderTaller();
+                }).catch(() => showMessage("❌ ERROR AL ENTREGAR", "fix-error"));
+            });
+        };
+
+        // --- LÓGICA DE GARANTÍAS EN TRÁMITE ---
+        function renderGarantias() {
+            const container = document.getElementById('garantiasList'); if(!container) return;
+            const query = document.getElementById('garantiasSearchInput')?.value.toUpperCase() || "";
+            let filtered = visitsArray.filter(v => v.estado === 'Garantia en Tramite');
+            if(query) filtered = filtered.filter(v => v.nombreCliente && v.nombreCliente.toUpperCase().includes(query));
+
+            if(filtered.length === 0) { container.innerHTML = '<p class="p-10 text-center text-stone-500 font-black uppercase italic">No hay garantías en trámite</p>'; return; }
+
+            container.innerHTML = filtered.map(v => {
+                return `<div class="glass-card p-6 md:p-8 mb-6 hover:shadow-lg transition-all shadow-md border-white/80" style="border-left: 12px solid #3e2723; border-radius: 2.5rem;">
+                    <div class="flex flex-col md:flex-row justify-between gap-6 font-black">
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-start mb-5 border-b border-white/60 pb-4">
+                                <div>
+                                    <h3 class="text-base font-black text-fix-main underline italic uppercase">${v.nombreCliente}</h3>
+                                    <p class="text-[9px] font-bold text-stone-600 mt-1 uppercase">TÉCNICO INGRESO: ${v.tecnico || '---'} • FECHA VISITA ORIGINAL: ${v.fechaInstalacion}</p>
+                                </div>
+                                <button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/70 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div class="glass-panel p-5 italic">
+                                    <p class="text-[9px] font-black text-fix-main uppercase mb-2 italic underline">Nota / Comentario del Técnico:</p>
+                                    <div class="text-[10px] text-stone-700 italic border-b border-white/50 pb-3 mb-3 uppercase">${v.commentarioCliente || 'Sin comentario del técnico'}</div>
+                                    <p class="text-[9px] font-black text-fix-accent uppercase mb-2 italic underline">Detalle Falla/Novedad:</p>
+                                    <div class="text-[10px] text-stone-700 italic border-b border-white/50 pb-3 mb-3 uppercase">${v.razonNoAtencion || 'Sin observación'}</div>
+                                    <p class="text-[9px] font-black text-stone-600 uppercase mb-2 italic underline">Equipo(s) de Ruta:</p>
+                                    <div class="text-[10px] font-black uppercase text-stone-800">${(v.equipos || []).map(e => '• ' + e.descProducto).join('<br>')}</div>
+                                </div>
+
+                                <div class="glass-panel bg-stone-100/40 border-stone-200/50 p-5 font-black italic">
+                                    <div class="grid grid-cols-1 gap-4 mb-4">
+                                        <div>
+                                            <label class="text-[8px] uppercase block mb-1 text-stone-600">1. REPUESTO O PARTE A SOLICITAR:</label>
+                                            <textarea id="garantias_repuesto_${v.id}" placeholder="Especifique los repuestos o códigos a solicitar..." class="w-full p-4 glass-input rounded-xl text-[10px] font-black uppercase min-h-[80px] outline-none text-stone-800">${v.repuestoSolicitadoGarantia || ''}</textarea>
+                                        </div>
+                                        <div>
+                                            <label class="text-[8px] uppercase block mb-1 text-stone-600">2. OBSERVACIÓN / TRÁMITE INTERNO:</label>
+                                            <textarea id="garantias_obs_${v.id}" placeholder="Notas sobre el estado del trámite en fábrica..." class="w-full p-4 glass-input rounded-xl text-[10px] font-black uppercase min-h-[80px] outline-none text-stone-800">${v.observacionGarantia || ''}</textarea>
+                                        </div>
+                                        <div class="glass-input p-4 rounded-xl bg-white/60 border-stone-200/50">
+                                            <label class="text-[8px] font-black text-fix-main uppercase block mb-2 tracking-tighter">📅 PLANIFICAR FECHA NUEVA VISITA:</label>
+                                            <input type="date" id="garantias_fecha_prog_${v.id}" value="${v.fechaNuevaVisita || ''}" class="w-full p-3 glass-input rounded-lg text-[10px] font-black outline-none text-stone-800">
+                                        </div>
+                                    </div>
+                                    <button onclick="saveGarantiaUpdate('${v.id}')" class="w-full mt-3 glass-card bg-fix-main/90 border-white/50 text-white py-4 rounded-xl text-[10px] font-black uppercase active:scale-95 shadow-sm text-center">💾 ACTUALIZAR DATOS TRÁMITE</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-full md:w-56 flex flex-col justify-center gap-4">
+                            <div class="glass-card bg-stone-900/90 text-white p-6 rounded-3xl text-center shadow-xl border-fix-accent/60">
+                                <p class="text-[9px] uppercase text-fix-accent font-black tracking-widest mb-2 italic">ESTADO DEL CASO</p>
+                                <p class="text-lg font-mono font-black text-emerald-400 drop-shadow-md">SOLICITADO</p>
+                            </div>
+                            <button onclick="reScheduleGarantia('${v.id}')" class="glass-card bg-emerald-700/90 border-emerald-500 text-white py-6 rounded-3xl text-xs font-black uppercase italic shadow-md active:scale-95 transition-all text-center hover:bg-emerald-800/90">🚀 RE-AGENDAR A RUTA</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        window.saveGarantiaUpdate = function(id) {
+            const repuesto = document.getElementById('garantias_repuesto_' + id).value.toUpperCase();
+            const obs = document.getElementById('garantias_obs_' + id).value.toUpperCase();
+            const fechaProg = document.getElementById('garantias_fecha_prog_' + id).value;
+
+            database.ref('visits/' + id).update({
+                repuestoSolicitadoGarantia: repuesto,
+                observacionGarantia: obs,
+                fechaNuevaVisita: fechaProg
+            }).then(() => {
+                showMessage("💾 TRÁMITE ACTUALIZADO", "fix-report");
+                renderGarantias();
+                renderRutero();
+            }).catch(() => showMessage("❌ ERROR AL GUARDAR", "fix-error"));
+        };
+
+        window.reScheduleGarantia = function(id) {
+            const fechaProg = document.getElementById('garantias_fecha_prog_' + id).value;
+            const obs = document.getElementById('garantias_obs_' + id).value.toUpperCase();
+            if(!fechaProg) {
+                showMessage("⚠️ SELECCIONE UNA FECHA DE NUEVA VISITA", "fix-accent");
+                return;
+            }
+            showConfirmModal("¿DESEA RE-AGENDAR ESTE CLIENTE? EL ESTADO VOLVERÁ A 'PENDIENTE' EN LA FECHA SELECCIONADA Y SALDRÁ DE ESTA BANDEJA.", function() {
+                database.ref('visits/' + id).update({
+                    estado: 'PENDIENTE',
+                    fechaInstalacion: fechaProg,
+                    observacionGarantia: obs,
+                    priority: 0
+                }).then(() => {
+                    showMessage("🚀 RE-AGENDADO CON ÉXITO", "fix-report");
+                    renderGarantias();
+                    renderRutero();
+                    renderUIAgenda();
+                }).catch(() => showMessage("❌ ERROR AL RE-AGENDAR", "fix-error"));
+            });
+        };
+
+        // --- MAESTRO DE GARANTÍAS FINALIZADAS ---
+        function renderMaestroGarantias() {
+            const body = document.getElementById('maestroGarantiasBody'); if(!body) return;
+            const start = document.getElementById('garantiaMaestroStart').value;
+            const end = document.getElementById('garantiaMaestroEnd').value;
+
+            let filtered = visitsArray.filter(v => v.tipoAtencion === 'Garantía' && v.estado === 'Atendido');
+            if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
+            filtered.sort((a, b) => (a.fechaInstalacion || "").localeCompare(b.fechaInstalacion || ""));
+
+            if(filtered.length === 0) {
+                body.innerHTML = '<tr><td colspan="18" class="p-6 text-center text-stone-500 italic font-black uppercase">No hay garantías finalizadas en este periodo.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = filtered.flatMap(v => (v.equipos || []).map(eq => {
+                const obs = (v.commentarioCliente || v.razonNoAtencion || '').replace(/(\r\n|\n|\r)/gm, " ");
+                const repuesto = (v.repuestoSolicitadoGarantia || '-').replace(/(\r\n|\n|\r)/gm, " ");
+
+                return `<tr class="border-b border-white/50 row-hover font-black uppercase whitespace-nowrap">
+                    <td class="report-cell font-mono text-stone-800">${v.fechaEmision || ''}</td>
+                    <td class="report-cell font-mono text-stone-800">${v.fechaInstalacion}</td>
+                    <td class="report-cell text-center text-stone-800">1</td>
+                    <td class="report-cell font-mono text-stone-700">${repuesto}</td>
+                    <td class="report-cell text-stone-600">-</td>
+                    <td class="report-cell font-mono text-stone-800">${eq.codProducto || '-'}</td>
+                    <td class="report-cell text-stone-800">${eq.descProducto || '-'}</td>
+                    <td class="report-cell font-mono tracking-widest text-stone-800">${eq.serieEquipo || '-'}</td>
+                    <td class="report-cell font-black text-emerald-700">SI</td>
+                    <td class="report-cell text-stone-800">${v.tecnico || '-'}</td>
+                    <td class="report-cell font-black italic text-fix-main">${v.nombreCliente}</td>
+                    <td class="report-cell max-w-[200px] truncate text-stone-700" title="${obs}">${obs || '-'}</td>
+                    <td class="report-cell font-mono text-right text-stone-800">$0.00</td>
+                    <td class="report-cell font-mono text-stone-800">${v.cedula || '-'}</td>
+                    <td class="report-cell lowercase text-stone-600">${v.email || '-'}</td>
+                    <td class="report-cell font-mono text-stone-800">${v.telefono || '-'}</td>
+                    <td class="report-cell text-stone-800"></td>
+                    <td class="report-cell font-mono text-stone-800">${v.numFactura || '-'}</td>
+                </tr>`;
+            })).join('');
+        }
+
+        window.downloadGarantiasCSV = function() {
+            let csv = "Fecha de Compra,Fecha de Intervención,Cantidad,Código del repuesto,Descripción del Repuesto,Codigo del Producto,Descripción del Producto,Serie,Garantía,Técnico,Cliente,Observación,valor a pagar,Cédula,Correo,telefono del cliente,VIÁTICO,FACTURA NUMERO\n";
+            document.querySelectorAll('#maestroGarantiasBody tr').forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if(cols.length >= 18) {
+                    let rowData = [];
+                    for(let i=0; i<18; i++) {
+                        rowData.push('"' + cols[i].innerText.replace(/"/g, '""') + '"');
+                    }
+                    csv += rowData.join(",") + "\n";
+                }
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", "REPORTE_GARANTIAS_FINALIZADAS.csv");
+            link.click();
+            showMessage("📊 Reporte descargado", "fix-report");
+        };
+
+        function renderReporteMantenimiento() {
+            const body = document.getElementById('mantenimientoReporteBody'); if(!body) return;
+            const start = document.getElementById('maintBalanceStart')?.value;
+            const end = document.getElementById('maintBalanceEnd')?.value;
+            let filtered = visitsArray.filter(v => v.esMantenimiento);
+            if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
+            body.innerHTML = filtered.map(v => `<tr class="border-b border-white/50 row-hover font-black uppercase"><td class="report-cell font-mono font-black text-stone-800">${v.fechaInstalacion}</td><td class="report-cell font-black text-fix-main">${v.nombreCliente}</td><td class="report-cell font-mono text-stone-700">${v.telefono || '-'}</td><td class="report-cell uppercase text-[8px] max-w-[120px] truncate text-stone-700">${v.callePrincipal || '-'}</td><td class="report-cell uppercase text-[8px] font-bold text-fix-accent">${v.mantenimientoEquipo || 'General'}</td><td class="report-cell font-black text-right text-fix-report">$${(v.financiera ? v.financiera.totalCliente : 0).toFixed(2)}</td><td class="report-cell text-center font-black">${v.estado === 'Atendido' ? '✅' : '⏳'}</td><td class="report-cell text-center font-black"><button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/70 w-7 h-7 rounded-full flex items-center justify-center hover:scale-110 shadow-sm">🗑️</button></td></tr>`).join('');
+        }
+
+        function processMaintBalance() {
+            const start = document.getElementById('maintBalanceStart')?.value;
+            const end = document.getElementById('maintBalanceEnd')?.value;
+            let filtered = visitsArray.filter(v => v.esMantenimiento && v.estado === 'Atendido' && v.financiera);
+            if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
+            let cash = 0, trans = 0;
+            filtered.forEach(v => {
+                const monto = v.financiera.totalCliente || 0;
+                if(v.financiera.formaPago === 'TRANSFERENCIA') trans += monto; else cash += monto;
+            });
+            if(document.getElementById('maintTotalCash')) document.getElementById('maintTotalCash').textContent = "$" + cash.toFixed(2);
+            if(document.getElementById('maintTotalTrans')) document.getElementById('maintTotalTrans').textContent = "$" + trans.toFixed(2);
+            if(document.getElementById('maintTotalGeneral')) document.getElementById('maintTotalGeneral').textContent = "$" + (cash + trans).toFixed(2);
+        }
+
+        window.setMaintFilter = function(type) {
+            const now = new Date(); let start, end;
+            if(type === 'week') { 
+                const day = now.getDay(); 
+                const diff = now.getDate() - day + (day === 0 ? -6 : 1); 
+                start = new Date(now.setDate(diff)).toISOString().split('T')[0]; 
+                end = new Date().toISOString().split('T')[0]; 
+            } 
+            else if (type === 'month') { 
+                start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]; 
+                end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]; 
+            }
+            if(document.getElementById('maintBalanceStart')) document.getElementById('maintBalanceStart').value = start;
+            if(document.getElementById('maintBalanceEnd')) document.getElementById('maintBalanceEnd').value = end;
+            processMaintBalance(); 
+            renderReporteMantenimiento();
+        };
+
+        window.downloadCSV = function() {
+            const start = document.getElementById('maestroDateStart').value || "HISTORICO";
+            let csv = "NRO,FECHA DE EMISION,LUGAR DE COMPRA,FACTURA,CODIGO,DESCRIPCION,SERIE,SAP,TECNICO,CIUDAD,FECHA ATENCION,CLIENTE,CALLE,TELEFONO,PRECIO,LLEGADA INFO,TECNICO QUE ATENDIO,VIATICO,FACTURA REP,CEDULA,CORREO\n";
+            document.querySelectorAll('#tekaReporteBody tr').forEach(row => { const cols = row.querySelectorAll('td'); if(cols.length >= 21) { let rowData = []; for(let i=0; i<21; i++) { rowData.push('"' + cols[i].innerText.replace(/"/g, '""') + '"'); } csv += rowData.join(",") + "\n"; } });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "REPORTE_SAP_" + start + ".csv"); link.click();
+        }
+
+        window.downloadCajaCSV = function() {
+            let csv = "FECHA,TECNICO,TIPO,FORMA PAGO,CONCEPTO,MONTO\n";
+            document.querySelectorAll('#contabilidadTableBody tr').forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if(cols.length >= 4) {
+                    const rowData = [
+                        cols[0].innerText.split('\n')[0],
+                        cols[0].innerText.split('\n')[1],
+                        cols[1].innerText.split('\n')[0],
+                        cols[1].innerText.split('\n')[1],
+                        cols[2].innerText,
+                        cols[3].innerText.replace('$', '')
+                    ];
+                    csv += rowData.map(d => `"${d}"`).join(",") + "\n";
+                }
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "CAJA_FILTRADA.csv"); link.click();
+        }
+
+        window.downloadMantenimientoCSV = function() {
+            let csv = "FECHA,CLIENTE,TELEFONO,CALLE,DESCRIPCION,VALOR,ESTADO\n";
+            document.querySelectorAll('#mantenimientoReporteBody tr').forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if(cols.length >= 7) {
+                    let rowData = [];
+                    for(let i=0; i<7; i++) {
+                        rowData.push('"' + cols[i].innerText.replace(/"/g, '""') + '"');
+                    }
+                    csv += rowData.join(",") + "\n";
+                }
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.setAttribute("download", "REPORTE_MANTENIMIENTOS.csv"); link.click();
+            showMessage("📊 Reporte descargado", "fix-report");
+        }
+
+        function renderReporteTeka() {
+            const body = document.getElementById('tekaReporteBody'); if(!body) return;
+            const start = document.getElementById('maestroDateStart').value; 
+            const end = document.getElementById('maestroDateEnd').value;
+            
+            let filtered = visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Garantía' && v.estado === 'Atendido');
+            if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
+            filtered.sort((a, b) => (a.fechaInstalacion || "").localeCompare(b.fechaInstalacion || ""));
+
+            const bbqs = filtered.filter(v => (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ"));
+            const multis = filtered.filter(v => !(v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ") && (v.equipos || []).length > 1);
+            const singles = filtered.filter(v => !(v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ") && (v.equipos || []).length === 1);
+
+            let rowCount = 1;
+            let granTotalMO = 0;
+
+            const renderSection = (title, list) => {
+                if (list.length === 0) return "";
+                let html = `<tr><td colspan="22" class="p-5 glass-panel bg-white/80 text-fix-main text-[11px] font-black italic tracking-widest uppercase border-y border-white/90 shadow-sm">${title} (${list.length} SERVICIOS)</td></tr>`;
+                html += list.flatMap(v => (v.equipos || []).map(eq => {
+                    const costo = (eq.costoBase || 0);
+                    granTotalMO += costo;
+                    return `<tr class="border-b border-white/50 row-hover font-black uppercase"><td class="report-cell text-center font-mono glass-input bg-white/90">${rowCount++}</td><td class="report-cell font-mono text-stone-700">${v.fechaEmision || ''}</td><td class="report-cell text-stone-700">${v.lugarCompra || 'OTRO'}</td><td class="report-cell font-mono text-stone-700">${v.numFactura || '-'}</td><td class="report-cell font-mono text-stone-700">${eq.codProducto || '-'}</td><td class="report-cell italic text-stone-500"></td><td class="report-cell font-mono tracking-widest text-stone-700">${eq.serieEquipo || '-'}</td><td class="report-cell font-black text-stone-800">SAP</td><td class="report-cell text-stone-800">CAPELO</td><td class="report-cell text-stone-800">CUENCA</td><td class="report-cell font-mono text-stone-800">${v.fechaInstalacion}</td><td class="report-cell font-black italic text-fix-main">${v.nombreCliente}</td><td class="report-cell max-w-[150px] truncate text-stone-700">${v.callePrincipal || '-'}</td><td class="report-cell font-mono text-stone-700">${v.telefono || '-'}</td><td class="report-cell font-black text-right font-mono text-stone-900">$${costo.toFixed(2)}</td><td class="report-cell text-stone-800">CLIENTE FINAL</td><td class="report-cell text-stone-800">CAPELO</td><td class="report-cell italic text-stone-500"></td><td class="report-cell font-mono text-stone-700">${v.numFactura || '-'}</td><td class="report-cell font-mono text-stone-700">${v.cedula || '-'}</td><td class="report-cell lowercase text-stone-600">${v.email || '-'}</td><td class="report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/80 w-7 h-7 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button></td></tr>`;
+                })).join('');
+                return html;
+            };
+
+            body.innerHTML = 
+                renderSection("📋 REPORTE UN PRODUCTO", singles) + 
+                renderSection("📚 REPORTE MULTI-PRODUCTO", multis) + 
+                renderSection("🔥 REPORTE PARRILLAS BBQ", bbqs);
+
+            const summaryBox = document.getElementById('tekaSummaryTotal');
+            if(summaryBox) summaryBox.textContent = "$" + granTotalMO.toFixed(2);
+        }
+
+        function renderInventoryView() {
+            const container = document.getElementById('inventoryTableBody'); if(!container) return;
+            const selectAcc = document.getElementById('invAccSelect');
+            if(selectAcc && selectAcc.options.length === 0) { Object.keys(ACCESORIOS_DEFAULT).forEach(n => selectAcc.add(new Option(n, n))); }
+            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(item => {
+                const name = item[0]; const price = item[1];
+                const totalIn = inventoryEntries.filter(e => e.accesorio === name).reduce((sum, e) => sum + e.cantidad, 0);
+                let totalOut = 0;
+                visitsArray.filter(v => v.estado === 'Atendido' && v.accesoriosVendidos).forEach(v => { const sold = v.accesoriosVendidos.find(a => a.nombre === name); if(sold) totalOut += sold.cantidad; });
+                const stock = totalIn - totalOut;
+                return `<tr class="border-b border-white/50 row-hover font-black uppercase"><td class="p-4 text-xs font-black text-fix-main tracking-tighter">${name}</td><td class="p-4 text-center text-[10px] font-mono font-bold text-stone-700">${totalIn}</td><td class="p-4 text-center text-[10px] font-mono font-bold text-fix-error">${totalOut}</td><td class="p-4 text-center"><span class="px-3 py-1.5 rounded-md shadow-sm border border-white text-xs font-mono font-black ${stock <= 5 ? 'bg-rose-100/90 text-rose-800' : 'bg-emerald-100/90 text-emerald-800'}">${stock}</span></td><td class="p-4 text-right text-[10px] font-mono text-stone-600 italic">$${price.toFixed(2)}</td></tr>`;
+            }).join('');
+        }
+
+        window.showDesgloseVisita = function(id) {
             const v = visitsArray.find(item => item.id === id);
             if (!v) return;
-            const textBlock = `Nombre: ${v.nombreCliente || ''}
-Calle: ${v.callePrincipal || ''}
-Cédula: ${v.cedula || ''}
-Teléfono: ${v.telefono || ''}
-Correo: ${v.email || ''}`;
-            
-            // Clipboard native fallback
-            const el = document.createElement('textarea');
-            el.value = textBlock;
-            document.body.appendChild(el);
-            el.select();
-            document.execCommand('copy');
-            document.body.removeChild(el);
-            showMessage("📋 DATOS DEL CLIENTE COPIADOS", "fix-report");
+            const container = document.getElementById('desgloseContent');
+            const modal = document.getElementById('desgloseModal');
+            let html = `<div class="space-y-4">`;
+            let totalGeneral = 0;
+            if (v.tipoAtencion !== 'Garantía') {
+                const hasBBQ = (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ");
+                const eqCount = (v.equipos || []).length;
+                if (eqCount === 1 && !hasBBQ) {
+                    const mo = (v.equipos || []).reduce((sum, eq) => sum + (eq.costoBase || 0), 0);
+                    if(mo > 0) {
+                        html += `<div class="flex justify-between items-center glass-input bg-white/80 p-5 rounded-2xl shadow-sm border border-white"><span class="text-xs font-black text-stone-700 uppercase tracking-tighter">🛠️ MANO DE OBRA</span><span class="font-mono font-black text-fix-main text-base">$${mo.toFixed(2)}</span></div>`;
+                        totalGeneral += mo;
+                    }
+                }
+            }
+            if (v.accesoriosVendidos && v.accesoriosVendidos.length > 0) {
+                v.accesoriosVendidos.forEach(a => {
+                    const itemTotal = a.cantidad * a.precio;
+                    html += `<div class="flex justify-between items-center glass-input bg-white/60 p-5 rounded-2xl shadow-sm border border-white"><div class="flex flex-col"><span class="text-[10px] font-black text-stone-800 uppercase tracking-tighter">${a.nombre}</span><span class="text-[8px] font-bold text-stone-500 mt-1">CANT: ${a.cantidad} x $${a.precio.toFixed(2)}</span></div><span class="font-mono font-black text-fix-report text-base">$${itemTotal.toFixed(2)}</span></div>`;
+                    totalGeneral += itemTotal;
+                });
+            }
+            html += `<div class="pt-6 border-t border-stone-400/30 flex justify-between items-end"><span class="text-[10px] font-black text-stone-600 uppercase italic">Total Cobrado:</span><span class="text-4xl font-mono font-black text-stone-900 tracking-tighter drop-shadow-sm">$${totalGeneral.toFixed(2)}</span></div></div>`;
+            document.getElementById('desgloseTitle').textContent = v.nombreCliente;
+            container.innerHTML = html;
+            modal.classList.remove('hidden');
         };
 
-        // --- MANEJO EXCLUSIVO DE LA IA DE GEMINI (CONEXIÓN ROBUSTA CON RETRIES) ---
-        async function callGeminiAPI(payload) {
-            const apiKey = ""; // La clave de API vacía por requerimiento del entorno de ejecución
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            
-            let retries = 5;
-            let delay = 1000;
-            
-            for (let i = 0; i < retries; i++) {
-                try {
-                    const response = await fetch(url, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(payload)
-                    });
-                    if (response.ok) {
-                        return await response.json();
-                    }
-                } catch (e) {
-                    // Re-intento silencioso sin loguear en consola
-                }
-                await new Promise(resolve => setTimeout(resolve, delay));
-                delay *= 2;
-            }
-            throw new Error("No se pudo conectar con el motor de Inteligencia Artificial.");
-        }
+        window.closeDesgloseModal = function() { document.getElementById('desgloseModal').classList.add('hidden'); };
 
-        // --- ESCÁNER DE IMAGEN DE FACTURA POR IA ---
-        window.scanInvoiceFile = async function(event, formType) {
-            const file = event.target.files[0];
-            if (!file) return;
+        function processFinancialBalance() {
+            const startInput = document.getElementById('cajaDateStart');
+            const endInput = document.getElementById('cajaDateEnd');
+            const start = startInput ? startInput.value : ""; 
+            const end = endInput ? endInput.value : "";
+            const techFilter = document.getElementById('cajaTechFilter') ? document.getElementById('cajaTechFilter').value : "";
             
-            // Mostrar indicador de carga interactivo
-            const quickPasteElement = formType === 'visit' ? 'quickPasteVisit' : 'quickPasteMaint';
-            const originalPlaceholder = document.getElementById(quickPasteElement).placeholder;
-            document.getElementById(quickPasteElement).placeholder = "🪄 ANALIZANDO IMAGEN CON INTELIGENCIA ARTIFICIAL (IA)... POR FAVOR ESPERA...";
-            showMessage("🔮 LEYENDO FOTO DE FACTURA POR IA...", "fix-accent");
+            let todos = [];
             
-            try {
-                const base64Data = await convertToBase64(file);
-                const base64Clean = base64Data.split(',')[1];
-                const mimeType = file.type;
-
-                const payload = {
-                    contents: [{
-                        role: "user",
-                        parts: [
-                            { 
-                                text: "Analiza esta factura o nota de venta. Extrae los datos del cliente: nombre completo, dirección/calle principal, número de cédula o RUC (solo dígitos de la identificación), número de teléfono, correo electrónico, número de factura de compra, lugar de compra (coincidir con uno de estos: COMERCIAL KYWI, COMERCIAL SOLIS, COMO HOGAR, SUKASA, LUNA PAZMIÑO, MACAOFERTAS, HOME VEGA, ALMACENES BOYACÁ, ALMACENES CHORDELEG, VTORIA HOGAR, etc.), y fecha de emisión (AAAA-MM-DD). Si encuentras un link de ubicación GPS (Google Maps, Waze, etc.) extráelo. Si no encuentras ningún link GPS, genera uno de búsqueda de Google Maps usando la calle y la ciudad (asume Cuenca, Ecuador si no hay otra indicada) con esta estructura: 'https://www.google.com/maps/search/?api=1&query=' seguido del nombre de la calle, sector y ciudad codificados para URL." 
-                            },
-                            { 
-                                inlineData: { 
-                                    mimeType: mimeType, 
-                                    data: base64Clean 
-                                } 
-                            }
-                        ]
-                    }],
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                nombre: { type: "STRING" },
-                                calle: { type: "STRING" },
-                                cedula: { type: "STRING" },
-                                telefono: { type: "STRING" },
-                                email: { type: "STRING" },
-                                numFactura: { type: "STRING" },
-                                lugarCompra: { type: "STRING" },
-                                fechaEmision: { type: "STRING" },
-                                direccionGps: { type: "STRING" }
-                            },
-                            required: ["nombre"]
-                        }
-                    }
-                };
-
-                const result = await callGeminiAPI(payload);
-                const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+            visitsArray.filter(v => v.estado === 'Atendido' && v.financiera).forEach(v => {
+                let monto = (v.tipoAtencion === 'Garantía') ? 0 : (v.financiera.totalCliente || 0);
+                let concepto = v.esMantenimiento ? "MANTENIMIENTO: " + v.nombreCliente : "VISITA: " + v.nombreCliente;
                 
-                if (rawText) {
-                    const data = JSON.parse(rawText);
-                    fillFormFields(data, formType);
-                    showMessage("🪄 ¡FOTO ESCANEADA CON ÉXITO!", "fix-report");
-                } else {
-                    throw new Error("No se recibieron datos legibles de la imagen.");
-                }
-            } catch (err) {
-                console.error(err);
-                showMessage("❌ ERROR AL ESCANEAR: Intente pegar el texto manual", "fix-error");
-            } finally {
-                document.getElementById(quickPasteElement).placeholder = originalPlaceholder;
-                event.target.value = ''; // Resetear input file
-            }
-        };
-
-        // --- PARSER INTELIGENTE PARA PEGAR TEXTO CON IA ---
-        window.parseQuickPasteWithAI = async function(formType) {
-            const quickPasteElement = formType === 'visit' ? 'quickPasteVisit' : 'quickPasteMaint';
-            const textValue = document.getElementById(quickPasteElement).value;
-            
-            if (!textValue.trim()) {
-                showMessage("⚠️ PEGA UN TEXTO O CAPTURA PRIMERO", "fix-error");
-                return;
-            }
-
-            const originalPlaceholder = document.getElementById(quickPasteElement).placeholder;
-            document.getElementById(quickPasteElement).placeholder = "🪄 PROCESANDO TEXTO CON IA... ESPERA POR FAVOR...";
-            showMessage("🔮 PROCESANDO MENSAJE CON IA...", "fix-accent");
-
-            try {
-                const payload = {
-                    contents: [{
-                        role: "user",
-                        parts: [{
-                            text: `Analiza el siguiente texto de un cliente, mensaje de WhatsApp o factura: "${textValue}". Extrae los datos del cliente: nombre completo, dirección/calle principal, número de cédula o RUC (solo dígitos de la identificación), número de teléfono, correo electrónico, número de factura de compra, lugar de compra (coincidir con uno de estos: COMERCIAL KYWI, COMERCIAL SOLIS, COMO HOGAR, SUKASA, LUNA PAZMIÑO, MACAOFERTAS, HOME VEGA, ALMACENES BOYACÁ, ALMACENES CHORDELEG, VTORIA HOGAR, etc.), y fecha de emisión (AAAA-MM-DD). Si encuentras un link de ubicación GPS (Google Maps, Waze, etc.) extráelo. Si no encuentras ningún link GPS, genera uno de búsqueda de Google Maps usando la calle y la ciudad (asume Cuenca, Ecuador si no hay otra indicada) con esta estructura: 'https://www.google.com/maps/search/?api=1&query=' seguido del nombre de la calle, sector y ciudad codificados para URL.`
-                        }]
-                    }],
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                nombre: { type: "STRING" },
-                                calle: { type: "STRING" },
-                                cedula: { type: "STRING" },
-                                telefono: { type: "STRING" },
-                                email: { type: "STRING" },
-                                numFactura: { type: "STRING" },
-                                lugarCompra: { type: "STRING" },
-                                fechaEmision: { type: "STRING" },
-                                direccionGps: { type: "STRING" }
-                            },
-                            required: ["nombre"]
-                        }
-                    }
-                };
-
-                const result = await callGeminiAPI(payload);
-                const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-                if (rawText) {
-                    const data = JSON.parse(rawText);
-                    fillFormFields(data, formType);
-                    document.getElementById(quickPasteElement).value = ''; // Limpiar caja
-                    showMessage("🪄 ¡DATOS DEL TEXTO IMPORTADOS!", "fix-report");
-                } else {
-                    throw new Error("No se recibieron datos estructurados.");
-                }
-            } catch (err) {
-                console.error(err);
-                // Fallback clásico local si la IA falla
-                window.parseQuickPaste(textValue, formType);
-            } finally {
-                document.getElementById(quickPasteElement).placeholder = originalPlaceholder;
-            }
-        };
-
-        // --- FUNCIÓN CENTRALIZADA PARA AUTOCOMPLETAR FORMULARIOS ---
-        function fillFormFields(data, formType) {
-            if (formType === 'visit') {
-                if (data.nombre) document.getElementsByName("nombreCliente")[0].value = data.nombre.toUpperCase();
-                if (data.calle) document.getElementsByName("callePrincipal")[0].value = data.calle.toUpperCase();
-                if (data.cedula) document.getElementsByName("cedula")[0].value = data.cedula.replace(/\D/g, '');
-                if (data.telefono) document.getElementsByName("telefono")[0].value = data.telefono.replace(/[^\d+]/g, '');
-                if (data.email) document.getElementsByName("email")[0].value = data.email.toLowerCase();
-                if (data.numFactura) document.getElementsByName("numFactura")[0].value = data.numFactura.toUpperCase();
-                if (data.fechaEmision) document.getElementById("inputEmision").value = data.fechaEmision;
-                if (data.direccionGps) document.getElementsByName("direccion")[0].value = data.direccionGps;
-                
-                // Tratar de seleccionar el lugar de compra
-                if (data.lugarCompra) {
-                    const select = document.getElementById("selectLugar");
-                    for (let i = 0; i < select.options.length; i++) {
-                        if (select.options[i].value.includes(data.lugarCompra.toUpperCase())) {
-                            select.selectedIndex = i;
-                            break;
-                        }
-                    }
-                }
-            } else if (formType === 'maint') {
-                if (data.nombre) document.getElementsByName("mNombre")[0].value = data.nombre.toUpperCase();
-                if (data.calle) document.getElementsByName("mCalle")[0].value = data.mCalle.toUpperCase();
-                if (data.cedula) document.getElementById("mCedula").value = data.cedula.replace(/\D/g, '');
-                if (data.telefono) document.getElementsByName("mTelefono")[0].value = data.telefono.replace(/[^\d+]/g, '');
-                if (data.email) document.getElementById("mEmail").value = data.email.toLowerCase();
-                if (data.direccionGps) document.getElementsByName("mDireccion")[0].value = data.direccionGps;
-            }
-        }
-
-        // --- SISTEMA CLÁSICO DE PARSEO MANUAL (FALLBACK SIN CONEXIÓN) ---
-        window.parseQuickPaste = function(text, formType) {
-            if (!text) {
-                showMessage("⚠️ Pega algún texto primero", "fix-error");
-                return;
-            }
-            
-            let nombre = "";
-            let cedula = "";
-            let telefono = "";
-            let calle = "";
-            let email = "";
-            let gpsUrl = "";
-            
-            const lines = text.split('\n');
-            
-            // Buscar URLs de Google Maps o Waze en el texto
-            const mapsRegex = /(https?:\/\/[^\s]+(?:google\.com\/maps|goo\.gl\/maps|waze\.com)[^\s]*)/i;
-            const gpsMatch = text.match(mapsRegex);
-            if (gpsMatch) {
-                gpsUrl = gpsMatch[0];
-            }
-            
-            lines.forEach(line => {
-                const trimmed = line.trim();
-                if (!trimmed) return;
-                
-                const parts = trimmed.split(/[:=]/);
-                if (parts.length >= 2) {
-                    const key = parts[0].toLowerCase();
-                    const val = parts.slice(1).join(':').trim();
-                    
-                    if (key.includes("nombre") || key.includes("cliente") || key.includes("atencion") || key.includes("atención")) {
-                        nombre = val;
-                    } else if (key.includes("calle") || key.includes("direccion") || key.includes("dirección") || key.includes("dir")) {
-                        calle = val;
-                    } else if (key.includes("cedula") || key.includes("cédula") || key.includes("ci") || key.includes("ruc")) {
-                        cedula = val.replace(/\D/g, ''); 
-                    } else if (key.includes("telefono") || key.includes("teléfono") || key.includes("celular") || key.includes("telf") || key.includes("cel")) {
-                        telefono = val;
-                    } else if (key.includes("correo") || key.includes("email") || key.includes("mail")) {
-                        email = val;
-                    }
-                }
+                todos.push({ 
+                    id: v.id, 
+                    monto, 
+                    type: 'INGRESO', 
+                    concepto: concepto, 
+                    fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt, 
+                    dateStr: v.fechaInstalacion, 
+                    source: 'VISITA', 
+                    tecnico: v.tecnico || '---', 
+                    formaPago: v.financiera.formaPago || 'EFECTIVO' 
+                });
             });
             
-            if (!email) {
-                const emails = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i);
-                if (emails) email = emails[0];
-            }
-            
-            const allNums = text.match(/\b\d{9,13}\b/g) || [];
-            allNums.forEach(num => {
-                if ((num.startsWith("09") || num.startsWith("9")) && num.length <= 10 && !telefono) {
-                    telefono = num;
-                } else if ((num.length === 10 || num.length === 13) && !cedula) {
-                    cedula = num;
-                } else if (num.length === 9 && !telefono) {
-                    telefono = num;
-                }
+            movementsArray.forEach(m => {
+                const mDate = new Date(m.fecha);
+                const dStr = mDate.toISOString().split('T')[0];
+                todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: "MANUAL: " + m.concepto, fecha: m.fecha, dateStr: dStr, source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' });
             });
+
+            let filteredTodos = [...todos];
+            if(start && end) filteredTodos = filteredTodos.filter(m => m.dateStr >= start && m.dateStr <= end);
+            if(techFilter) filteredTodos = filteredTodos.filter(m => m.tecnico === techFilter);
             
-            if (!nombre) {
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (line && !line.includes("@") && !line.includes(":") && !line.includes("=") && !line.match(/\d{5,}/) && line.length > 4) {
-                        nombre = line;
-                        break;
-                    }
-                }
-            }
-            
-            if (!calle) {
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    const lower = line.toLowerCase();
-                    if (line && line !== nombre && (lower.includes("av") || lower.includes("calle") || lower.includes("conjunto") || lower.includes("casa") || lower.includes("sector") || lower.includes("lote") || lower.includes("esquina"))) {
-                        calle = line;
-                        break;
-                    }
-                }
-            }
-            
-            nombre = nombre.trim().toUpperCase();
-            calle = calle.trim().toUpperCase();
-            cedula = cedula.replace(/\D/g, '').trim();
-            telefono = telefono.replace(/[^\d+]/g, '').trim();
-            email = email.trim().toLowerCase();
-            
-            const data = {
-                nombre: nombre,
-                calle: calle,
-                cedula: cedula,
-                telefono: telefono,
-                email: email,
-                direccionGps: gpsUrl || (calle ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(calle + ', Cuenca, Ecuador')}` : '')
+            filteredTodos.sort((a,b) => b.fecha - a.fecha);
+
+            const parseDateString = (timestamp) => {
+                if (!timestamp) return '---';
+                const d = new Date(timestamp);
+                return isNaN(d.getTime()) ? '---' : d.toLocaleDateString();
             };
             
-            fillFormFields(data, formType);
-            showMessage("🪄 ¡DATOS IMPORTADOS (FALLBACK LOCAL)!", "fix-report");
+            const tb = document.getElementById('contabilidadTableBody');
+            if(tb) tb.innerHTML = filteredTodos.map(m => `<tr class="border-b border-white/50 row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic text-stone-700">${parseDateString(m.fecha)}<br><span class="text-[7px] text-stone-500 font-bold mt-1">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-emerald-700' : 'text-rose-700'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-600' : 'text-stone-600'} mt-1">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter text-stone-800">${m.concepto}</td><td class="p-4 text-right text-[12px] font-mono font-black text-stone-900">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-main text-base font-black glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-accent text-base font-black glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-base glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button>` : ''}</div></td></tr>`).join('');
+            
+            let tCashIn = 0, tOut = 0, tTransIn = 0;
+            filteredTodos.forEach(m => { 
+                if(m.type === 'INGRESO') { 
+                    if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; 
+                    else tTransIn += m.monto; 
+                } else { 
+                    if(m.formaPago === 'EFECTIVO') tOut += m.monto; 
+                } 
+            });
+            
+            if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
+            if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tOut.toFixed(2);
+            if(document.getElementById('totalTransferDisplay')) document.getElementById('totalTransferDisplay').textContent = "$" + tTransIn.toFixed(2);
+            if(document.getElementById('balanceNetoDisplay')) document.getElementById('balanceNetoDisplay').textContent = "$" + (tCashIn - tOut).toFixed(2);
+        }
+
+        window.openEditModal = function(id) {
+            const v = visitsArray.find(item => item.id === id); if(!v) return;
+            document.getElementById('edit_id').value = v.id;
+            document.getElementById('edit_nombre').value = v.nombreCliente || "";
+            document.getElementById('edit_telefono').value = v.telefono || "";
+            document.getElementById('edit_email').value = v.email || "";
+            document.getElementById('edit_cedula').value = v.cedula || "";
+            document.getElementById('edit_calle').value = v.callePrincipal || "";
+            document.getElementById('edit_fecha').value = v.fechaInstalacion || "";
+            document.getElementById('edit_fechaEmision').value = v.fechaEmision || "";
+            document.getElementById('edit_direccion').value = v.direccion || "";
+            document.getElementById('edit_priority').value = v.priority || 0;
+            document.getElementById('edit_tecnico').value = v.tecnico || "";
+            document.getElementById('edit_numFactura').value = v.numFactura || "";
+            document.getElementById('edit_lugarCompra').value = v.lugarCompra || "";
+            document.getElementById('edit_observaciones').value = v.observacionesAdmin || "";
+            document.getElementById('edit_numEquipos').value = v.equipos ? v.equipos.length : 1;
+            
+            window.rebuildEditEquipmentInputs(v.equipos || []);
+            
+            const accContainer = document.getElementById('editAccesoriosContainer');
+            if(accContainer) {
+                accContainer.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(item => {
+                    const n = item[0]; const p = item[1];
+                    const vSold = (v.accesoriosVendidos || []).find(a => a.nombre === n) || { cantidad: 0 };
+                    return `<div class="flex justify-between items-center p-4 glass-input bg-white/60 rounded-xl"><span class="text-[9px] font-black text-stone-700">${n} ($${p.toFixed(2)})</span><input type="number" min="0" value="${vSold.cantidad}" data-name="${n}" data-price="${p}" class="edit-acc-qty w-14 text-center font-black text-sm glass-input rounded-lg border border-white p-2 outline-none bg-white/90"></div>`;
+                }).join('');
+            }
+            
+            document.getElementById('editModal').classList.remove('hidden');
         };
+
+        window.rebuildEditEquipmentInputs = function(inputEquipos = null) {
+            const countInput = document.getElementById('edit_numEquipos');
+            const count = parseInt(countInput ? countInput.value : 1) || 1;
+            const container = document.getElementById('editEquiposContainer');
+            if(!container) return;
+
+            let equiposActuales = [];
+
+            if (inputEquipos === null) {
+                const currentRows = container.querySelectorAll('.equipment-edit-row');
+                currentRows.forEach(row => {
+                    equiposActuales.push({
+                        descProducto: row.querySelector('.edit-eq-select').value,
+                        manualName: row.querySelector('.edit-eq-manual').value,
+                        codProducto: row.querySelector('.edit-eq-code').value,
+                        serieEquipo: row.querySelector('.edit-eq-serie').value,
+                        costoBase: parseFloat(row.querySelector('.edit-eq-cost').value) || 0
+                    });
+                });
+            } else {
+                equiposActuales = [...inputEquipos];
+            }
+
+            container.innerHTML = '';
+
+            for(let i = 0; i < count; i++) {
+                const eq = equiposActuales[i] || { descProducto: "", manualName: "", costoBase: 0, codProducto: "", serieEquipo: "" };
+                let currentDesc = (eq.descProducto || "").toUpperCase();
+                let defaultCost = eq.costoBase;
+                
+                if (eq.costoBase === 0 && !eq.descProducto) {
+                    if (count === 1) defaultCost = 25; 
+                    else if (count === 2) defaultCost = 20;
+                    else defaultCost = 15;
+                }
+
+                container.innerHTML += `
+                <div class="equipment-edit-row p-5 glass-panel bg-white/70 mb-5 shadow-sm italic font-black border border-white/90">
+                    <p class="text-[10px] font-black mb-4 text-fix-main uppercase italic underline tracking-tighter">EQUIPO REGISTRADO ${i+1}</p>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <select class="edit-eq-select w-full p-4 text-[10px] font-black uppercase rounded-xl glass-input outline-none text-stone-800">
+                                <option value="">-- ELEGIR PRODUCTO --</option>
+                                ${TIPOS_EQUIPO.map(t => {
+                                    const isSelected = (currentDesc === t.toUpperCase()) ? 'selected' : '';
+                                    return `<option value="${t}" ${isSelected}>${t}</option>`;
+                                }).join('')}
+                            </select>
+                            <input type="text" class="edit-eq-manual w-full p-4 text-[10px] font-black uppercase rounded-xl glass-input outline-none text-stone-800" value="${eq.manualName || ''}" placeholder="MODELO / NOMBRE MANUAL">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="text-[8px] text-stone-600 font-black ml-1 mb-1 block">CÓDIGO SAP</label><input type="text" class="edit-eq-code w-full p-4 text-[10px] font-black rounded-xl glass-input uppercase text-stone-800" value="${eq.codProducto || ''}"></div>
+                            <div><label class="text-[8px] text-stone-600 font-black ml-1 mb-1 block">NÚMERO SERIE</label><input type="text" class="edit-eq-serie w-full p-4 text-[10px] font-black rounded-xl glass-input uppercase text-stone-800" value="${eq.serieEquipo || ''}"></div>
+                        </div>
+                        <div class="mt-3"><label class="text-[9px] text-fix-main font-black italic block mb-2">💰 PRECIO LIQUIDACIÓN / COBRO:</label><input type="number" step="0.01" value="${defaultCost.toFixed(2)}" class="edit-eq-cost w-full p-4 text-base font-mono font-black rounded-xl glass-input bg-stone-100/80 border border-stone-300 text-fix-report outline-none"></div>
+                    </div>
+                </div>`;
+            }
+
+            container.querySelectorAll('.edit-eq-select').forEach((sel, idx) => {
+                sel.onchange = function() { window.updateEditPrice(this, idx); };
+            });
+        }
+
+        window.updateEditPrice = function(selectEl, index) {
+             const costInputs = document.querySelectorAll('.edit-eq-cost');
+             const selectedVal = selectEl.value;
+             if(!costInputs[index]) return;
+             if (selectedVal === "PARRILLA BBQ") costInputs[index].value = "29.00";
+             else costInputs[index].value = (COSTOS_EQUIPO[selectedVal] || 0.00).toFixed(2);
+        }
+
+        function getEditModalData() {
+            const selects = document.querySelectorAll('.edit-eq-select');
+            const manualNames = document.querySelectorAll('.edit-eq-manual');
+            const codes = document.querySelectorAll('.edit-eq-code');
+            const series = document.querySelectorAll('.edit-eq-serie');
+            const selectsCosts = document.querySelectorAll('.edit-eq-cost');
+            
+            let updatedEquipos = []; 
+            let moTotal = 0;
+
+            for(let i=0; i<selects.length; i++) {
+                const cost = parseFloat(selectsCosts[i].value) || 0;
+                let desc = selects[i].value.toUpperCase();
+                let manual = manualNames[i].value.toUpperCase();
+                updatedEquipos.push({ 
+                    descProducto: manual || desc, 
+                    manualName: manual, 
+                    costoBase: cost, 
+                    codProducto: codes[i].value.toUpperCase(), 
+                    serieEquipo: series[i].value.toUpperCase() 
+                });
+                moTotal += cost;
+            }
+
+            let updatedAccs = [];
+            let accTotal = 0;
+            document.querySelectorAll('.edit-acc-qty').forEach(function(i) { 
+                const q = parseInt(i.value) || 0; 
+                const p = parseFloat(i.dataset.price) || 0;
+                if(q > 0) { updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); accTotal += (q * p); } 
+            });
+
+            return {
+                nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), 
+                telefono: document.getElementById('edit_telefono').value, 
+                email: document.getElementById('edit_email').value.toLowerCase(), 
+                cedula: document.getElementById('edit_cedula').value, 
+                callePrincipal: document.getElementById('edit_calle').value.toUpperCase(), 
+                fechaInstalacion: document.getElementById('edit_fecha').value, 
+                fechaEmision: document.getElementById('edit_fechaEmision').value,
+                direccion: document.getElementById('edit_direccion').value, 
+                tecnico: document.getElementById('edit_tecnico').value, 
+                numFactura: document.getElementById('edit_numFactura').value.toUpperCase(), 
+                lugarCompra: document.getElementById('edit_lugarCompra').value, 
+                priority: parseInt(document.getElementById('edit_priority').value) || 0, 
+                equipos: updatedEquipos, 
+                accesoriosVendidos: updatedAccs, 
+                observacionesAdmin: document.getElementById('edit_observaciones').value.toUpperCase(),
+                'financiera/totalCliente': (moTotal + accTotal)
+            };
+        }
 
         window.saveEditChanges = function() {
             const id = document.getElementById('edit_id').value;
@@ -1178,7 +1733,7 @@ Correo: ${v.email || ''}`;
                     createdAt: Date.now(), 
                     equipos: eqs, 
                     accesoriosVendidos: accs, 
-                    financiera: { totalCliente: totalFinal, formaPago: 'EFECTIVO' }, 
+                    financiera: { totalCliente: totalFinal }, 
                     priority: 0, 
                     observacionesAdmin: note 
                 }).then(() => { 
@@ -1189,18 +1744,8 @@ Correo: ${v.email || ''}`;
         };
 
         function startSync() {
-            // Sincronización robusta tolerante a caídas de red o denegación de permisos de Firebase
             database.ref('visits').on('value', snap => {
-                let rawVal = snap.val();
-                if (rawVal) {
-                    if (Array.isArray(rawVal)) {
-                        visitsArray = rawVal.filter(item => item !== null).map((item, idx) => Object.assign({}, item, {id: item.id || 'visit_' + idx}));
-                    } else {
-                        visitsArray = Object.entries(rawVal).map(item => Object.assign({}, item[1], {id: item[0]}));
-                    }
-                } else {
-                    visitsArray = [];
-                }
+                visitsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : [];
                 renderUIAgenda(); renderRutero(); renderInventoryView(); renderPendientes(); renderTaller(); renderGarantias();
                 if(currentView === 'reporte_teka') renderReporteTeka(); 
                 if(currentView === 'garantias') renderMaestroGarantias();
@@ -1208,58 +1753,257 @@ Correo: ${v.email || ''}`;
                 if(currentView === 'contabilidad') processFinancialBalance(); 
                 if(currentView === 'buscador') renderBuscador();
             }, error => {
-                console.warn("Firebase de respaldo desactivado. Operando localmente.");
+                console.error("Database error (visits):", error);
             });
-            
             database.ref('movements').on('value', snap => { 
-                let rawVal = snap.val();
-                if (rawVal) {
-                    if (Array.isArray(rawVal)) {
-                        movementsArray = rawVal.filter(item => item !== null).map((item, idx) => Object.assign({}, item, {id: item.id || 'mov_' + idx}));
-                    } else {
-                        movementsArray = Object.entries(rawVal).map(item => Object.assign({}, item[1], {id: item[0]}));
-                    }
-                } else {
-                    movementsArray = [];
-                }
+                movementsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : []; 
                 if(currentView === 'contabilidad') processFinancialBalance(); 
             }, error => {
-                console.warn("Fallo en sincronizar caja manual.");
+                console.error("Database error (movements):", error);
             });
-            
             database.ref('inventory_entries').on('value', snap => { 
-                let rawVal = snap.val();
-                if (rawVal) {
-                    if (Array.isArray(rawVal)) {
-                        inventoryEntries = rawVal.filter(item => item !== null);
-                    } else {
-                        inventoryEntries = Object.values(rawVal);
-                    }
-                } else {
-                    inventoryEntries = [];
-                }
+                inventoryEntries = snap.val() ? Object.values(snap.val()) : []; 
                 renderInventoryView(); 
             }, error => {
-                console.warn("Fallo en sincronizar inventario.");
+                console.error("Database error (inventory_entries):", error);
             });
         }
+
+        window.saveMantenimiento = function(isPending = false) {
+            try {
+                const form = document.getElementById('maintForm'); const data = Object.fromEntries(new FormData(form));
+                if(!data.mNombre || !data.mCalle || !data.mDescripcion) { showMessage("⚠️ Datos obligatorios", "fix-error"); return; }
+                const status = isPending ? 'Pendiente (Tramite)' : 'PENDIENTE';
+                const ref = database.ref('visits').push();
+                ref.set({ 
+                    id: ref.key, 
+                    nombreCliente: data.mNombre.toUpperCase(), 
+                    telefono: data.mTelefono || '', 
+                    callePrincipal: data.mCalle.toUpperCase(), 
+                    mantenimientoEquipo: data.mDescripcion.toUpperCase(), 
+                    tecnico: data.mTecnico || '', 
+                    tipoAtencion: "Mantenimiento", 
+                    estado: status, 
+                    createdAt: Date.now(), 
+                    fechaInstalacion: document.getElementById('maintScheduleDate').value, 
+                    esMantenimiento: true, 
+                    financiera: { totalCliente: 0, formaPago: 'EFECTIVO' }, 
+                    priority: 999, 
+                    razonNoAtencion: isPending ? 'MANTENIMIENTO PENDIENTE DE COORDINAR' : '' 
+                }).then(() => { showMessage(isPending ? "⏳ Guardado en Pendientes" : "✅ Mantenimiento Guardado", isPending ? "fix-pending" : "fix-report"); form.reset(); });
+            } catch (err) { showMessage("❌ Error", "fix-error"); }
+        };
+
+        window.saveInventoryEntry = function() {
+            const acc = document.getElementById('invAccSelect').value;
+            const qty = parseInt(document.getElementById('invQty').value) || 0;
+            if (qty <= 0) return showMessage("⚠️ Ingrese cantidad", "fix-accent");
+            const ref = database.ref('inventory_entries').push();
+            ref.set({ accesorio: acc, cantidad: qty, fecha: Date.now() }).then(() => { document.getElementById('invQty').value = ''; showMessage("✅ Ingreso Registrado", "fix-report"); });
+        };
+
+        window.openEditFinanceModal = function(id, source, currentMonto, concepto) {
+            document.getElementById('finance_id').value = id; 
+            document.getElementById('finance_source').value = source; 
+            document.getElementById('finance_monto').value = currentMonto; 
+            document.getElementById('finance_concepto').value = concepto; 
+            
+            const formaPagoSelect = document.getElementById('finance_forma_pago');
+            const paymentContainer = document.getElementById('finance_payment_container');
+            
+            if (source === 'VISITA') {
+                paymentContainer.classList.remove('hidden');
+                const v = visitsArray.find(item => item.id === id);
+                if (v && v.financiera) {
+                    formaPagoSelect.value = v.financiera.formaPago || 'EFECTIVO';
+                }
+            } else if (source === 'MANUAL') {
+                paymentContainer.classList.remove('hidden');
+                const m = movementsArray.find(item => item.id === id);
+                if (m) {
+                    formaPagoSelect.value = m.formaPago || 'EFECTIVO';
+                }
+            } else {
+                paymentContainer.classList.add('hidden');
+            }
+            
+            document.getElementById('editFinanceModal').classList.remove('hidden');
+        };
+
+        window.saveFinanceAdjustment = function() {
+            const id = document.getElementById('finance_id').value; 
+            const source = document.getElementById('finance_source').value; 
+            const nuevoMonto = parseFloat(document.getElementById('finance_monto').value) || 0; 
+            const nuevoConcepto = document.getElementById('finance_concepto').value.toUpperCase();
+            const nuevaFormaPago = document.getElementById('finance_forma_pago').value;
+            
+            if (source === 'MANUAL') {
+                database.ref('movements/' + id).update({ 
+                    monto: nuevoMonto, 
+                    concepto: nuevoConcepto.replace('MANUAL: ', ''),
+                    formaPago: nuevaFormaPago
+                }).then(() => {
+                    showMessage("✅ Movimiento Actualizado", "fix-report");
+                    window.closeEditFinanceModal();
+                }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
+            } else {
+                database.ref('visits/' + id).update({ 
+                    'financiera/totalCliente': nuevoMonto,
+                    'financiera/formaPago': nuevaFormaPago
+                }).then(() => {
+                    showMessage("✅ Liquidación Actualizada", "fix-report");
+                    window.closeEditFinanceModal();
+                }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
+            }
+        };
+
+        window.saveManualMovement = function() {
+            const c = document.getElementById('movConcepto').value; 
+            const m = parseFloat(document.getElementById('movMonto').value); 
+            const t = document.getElementById('movType').value; 
+            const p = document.getElementById('movPago').value; 
+            const tech = document.getElementById('movTecnico').value;
+            const d = document.getElementById('movFecha').value;
+            if(!c || isNaN(m) || !d) return showMessage("⚠️ Incompleto", "fix-accent");
+            const dateObj = new Date(d + "T12:00:00");
+            const timestamp = dateObj.getTime();
+            const ref = database.ref('movements').push();
+            ref.set({ id: ref.key, concepto: c.toUpperCase(), monto: m, fecha: timestamp, type: t, formaPago: p, tecnico: tech || 'ADMIN' }).then(() => { document.getElementById('movConcepto').value=''; document.getElementById('movMonto').value=''; showMessage("✅ Manual Guardado", "fix-report"); });
+        };
+
+        function renderBuscador() {
+            const query = document.getElementById('searchGlobalInput').value.toUpperCase();
+            const start = document.getElementById('searchDateStart').value;
+            const end = document.getElementById('searchDateEnd').value;
+            const tech = document.getElementById('searchTechFilter').value;
+            const type = document.getElementById('searchTypeFilter').value;
+
+            let filtered = visitsArray.filter(v => {
+                const textMatch = !query || 
+                    (v.nombreCliente && v.nombreCliente.toUpperCase().includes(query)) ||
+                    (v.cedula && v.cedula.includes(query)) ||
+                    (v.numFactura && v.numFactura.toUpperCase().includes(query)) ||
+                    (v.telefono && v.telefono.includes(query)) ||
+                    (v.equipos && v.equipos.some(e => 
+                        (e.codProducto && e.codProducto.toUpperCase().includes(query)) || 
+                        (e.serieEquipo && e.serieEquipo.toUpperCase().includes(query)) ||
+                        (e.descProducto && e.descProducto.toUpperCase().includes(query))
+                    ));
+                
+                const dateMatch = (!start || v.fechaInstalacion >= start) && (!end || v.fechaInstalacion <= end);
+                const techMatch = !tech || v.tecnico === tech;
+                const typeMatch = (type === 'TODOS') || 
+                                  (type === 'MANTENIMIENTO' && v.esMantenimiento) ||
+                                  (type === 'NORMAL' && !v.esMantenimiento);
+
+                return textMatch && dateMatch && techMatch && typeMatch;
+            });
+
+            filtered.sort((a,b) => (b.fechaInstalacion || "").localeCompare(a.fechaInstalacion || ""));
+
+            const body = document.getElementById('buscadorResultsBody');
+            if(body) {
+                if(filtered.length === 0) {
+                    body.innerHTML = '<tr><td colspan="8" class="p-10 text-center text-stone-500 font-black italic">Sin resultados</td></tr>';
+                    return;
+                }
+                body.innerHTML = filtered.map(v => `
+                    <tr class="border-b border-stone-300/30 row-hover uppercase font-black">
+                        <td class="p-4 text-[9px] font-mono text-stone-600">${v.fechaInstalacion}</td>
+                        <td class="p-4 text-xs text-fix-main underline cursor-pointer" onclick="openEditModal('${v.id}')">${v.nombreCliente}</td>
+                        <td class="p-4 text-[9px] font-mono text-stone-700">${v.cedula || '-'}</td>
+                        <td class="p-4 text-[9px] text-stone-700">${v.tecnico || '-'}</td>
+                        <td class="p-4 text-[8px] max-w-[200px] truncate text-stone-600">${v.esMantenimiento ? 'MANT: ' + v.mantenimientoEquipo : (v.equipos || []).map(e=>e.descProducto).join(', ')}</td>
+                        <td class="p-4 text-[9px] font-mono text-fix-report">${v.numFactura || '-'}</td>
+                        <td class="p-4 text-center">
+                            <span class="px-3 py-1 rounded-md border border-white text-[7px] shadow-sm ${v.estado === 'Atendido' ? 'bg-emerald-100/90 text-emerald-800' : 'bg-amber-100/90 text-amber-800'}">${v.estado}</span>
+                        </td>
+                        <td class="p-4 text-center flex gap-2 justify-center">
+                            <button onclick="printServiceOrder('${v.id}')" class="text-stone-600 hover:text-fix-main glass-input bg-white/70 w-8 h-8 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm" title="Imprimir Orden">🖨️</button>
+                            <button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/70 w-8 h-8 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        window.closeEditModal = function() { document.getElementById('editModal').classList.add('hidden'); }
+        window.closeEditFinanceModal = function() { document.getElementById('editFinanceModal').classList.add('hidden'); };
+
+        function getMondayAndFriday() {
+            const today = new Date();
+            const day = today.getDay(); 
+            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(today.setDate(diff));
+            const friday = new Date(monday);
+            friday.setDate(monday.getDate() + 4);
+            
+            const pad = (n) => String(n).padStart(2, '0');
+            const formatLocal = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            
+            return { monday: formatLocal(monday), friday: formatLocal(friday) };
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const pad = (n) => String(n).padStart(2, '0');
+            const dHoy = new Date();
+            const hoyLocal = `${dHoy.getFullYear()}-${pad(dHoy.getMonth() + 1)}-${pad(dHoy.getDate())}`;
+            
+            ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd', 'garantiaMaestroStart', 'garantiaMaestroEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoyLocal; });
+            
+            if(document.getElementById('cajaDateStart')) document.getElementById('cajaDateStart').value = hoyLocal;
+            if(document.getElementById('cajaDateEnd')) document.getElementById('cajaDateEnd').value = hoyLocal;
+
+            const date6Months = new Date(); date6Months.setMonth(date6Months.getMonth() - 6);
+            const date6MonthsLocal = `${date6Months.getFullYear()}-${pad(date6Months.getMonth() + 1)}-${pad(date6Months.getDate())}`;
+            if(document.getElementById('searchDateStart')) document.getElementById('searchDateStart').value = date6MonthsLocal;
+
+            startSync();
+
+            const p = new URLSearchParams(window.location.search); 
+            const t = p.get('tech');
+            if(t && LISTA_TECNICOS.indexOf(t) !== -1) { 
+                currentTechUser = t; 
+                document.body.classList.add('technician-mode'); 
+                document.getElementById('userDisplayLabel').textContent = "RUTA: " + t.toUpperCase(); 
+                document.getElementById('adminNav').classList.add('hidden'); 
+                document.getElementById('mobileAdminNav').classList.add('hidden'); 
+                document.getElementById('exitTechModeBtn').classList.remove('hidden');
+                changeMasterView('rutero'); 
+            } 
+            
+            LISTA_TECNICOS.forEach(item => { ['selectTecnico', 'ruteroTechFilter', 'selectTecnicoMaint', 'edit_tecnico', 'movTecnico', 'cajaTechFilter', 'pendingTechFilter', 'searchTechFilter'].forEach(id => { const el = document.getElementById(id); if(el) el.add(new Option(item || (id.includes('Filter') ? "TODOS LOS TÉCNICOS" : "--- TÉCNICO ---"), item)); }); });
+            
+            const elLugar = document.getElementById('selectLugar');
+            const elLugarEdit = document.getElementById('edit_lugarCompra');
+            LUGARES_COMPRA.forEach(i => { if(elLugar) elLugar.add(new Option(i || "--- LUGAR COMPRA ---", i)); if(elLugarEdit) elLugarEdit.add(new Option(i || "--- LUGAR COMPRA ---", i)); });
+            
+            const warrantySelect = document.getElementById('warrantyEquipmentSelect');
+            if(warrantySelect) { TIPOS_EQUIPO.forEach(e => { if(e) warrantySelect.add(new Option(e, e)); }); }
+
+            renderInsumosAdmin(); window.expandEquipmentUI();
+
+            if (isFirebaseFallback) {
+                setTimeout(() => { showMessage("🔌 MODO SIN CONEXIÓN (MOCK DE RESERVA ACTIVO)", "fix-accent"); }, 1500);
+            }
+        });
     </script>
 </head>
 
 <body class="min-h-screen p-2 md:p-8 font-sans selection:bg-fix-main text-stone-800 font-black uppercase overflow-x-hidden">
 
-    <!-- BOTTOM TAB BAR MÓVIL (iOS Style - Solo para ADMIN, optimizado para alto contraste y legibilidad) -->
+    <!-- BOTTOM TAB BAR MÓVIL (iOS Style - Solo para ADMIN) -->
     <nav id="mobileAdminNav" class="admin-only md:hidden fixed bottom-0 left-0 w-full glass-nav-mobile flex justify-around p-2 z-[999] rounded-t-3xl">
-        <button onclick="changeMasterView('reporte_admin')" class="mobile-nav-btn flex flex-col items-center p-2 text-white scale-110 bg-fix-main rounded-2xl shadow-sm border border-white/20 font-black transition-all" data-view="reporte_admin">
+        <button onclick="changeMasterView('reporte_admin')" class="mobile-nav-btn flex flex-col items-center p-2 text-fix-main scale-110 bg-white/60 rounded-2xl shadow-sm border border-white/80 font-black transition-all" data-view="reporte_admin">
             <span class="text-xl leading-none">📝</span><span class="text-[9px] mt-1 font-bold">Registro</span>
         </button>
-        <button onclick="changeMasterView('rutero')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-600 transition-all bg-transparent" data-view="rutero">
+        <button onclick="changeMasterView('rutero')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="rutero">
             <span class="text-xl leading-none">🚚</span><span class="text-[9px] mt-1 font-bold">Logística</span>
         </button>
-        <button onclick="changeMasterView('contabilidad')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-600 transition-all bg-transparent" data-view="contabilidad">
+        <button onclick="changeMasterView('contabilidad')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="contabilidad">
             <span class="text-xl leading-none">💰</span><span class="text-[9px] mt-1 font-bold">Caja</span>
         </button>
-        <button onclick="changeMasterView('buscador')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-600 transition-all bg-transparent" data-view="buscador">
+        <button onclick="changeMasterView('buscador')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="buscador">
             <span class="text-xl leading-none">🔍</span><span class="text-[9px] mt-1 font-bold">Buscador</span>
         </button>
     </nav>
@@ -1275,7 +2019,7 @@ Correo: ${v.email || ''}`;
                     <h1 class="text-xl sm:text-4xl font-black uppercase italic text-stone-800 tracking-tighter leading-none drop-shadow-sm">Gestión</h1>
                     <div class="flex flex-col">
                         <span id="userDisplayLabel" class="text-[10px] sm:text-xs font-black text-stone-600 uppercase tracking-widest italic font-mono">Admin</span>
-                        <span class="version-badge shadow-sm">V. 4.1 Glass Mocha AI</span>
+                        <span class="version-badge shadow-sm">V. 4.0 Glass Mocha</span>
                         <span class="text-[8px] font-bold text-emerald-700 lowercase mt-1 flex items-center gap-1 glass-input w-max px-2 py-0.5 rounded-full border border-white">
                             <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> nube activa
                         </span>
@@ -1292,18 +2036,18 @@ Correo: ${v.email || ''}`;
                 </div>
             </div>
             
-            <!-- NAV ESCRITORIO CON ICONOS (Perfecto contraste activo bg-fix-main / inactivo text-stone-700) -->
+            <!-- NAV ESCRITORIO CON ICONOS (Se oculta en móviles para el Admin) -->
             <nav id="adminNav" class="hidden md:flex flex-wrap justify-center glass-card p-2 rounded-full gap-2 admin-only">
-                <button onclick="changeMasterView('reporte_admin')" data-view="reporte_admin" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-fix-main text-white shadow-md scale-105 italic transition-all"><span class="text-xs">📝</span> Registro</button>
-                <button onclick="changeMasterView('mantenimiento')" data-view="mantenimiento" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">⚙️</span> Mant.</button>
-                <button onclick="changeMasterView('pendientes')" data-view="pendientes" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">⏳</span> Segui.</button>
-                <button onclick="changeMasterView('garantias')" data-view="garantias" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🛡️</span> Garan.</button>
-                <button onclick="changeMasterView('taller')" data-view="taller" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🏢</span> Taller</button>
-                <button onclick="changeMasterView('inventory')" data-view="inventory" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">📦</span> Invent.</button>
-                <button onclick="changeMasterView('rutero')" data-view="rutero" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🚚</span> Logist.</button>
-                <button onclick="changeMasterView('reporte_teka')" data-view="reporte_teka" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">📚</span> Maestro</button>
-                <button onclick="changeMasterView('contabilidad')" data-view="contabilidad" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">💰</span> Caja</button>
-                <button onclick="changeMasterView('buscador')" data-view="buscador" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-700 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🔍</span> Buscador</button>
+                <button onclick="changeMasterView('reporte_admin')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-fix-main text-white shadow-md scale-105 italic transition-all"><span class="text-xs">📝</span> Registro</button>
+                <button onclick="changeMasterView('mantenimiento')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">⚙️</span> Mant.</button>
+                <button onclick="changeMasterView('pendientes')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">⏳</span> Segui.</button>
+                <button onclick="changeMasterView('garantias')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🛡️</span> Garan.</button>
+                <button onclick="changeMasterView('taller')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🏢</span> Taller</button>
+                <button onclick="changeMasterView('inventory')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">📦</span> Invent.</button>
+                <button onclick="changeMasterView('rutero')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🚚</span> Logist.</button>
+                <button onclick="changeMasterView('reporte_teka')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">📚</span> Maestro</button>
+                <button onclick="changeMasterView('contabilidad')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">💰</span> Caja</button>
+                <button onclick="changeMasterView('buscador')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🔍</span> Buscador</button>
             </nav>
         </header>
 
@@ -1311,7 +2055,7 @@ Correo: ${v.email || ''}`;
             
             <div id="buscadorView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem]">
-                    <h2 class="text-xl font-black uppercase italic underline text-fix-main mb-6 tracking-tighter">🔍 Buscador Inteligente Global</h2>
+                    <h2 class="text-xl font-black uppercase italic underline text-fix-main mb-6 tracking-tighter">Buscador Inteligente Global</h2>
                     
                     <div class="glass-panel p-5 grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 items-end italic border border-white/80">
                         <div class="md:col-span-2">
@@ -1351,36 +2095,7 @@ Correo: ${v.email || ''}`;
                 </div>
             </div>
 
-            <!-- ENCABEZADO CORREGIDO Y AÑADIDO PARA LA VISTA DE REGISTRO -->
             <div id="formContainer" class="lg:col-span-2 space-y-5 admin-only no-print">
-                <h2 class="text-2xl font-black uppercase italic text-fix-main tracking-tighter underline">📝 REGISTRO GENERAL DE SERVICIOS</h2>
-                
-                <!-- 🪄 CAJA DE IMPORTACIÓN RÁPIDA POR IA Y MULTIMEDIA - REGISTRO -->
-                <div class="glass-panel p-5 mb-4 border border-white/80 shadow-md relative bg-white/35 rounded-3xl">
-                    <details class="group" open>
-                        <summary class="list-none flex items-center justify-between cursor-pointer font-black text-[11px] text-fix-main italic tracking-tighter uppercase select-none">
-                            <span class="flex items-center gap-2 text-xs">🪄 ESCÁNER DE FACTURA INTELIGENTE (IA / TEXTO)</span>
-                            <span class="transition-transform group-open:rotate-180">▼</span>
-                        </summary>
-                        <div class="mt-4 space-y-4">
-                            <!-- Dropzone de imagen / Archivo -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="glass-panel bg-white/70 p-4 border border-dashed border-stone-400 hover:border-fix-accent transition-colors rounded-2xl flex flex-col justify-center items-center text-center cursor-pointer relative">
-                                    <span class="text-2xl mb-1">📷</span>
-                                    <span class="text-[9px] font-black text-stone-700">SUBIR FOTO DE FACTURA</span>
-                                    <span class="text-[7.5px] text-stone-500 font-bold lowercase mt-1">(captura de whatsapp, PDF o foto del documento)</span>
-                                    <input type="file" accept="image/*" onchange="scanInvoiceFile(event, 'visit')" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
-                                </div>
-                                <div class="flex flex-col gap-2">
-                                    <p class="text-[8.5px] text-stone-600 font-bold lowercase">O pega aquí cualquier texto copiado (ej: bloque de chat o texto de PDF):</p>
-                                    <textarea id="quickPasteVisit" placeholder="Pega el texto aquí..." class="w-full p-3 glass-input rounded-xl text-xs uppercase min-h-[70px] outline-none text-stone-800 shadow-inner resize-none"></textarea>
-                                    <button type="button" onclick="parseQuickPasteWithAI('visit')" class="glass-card bg-fix-main/90 border-white/30 text-white py-2.5 rounded-xl text-[9px] font-black uppercase shadow-sm active:scale-95 transition-all text-center hover:bg-stone-800">🪄 LEER TEXTO CON IA</button>
-                                </div>
-                            </div>
-                        </div>
-                    </details>
-                </div>
-
                 <div class="glass-card p-4 rounded-3xl"><input type="date" id="filterDateInput" onchange="syncDates('filterDateInput')" class="bg-transparent w-full text-center text-2xl font-black italic text-fix-main outline-none border-none font-mono drop-shadow-sm"></div>
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem]">
                     <form id="visitForm" onsubmit="event.preventDefault();">
@@ -1424,7 +2139,7 @@ Correo: ${v.email || ''}`;
                             <textarea id="warrantyDamageDesc" placeholder="DESCRIBA LA FALLA..." class="w-full p-5 glass-input rounded-2xl font-black text-xs uppercase min-h-[100px] outline-none text-stone-800"></textarea>
                         </div>
                         
-                        <div id="financialDashboardRegistration" class="mt-8 grid grid-cols-3 gap-2 text-center">
+                        <div id="financialDashboardRegistration" class="mt-8 grid grid-cols-3 gap-4 text-center">
                             <div class="glass-panel p-4 italic text-[8px] flex flex-col justify-center border-white/80 shadow-sm text-stone-600">M.O. (MAESTRO)<br><span id="displayCostoInstalacion" class="text-lg font-black text-stone-800">$0.00</span></div>
                             <div class="glass-panel p-4 italic text-[8px] flex flex-col justify-center border-white/80 shadow-sm text-stone-600">INSUMOS<br><span id="displayTotalAccesorios" class="text-lg font-black text-stone-800">$0.00</span></div>
                             <div class="glass-card bg-fix-accent/90 border-white p-4 rounded-2xl font-black text-white uppercase flex flex-col justify-center shadow-xl shadow-amber-700/20">TOTAL CAJA<br><span id="displayTotalFinal" class="text-2xl font-mono text-white drop-shadow-md">$0.00</span></div>
@@ -1450,7 +2165,7 @@ Correo: ${v.email || ''}`;
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem]">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-white/60 pb-5">
                         <div>
-                            <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-taller tracking-tighter">🏢 Control de Equipos en Taller</h2>
+                            <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-taller tracking-tighter">Control de Equipos en Taller</h2>
                             <p class="text-[8px] text-stone-600 font-black italic mt-1">GESTIÓN DE REPARACIONES FÍSICAS Y COSTOS TOTALES</p>
                         </div>
                         <input type="text" id="tallerSearchInput" oninput="renderTaller()" placeholder="🔍 BUSCAR CLIENTE..." class="p-4 glass-input rounded-2xl text-xs font-black uppercase w-full md:w-72 shadow-sm outline-none text-stone-800">
@@ -1463,7 +2178,7 @@ Correo: ${v.email || ''}`;
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem] border-fix-main/40">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-white/60 pb-5">
                         <div>
-                            <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-main tracking-tighter">🛡️ Control de Garantías en Trámite</h2>
+                            <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-main tracking-tighter">Control de Garantías en Trámite</h2>
                             <p class="text-[8px] text-stone-600 font-black italic mt-1">GESTIÓN DE REPUESTOS A FÁBRICA</p>
                         </div>
                         <input type="text" id="garantiasSearchInput" oninput="renderGarantias()" placeholder="🔍 BUSCAR CLIENTE..." class="p-4 glass-input rounded-2xl text-xs font-black uppercase w-full md:w-72 shadow-sm outline-none text-stone-800">
@@ -1476,8 +2191,8 @@ Correo: ${v.email || ''}`;
                         <div>
                             <h2 class="text-lg font-black uppercase italic font-sans underline text-indigo-800">Maestro de Garantías Finalizadas</h2>
                             <div class="flex gap-2 mt-3 font-black">
-                                <input type="date" id="garantiaMaestroStart" class="glass-input p-2.5 rounded-xl text-[10px] outline-none text-stone-800 border">
-                                <input type="date" id="garantiaMaestroEnd" class="glass-input p-2.5 rounded-xl text-[10px] outline-none text-stone-800 border">
+                                <input type="date" id="garantiaMaestroStart" class="glass-input p-2.5 rounded-xl text-[10px] outline-none text-stone-800">
+                                <input type="date" id="garantiaMaestroEnd" class="glass-input p-2.5 rounded-xl text-[10px] outline-none text-stone-800">
                                 <button onclick="renderMaestroGarantias()" class="glass-card bg-indigo-800/90 border-indigo-400 text-white px-5 rounded-xl text-[10px] shadow-md hover:scale-105 transition-transform">VER</button>
                             </div>
                         </div>
@@ -1497,7 +2212,7 @@ Correo: ${v.email || ''}`;
             <div id="pendientesView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem] border-fix-pending/40">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-white/60 pb-5">
-                        <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-pending tracking-tighter">⏳ Seguimiento de Pendientes</h2>
+                        <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-pending tracking-tighter">Seguimiento de Pendientes</h2>
                         <div class="flex flex-wrap gap-2 w-full md:w-auto">
                             <input type="text" id="pendingSearchInput" oninput="renderPendientes()" placeholder="🔍 BUSCAR..." class="p-3.5 glass-input rounded-xl text-[10px] font-black uppercase w-full md:w-48 shadow-sm outline-none text-stone-800">
                             <select id="pendingTypeFilter" onchange="renderPendientes()" class="p-3.5 glass-input rounded-xl text-[10px] font-black uppercase outline-none shadow-sm text-stone-800"><option value="TODOS">TODOS LOS CASOS</option><option value="Pendiente (Tramite)">SOLO PENDIENTES</option><option value="No Atendido">SOLO NO ATENDIDOS</option></select>
@@ -1508,49 +2223,18 @@ Correo: ${v.email || ''}`;
                 </div>
             </div>
 
-            <!-- ENCABEZADO CORREGIDO Y AÑADIDO PARA LA VISTA DE MANTENIMIENTO -->
             <div id="mantenimientoView" class="hidden lg:col-span-3 space-y-6 admin-only">
-                <h2 class="text-2xl font-black uppercase italic text-fix-main tracking-tighter underline">⚙️ GESTIÓN DE MANTENIMIENTOS</h2>
-                
-                <!-- 🪄 CAJA DE IMPORTACIÓN RÁPIDA POR IA Y MULTIMEDIA - MANTENIMIENTO -->
-                <div class="glass-panel p-5 mb-4 border border-white/80 shadow-md relative bg-white/35 rounded-3xl">
-                    <details class="group" open>
-                        <summary class="list-none flex items-center justify-between cursor-pointer font-black text-[11px] text-fix-main italic tracking-tighter uppercase select-none">
-                            <span class="flex items-center gap-2 text-xs">🪄 ESCÁNER DE FACTURA INTELIGENTE (IA / TEXTO)</span>
-                            <span class="transition-transform group-open:rotate-180">▼</span>
-                        </summary>
-                        <div class="mt-4 space-y-4">
-                            <!-- Dropzone de imagen / Archivo -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="glass-panel bg-white/70 p-4 border border-dashed border-stone-400 hover:border-fix-accent transition-colors rounded-2xl flex flex-col justify-center items-center text-center cursor-pointer relative">
-                                    <span class="text-2xl mb-1">📷</span>
-                                    <span class="text-[9px] font-black text-stone-700">SUBIR FOTO DE FACTURA</span>
-                                    <span class="text-[7.5px] text-stone-500 font-bold lowercase mt-1">(captura de whatsapp, PDF o foto del documento)</span>
-                                    <input type="file" accept="image/*" onchange="scanInvoiceFile(event, 'maint')" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
-                                </div>
-                                <div class="flex flex-col gap-2">
-                                    <p class="text-[8.5px] text-stone-600 font-bold lowercase">O pega aquí cualquier texto copiado (ej: bloque de chat o texto de PDF):</p>
-                                    <textarea id="quickPasteMaint" placeholder="Pega el texto aquí..." class="w-full p-3 glass-input rounded-xl text-xs uppercase min-h-[70px] outline-none text-stone-800 shadow-inner resize-none"></textarea>
-                                    <button type="button" onclick="parseQuickPasteWithAI('maint')" class="glass-card bg-fix-main/90 border-white/30 text-white py-2.5 rounded-xl text-[9px] font-black uppercase shadow-sm active:scale-95 transition-all text-center hover:bg-stone-800">🪄 LEER TEXTO CON IA</button>
-                                </div>
-                            </div>
-                        </div>
-                    </details>
-                </div>
-
                 <div class="glass-card p-4 rounded-3xl border border-white/80 flex items-center justify-center gap-4 shadow-sm bg-white/40">
                     <p class="text-[10px] font-black text-fix-accent italic underline m-0">📅 FECHA AGENDAMIENTO:</p>
                     <input type="date" id="maintScheduleDate" class="bg-transparent text-2xl font-black italic text-fix-accent outline-none border-none font-mono drop-shadow-sm">
                 </div>
                 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    <div class="glass-card p-6 md:p-8 rounded-[2.5rem] font-black italic">
+                    <div class="xl:col-span-2 glass-card p-6 md:p-8 rounded-[2.5rem] font-black italic">
                         <h2 class="text-xl font-black uppercase mb-6 text-fix-main underline pb-3 font-sans italic tracking-tighter border-b border-white/50">REGISTRO DE MANTENIMIENTOS</h2>
                         <form id="maintForm" onsubmit="event.preventDefault();">
                             <div class="glass-panel p-6 grid grid-cols-1 md:grid-cols-2 gap-4 uppercase font-black border-white/60">
                                 <input type="text" name="mNombre" placeholder="CLIENTE*" required class="p-4 glass-input rounded-xl font-black uppercase text-sm text-stone-800">
                                 <input type="tel" name="mTelefono" placeholder="TELÉFONO*" required class="p-4 glass-input rounded-xl font-black font-mono text-sm text-stone-800">
-                                <input type="text" id="mCedula" name="mCedula" placeholder="CÉDULA" class="p-4 glass-input rounded-xl font-mono text-sm text-stone-800">
-                                <input type="email" id="mEmail" name="mEmail" placeholder="CORREO" class="p-4 glass-input rounded-xl text-sm text-stone-800">
                                 <input type="text" name="mCalle" placeholder="CALLE*" required class="p-4 bg-amber-50/70 backdrop-blur-md border border-white rounded-xl font-bold uppercase text-sm shadow-sm text-stone-800">
                                 <input type="text" name="mDireccion" placeholder="LINK GPS (OPCIONAL)" class="p-4 glass-input rounded-xl font-black text-sm text-stone-800">
                                 <select name="mTecnico" id="selectTecnicoMaint" class="p-4 glass-input rounded-xl font-black uppercase italic text-sm md:col-span-2 outline-none text-stone-800"></select>
@@ -1588,7 +2272,7 @@ Correo: ${v.email || ''}`;
                         <div class="flex flex-wrap gap-2">
                             <input type="date" id="maintBalanceStart" onchange="processMaintBalance(); renderReporteMantenimiento();" class="p-3 glass-input rounded-xl text-[10px] font-black text-stone-800 shadow-sm outline-none">
                             <input type="date" id="maintBalanceEnd" onchange="processMaintBalance(); renderReporteMantenimiento();" class="p-3 glass-input rounded-xl text-[10px] font-black text-stone-800 shadow-sm outline-none">
-                            <button onclick="downloadMantenimientoCSV()" class="bg-fix-report/90 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase italic border-white/50 shadow-md transition-all hover:scale-105">📊 EXCEL</button>
+                            <button onclick="downloadMantenimientoCSV()" class="glass-card bg-fix-report/90 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase italic border-white/50 shadow-md transition-all hover:scale-105">📊 EXCEL</button>
                         </div>
                     </div>
                     <div class="overflow-x-auto rounded-2xl border border-white/80 shadow-sm bg-white/30 backdrop-blur-md"><table class="w-full border-collapse admin-table font-black"><thead><tr><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Calle</th><th>Descripción</th><th>Valor</th><th>Est.</th><th>X</th></tr></thead><tbody id="mantenimientoReporteBody" class="uppercase italic text-stone-800"></tbody></table></div>
@@ -1597,7 +2281,7 @@ Correo: ${v.email || ''}`;
 
             <div id="inventoryView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem] font-black italic uppercase">
-                    <h2 class="text-xl font-black uppercase mb-8 border-b-2 border-white/60 pb-4 font-sans italic text-fix-report tracking-tighter">📦 STOCK DE INVENTARIO Y STOCK</h2>
+                    <h2 class="text-xl font-black uppercase mb-8 border-b-2 border-white/60 pb-4 font-sans italic text-fix-report tracking-tighter">STOCK DE INVENTARIO</h2>
                     <div class="glass-panel p-6 md:p-8 mb-8 flex flex-wrap gap-4 items-end border-white/70 shadow-md">
                         <div class="flex-grow">
                             <label class="text-[9px] ml-2 text-stone-600 mb-2 block">ACCESORIO / INSUMO</label>
@@ -1618,9 +2302,9 @@ Correo: ${v.email || ''}`;
                 </div>
             </div>
 
-            <div id="ruteroView" class="hidden lg:col-span-3 glass-card p-4 md:p-6 rounded-[2.5rem]">
+            <div id="ruteroView" class="hidden lg:col-span-3 glass-card p-4 md:p-6 rounded-[2.5rem] admin-only-mobile">
                 <div class="flex flex-col md:flex-row justify-between items-center mb-6 px-2 gap-4">
-                    <h2 class="text-xl font-black uppercase italic font-sans text-fix-main tracking-tighter underline">🚚 Logística / Rutero de Visitas</h2>
+                    <h2 class="text-lg font-black uppercase italic font-sans text-stone-800 tracking-tighter underline">Logística / Rutero</h2>
                     <div class="flex gap-2 w-full md:w-auto">
                         <select id="ruteroTechFilter" onchange="renderRutero()" class="admin-only flex-grow p-3 glass-input rounded-xl text-[10px] font-black outline-none italic uppercase text-stone-800 shadow-sm"></select>
                         <input type="date" id="filterDateInputRutero" onchange="syncDates('filterDateInputRutero')" class="p-3 glass-input rounded-xl text-xs font-black italic text-fix-main outline-none font-mono shadow-sm">
@@ -1637,7 +2321,7 @@ Correo: ${v.email || ''}`;
             <div id="reporteTekaView" class="hidden lg:col-span-3 glass-card p-6 md:p-8 rounded-[2.5rem] font-black uppercase admin-only">
                 <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
                     <div>
-                        <h2 class="text-xl font-black uppercase italic font-sans underline text-fix-main tracking-tighter">📚 Maestro Consolidado SAP</h2>
+                        <h2 class="text-lg font-black uppercase italic font-sans underline text-fix-main tracking-tighter">Maestro Consolidado SAP</h2>
                         <div class="flex gap-2 mt-4 font-black">
                             <input type="date" id="maestroDateStart" class="glass-input p-2.5 rounded-xl text-[10px] outline-none border font-black text-stone-800">
                             <input type="date" id="maestroDateEnd" class="glass-input p-2.5 rounded-xl text-[10px] outline-none border font-black text-stone-800">
@@ -1654,7 +2338,7 @@ Correo: ${v.email || ''}`;
                 </div>
                 <div class="flex justify-end no-print">
                     <div class="glass-card bg-stone-900/90 border-white/20 text-white p-6 md:p-8 rounded-[2rem] inline-block min-w-[300px] shadow-2xl">
-                        <p class="text-[10px] text-fix-report uppercase tracking-widest font-black italic mb-2 underline">Resumen Financiero (M.O.):</p>
+                        <p class="text-[10px] text-fix-report uppercase tracking-widest font-black italic mb-3 underline">Resumen Financiero (M.O.):</p>
                         <div class="flex justify-between items-end mb-2">
                             <span class="text-xs text-stone-300">TOTAL SAP:</span>
                             <span id="tekaSummaryTotal" class="text-4xl font-mono font-black text-white drop-shadow-md">$0.00</span>
@@ -1667,7 +2351,7 @@ Correo: ${v.email || ''}`;
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem] font-black uppercase">
                     <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
                         <div>
-                            <h2 class="text-xl font-black uppercase underline font-sans italic text-fix-main tracking-tighter border-b border-white/50 pb-2">💰 CONTABILIDAD Y CAJA DIARIA</h2>
+                            <h2 class="text-xl font-black uppercase underline font-sans italic text-stone-800 tracking-tighter border-b border-white/50 pb-2">CONTABILIDAD Y CAJA</h2>
                             <div class="flex flex-wrap gap-3 mt-5 font-black items-center">
                                 <input type="date" id="cajaDateStart" class="glass-input p-3 rounded-xl text-[10px] text-stone-800 shadow-sm outline-none">
                                 <input type="date" id="cajaDateEnd" class="glass-input p-3 rounded-xl text-[10px] text-stone-800 shadow-sm outline-none">
@@ -1698,10 +2382,10 @@ Correo: ${v.email || ''}`;
 
                     <div class="glass-panel p-6 mb-8 grid grid-cols-1 md:grid-cols-6 gap-4 items-end italic font-black bg-white/50 border-white/80 shadow-md">
                         <div class="md:col-span-1"><label class="text-[8px] ml-1 text-stone-600 block mb-1">FECHA</label><input type="date" id="movFecha" class="w-full p-3.5 rounded-xl glass-input text-[10px] font-mono text-stone-800 shadow-inner outline-none"></div>
-                        <div class="md:col-span-1"><label class="text-[7px] ml-1 text-stone-600 block mb-1">CONCEPTO</label><input type="text" id="movConcepto" placeholder="DESCRIPCIÓN..." class="w-full p-3.5 rounded-xl glass-input text-[10px] uppercase text-stone-800 outline-none shadow-inner"></div>
-                        <div><label class="text-[7px] ml-1 text-stone-600 block mb-1">MONTO $</label><input type="number" id="movMonto" placeholder="$0" class="w-full p-3.5 rounded-xl glass-input text-right text-base font-mono text-fix-main outline-none shadow-inner bg-white/80"></div>
-                        <div><label class="text-[7px] ml-1 text-stone-600 block mb-1">TIPO</label><select id="movType" class="w-full p-3.5 rounded-xl glass-input text-[10px] outline-none text-stone-800 shadow-inner"><option value="EGRESO">➖ EGRESO</option><option value="INGRESO">➕ INGRESO</option></select></div>
-                        <div><label class="text-[7px] ml-1 text-stone-600 block mb-1">MÉTODO / TÉCNICO</label><div class="flex gap-2"><select id="movPago" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner"><option value="EFECTIVO">EFEC</option><option value="TRANSFERENCIA">TRANS</option></select><select id="movTecnico" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner"></select></div></div>
+                        <div class="md:col-span-1"><label class="text-[8px] ml-1 text-stone-600 block mb-1">CONCEPTO</label><input type="text" id="movConcepto" placeholder="DESCRIPCIÓN..." class="w-full p-3.5 rounded-xl glass-input text-[10px] uppercase text-stone-800 outline-none shadow-inner"></div>
+                        <div><label class="text-[8px] ml-1 text-stone-600 block mb-1">MONTO $</label><input type="number" id="movMonto" placeholder="$0" class="w-full p-3.5 rounded-xl glass-input text-right text-base font-mono text-fix-main outline-none shadow-inner bg-white/80"></div>
+                        <div><label class="text-[8px] ml-1 text-stone-600 block mb-1">TIPO</label><select id="movType" class="w-full p-3.5 rounded-xl glass-input text-[10px] outline-none text-stone-800 shadow-inner"><option value="EGRESO">➖ EGRESO</option><option value="INGRESO">➕ INGRESO</option></select></div>
+                        <div><label class="text-[8px] ml-1 text-stone-600 block mb-1">MÉTODO / TÉCNICO</label><div class="flex gap-2"><select id="movPago" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner"><option value="EFECTIVO">EFEC</option><option value="TRANSFERENCIA">TRANS</option></select><select id="movTecnico" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner"></select></div></div>
                         <button onclick="saveManualMovement()" class="glass-card bg-fix-main/90 border-white/60 text-white py-4 rounded-xl font-black text-[10px] active:scale-95 transition-all uppercase italic text-center shadow-lg hover:shadow-stone-900/20">Registrar</button>
                     </div>
 
@@ -1752,7 +2436,7 @@ Correo: ${v.email || ''}`;
                 <div class="md:col-span-3"><label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">LINK GPS / DIRECCIÓN</label><input type="text" id="edit_direccion" class="w-full p-3 glass-input rounded-xl text-xs text-stone-800 shadow-inner outline-none"></div>
             </div>
             
-            <div class="mb-6"><label class="text-[8px] text-stone-600 ml-2 uppercase font-black block mb-1">Observaciones Oficina</label><textarea id="edit_observaciones" placeholder="INDICACIONES ESPECIALES..." class="w-full p-5 glass-input rounded-[1.5rem] font-black text-xs uppercase min-h-[100px] text-stone-800 outline-none shadow-inner bg-white/60"></textarea></div>
+            <div class="mb-6"><label class="text-[8px] text-stone-600 ml-2 uppercase font-black block mb-1">Observaciones Oficina</label><textarea id="edit_observaciones" class="w-full p-5 glass-input rounded-[1.5rem] font-black text-xs uppercase min-h-[100px] text-stone-800 outline-none shadow-inner bg-white/60"></textarea></div>
 
             <div class="p-6 glass-panel bg-stone-100/40 rounded-[2rem] mb-6 border border-white/70 shadow-sm">
                 <div class="flex justify-between items-center mb-5">
@@ -1769,18 +2453,17 @@ Correo: ${v.email || ''}`;
                 <div id="editAccesoriosContainer" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3"></div>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 sticky bottom-0 bg-white pt-4 border-t-2 border-dashed border-slate-200">
-                <button onclick="saveEditChanges()" class="glass-card bg-emerald-700/90 border-white/60 text-white py-4 rounded-2xl font-black active:scale-95 transition-all text-xs uppercase italic text-center shadow-lg hover:shadow-emerald-900/20 col-span-1">💾 Guardar</button>
-                <button onclick="duplicateVisitRecord()" class="glass-card bg-fix-main/90 border-white/60 text-white py-4 rounded-2xl font-black active:scale-95 transition-all text-xs uppercase italic text-center shadow-lg hover:shadow-stone-900/20 col-span-1">🚀 Duplicar</button>
-                <button onclick="copyClientBlock(document.getElementById('edit_id').value)" class="glass-card bg-fix-accent/90 border-white/60 text-white py-4 rounded-2xl font-black active:scale-95 transition-all text-xs uppercase italic text-center shadow-lg col-span-1">📋 Copiar</button>
-                <button onclick="closeEditModal()" class="glass-input bg-white/70 border-white/80 text-stone-600 py-4 rounded-2xl font-black uppercase italic text-xs text-center active:scale-95 shadow-sm col-span-1">Descartar</button>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <button onclick="saveEditChanges()" class="glass-card bg-emerald-700/90 border-white/60 text-white py-4 rounded-2xl font-black active:scale-95 transition-all text-sm uppercase italic text-center shadow-lg hover:shadow-emerald-900/20">💾 Actualizar</button>
+                <button onclick="duplicateVisitRecord()" class="glass-card bg-fix-main/90 border-white/60 text-white py-4 rounded-2xl font-black active:scale-95 transition-all text-sm uppercase italic text-center shadow-lg hover:shadow-stone-900/20">🚀 Duplicar (Nueva Fecha)</button>
+                <button onclick="closeEditModal()" class="glass-input bg-white/70 border-white/80 text-stone-600 py-4 rounded-2xl font-black uppercase italic text-sm text-center active:scale-95 shadow-sm">Descartar Cambios</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL DE AJUSTE FINANCIERO -->
     <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 admin-only">
-        <div class="glass-card w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 uppercase italic font-black text-center text-stone-800 border border-white/90">
+        <div class="glass-card w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 font-black uppercase italic text-center text-stone-800 border border-white/90">
             <h2 class="text-xl font-black uppercase text-fix-main mb-6 border-b border-stone-300/60 pb-4">EDITAR CAJA / LIQUIDACIÓN</h2>
             <input type="hidden" id="finance_id">
             <input type="hidden" id="finance_source">
@@ -1813,3 +2496,4 @@ Correo: ${v.email || ''}`;
 
 </body>
 </html>
+
