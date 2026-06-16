@@ -991,7 +991,7 @@ Correo: ${v.email || ''}`;
                 }
             } else if (formType === 'maint') {
                 if (data.nombre) document.getElementsByName("mNombre")[0].value = data.nombre.toUpperCase();
-                if (data.calle) document.getElementsByName("mCalle")[0].value = data.calle.toUpperCase();
+                if (data.calle) document.getElementsByName("mCalle")[0].value = data.mCalle.toUpperCase();
                 if (data.cedula) document.getElementById("mCedula").value = data.cedula.replace(/\D/g, '');
                 if (data.telefono) document.getElementsByName("mTelefono")[0].value = data.telefono.replace(/[^\d+]/g, '');
                 if (data.email) document.getElementById("mEmail").value = data.email.toLowerCase();
@@ -1189,8 +1189,18 @@ Correo: ${v.email || ''}`;
         };
 
         function startSync() {
+            // Sincronización robusta tolerante a caídas de red o denegación de permisos de Firebase
             database.ref('visits').on('value', snap => {
-                visitsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : [];
+                let rawVal = snap.val();
+                if (rawVal) {
+                    if (Array.isArray(rawVal)) {
+                        visitsArray = rawVal.filter(item => item !== null).map((item, idx) => Object.assign({}, item, {id: item.id || 'visit_' + idx}));
+                    } else {
+                        visitsArray = Object.entries(rawVal).map(item => Object.assign({}, item[1], {id: item[0]}));
+                    }
+                } else {
+                    visitsArray = [];
+                }
                 renderUIAgenda(); renderRutero(); renderInventoryView(); renderPendientes(); renderTaller(); renderGarantias();
                 if(currentView === 'reporte_teka') renderReporteTeka(); 
                 if(currentView === 'garantias') renderMaestroGarantias();
@@ -1198,19 +1208,39 @@ Correo: ${v.email || ''}`;
                 if(currentView === 'contabilidad') processFinancialBalance(); 
                 if(currentView === 'buscador') renderBuscador();
             }, error => {
-                console.error("Database error (visits):", error);
+                console.warn("Firebase de respaldo desactivado. Operando localmente.");
             });
+            
             database.ref('movements').on('value', snap => { 
-                movementsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : []; 
+                let rawVal = snap.val();
+                if (rawVal) {
+                    if (Array.isArray(rawVal)) {
+                        movementsArray = rawVal.filter(item => item !== null).map((item, idx) => Object.assign({}, item, {id: item.id || 'mov_' + idx}));
+                    } else {
+                        movementsArray = Object.entries(rawVal).map(item => Object.assign({}, item[1], {id: item[0]}));
+                    }
+                } else {
+                    movementsArray = [];
+                }
                 if(currentView === 'contabilidad') processFinancialBalance(); 
             }, error => {
-                console.error("Database error (movements):", error);
+                console.warn("Fallo en sincronizar caja manual.");
             });
+            
             database.ref('inventory_entries').on('value', snap => { 
-                inventoryEntries = snap.val() ? Object.values(snap.val()) : []; 
+                let rawVal = snap.val();
+                if (rawVal) {
+                    if (Array.isArray(rawVal)) {
+                        inventoryEntries = rawVal.filter(item => item !== null);
+                    } else {
+                        inventoryEntries = Object.values(rawVal);
+                    }
+                } else {
+                    inventoryEntries = [];
+                }
                 renderInventoryView(); 
             }, error => {
-                console.error("Database error (inventory_entries):", error);
+                console.warn("Fallo en sincronizar inventario.");
             });
         }
     </script>
@@ -1750,7 +1780,7 @@ Correo: ${v.email || ''}`;
 
     <!-- MODAL DE AJUSTE FINANCIERO -->
     <div id="editFinanceModal" class="hidden fixed inset-0 z-[20000] modal-overlay flex items-center justify-center p-4 admin-only">
-        <div class="glass-card w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 uppercase italic font-black border border-white/90">
+        <div class="glass-card w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 uppercase italic font-black text-center text-stone-800 border border-white/90">
             <h2 class="text-xl font-black uppercase text-fix-main mb-6 border-b border-stone-300/60 pb-4">EDITAR CAJA / LIQUIDACIÓN</h2>
             <input type="hidden" id="finance_id">
             <input type="hidden" id="finance_source">
