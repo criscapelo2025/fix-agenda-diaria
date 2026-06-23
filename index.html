@@ -371,35 +371,73 @@
             });
         }
 
-        // AUTOCOMPLETADO DE CLIENTES POR CÓDIGO
-        window.autocompletarCliente = function(inputId, isMaint) {
-            const code = document.getElementById(inputId).value.trim().toUpperCase();
-            if(!code) return showMessage("⚠️ INGRESE UN CÓDIGO", "fix-accent");
+        // GENERADOR DE CÓDIGOS DE CLIENTE GLOBAL Y ESTABLE
+        function getGlobalClients() {
+            const clientsMap = new Map();
+            // Ordenar por fecha de creación para que los primeros clientes siempre tengan los primeros números (00001, 00002...)
+            const sortedVisits = [...visitsArray].sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0));
             
-            const matches = visitsArray.filter(v => {
-                const vCode = "CLI-" + v.id.substring(v.id.length - 5).toUpperCase();
-                return vCode === code;
+            let counter = 1;
+            sortedVisits.forEach(v => {
+                if(!v.nombreCliente) return;
+                const key = v.nombreCliente.trim().toUpperCase();
+                
+                if(!clientsMap.has(key)) {
+                    const code = String(counter).padStart(5, '0');
+                    counter++;
+                    clientsMap.set(key, {
+                        code: code,
+                        nombre: v.nombreCliente,
+                        cedula: v.cedula || '-',
+                        telefono: v.telefono || '-',
+                        email: v.email || '-',
+                        calle: v.callePrincipal || '-',
+                        direccion: v.direccion || '-',
+                        fechaUltimaVisita: v.fechaInstalacion
+                    });
+                } else {
+                    let existing = clientsMap.get(key);
+                    // Actualizamos con datos más recientes si los hay
+                    if((v.fechaInstalacion || "") > (existing.fechaUltimaVisita || "")) {
+                        existing.fechaUltimaVisita = v.fechaInstalacion;
+                    }
+                    if(existing.telefono === '-' && v.telefono) existing.telefono = v.telefono;
+                    if(existing.cedula === '-' && v.cedula) existing.cedula = v.cedula;
+                    if(existing.email === '-' && v.email) existing.email = v.email;
+                    if(existing.direccion === '-' && v.direccion) existing.direccion = v.direccion;
+                }
             });
+            return Array.from(clientsMap.values());
+        }
+
+        // AUTOCOMPLETADO DE CLIENTES POR CÓDIGO O POR NOMBRE
+        window.autocompletarCliente = function(inputId, isMaint) {
+            const query = document.getElementById(inputId).value.trim().toUpperCase();
+            if(!query) return showMessage("⚠️ INGRESE CÓDIGO O NOMBRE", "fix-accent");
+            
+            const clients = getGlobalClients();
+            // Busca coincidencia exacta de código, o que el nombre contenga el texto buscado
+            const matches = clients.filter(c => c.code === query || c.nombre.includes(query));
 
             if(matches.length === 0) {
                 return showMessage("❌ CLIENTE NO ENCONTRADO", "fix-error");
             }
-
-            matches.sort((a,b) => (b.fechaInstalacion || "").localeCompare(a.fechaInstalacion || ""));
-            const client = matches[0];
+            
+            // Si hay varias coincidencias por nombre, prioriza la coincidencia exacta si es posible, sino usa el primero
+            let client = matches.find(c => c.nombre === query) || matches[0];
 
             if(isMaint) {
-                document.getElementsByName('mNombre')[0].value = client.nombreCliente || '';
-                document.getElementsByName('mTelefono')[0].value = client.telefono || '';
-                document.getElementsByName('mCalle')[0].value = client.callePrincipal || '';
-                document.getElementsByName('mDireccion')[0].value = client.direccion || '';
+                document.getElementsByName('mNombre')[0].value = client.nombre || '';
+                document.getElementsByName('mTelefono')[0].value = client.telefono !== '-' ? client.telefono : '';
+                document.getElementsByName('mCalle')[0].value = client.calle !== '-' ? client.calle : '';
+                document.getElementsByName('mDireccion')[0].value = client.direccion !== '-' ? client.direccion : '';
             } else {
-                document.getElementsByName('nombreCliente')[0].value = client.nombreCliente || '';
-                document.getElementsByName('telefono')[0].value = client.telefono || '';
-                document.getElementsByName('cedula')[0].value = client.cedula || '';
-                document.getElementsByName('email')[0].value = client.email || '';
-                document.getElementsByName('callePrincipal')[0].value = client.callePrincipal || '';
-                document.getElementsByName('direccion')[0].value = client.direccion || '';
+                document.getElementsByName('nombreCliente')[0].value = client.nombre || '';
+                document.getElementsByName('telefono')[0].value = client.telefono !== '-' ? client.telefono : '';
+                document.getElementsByName('cedula')[0].value = client.cedula !== '-' ? client.cedula : '';
+                document.getElementsByName('email')[0].value = client.email !== '-' ? client.email : '';
+                document.getElementsByName('callePrincipal')[0].value = client.calle !== '-' ? client.calle : '';
+                document.getElementsByName('direccion')[0].value = client.direccion !== '-' ? client.direccion : '';
             }
 
             showMessage("✅ DATOS CARGADOS", "fix-report");
@@ -573,7 +611,8 @@
         };
 
         window.changeMasterView = function(view) {
-            if (currentTechUser && view !== 'rutero') {
+            // El técnico SÍ puede ver el rutero y los clientes
+            if (currentTechUser && view !== 'rutero' && view !== 'clientes') {
                 showMessage("🔒 ACCESO SOLO TÉCNICOS", "fix-error");
                 return;
             }
@@ -625,8 +664,6 @@
             currentTechUser = null;
             document.body.classList.remove('technician-mode');
             document.getElementById('userDisplayLabel').textContent = "Admin";
-            document.getElementById('adminNav').classList.remove('hidden');
-            document.getElementById('mobileAdminNav').classList.remove('hidden');
             document.getElementById('exitTechModeBtn').classList.add('hidden');
             
             const url = new URL(window.location);
@@ -1472,42 +1509,11 @@
             const container = document.getElementById('clientesTableBody'); if(!container) return;
             const query = (document.getElementById('clientesSearchInput')?.value || "").toUpperCase();
             
-            // Extraer clientes únicos
-            const clientsMap = new Map();
-            visitsArray.forEach(v => {
-                if(!v.nombreCliente) return;
-                const key = v.nombreCliente.trim().toUpperCase();
-                
-                if(!clientsMap.has(key)) {
-                    // Generar un código corto usando parte del ID
-                    const code = "CLI-" + v.id.substring(v.id.length - 5).toUpperCase();
-                    clientsMap.set(key, {
-                        code: code,
-                        nombre: v.nombreCliente,
-                        cedula: v.cedula || '-',
-                        telefono: v.telefono || '-',
-                        email: v.email || '-',
-                        calle: v.callePrincipal || '-',
-                        direccion: v.direccion || '-',
-                        fechaUltimaVisita: v.fechaInstalacion
-                    });
-                } else {
-                    // Actualizar si la visita es más reciente o tiene mejores datos
-                    let existing = clientsMap.get(key);
-                    if((v.fechaInstalacion || "") > (existing.fechaUltimaVisita || "")) {
-                        existing.fechaUltimaVisita = v.fechaInstalacion;
-                    }
-                    if(existing.telefono === '-' && v.telefono) existing.telefono = v.telefono;
-                    if(existing.cedula === '-' && v.cedula) existing.cedula = v.cedula;
-                    if(existing.email === '-' && v.email) existing.email = v.email;
-                    if(existing.direccion === '-' && v.direccion) existing.direccion = v.direccion;
-                }
-            });
-
-            let clientsList = Array.from(clientsMap.values());
+            const clientsList = getGlobalClients();
+            let filtered = clientsList;
             
             if(query) {
-                clientsList = clientsList.filter(c => 
+                filtered = filtered.filter(c => 
                     c.nombre.includes(query) || 
                     c.cedula.includes(query) || 
                     c.code.includes(query) ||
@@ -1515,14 +1521,15 @@
                 );
             }
 
-            clientsList.sort((a,b) => a.nombre.localeCompare(b.nombre));
+            // Ordenamiento por defecto por nombre en la tabla
+            filtered.sort((a,b) => a.nombre.localeCompare(b.nombre));
 
-            if(clientsList.length === 0) {
+            if(filtered.length === 0) {
                 container.innerHTML = '<tr><td colspan="7" class="p-8 text-center-force text-stone-500 italic font-black uppercase">No se encontraron clientes</td></tr>';
                 return;
             }
 
-            container.innerHTML = clientsList.map(c => {
+            container.innerHTML = filtered.map(c => {
                 const mapLink = (c.direccion && c.direccion.includes('http')) ? c.direccion : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.calle);
                 return `<tr class="border-b border-white/50 row-hover uppercase font-black">
                     <td class="p-4 font-mono font-bold text-fix-main">${c.code}</td>
@@ -2156,7 +2163,7 @@
                     <h1 class="text-xl sm:text-4xl font-black uppercase italic text-stone-800 tracking-tighter leading-none drop-shadow-sm">Gestión</h1>
                     <div class="flex flex-col">
                         <span id="userDisplayLabel" class="font-black text-stone-600 uppercase tracking-widest italic font-mono">Admin</span>
-                        <span class="version-badge shadow-sm">V. 4.2 Pro Auto-Code</span>
+                        <span class="version-badge shadow-sm">V. 4.3 Pro Direct (Auto-Code)</span>
                         <span class="font-bold text-emerald-700 lowercase mt-1 flex items-center gap-1 glass-input w-max px-2 py-0.5 rounded-full border border-white" style="font-size: 10px;">
                             <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> nube activa
                         </span>
@@ -2192,7 +2199,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-8 relative z-10">
 
             <!-- NUEVA PESTAÑA: DIRECTORIO DE CLIENTES -->
-            <div id="clientesView" class="hidden lg:col-span-3 space-y-6 admin-only">
+            <div id="clientesView" class="hidden lg:col-span-3 space-y-6">
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem]">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-white/60 pb-5">
                         <div>
@@ -2273,7 +2280,7 @@
                     <!-- NUEVO AUTOCOMPLETADO REGISTRO NORMAL -->
                     <div class="glass-panel p-4 mb-6 border border-white/70 flex flex-col md:flex-row gap-3 items-center bg-stone-100/50">
                         <span class="text-xl hidden md:inline-block text-stone-500">🔍</span>
-                        <input type="text" id="codigoBuscadorRegistro" placeholder="BUSCAR POR CÓDIGO (EJ. CLI-A1B2C)" class="w-full p-3 glass-input rounded-xl font-black uppercase text-stone-800 outline-none">
+                        <input type="text" id="codigoBuscadorRegistro" placeholder="BUSCAR POR CÓDIGO (EJ. 00001) O POR NOMBRE..." class="w-full p-3 glass-input rounded-xl font-black uppercase text-stone-800 outline-none">
                         <button type="button" onclick="autocompletarCliente('codigoBuscadorRegistro', false)" class="glass-card bg-fix-light/90 border-white/40 text-white px-5 py-3 rounded-xl font-black shadow-md hover:scale-105 transition-transform w-full md:w-auto">AUTOCOMPLETAR</button>
                     </div>
 
@@ -2414,7 +2421,7 @@
                         <!-- NUEVO AUTOCOMPLETADO MANTENIMIENTO -->
                         <div class="glass-panel p-4 mb-6 border border-white/70 flex flex-col md:flex-row gap-3 items-center bg-stone-100/50">
                             <span class="text-xl hidden md:inline-block text-stone-500">🔍</span>
-                            <input type="text" id="codigoBuscadorMaint" placeholder="BUSCAR POR CÓDIGO (EJ. CLI-A1B2C)" class="w-full p-3 glass-input rounded-xl font-black uppercase text-stone-800 outline-none">
+                            <input type="text" id="codigoBuscadorMaint" placeholder="BUSCAR POR CÓDIGO (EJ. 00001) O POR NOMBRE..." class="w-full p-3 glass-input rounded-xl font-black uppercase text-stone-800 outline-none">
                             <button type="button" onclick="autocompletarCliente('codigoBuscadorMaint', true)" class="glass-card bg-fix-light/90 border-white/40 text-white px-5 py-3 rounded-xl font-black shadow-md hover:scale-105 transition-transform w-full md:w-auto">AUTOCOMPLETAR</button>
                         </div>
 
@@ -2489,7 +2496,7 @@
                 </div>
             </div>
 
-            <div id="ruteroView" class="hidden lg:col-span-3 glass-card p-4 md:p-6 rounded-[2.5rem] admin-only-mobile">
+            <div id="ruteroView" class="hidden lg:col-span-3 glass-card p-4 md:p-6 rounded-[2.5rem]">
                 <div class="flex flex-col md:flex-row justify-between items-center mb-6 px-2 gap-4">
                     <h2 class="text-lg font-black uppercase italic font-sans text-stone-800 tracking-tighter underline">Logística / Rutero</h2>
                     <div class="flex gap-2 w-full md:w-auto">
