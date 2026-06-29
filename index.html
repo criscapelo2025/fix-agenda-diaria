@@ -541,7 +541,7 @@
                 return;
             }
             currentView = view;
-            const sections = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView'];
+            const sections = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'clientesView'];
             sections.forEach(function(id) { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
 
             if(view === 'reporte_admin') { 
@@ -559,6 +559,7 @@
             if(view === 'rutero') renderRutero();
             if(view === 'contabilidad') processFinancialBalance();
             if(view === 'inventory') renderInventoryView();
+            if(view === 'clientes') renderClientes();
             
             // Desktop Nav
             document.querySelectorAll('.view-btn').forEach(function(btn) { 
@@ -1404,6 +1405,98 @@
             }).join('');
         }
 
+        // --- LÓGICA DE DIRECTORIO DE CLIENTES ---
+        function renderClientes() {
+            const container = document.getElementById('clientesTableBody'); if(!container) return;
+            const query = (document.getElementById('clientesSearchInput')?.value || "").toUpperCase();
+            
+            const clientsMap = new Map();
+            visitsArray.forEach(v => {
+                if(!v.nombreCliente) return;
+                const key = v.nombreCliente.trim().toUpperCase();
+                
+                if(!clientsMap.has(key)) {
+                    const code = "CLI-" + v.id.substring(v.id.length - 5).toUpperCase();
+                    clientsMap.set(key, {
+                        code: code,
+                        nombre: v.nombreCliente,
+                        cedula: v.cedula || '-',
+                        telefono: v.telefono || '-',
+                        email: v.email || '-',
+                        calle: v.callePrincipal || '-',
+                        direccion: v.direccion || '-',
+                        fechaUltimaVisita: v.fechaInstalacion
+                    });
+                } else {
+                    let existing = clientsMap.get(key);
+                    if((v.fechaInstalacion || "") > (existing.fechaUltimaVisita || "")) {
+                        existing.fechaUltimaVisita = v.fechaInstalacion;
+                    }
+                    if(existing.telefono === '-' && v.telefono) existing.telefono = v.telefono;
+                    if(existing.cedula === '-' && v.cedula) existing.cedula = v.cedula;
+                    if(existing.email === '-' && v.email) existing.email = v.email;
+                    if(existing.direccion === '-' && v.direccion) existing.direccion = v.direccion;
+                }
+            });
+
+            let clientsList = Array.from(clientsMap.values());
+            
+            if(query) {
+                clientsList = clientsList.filter(c => 
+                    c.nombre.includes(query) || 
+                    c.cedula.includes(query) || 
+                    c.code.includes(query) ||
+                    c.telefono.includes(query)
+                );
+            }
+
+            clientsList.sort((a,b) => a.nombre.localeCompare(b.nombre));
+
+            if(clientsList.length === 0) {
+                container.innerHTML = '<tr><td colspan="8" class="p-8 text-center-force text-stone-500 italic font-black uppercase text-xs">No se encontraron clientes</td></tr>';
+                return;
+            }
+
+            container.innerHTML = clientsList.map(c => {
+                const mapLink = (c.direccion && c.direccion.includes('http')) ? c.direccion : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.calle);
+                return `<tr class="border-b border-white/50 row-hover font-black uppercase text-[10px]">
+                    <td class="p-4 font-mono font-bold text-fix-main">${c.code}</td>
+                    <td class="p-4 italic underline decoration-stone-300 text-stone-800">${c.nombre}</td>
+                    <td class="p-4 font-mono text-stone-600">${c.cedula}</td>
+                    <td class="p-4 font-mono text-stone-700">${c.telefono}</td>
+                    <td class="p-4 lowercase text-stone-500 font-normal">${c.email}</td>
+                    <td class="p-4 max-w-[200px] truncate text-stone-700">${c.calle}</td>
+                    <td class="p-4 text-center-force">
+                        <a href="${mapLink}" target="_blank" class="glass-card bg-fix-light/90 text-white px-3 py-2 rounded-lg font-black shadow-sm border border-stone-400/50 italic inline-block hover:scale-105 transition-transform text-center-force">📍 VER</a>
+                    </td>
+                    <td class="p-4 text-center-force">
+                        <button onclick="seleccionarCliente('${c.code}')" class="glass-card bg-fix-report/90 text-white px-3 py-2 rounded-lg font-black shadow-sm border border-emerald-500/50 italic inline-block hover:scale-105 transition-transform text-center-force">📋 AUTOCOMPLETAR</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        window.seleccionarCliente = function(code) {
+            const matches = visitsArray.filter(v => {
+                const vCode = "CLI-" + v.id.substring(v.id.length - 5).toUpperCase();
+                return vCode === code;
+            });
+            if(matches.length === 0) return showMessage("❌ CLIENTE NO ENCONTRADO", "fix-error");
+            matches.sort((a,b) => (b.fechaInstalacion || "").localeCompare(a.fechaInstalacion || ""));
+            const client = matches[0];
+
+            // Auto-fill form fields using document.getElementsByName
+            if (document.getElementsByName('nombreCliente')[0]) document.getElementsByName('nombreCliente')[0].value = client.nombreCliente || '';
+            if (document.getElementsByName('telefono')[0]) document.getElementsByName('telefono')[0].value = client.telefono || '';
+            if (document.getElementsByName('cedula')[0]) document.getElementsByName('cedula')[0].value = client.cedula || '';
+            if (document.getElementsByName('email')[0]) document.getElementsByName('email')[0].value = client.email || '';
+            if (document.getElementsByName('callePrincipal')[0]) document.getElementsByName('callePrincipal')[0].value = client.callePrincipal || '';
+            if (document.getElementsByName('direccion')[0]) document.getElementsByName('direccion')[0].value = client.direccion || '';
+
+            changeMasterView('reporte_admin');
+            showMessage("✅ DATOS CARGADOS EN REGISTRO", "fix-report");
+        };
+
         window.showDesgloseVisita = function(id) {
             const v = visitsArray.find(item => item.id === id);
             if (!v) return;
@@ -1745,13 +1838,20 @@
 
         function startSync() {
             database.ref('visits').on('value', snap => {
-                visitsArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], {id: item[0]})) : [];
-                renderUIAgenda(); renderRutero(); renderInventoryView(); renderPendientes(); renderTaller(); renderGarantias();
+                visitsArray = snap.val() ? Object.entries(snap.val()).map(item => {
+                    const v = Object.assign({}, item[1], {id: item[0]});
+                    if (v.telefono && v.telefono.length > 50) {
+                        v.telefono = v.telefono.substring(0, 50) + "...";
+                    }
+                    return v;
+                }) : [];
+                renderUIAgenda(); renderRutero(); renderInventoryView(); renderPendientes(); renderTaller(); renderGarantias(); renderClientes();
                 if(currentView === 'reporte_teka') renderReporteTeka(); 
                 if(currentView === 'garantias') renderMaestroGarantias();
                 if(currentView === 'mantenimiento') renderReporteMantenimiento(); 
                 if(currentView === 'contabilidad') processFinancialBalance(); 
                 if(currentView === 'buscador') renderBuscador();
+                if(currentView === 'clientes') renderClientes();
             }, error => {
                 console.error("Database error (visits):", error);
             });
@@ -2006,6 +2106,9 @@
         <button onclick="changeMasterView('buscador')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="buscador">
             <span class="text-xl leading-none">🔍</span><span class="text-[9px] mt-1 font-bold">Buscador</span>
         </button>
+        <button onclick="changeMasterView('clientes')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="clientes">
+            <span class="text-xl leading-none">👥</span><span class="text-[9px] mt-1 font-bold">Clientes</span>
+        </button>
     </nav>
 
     <div class="max-w-[2800px] mx-auto pb-32 md:pb-10 relative">
@@ -2048,11 +2151,44 @@
                 <button onclick="changeMasterView('reporte_teka')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">📚</span> Maestro</button>
                 <button onclick="changeMasterView('contabilidad')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">💰</span> Caja</button>
                 <button onclick="changeMasterView('buscador')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">🔍</span> Buscador</button>
+                <button onclick="changeMasterView('clientes')" class="view-btn flex items-center gap-1 py-1.5 px-4 rounded-full font-black text-[9px] uppercase bg-white/60 text-stone-600 italic transition-all hover:bg-white/80 hover:scale-105"><span class="text-xs">👥</span> Clientes</button>
             </nav>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-8 relative z-10">
             
+            <div id="clientesView" class="hidden lg:col-span-3 space-y-6 admin-only">
+                <div class="glass-card p-6 md:p-8 rounded-[2.5rem]">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-white/60 pb-5">
+                        <div>
+                            <h2 class="text-xl font-black uppercase italic underline text-fix-main tracking-tighter">Directorio de Clientes</h2>
+                            <p class="text-stone-600 font-black italic mt-1 text-[10px]">Base de datos de todos los usuarios registrados</p>
+                        </div>
+                        <input type="text" id="clientesSearchInput" oninput="renderClientes()" placeholder="🔍 BUSCAR CLIENTE..." class="w-full md:w-80 p-4 glass-input rounded-2xl font-black text-xs uppercase text-stone-800 outline-none">
+                    </div>
+                    
+                    <div class="overflow-x-auto rounded-3xl border border-white/80 shadow-sm bg-white/30 backdrop-blur-md">
+                        <table class="w-full text-left admin-table font-black uppercase">
+                            <thead>
+                                <tr>
+                                    <th class="p-4 w-28">CÓDIGO</th>
+                                    <th class="p-4 w-60">NOMBRE DEL CLIENTE</th>
+                                    <th class="p-4 w-28">CÉDULA</th>
+                                    <th class="p-4 w-32">TELÉFONO</th>
+                                    <th class="p-4 w-40">CORREO</th>
+                                    <th class="p-4">CALLE PRINCIPAL</th>
+                                    <th class="p-4 w-24 text-center-force">DIRECCIÓN GPS</th>
+                                    <th class="p-4 w-28 text-center-force">ACCIONES</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientesTableBody" class="italic text-stone-800">
+                                <!-- Contenido generado por renderClientes() -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div id="buscadorView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="glass-card p-6 md:p-8 rounded-[2.5rem]">
                     <h2 class="text-xl font-black uppercase italic underline text-fix-main mb-6 tracking-tighter">Buscador Inteligente Global</h2>
