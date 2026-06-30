@@ -17,6 +17,9 @@
         tailwind.config = {
             theme: {
                 extend: {
+                    fontFamily: {
+                        sans: ['Calibri', 'Candara', 'Segoe', 'Segoe UI', 'Optima', 'Arial', 'sans-serif'],
+                    },
                     colors: {
                         'fix-main': '#3e2723',    /* Dark Espresso - Elegante, reemplaza al azul */
                         'fix-light': '#8d6e63',   /* Latte / Mocha claro */
@@ -32,11 +35,15 @@
     </script>
 
     <style>
-        /* FONDO ESTILO iOS - TONOS CAFÉ / MOCHA */
+        /* CONFIGURACIÓN DE FUENTES DEL SISTEMA (CALIBRI 12) */
+        html, body, input, select, textarea, button, table, th, td {
+            font-family: Calibri, Candara, Segoe, "Segoe UI", Optima, Arial, sans-serif;
+        }
         body {
             background: linear-gradient(135deg, #f5efe6 0%, #e8d8c8 50%, #d5bdaf 100%);
             background-attachment: fixed;
             background-size: cover;
+            font-size: 12px;
         }
 
         /* NIVELES DE LIQUID GLASS - PROFUNDIDAD 3D Y REFLEJOS */
@@ -661,6 +668,22 @@
                     renderPendientes(); 
                     renderTaller();
                     renderGarantias();
+
+                    if (s === 'No Atendido' && !currentTechUser) {
+                        changeMasterView('pendientes');
+                        setTimeout(() => {
+                            const dateInput = document.getElementById('date_pend_' + id);
+                            if (dateInput) {
+                                dateInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                dateInput.focus();
+                                const card = dateInput.closest('.glass-card');
+                                if (card) {
+                                    card.classList.add('ring-4', 'ring-fix-accent');
+                                    setTimeout(() => card.classList.remove('ring-4', 'ring-fix-accent'), 3000);
+                                }
+                            }
+                        }, 500);
+                    }
                 }).catch(function() { showMessage("❌ Error", "fix-error"); });
             } catch(e) { console.error(e); showMessage("❌ Error Crítico", "fix-error"); }
         };
@@ -1470,14 +1493,15 @@
                     <td class="p-4 text-center-force">
                         <a href="${mapLink}" target="_blank" class="glass-card bg-fix-light/90 text-white px-3 py-2 rounded-lg font-black shadow-sm border border-stone-400/50 italic inline-block hover:scale-105 transition-transform text-center-force">📍 VER</a>
                     </td>
-                    <td class="p-4 text-center-force">
-                        <button onclick="seleccionarCliente('${c.code}')" class="glass-card bg-fix-report/90 text-white px-3 py-2 rounded-lg font-black shadow-sm border border-emerald-500/50 italic inline-block hover:scale-105 transition-transform text-center-force">📋 AUTOCOMPLETAR</button>
+                    <td class="p-4 text-center-force flex flex-col md:flex-row justify-center items-center gap-1.5">
+                        <button onclick="seleccionarCliente('${c.code}', 'registro')" class="glass-card bg-fix-report/90 text-white px-2 py-1 rounded-lg font-black shadow-sm border border-emerald-500/50 italic inline-block hover:scale-105 transition-transform text-center-force text-[8px] whitespace-nowrap">📝 REGISTRO</button>
+                        <button onclick="seleccionarCliente('${c.code}', 'mantenimiento')" class="glass-card bg-amber-600/90 text-white px-2 py-1 rounded-lg font-black shadow-sm border border-amber-500/50 italic inline-block hover:scale-105 transition-transform text-center-force text-[8px] whitespace-nowrap">⚙️ MANT.</button>
                     </td>
                 </tr>`;
             }).join('');
         }
 
-        window.seleccionarCliente = function(code) {
+        window.seleccionarCliente = function(code, target = 'registro') {
             const matches = visitsArray.filter(v => {
                 const vCode = "CLI-" + v.id.substring(v.id.length - 5).toUpperCase();
                 return vCode === code;
@@ -1486,16 +1510,25 @@
             matches.sort((a,b) => (b.fechaInstalacion || "").localeCompare(a.fechaInstalacion || ""));
             const client = matches[0];
 
-            // Auto-fill form fields using document.getElementsByName
-            if (document.getElementsByName('nombreCliente')[0]) document.getElementsByName('nombreCliente')[0].value = client.nombreCliente || '';
-            if (document.getElementsByName('telefono')[0]) document.getElementsByName('telefono')[0].value = client.telefono || '';
-            if (document.getElementsByName('cedula')[0]) document.getElementsByName('cedula')[0].value = client.cedula || '';
-            if (document.getElementsByName('email')[0]) document.getElementsByName('email')[0].value = client.email || '';
-            if (document.getElementsByName('callePrincipal')[0]) document.getElementsByName('callePrincipal')[0].value = client.callePrincipal || '';
-            if (document.getElementsByName('direccion')[0]) document.getElementsByName('direccion')[0].value = client.direccion || '';
+            if (target === 'mantenimiento') {
+                if (document.getElementsByName('mNombre')[0]) document.getElementsByName('mNombre')[0].value = client.nombreCliente || '';
+                if (document.getElementsByName('mTelefono')[0]) document.getElementsByName('mTelefono')[0].value = client.telefono || '';
+                if (document.getElementsByName('mCalle')[0]) document.getElementsByName('mCalle')[0].value = client.callePrincipal || '';
+                if (document.getElementsByName('mDireccion')[0]) document.getElementsByName('mDireccion')[0].value = client.direccion || '';
+                changeMasterView('mantenimiento');
+                showMessage("✅ DATOS CARGADOS EN MANTENIMIENTO", "fix-report");
+            } else {
+                // Auto-fill form fields using document.getElementsByName
+                if (document.getElementsByName('nombreCliente')[0]) document.getElementsByName('nombreCliente')[0].value = client.nombreCliente || '';
+                if (document.getElementsByName('telefono')[0]) document.getElementsByName('telefono')[0].value = client.telefono || '';
+                if (document.getElementsByName('cedula')[0]) document.getElementsByName('cedula')[0].value = client.cedula || '';
+                if (document.getElementsByName('email')[0]) document.getElementsByName('email')[0].value = client.email || '';
+                if (document.getElementsByName('callePrincipal')[0]) document.getElementsByName('callePrincipal')[0].value = client.callePrincipal || '';
+                if (document.getElementsByName('direccion')[0]) document.getElementsByName('direccion')[0].value = client.direccion || '';
 
-            changeMasterView('reporte_admin');
-            showMessage("✅ DATOS CARGADOS EN REGISTRO", "fix-report");
+                changeMasterView('reporte_admin');
+                showMessage("✅ DATOS CARGADOS EN REGISTRO", "fix-report");
+            }
         };
 
         window.showDesgloseVisita = function(id) {
