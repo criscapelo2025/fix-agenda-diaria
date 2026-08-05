@@ -378,7 +378,10 @@
         window.movePriority = function(id, direction) {
             const date = document.getElementById('filterDateInputRutero').value;
             const tech = currentTechUser || document.getElementById('ruteroTechFilter').value;
-            let currentDayList = visitsArray.filter(v => v.fechaInstalacion === date);
+            let currentDayList = visitsArray.filter(v => 
+                v.estado && (v.fechaInstalacion === date || v.fechaEntregaProgramada === date || v.fechaNuevaVisita === date) && 
+                (v.estado === 'PENDIENTE' || v.estado === 'Atendido' || v.estado === 'A Taller' || v.estado === 'No Atendido' || v.estado === 'Pendiente (Tramite)' || v.estado === 'Garantia en Tramite')
+            );
             if (tech) currentDayList = currentDayList.filter(v => v.tecnico === tech);
             currentDayList.sort((a, b) => (parseInt(a.priority) || 0) - (parseInt(b.priority) || 0));
             const currentIndex = currentDayList.findIndex(v => v.id === id);
@@ -442,7 +445,15 @@
                 if(sel && pri) {
                     const valorMO = parseFloat(pri.value) || 0;
                     moTotalSAP += valorMO;
-                    if (sel.value !== "PARRILLA BBQ" && count === 1) { moParaTecnico += valorMO; }
+                    if (count === 1) {
+                        if (sel.value !== "PARRILLA BBQ") {
+                            moParaTecnico += valorMO;
+                        }
+                    } else {
+                        if (sel.value === "Triturador") {
+                            moParaTecnico += valorMO;
+                        }
+                    }
                 }
             }
             let acc = 0; 
@@ -641,8 +652,19 @@
                 } 
                 else { 
                     if (v.tipoAtencion !== 'Garantía' && t !== 'Garantía') { 
-                        const hasBBQ = (v.equipos || []).some(function(eq) { return eq.descProducto === "PARRILLA BBQ"; }); 
-                        if (eqCount === 1 && !hasBBQ) { moParaCaja = (v.equipos || []).reduce(function(acc, eq) { return acc + (eq.costoBase || 0); }, 0); } 
+                        if (eqCount === 1) {
+                            const hasBBQ = (v.equipos || []).some(function(eq) { return eq.descProducto === "PARRILLA BBQ"; }); 
+                            if (!hasBBQ) {
+                                moParaCaja = (v.equipos || []).reduce(function(acc, eq) { return acc + (eq.costoBase || 0); }, 0);
+                            }
+                        } else {
+                            moParaCaja = (v.equipos || []).reduce(function(acc, eq) {
+                                if (eq.descProducto === "Triturador") {
+                                    return acc + (eq.costoBase || 0);
+                                }
+                                return acc;
+                            }, 0);
+                        }
                     } 
                 }
                 
@@ -897,6 +919,7 @@
                 </tr>
                 <tr id="detail-${v.id}" class="hidden detail-row uppercase font-black"><td colspan="9" class="p-4 bg-white/50 backdrop-blur-xl border-y border-white/70 shadow-inner"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="glass-panel p-5"><p class="text-[10px] font-black text-fix-main uppercase mb-2 italic tracking-tighter">📄 Información Orden</p>
                 <p class="text-xs uppercase mb-1"><b>CÉDULA:</b> <span class="text-fix-main font-mono">${v.cedula || '---'}</span></p>
+                <p class="text-xs uppercase mb-1"><b>TELÉFONO:</b> <span class="text-fix-main font-mono">${v.telefono || '---'}</span></p>
                 <p class="text-xs uppercase mb-1"><b>EMAIL:</b> <span class="text-fix-main font-mono">${v.email || '---'}</span></p>
                 <p class="text-xs uppercase mb-1"><b>FECHA COMPRA:</b> <span class="text-fix-main font-mono">${v.fechaEmision || '---'}</span></p>
                 <p class="text-xs uppercase mb-1"><b>EQUIPOS / DESC:</b> ${v.esMantenimiento ? v.mantenimientoEquipo : (v.equipos || []).map(e=>e.descProducto).join(', ')}</p>
@@ -1539,12 +1562,25 @@
             let html = `<div class="space-y-4">`;
             let totalGeneral = 0;
             if (v.tipoAtencion !== 'Garantía') {
-                const hasBBQ = (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ");
                 const eqCount = (v.equipos || []).length;
-                if (eqCount === 1 && !hasBBQ) {
-                    const mo = (v.equipos || []).reduce((sum, eq) => sum + (eq.costoBase || 0), 0);
+                if (eqCount === 1) {
+                    const hasBBQ = (v.equipos || []).some(eq => eq.descProducto === "PARRILLA BBQ");
+                    if (!hasBBQ) {
+                        const mo = (v.equipos || []).reduce((sum, eq) => sum + (eq.costoBase || 0), 0);
+                        if(mo > 0) {
+                            html += `<div class="flex justify-between items-center glass-input bg-white/80 p-5 rounded-2xl shadow-sm border border-white"><span class="text-xs font-black text-stone-700 uppercase tracking-tighter">🛠️ MANO DE OBRA</span><span class="font-mono font-black text-fix-main text-base">$${mo.toFixed(2)}</span></div>`;
+                            totalGeneral += mo;
+                        }
+                    }
+                } else {
+                    const mo = (v.equipos || []).reduce((sum, eq) => {
+                        if (eq.descProducto === "Triturador") {
+                            return sum + (eq.costoBase || 0);
+                        }
+                        return sum;
+                    }, 0);
                     if(mo > 0) {
-                        html += `<div class="flex justify-between items-center glass-input bg-white/80 p-5 rounded-2xl shadow-sm border border-white"><span class="text-xs font-black text-stone-700 uppercase tracking-tighter">🛠️ MANO DE OBRA</span><span class="font-mono font-black text-fix-main text-base">$${mo.toFixed(2)}</span></div>`;
+                        html += `<div class="flex justify-between items-center glass-input bg-white/80 p-5 rounded-2xl shadow-sm border border-white"><span class="text-xs font-black text-stone-700 uppercase tracking-tighter">🛠️ MANO DE OBRA (TRITURADOR)</span><span class="font-mono font-black text-fix-main text-base">$${mo.toFixed(2)}</span></div>`;
                         totalGeneral += mo;
                     }
                 }
@@ -1635,7 +1671,13 @@
             document.getElementById('edit_email').value = v.email || "";
             document.getElementById('edit_cedula').value = v.cedula || "";
             document.getElementById('edit_calle').value = v.callePrincipal || "";
-            document.getElementById('edit_fecha').value = v.fechaInstalacion || "";
+            let activeDate = v.fechaInstalacion || "";
+            if (v.estado === 'A Taller') {
+                activeDate = v.fechaEntregaProgramada || v.fechaInstalacion || "";
+            } else if (v.estado === 'Garantia en Tramite') {
+                activeDate = v.fechaNuevaVisita || v.fechaInstalacion || "";
+            }
+            document.getElementById('edit_fecha').value = activeDate;
             document.getElementById('edit_fechaEmision').value = v.fechaEmision || "";
             document.getElementById('edit_direccion').value = v.direccion || "";
             document.getElementById('edit_priority').value = v.priority || 0;
@@ -1740,6 +1782,7 @@
             
             let updatedEquipos = []; 
             let moTotal = 0;
+            const eqCount = selects.length;
 
             for(let i=0; i<selects.length; i++) {
                 const cost = parseFloat(selectsCosts[i].value) || 0;
@@ -1752,7 +1795,16 @@
                     codProducto: codes[i].value.toUpperCase(), 
                     serieEquipo: series[i].value.toUpperCase() 
                 });
-                moTotal += cost;
+                
+                if (eqCount === 1) {
+                    if (desc !== "PARRILLA BBQ") {
+                        moTotal += cost;
+                    }
+                } else {
+                    if (desc === "TRITURADOR") {
+                        moTotal += cost;
+                    }
+                }
             }
 
             let updatedAccs = [];
@@ -1763,13 +1815,16 @@
                 if(q > 0) { updatedAccs.push({ nombre: i.dataset.name, cantidad: q, precio: p }); accTotal += (q * p); } 
             });
 
-            return {
+            const editedDate = document.getElementById('edit_fecha').value;
+            const originalVisit = visitsArray.find(item => item.id === document.getElementById('edit_id').value);
+            
+            const data = {
                 nombreCliente: document.getElementById('edit_nombre').value.toUpperCase(), 
                 telefono: document.getElementById('edit_telefono').value, 
                 email: document.getElementById('edit_email').value.toLowerCase(), 
                 cedula: document.getElementById('edit_cedula').value, 
                 callePrincipal: document.getElementById('edit_calle').value.toUpperCase(), 
-                fechaInstalacion: document.getElementById('edit_fecha').value, 
+                fechaInstalacion: editedDate, 
                 fechaEmision: document.getElementById('edit_fechaEmision').value,
                 direccion: document.getElementById('edit_direccion').value, 
                 tecnico: document.getElementById('edit_tecnico').value, 
@@ -1781,6 +1836,16 @@
                 observacionesAdmin: document.getElementById('edit_observaciones').value.toUpperCase(),
                 'financiera/totalCliente': (moTotal + accTotal)
             };
+
+            if (originalVisit) {
+                if (originalVisit.estado === 'A Taller') {
+                    data.fechaEntregaProgramada = editedDate;
+                } else if (originalVisit.estado === 'Garantia en Tramite') {
+                    data.fechaNuevaVisita = editedDate;
+                }
+            }
+
+            return data;
         }
 
         window.saveEditChanges = function() {
