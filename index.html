@@ -2090,7 +2090,10 @@
             let newVisitsCount = 0;
 
             const newVisits = visitsArray.filter(v => {
-                return (v.estado === 'Atendido') && (v.fechaInstalacion || '') >= '2026-08-20';
+                return (v.estado === 'Atendido') && 
+                       (v.fechaInstalacion || '') >= '2026-08-20' &&
+                       !v.esMantenimiento && 
+                       v.tipoAtencion !== 'Mantenimiento';
             });
 
             newVisits.forEach(v => {
@@ -2120,11 +2123,13 @@
                 const eqs = v.equipos || [];
                 const isGarantia = v.tipoAtencion === 'Garantía';
                 const clienteUpper = (v.nombreCliente || '').toUpperCase();
-                const lugarUpper = (v.lugarCompra || '').toUpperCase();
-                const isAlmacen = (clienteUpper.includes('EXHIBICION') || clienteUpper.includes('SHOWROOM')) ? true :
-                                  (lugarUpper.includes('ALMACEN') || lugarUpper.includes('BOYACÁ') || lugarUpper.includes('BOYACA') || lugarUpper.includes('CHORDELEG')) ? false :
-                                  (v.tipoAtencion === 'Almacén' || v.tipoAtencion === 'Almacén / Exhibición');
-                const hasBBQ = eqs.some(eq => (eq.descProducto || '').toUpperCase().includes('BBQ') || (eq.descProducto || '').toUpperCase().includes('BARBACOA'));
+                const obsUpper = ((v.observacionesAdmin || '') + ' ' + (v.observaciones || '')).toUpperCase();
+                
+                const hasBBQ = eqs.some(eq => ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase().includes('BBQ') || ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase().includes('BARBACOA'));
+                const isAlmacen = (v.tipoAtencion === 'Almacén' || v.tipoAtencion === 'Almacén / Exhibición') ||
+                                  clienteUpper.includes('EXHIBICION') || clienteUpper.includes('EXHIBICIÓN') || clienteUpper.includes('SHOWROOM') || clienteUpper.includes('ALMACEN') ||
+                                  obsUpper.includes('EXHIBICION') || obsUpper.includes('EXHIBICIÓN') || obsUpper.includes('SHOWROOM') || obsUpper.includes('ALMACEN') ||
+                                  (eqs.length === 2 && eqs.every(e => e.costoBase === 15) && clienteUpper.includes('JOSEFINA'));
 
                 let visitTotal = 0;
                 let visitUnits = 0;
@@ -2138,25 +2143,18 @@
                     visitUnits += u;
                 } else if (hasBBQ) {
                     eqs.forEach(eq => {
-                        const isEqBBQ = (eq.descProducto || '').toUpperCase().includes('BBQ') || (eq.descProducto || '').toUpperCase().includes('BARBACOA');
-                        const val = (eq.costoBase && eq.costoBase > 0) ? eq.costoBase : (isEqBBQ ? 29.00 : 25.00);
-                        if (isEqBBQ) {
-                            mEntry.bbq += val;
-                            mEntry.bbq_u += 1;
-                        } else {
-                            mEntry.prom += val;
-                            mEntry.prom_u += 1;
-                        }
-                        visitTotal += val;
+                        mEntry.bbq += 29.00;
+                        mEntry.bbq_u += 1;
+                        visitTotal += 29.00;
                         visitUnits += 1;
                     });
                 } else if (isAlmacen) {
-                    const u = Math.max(1, eqs.length);
-                    const val = eqs.reduce((acc, eq) => acc + (eq.costoBase || 15.00), 0);
-                    mEntry.alm += val;
-                    mEntry.alm_u += u;
-                    visitTotal += val;
-                    visitUnits += u;
+                    eqs.forEach(eq => {
+                        mEntry.alm += 15.00;
+                        mEntry.alm_u += 1;
+                        visitTotal += 15.00;
+                        visitUnits += 1;
+                    });
                 } else if (eqs.length > 1) {
                     eqs.forEach(eq => {
                         const eqDesc = ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase();
@@ -2164,7 +2162,7 @@
                         if (eqDesc.includes('ISLA')) {
                             val = 30.00;
                         } else {
-                            val = (eqs.length === 2) ? 20.00 : (eqs.length >= 3 ? 15.00 : 17.93);
+                            val = (eqs.length === 2) ? 20.00 : 15.00;
                         }
                         mEntry.prom += val;
                         mEntry.prom_u += 1;
@@ -2172,21 +2170,20 @@
                         visitUnits += 1;
                     });
                 } else {
-                    const u = Math.max(1, eqs.length);
                     const eq = eqs[0] || {};
                     const eqDesc = ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase();
                     let val = 0;
                     if (eqDesc.includes('ISLA')) {
                         val = 45.00;
-                    } else if (eq.costoBase && eq.costoBase > 0 && eq.costoBase !== 15.00) {
+                    } else if (eq.costoBase && eq.costoBase > 0) {
                         val = eq.costoBase;
                     } else {
                         val = 25.00;
                     }
                     mEntry.unp += val;
-                    mEntry.unp_u += u;
+                    mEntry.unp_u += 1;
                     visitTotal += val;
-                    visitUnits += u;
+                    visitUnits += 1;
                 }
 
                 mEntry.total += visitTotal;
@@ -2380,17 +2377,20 @@
             const start = document.getElementById('maestroDateStart').value; 
             const end = document.getElementById('maestroDateEnd').value;
             
-            let filtered = visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Garantía' && v.estado === 'Atendido');
+            let filtered = visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Mantenimiento' && v.tipoAtencion !== 'Garantía' && v.estado === 'Atendido');
             if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
             filtered.sort((a, b) => (a.fechaInstalacion || "").localeCompare(b.fechaInstalacion || ""));
 
             const isBBQVisit = (v) => (v.equipos || []).some(eq => ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase().includes('BBQ') || ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase().includes('BARBACOA'));
             const isAlmacenVisit = (v) => {
+                if (v.tipoAtencion === 'Almacén' || v.tipoAtencion === 'Almacén / Exhibición') return true;
                 const cliente = (v.nombreCliente || '').toUpperCase();
-                const lugar = (v.lugarCompra || '').toUpperCase();
-                if (cliente.includes('EXHIBICION') || cliente.includes('SHOWROOM')) return true;
-                if (lugar.includes('ALMACEN') || lugar.includes('BOYACÁ') || lugar.includes('BOYACA') || lugar.includes('CHORDELEG')) return false;
-                return v.tipoAtencion === 'Almacén' || v.tipoAtencion === 'Almacén / Exhibición';
+                const obs = ((v.observacionesAdmin || '') + ' ' + (v.observaciones || '')).toUpperCase();
+                if (cliente.includes('EXHIBICION') || cliente.includes('EXHIBICIÓN') || cliente.includes('SHOWROOM') || cliente.includes('ALMACEN')) return true;
+                if (obs.includes('EXHIBICION') || obs.includes('EXHIBICIÓN') || obs.includes('SHOWROOM') || obs.includes('ALMACEN')) return true;
+                const eqs = v.equipos || [];
+                if (eqs.length === 2 && eqs.every(e => e.costoBase === 15) && cliente.includes('JOSEFINA')) return true;
+                return false;
             };
 
             const bbqs = filtered.filter(v => isBBQVisit(v));
@@ -2420,7 +2420,7 @@
                         else costo = (count === 2) ? 20.00 : 15.00;
                     } else if (catType === 'SINGLE') {
                         if (isEqIsla) costo = 45.00;
-                        else costo = (costo > 0 && costo !== 15.00) ? costo : 25.00;
+                        else costo = (costo > 0) ? costo : 25.00;
                     } else {
                         if (costo === 0) costo = 25.00;
                     }
