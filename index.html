@@ -1019,6 +1019,10 @@
             </html>
             `;
 
+            printWindow.document.write(template);
+            printWindow.document.close();
+        };
+
         window.printDailyRoute = function() {
             const date = document.getElementById('filterDateInputRutero') ? document.getElementById('filterDateInputRutero').value : "";
             if (!date) {
@@ -1861,7 +1865,7 @@
             return '<span class="tag tag-unp">Un Producto</span>';
         }
 
-        window.filterDashProducts = function() {
+        function filterDashProducts() {
             const q = (document.getElementById('dashProdSearch') ? document.getElementById('dashProdSearch').value : '').toLowerCase().trim();
             const cat = document.getElementById('dashCatFilter') ? document.getElementById('dashCatFilter').value : 'ALL';
             const filtered = currentDashProducts.filter(p => {
@@ -1871,7 +1875,8 @@
                 return matchesQ && matchesCat;
             });
             renderDashProductsTable(filtered);
-        };
+        }
+        window.filterDashProducts = filterDashProducts;
 
         function renderDashProductsTable(items) {
             const tbody = document.getElementById('dashProdTableBody');
@@ -2062,7 +2067,7 @@
             }
         }
 
-        window.renderDashboardTotales = function() {
+        function renderDashboardTotales() {
             // 1. Clona los meses de la base histórica
             const months = JSON.parse(JSON.stringify(DASHBOARD_BASELINE_MONTHS));
             
@@ -2367,65 +2372,8 @@
                     </tr>`;
                 }).join('');
             }
-        window.setMaestroPeriod = function(periodOffset = 0) {
-            const todayStr = new Date().toISOString().split('T')[0];
-            let basePeriod = getReportPeriodForDate(todayStr);
-            if (!basePeriod) return;
-            
-            let targetYear = basePeriod.repYear;
-            let targetMonth = basePeriod.repMonth + periodOffset;
-            while (targetMonth < 1) {
-                targetMonth += 12;
-                targetYear -= 1;
-            }
-            while (targetMonth > 12) {
-                targetMonth -= 12;
-                targetYear += 1;
-            }
-            let prevMonth = targetMonth - 1;
-            let prevYear = targetYear;
-            if (prevMonth < 1) { prevMonth = 12; prevYear--; }
-            const start = `${prevYear}-${String(prevMonth).padStart(2, '0')}-20`;
-            const end = `${targetYear}-${String(targetMonth).padStart(2, '0')}-19`;
-            
-            const sEl = document.getElementById('maestroDateStart');
-            const eEl = document.getElementById('maestroDateEnd');
-            if (sEl && eEl) {
-                sEl.value = start;
-                eEl.value = end;
-                renderReporteTeka();
-            }
-        };
-
-        window.setCajaPeriod = function(periodOffset = 0) {
-            const todayStr = new Date().toISOString().split('T')[0];
-            let basePeriod = getReportPeriodForDate(todayStr);
-            if (!basePeriod) return;
-            
-            let targetYear = basePeriod.repYear;
-            let targetMonth = basePeriod.repMonth + periodOffset;
-            while (targetMonth < 1) {
-                targetMonth += 12;
-                targetYear -= 1;
-            }
-            while (targetMonth > 12) {
-                targetMonth -= 12;
-                targetYear += 1;
-            }
-            let prevMonth = targetMonth - 1;
-            let prevYear = targetYear;
-            if (prevMonth < 1) { prevMonth = 12; prevYear--; }
-            const start = `${prevYear}-${String(prevMonth).padStart(2, '0')}-20`;
-            const end = `${targetYear}-${String(targetMonth).padStart(2, '0')}-19`;
-            
-            const sEl = document.getElementById('cajaDateStart');
-            const eEl = document.getElementById('cajaDateEnd');
-            if (sEl && eEl) {
-                sEl.value = start;
-                eEl.value = end;
-                processFinancialBalance();
-            }
-        };
+        }
+        window.renderDashboardTotales = renderDashboardTotales;
 
         function renderReporteTeka() {
             const body = document.getElementById('tekaReporteBody'); if(!body) return;
