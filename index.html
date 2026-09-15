@@ -1019,6 +1019,229 @@
             </html>
             `;
 
+        window.printDailyRoute = function() {
+            const date = document.getElementById('filterDateInputRutero') ? document.getElementById('filterDateInputRutero').value : "";
+            if (!date) {
+                showMessage("⚠️ SELECCIONE UNA FECHA PARA IMPRIMIR", "fix-accent");
+                return;
+            }
+            const selectedTech = currentTechUser || (document.getElementById('ruteroTechFilter') ? document.getElementById('ruteroTechFilter').value : "");
+            
+            let filtered = visitsArray.filter(v => 
+                v.estado && (v.fechaInstalacion === date || v.fechaEntregaProgramada === date || v.fechaNuevaVisita === date) && 
+                (v.estado === 'PENDIENTE' || v.estado === 'Atendido' || v.estado === 'A Taller' || v.estado === 'No Atendido' || v.estado === 'Pendiente (Tramite)' || v.estado === 'Garantia en Tramite')
+            );
+            
+            if (selectedTech) {
+                filtered = filtered.filter(v => v.tecnico === selectedTech);
+            }
+            
+            if (filtered.length === 0) {
+                showMessage("⚠️ NO HAY VISITAS PROGRAMADAS PARA IMPRIMIR EN ESTA FECHA", "fix-accent");
+                return;
+            }
+            
+            // Agrupar visitas por técnico
+            const groupedByTech = {};
+            filtered.forEach(v => {
+                const tName = (v.tecnico || 'SIN TÉCNICO ASIGNADO').trim();
+                if (!groupedByTech[tName]) groupedByTech[tName] = [];
+                groupedByTech[tName].push(v);
+            });
+            
+            // Ordenar cada grupo según prioridad
+            Object.keys(groupedByTech).forEach(t => {
+                groupedByTech[t].sort((a,b) => (parseInt(a.priority) || 0) - (parseInt(b.priority) || 0));
+            });
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert("Por favor habilite las ventanas emergentes en su navegador para imprimir la hoja de ruta.");
+                return;
+            }
+
+            const parts = date.split('-');
+            const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const formattedDate = parts.length === 3 ? `${parts[2]} de ${monthNames[parseInt(parts[1], 10) - 1] || parts[1]} de ${parts[0]}` : date;
+            
+            let sheetsHtml = '';
+            const techKeys = Object.keys(groupedByTech);
+
+            techKeys.forEach((tName, techIdx) => {
+                const list = groupedByTech[tName];
+                let currentMinutes = 9 * 60; // 9:00 AM
+
+                const rows = list.map((v, idx) => {
+                    const h = Math.floor(currentMinutes / 60);
+                    const min = currentMinutes % 60;
+                    const timeStr = (h > 12 ? h - 12 : (h === 0 ? 12 : h)) + ":" + min.toString().padStart(2, '0') + " " + (h >= 12 ? 'PM' : 'AM');
+                    currentMinutes += (60 + (Math.max(0, (v.equipos || []).length - 1) * 20)) + 15;
+
+                    const cliente = v.nombreCliente || '---';
+                    const calle = v.callePrincipal || '---';
+                    const refDir = v.direccion && v.direccion !== v.callePrincipal && !v.direccion.toString().includes('http') ? v.direccion : '';
+                    const tel = v.telefono || '---';
+                    
+                    const obsArr = [];
+                    if (v.observacionesAdmin) obsArr.push(`OFICINA: ${v.observacionesAdmin}`);
+                    if (v.descFalla) obsArr.push(`FALLA: ${v.descFalla}`);
+                    if (v.razonNoAtencion) obsArr.push(`NOTA: ${v.razonNoAtencion}`);
+                    if (v.novedadFinal) obsArr.push(`NOVEDAD: ${v.novedadFinal}`);
+                    const obsText = obsArr.length > 0 ? obsArr.join(' | ') : '---';
+
+                    const eqs = v.esMantenimiento 
+                        ? `MANTENIMIENTO: ${v.mantenimientoEquipo || ''}` 
+                        : (v.equipos && v.equipos.length > 0 
+                            ? v.equipos.map(e => (e.descProducto || e.manualName || '').trim()).filter(Boolean).join(', ') 
+                            : (v.tipoAtencion || 'SERVICIO'));
+
+                    const est = (v.estado || 'PENDIENTE').toUpperCase();
+
+                    return `
+                    <tr>
+                        <td style="text-align:center; font-family:monospace; font-weight:bold; font-size:10px;">
+                            ${idx + 1}<br><span style="font-size:8.5px; color:#475569;">${timeStr}</span>
+                        </td>
+                        <td style="font-weight:bold; font-size:11px; color:#0f172a;">
+                            ${cliente}
+                        </td>
+                        <td style="font-size:10px; color:#1e293b;">
+                            <b>${calle}</b>
+                            ${refDir ? `<br><span style="font-size:8.5px; color:#64748b; font-style:italic;">Ref: ${refDir}</span>` : ''}
+                        </td>
+                        <td style="text-align:center; font-family:monospace; font-size:11px; font-weight:bold;">
+                            ${tel}
+                        </td>
+                        <td style="font-size:9.5px; color:#334155; line-height:1.25;">
+                            ${obsText}
+                        </td>
+                        <td style="font-size:9.5px; color:#0369a1; font-weight:bold;">
+                            ${eqs}
+                            <br><span style="font-size:8px; color:#64748b;">[${est}]</span>
+                        </td>
+                        <td style="text-align:center; width:65px;">
+                            <div style="border:1px dashed #94a3b8; height:28px; border-radius:4px;"></div>
+                        </td>
+                    </tr>`;
+                }).join('');
+
+                sheetsHtml += `
+                <div class="sheet ${techIdx < techKeys.length - 1 ? 'page-break' : ''}">
+                    <div class="header">
+                        <div class="header-left">
+                            <span class="sub-brand">SISTEMA INTEGRAL DE GESTIÓN TÉCNICA</span>
+                            <span class="main-brand">FIX GESTIÓN • LOGÍSTICA</span>
+                        </div>
+                        <div class="header-center">
+                            <h2 class="doc-title">HOJA DE RUTA DIARIA</h2>
+                            <span class="date-badge">${formattedDate}</span>
+                        </div>
+                        <div class="logo-teka">TEKA</div>
+                    </div>
+
+                    <div class="tech-bar">
+                        <div class="tech-bar-item">
+                            <span class="label">TÉCNICO:</span>
+                            <span class="val" style="color:#1e3a8a; font-size:12px;">${tName.toUpperCase()}</span>
+                        </div>
+                        <div class="tech-bar-item">
+                            <span class="label">SERVICIOS ASIGNADOS:</span>
+                            <span class="val" style="color:#047857;">${list.length} VISITAS</span>
+                        </div>
+                        <div class="tech-bar-item">
+                            <span class="label">FECHA PROGRAMADA:</span>
+                            <span class="val">${date}</span>
+                        </div>
+                    </div>
+
+                    <table class="route-table">
+                        <thead>
+                            <tr>
+                                <th style="width:45px;"># / HORA</th>
+                                <th style="width:160px;">NOMBRE CLIENTE</th>
+                                <th style="width:170px;">CALLE PRINCIPAL / DIRECCIÓN</th>
+                                <th style="width:95px;">CONTACTO TELÉFONO</th>
+                                <th>OBSERVACIONES</th>
+                                <th style="width:140px;">EQUIPOS / SERVICIO</th>
+                                <th style="width:65px;">FIRMA / OK</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+
+                    <div class="footer-sigs">
+                        <div class="sig-box">
+                            <div class="line"></div>
+                            <span>FIRMA TÉCNICO RESPONSABLE</span>
+                            <p style="font-size:8px; color:#64748b; margin-top:2px;">${tName}</p>
+                        </div>
+                        <div class="sig-box">
+                            <div class="line"></div>
+                            <span>HORARIO EFECTIVO</span>
+                            <p style="font-size:8px; color:#64748b; margin-top:2px;">Salida: _________ &nbsp;|&nbsp; Retorno: _________</p>
+                        </div>
+                        <div class="sig-box">
+                            <div class="line"></div>
+                            <span>SUPERVISIÓN / BODEGA</span>
+                            <p style="font-size:8px; color:#64748b; margin-top:2px;">FIX GESTIÓN CUENCA</p>
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            const template = `
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <title>Hoja de Ruta - ${date}</title>
+                <style>
+                    @page { size: A4 landscape; margin: 8mm; }
+                    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+                    body { background: #f8fafc; color: #0f172a; padding: 16px; }
+                    .sheet { background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; margin: 0 auto 20px auto; max-width: 1100px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+                    .page-break { page-break-after: always; break-after: page; }
+                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid #1e3a8a; padding-bottom: 8px; margin-bottom: 10px; }
+                    .sub-brand { display: block; font-size: 8px; font-weight: 800; letter-spacing: 0.8px; color: #64748b; text-transform: uppercase; }
+                    .main-brand { display: block; font-size: 15px; font-weight: 900; color: #1e3a8a; letter-spacing: -0.3px; }
+                    .header-center { text-align: center; }
+                    .doc-title { font-size: 16px; font-weight: 900; letter-spacing: 1px; color: #0f172a; text-transform: uppercase; }
+                    .date-badge { display: inline-block; background: #eff6ff; color: #1e3a8a; border: 1px solid #bfdbfe; font-size: 10px; font-weight: 700; padding: 1.5px 8px; border-radius: 9999px; margin-top: 2px; }
+                    .logo-teka { font-size: 24px; font-weight: 900; color: #dc2626; letter-spacing: -0.5px; }
+                    .tech-bar { display: flex; justify-content: space-between; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 12px; margin-bottom: 10px; }
+                    .tech-bar-item { display: flex; align-items: center; gap: 6px; font-size: 10px; }
+                    .tech-bar-item .label { font-size: 8.5px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+                    .tech-bar-item .val { font-weight: 800; }
+                    .route-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 9.5px; }
+                    .route-table th { background: #1e3a8a; color: #fff; padding: 6px 7px; font-weight: 800; font-size: 9px; text-transform: uppercase; border: 1px solid #1e3a8a; }
+                    .route-table td { padding: 6px 7px; border: 1px solid #cbd5e1; vertical-align: middle; }
+                    .route-table tbody tr:nth-child(even) { background: #f8fafc; }
+                    .footer-sigs { display: flex; justify-content: space-between; margin-top: 18px; padding-top: 6px; }
+                    .sig-box { text-align: center; width: 28%; }
+                    .sig-box .line { border-top: 1.5px solid #334155; width: 100%; margin-bottom: 4px; }
+                    .sig-box span { font-size: 8.5px; font-weight: 800; color: #1e293b; text-transform: uppercase; }
+                    .print-actions { text-align: center; margin-bottom: 15px; }
+                    .btn-print { background: #1e3a8a; color: white; border: none; padding: 9px 24px; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer; }
+                    .btn-close { background: #64748b; color: white; border: none; padding: 9px 16px; border-radius: 8px; font-weight: 700; font-size: 12px; cursor: pointer; margin-left: 8px; }
+                    @media print {
+                        body { background: white; padding: 0; }
+                        .sheet { border: none; box-shadow: none; padding: 0; margin: 0; max-width: 100%; }
+                        .print-actions { display: none !important; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-actions">
+                    <button onclick="window.print()" class="btn-print">🖨️ CONFIRMAR IMPRESIÓN</button>
+                    <button onclick="window.close()" class="btn-close">CERRAR</button>
+                </div>
+                ${sheetsHtml}
+            </body>
+            </html>
+            `;
+
             printWindow.document.write(template);
             printWindow.document.close();
         };
@@ -1496,7 +1719,52 @@
 
         // =========================================================================
         // MOTOR DE RESULTADOS TOTALES / DASHBOARD COMPARATIVO TEKA
+        // Periodos mensuales: Ciclo desde el 20 del mes anterior al 19 del mes actual
         // =========================================================================
+        function getReportPeriodForDate(dateStr) {
+            if (!dateStr || typeof dateStr !== 'string' || dateStr.length < 10) return null;
+            const parts = dateStr.substring(0, 10).split('-');
+            let y = parseInt(parts[0], 10);
+            let m = parseInt(parts[1], 10);
+            const d = parseInt(parts[2], 10);
+            if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+
+            let repMonth = m;
+            let repYear = y;
+            // Si el día es 20 o posterior, el servicio pertenece al reporte del siguiente mes
+            if (d >= 20) {
+                repMonth++;
+                if (repMonth > 12) {
+                    repMonth = 1;
+                    repYear++;
+                }
+            }
+            const monthKey = `${repYear}-${String(repMonth).padStart(2, '0')}`;
+            
+            let prevMonth = repMonth - 1;
+            let prevYear = repYear;
+            if (prevMonth < 1) {
+                prevMonth = 12;
+                prevYear--;
+            }
+            const startDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}-20`;
+            const endDate = `${repYear}-${String(repMonth).padStart(2, '0')}-19`;
+            
+            const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const shortNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            
+            return {
+                monthKey,
+                repYear,
+                repMonth,
+                monthName: monthNames[repMonth - 1],
+                label: `${monthNames[repMonth - 1]} ${repYear}`,
+                rangeLabel: `(20 ${shortNames[prevMonth - 1]} - 19 ${shortNames[repMonth - 1]})`,
+                startDate,
+                endDate
+            };
+        }
+
         const DASHBOARD_BASELINE_MONTHS = [
             { key: '2025-12', label: 'Diciembre 2025', prom: 1105.00, prom_u: 63, gar: 116.25, gar_u: 8, bbq: 145.00, bbq_u: 5, alm: 0.00, alm_u: 0, unp: 636.00, unp_u: 24, total: 2002.25, units: 100 },
             { key: '2026-01', label: 'Enero 2026', prom: 1320.00, prom_u: 82, gar: 83.75, gar_u: 6, bbq: 493.00, bbq_u: 17, alm: 0.00, alm_u: 0, unp: 634.00, unp_u: 26, total: 2530.75, units: 113 },
@@ -1811,29 +2079,28 @@
             });
 
             // 4. Filtrar y procesar nuevas visitas registradas en FIX Gestión
-            // Criterio: Estado 'Atendido', fecha >= 2026-09-01 (post periodo base)
+            // Criterio: Estado 'Atendido', fecha >= 2026-08-20 (Periodo Septiembre arranca el 20 de Agosto)
             let newServicesCount = 0;
             let newServicesSales = 0;
             let newVisitsCount = 0;
 
             const newVisits = visitsArray.filter(v => {
-                return (v.estado === 'Atendido') && (v.fechaInstalacion || '') >= '2026-09-01';
+                return (v.estado === 'Atendido') && (v.fechaInstalacion || '') >= '2026-08-20';
             });
 
             newVisits.forEach(v => {
                 newVisitsCount++;
                 const dateStr = v.fechaInstalacion || '';
-                const monthKey = dateStr.substring(0, 7);
-                if (!monthKey) return;
+                const pInfo = getReportPeriodForDate(dateStr);
+                if (!pInfo) return;
+                const monthKey = pInfo.monthKey;
 
                 let mEntry = months.find(m => m.key === monthKey);
                 if (!mEntry) {
-                    const [y, mNum] = monthKey.split('-');
-                    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-                    const label = (monthNames[parseInt(mNum, 10) - 1] || 'Mes') + ' ' + y + ' (Nuevo)';
                     mEntry = {
                         key: monthKey,
-                        label: label,
+                        label: `${pInfo.label} (Nuevo)`,
+                        periodRange: pInfo.rangeLabel,
                         prom: 0, prom_u: 0,
                         gar: 0, gar_u: 0,
                         bbq: 0, bbq_u: 0,
@@ -1948,6 +2215,9 @@
                 channelsMap[matchedChannel].sales += visitTotal;
             });
 
+            // Ordenar meses cronológicamente por su periodo YYYY-MM
+            months.sort((a, b) => a.key.localeCompare(b.key));
+
             // 5. Calcular Totales Generales
             const grandProm = months.reduce((s, m) => s + m.prom, 0);
             const grandPromU = months.reduce((s, m) => s + m.prom_u, 0);
@@ -2021,12 +2291,16 @@
                     const isRecord = m.label.includes('Récord') || m.label.includes('⭐');
                     const isNew = m.label.includes('Nuevo');
                     const rowClass = isNew ? 'bg-blue-50/40' : (isRecord ? 'bg-emerald-50/50' : 'hover:bg-slate-50');
+                    const periodDisplay = m.periodRange || (getReportPeriodForDate(m.key + '-01') ? getReportPeriodForDate(m.key + '-01').rangeLabel : '');
 
                     return `
                     <tr class="${rowClass} border-b border-slate-200 transition-colors">
                         <td class="font-semibold text-slate-800">
-                            <strong>${m.label}</strong>
-                            ${isNew ? '<span class="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold">En Vivo</span>' : ''}
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <strong>${m.label}</strong>
+                                ${isNew ? '<span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold">En Vivo</span>' : ''}
+                            </div>
+                            ${periodDisplay ? `<span class="block text-[11px] text-slate-500 font-mono font-normal mt-0.5">${periodDisplay}</span>` : ''}
                         </td>
                         <td class="text-right font-mono">$${m.prom.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span class="text-[11px] text-slate-500">(${m.prom_u}u)</span></td>
                         <td class="text-right font-mono">$${m.gar.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span class="text-[11px] text-slate-500">(${m.gar_u}u)</span></td>
@@ -2092,6 +2366,64 @@
                         <td><div style="background:#3b82f6; height:12px; width:${barW}%; border-radius:4px;"></div></td>
                     </tr>`;
                 }).join('');
+            }
+        window.setMaestroPeriod = function(periodOffset = 0) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            let basePeriod = getReportPeriodForDate(todayStr);
+            if (!basePeriod) return;
+            
+            let targetYear = basePeriod.repYear;
+            let targetMonth = basePeriod.repMonth + periodOffset;
+            while (targetMonth < 1) {
+                targetMonth += 12;
+                targetYear -= 1;
+            }
+            while (targetMonth > 12) {
+                targetMonth -= 12;
+                targetYear += 1;
+            }
+            let prevMonth = targetMonth - 1;
+            let prevYear = targetYear;
+            if (prevMonth < 1) { prevMonth = 12; prevYear--; }
+            const start = `${prevYear}-${String(prevMonth).padStart(2, '0')}-20`;
+            const end = `${targetYear}-${String(targetMonth).padStart(2, '0')}-19`;
+            
+            const sEl = document.getElementById('maestroDateStart');
+            const eEl = document.getElementById('maestroDateEnd');
+            if (sEl && eEl) {
+                sEl.value = start;
+                eEl.value = end;
+                renderReporteTeka();
+            }
+        };
+
+        window.setCajaPeriod = function(periodOffset = 0) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            let basePeriod = getReportPeriodForDate(todayStr);
+            if (!basePeriod) return;
+            
+            let targetYear = basePeriod.repYear;
+            let targetMonth = basePeriod.repMonth + periodOffset;
+            while (targetMonth < 1) {
+                targetMonth += 12;
+                targetYear -= 1;
+            }
+            while (targetMonth > 12) {
+                targetMonth -= 12;
+                targetYear += 1;
+            }
+            let prevMonth = targetMonth - 1;
+            let prevYear = targetYear;
+            if (prevMonth < 1) { prevMonth = 12; prevYear--; }
+            const start = `${prevYear}-${String(prevMonth).padStart(2, '0')}-20`;
+            const end = `${targetYear}-${String(targetMonth).padStart(2, '0')}-19`;
+            
+            const sEl = document.getElementById('cajaDateStart');
+            const eEl = document.getElementById('cajaDateEnd');
+            if (sEl && eEl) {
+                sEl.value = start;
+                eEl.value = end;
+                processFinancialBalance();
             }
         };
 
@@ -3071,9 +3403,10 @@ function getEditModalData() {
                         <div>
                             <div class="flex items-center gap-2 mb-2 flex-wrap">
                                 <span id="dashLiveBadge" class="pill pill-blue text-xs font-bold">🔵 Base Histórica Consolidada</span>
+                                <span class="pill pill-blue text-xs font-bold">📅 Cortes: Del 20 de cada mes al 19 del siguiente</span>
                             </div>
                             <h2 class="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">ANÁLISIS COMPARATIVO DE VENTAS Y SERVICIOS TÉCNICOS</h2>
-                            <p class="text-slate-500 text-xs mt-1">Base Consolidada: Diciembre 2025 - Agosto 2026 (9 Meses) + Nuevos Servicios Registrados en FIX Gestión | Técnico: Cristian Capelo</p>
+                            <p class="text-slate-500 text-xs mt-1">Periodos mensuales: del 20 de cada mes al 19 del mes siguiente (ej. Septiembre: 20 Ago - 19 Sep) | Base Consolidada + En Vivo FIX Gestión | Técnico: Cristian Capelo</p>
                         </div>
                         <div class="flex items-center gap-2.5">
                             <button onclick="renderDashboardTotales()" class="btn-dash bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3.5 rounded-lg text-xs shadow-sm flex items-center gap-1.5 transition-all">🔄 Recalcular</button>
@@ -3135,7 +3468,7 @@ function getEditModalData() {
 
                     <!-- PESTAÑAS INTERNAS DEL DASHBOARD -->
                     <div class="dash-tabs">
-                        <button class="dash-tab-btn active" onclick="switchDashTab('dash-tab-comparativa', event)">📊 Comparativa Mensual Completa</button>
+                        <button class="dash-tab-btn active" onclick="switchDashTab('dash-tab-comparativa', event)">📊 Comparativa Mensual Completa (Ciclos 20 al 19)</button>
                         <button class="dash-tab-btn" onclick="switchDashTab('dash-tab-graficas', event)">📈 Gráficas y Distribución</button>
                         <button class="dash-tab-btn" onclick="switchDashTab('dash-tab-productos', event)">🏆 Productos que Más se Repiten</button>
                         <button class="dash-tab-btn" onclick="switchDashTab('dash-tab-canales', event)">🏬 Canales de Venta y Tiendas</button>
@@ -3148,7 +3481,7 @@ function getEditModalData() {
                             <table class="w-full text-left text-xs">
                                 <thead>
                                     <tr class="bg-slate-100 text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
-                                        <th class="p-3">MES Y AÑO</th>
+                                        <th class="p-3">MES Y AÑO <span class="block text-[9px] font-mono font-normal text-slate-500">(Ciclo 20 al 19)</span></th>
                                         <th class="p-3 text-right">PROMOCIONES ($)</th>
                                         <th class="p-3 text-right">GARANTÍAS ($)</th>
                                         <th class="p-3 text-right">BBQ ($)</th>
@@ -3546,9 +3879,10 @@ function getEditModalData() {
             <div id="ruteroView" class="hidden lg:col-span-3 glass-card p-4 md:p-6 rounded-2xl admin-only-mobile">
                 <div class="flex flex-col md:flex-row justify-between items-center mb-6 px-2 gap-4">
                     <h2 class="text-lg font-black uppercase italic font-sans text-stone-800 tracking-tighter underline">Logística / Rutero</h2>
-                    <div class="flex gap-2 w-full md:w-auto">
+                    <div class="flex flex-wrap gap-2 w-full md:w-auto items-center">
                         <select id="ruteroTechFilter" onchange="renderRutero()" class="admin-only flex-grow p-3 glass-input rounded-xl text-[10px] font-black outline-none italic uppercase text-stone-800 shadow-sm"></select>
                         <input type="date" id="filterDateInputRutero" onchange="syncDates('filterDateInputRutero')" class="p-3 glass-input rounded-xl text-xs font-black italic text-fix-main outline-none font-mono shadow-sm">
+                        <button onclick="printDailyRoute()" class="glass-card bg-slate-800 hover:bg-slate-900 border-slate-700 text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase shadow-md flex items-center gap-1.5 transition-all active:scale-95 hover:scale-105" title="Imprimir hoja de ruta del día">🖨️ IMPRIMIR RUTA</button>
                     </div>
                 </div>
                 <div class="overflow-x-auto w-full rounded-[1.5rem] shadow-md border border-white/80 font-black uppercase bg-white/40 backdrop-blur-md">
