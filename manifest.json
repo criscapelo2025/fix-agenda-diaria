@@ -1,0 +1,27 @@
+{
+  "name": "FIX - Gestión de Visitas Diarias",
+  "short_name": "FIX Gestión",
+  "description": "Sistema Integral de Gestión de Visitas, Servicios Técnicos y Dashboard",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1e3a8a",
+  "theme_color": "#1e3a8a",
+  "icons": [
+    {
+      "src": "FIX LOGO.jpg",
+      "sizes": "576x576",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "FIX LOGO.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "FIX LOGO.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
