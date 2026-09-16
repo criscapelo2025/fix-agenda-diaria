@@ -22,6 +22,8 @@
     <meta name="msapplication-TileColor" content="#1e3a8a">
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <script src="teka_catalog.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -153,6 +155,14 @@
         .btn-refresh-float:active { transform: scale(0.95); }
         
         @media (max-width: 768px) { .btn-refresh-float { bottom: 5.5rem; } }
+
+        /* ESTILOS GEMINI LECTURA FACTURAS */
+        .gemini-field-highlight {
+            background-color: #ecfdf5 !important;
+            border-color: #10b981 !important;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3) !important;
+            transition: all 0.3s ease;
+        }
 
         .version-badge { background: #eff6ff; color: var(--primary); padding: 2px 10px; border-radius: 9999px; font-weight: 700; font-size: 11px; margin-top: 4px; display: inline-block; border: 1px solid #bfdbfe; }
         .modal-overlay { background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
@@ -608,6 +618,56 @@
             calculateFinancials();
         };
 
+        window.lookupTekaCode = function(inputEl, index) {
+            const code = (inputEl.value || '').trim();
+            const manualInput = document.getElementsByName("manualName_" + index)[0];
+            const selectEl = document.getElementsByName("descProducto_" + index)[0];
+            const hint = document.getElementById("codMatchHint_" + index);
+            if (!window.CATALOGO_TEKA_BASE) return;
+            
+            if (window.CATALOGO_TEKA_BASE[code]) {
+                const desc = window.CATALOGO_TEKA_BASE[code];
+                if (manualInput) {
+                    manualInput.value = desc;
+                    checkManualEquipmentName(manualInput, index);
+                }
+                if (selectEl) {
+                    const upperDesc = desc.toUpperCase();
+                    for (let opt of selectEl.options) {
+                        if (opt.value && upperDesc.includes(opt.value.toUpperCase())) {
+                            selectEl.value = opt.value;
+                            updateEquipmentPrice(selectEl, index);
+                            break;
+                        }
+                    }
+                }
+                if (hint) hint.innerHTML = `<span class="text-emerald-700 font-black">✅ ${desc}</span>`;
+                inputEl.classList.add('bg-emerald-50', 'border-emerald-500');
+            } else {
+                if (hint) hint.textContent = code.length > 2 ? "Código no en BASE" : "";
+                inputEl.classList.remove('bg-emerald-50', 'border-emerald-500');
+            }
+        };
+
+        window.syncTekaCodeFromSelect = function(selectEl, index) {
+            const codeInput = document.getElementsByName("codProducto_" + index)[0];
+            const manualInput = document.getElementsByName("manualName_" + index)[0];
+            if (!codeInput || !window.CATALOGO_TEKA_BASE) return;
+            
+            const val = (selectEl.value || '').toUpperCase();
+            if (!codeInput.value && val) {
+                for (const [code, desc] of Object.entries(window.CATALOGO_TEKA_BASE)) {
+                    if (desc.toUpperCase().includes(val)) {
+                        codeInput.value = code;
+                        if (manualInput && !manualInput.value) manualInput.value = desc;
+                        const hint = document.getElementById("codMatchHint_" + index);
+                        if (hint) hint.innerHTML = `<span class="text-emerald-700 font-black">✅ ${desc}</span>`;
+                        break;
+                    }
+                }
+            }
+        };
+
         window.expandEquipmentUI = function() {
             const countInput = document.getElementById('numEquipos');
             const count = parseInt(countInput ? countInput.value : 1) || 1;
@@ -622,17 +682,30 @@
             container.innerHTML = '';
             for(let i=1; i<=count; i++) {
                 container.innerHTML += `
-                <div class="glass-panel p-5 mb-4 grid grid-cols-1 gap-4 italic border-white/60 shadow-sm">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <select name="descProducto_${i}" onchange="updateEquipmentPrice(this, ${i})" class="p-3.5 glass-input rounded-xl font-bold text-xs outline-none uppercase text-stone-800" required>
-                            <option value="">ELEGIR EQUIPO...</option>
-                            ${TIPOS_EQUIPO.map(function(t) { return '<option value="' + t + '">' + t + '</option>'; }).join('')}
-                        </select>
-                        <input type="text" name="manualName_${i}" oninput="checkManualEquipmentName(this, ${i})" placeholder="ESCRIBIR EQUIPO MANUALMENTE (MODELO)" class="p-3.5 glass-input rounded-xl font-black text-xs outline-none uppercase text-stone-800">
+                <div class="glass-panel p-5 mb-4 grid grid-cols-1 gap-3 italic border-white/60 shadow-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label class="text-[8px] font-black uppercase text-stone-600 block mb-1">Cód. Artículo (BASE)</label>
+                            <input type="text" name="codProducto_${i}" oninput="lookupTekaCode(this, ${i})" placeholder="EJ: 915061" class="w-full p-3.5 glass-input rounded-xl font-mono font-black text-xs outline-none uppercase text-stone-800" title="Código de artículo Teka de la pestaña BASE">
+                        </div>
+                        <div>
+                            <label class="text-[8px] font-black uppercase text-stone-600 block mb-1">Tipo de Equipo</label>
+                            <select name="descProducto_${i}" onchange="updateEquipmentPrice(this, ${i}); syncTekaCodeFromSelect(this, ${i});" class="w-full p-3.5 glass-input rounded-xl font-bold text-xs outline-none uppercase text-stone-800" required>
+                                <option value="">ELEGIR EQUIPO...</option>
+                                ${TIPOS_EQUIPO.map(function(t) { return '<option value="' + t + '">' + t + '</option>'; }).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[8px] font-black uppercase text-stone-600 block mb-1">Descripción / Modelo</label>
+                            <input type="text" name="manualName_${i}" oninput="checkManualEquipmentName(this, ${i})" placeholder="DESC. MODELO..." class="w-full p-3.5 glass-input rounded-xl font-black text-xs outline-none uppercase text-stone-800">
+                        </div>
                     </div>
-                    <div class="flex justify-end items-center gap-3">
-                         <span class="text-[9px] font-black text-stone-600">VALOR LIQUIDACIÓN:</span>
-                         <input type="number" name="costoEquipo_${i}" step="0.01" value="${unitPrice.toFixed(2)}" oninput="calculateFinancials()" class="w-32 p-3.5 glass-input bg-white/80 rounded-xl font-black text-right text-fix-main outline-none font-mono text-base border-stone-300">
+                    <div class="flex justify-between items-center gap-3">
+                         <div id="codMatchHint_${i}" class="text-[9px] font-bold text-emerald-700 italic truncate max-w-sm"></div>
+                         <div class="flex items-center gap-2">
+                             <span class="text-[9px] font-black text-stone-600">VALOR LIQUIDACIÓN:</span>
+                             <input type="number" name="costoEquipo_${i}" step="0.01" value="${unitPrice.toFixed(2)}" oninput="calculateFinancials()" class="w-32 p-3.5 glass-input bg-white/80 rounded-xl font-black text-right text-fix-main outline-none font-mono text-base border-stone-300">
+                         </div>
                     </div>
                 </div>`;
             }
@@ -2372,73 +2445,1088 @@
         }
         window.renderDashboardTotales = renderDashboardTotales;
 
+        // =========================================================================
+        // CONTROLADOR REPORTE MENSUAL OFICIAL TEKA (CORTE AL DÍA 19 DE CADA MES)
+        // =========================================================================
+        const MESES_ES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+
+        function getTekaCycleDates(offsetMonths = 0) {
+            const now = new Date();
+            const day = now.getDate();
+            let month = now.getMonth();
+            let year = now.getFullYear();
+
+            // Ciclo TEKA mensual entregado el 19:
+            // Si el día actual es mayor a 19, el corte activo es el 19 del mes siguiente.
+            // Si el día actual es <= 19, el corte activo es el 19 de este mes en curso.
+            if (day > 19) {
+                month += 1;
+            }
+            month += offsetMonths;
+
+            const endDate = new Date(year, month, 19);
+            const startDate = new Date(year, month - 1, 20);
+
+            const pad = n => String(n).padStart(2, '0');
+            const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+            const mesNombre = MESES_ES[endDate.getMonth()];
+            const anio = endDate.getFullYear();
+
+            return {
+                start: fmt(startDate),
+                end: fmt(endDate),
+                mesNombre: mesNombre,
+                anio: anio,
+                label: `AL 19 DE ${mesNombre} ${anio}`
+            };
+        }
+
+        function getDiaAnterior(dateStr) {
+            if (!dateStr || typeof dateStr !== 'string') return '';
+            const parts = dateStr.trim().split('-');
+            if (parts.length === 3) {
+                const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                dt.setDate(dt.getDate() - 1);
+                const pad = n => String(n).padStart(2, '0');
+                return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+            }
+            return '';
+        }
+
+        window.switchTekaTab = function(tabName) {
+            const tabs = ['garantias', 'promocion', 'bbq', 'base', 'consolidado', 'unproducto', 'almacen'];
+            tabs.forEach(t => {
+                const content = document.getElementById('tekaTab_' + t);
+                const btn = document.getElementById('tabBtn_' + t);
+                if (content) {
+                    if (t === tabName) content.classList.remove('hidden');
+                    else content.classList.add('hidden');
+                }
+                if (btn) {
+                    if (t === tabName) {
+                        btn.className = 'teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-fix-main text-white shadow-sm transition-all flex items-center gap-1.5';
+                    } else {
+                        btn.className = 'teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5';
+                    }
+                }
+            });
+            if (tabName === 'base') {
+                renderTekaBaseTable();
+            }
+        };
+
+        window.setCicloActualTeka = function() {
+            const cycle = getTekaCycleDates(0);
+            const startEl = document.getElementById('maestroDateStart');
+            const endEl = document.getElementById('maestroDateEnd');
+            if (startEl) startEl.value = cycle.start;
+            if (endEl) endEl.value = cycle.end;
+            const ind = document.getElementById('tekaCycleIndicator');
+            if (ind) ind.textContent = `Periodo: ${cycle.label}`;
+            renderReporteTeka();
+        };
+
+        window.setCicloMesAnteriorTeka = function() {
+            const cycle = getTekaCycleDates(-1);
+            const startEl = document.getElementById('maestroDateStart');
+            const endEl = document.getElementById('maestroDateEnd');
+            if (startEl) startEl.value = cycle.start;
+            if (endEl) endEl.value = cycle.end;
+            const ind = document.getElementById('tekaCycleIndicator');
+            if (ind) ind.textContent = `Periodo: ${cycle.label}`;
+            renderReporteTeka();
+        };
+
+        window.renderTekaBaseTable = function() {
+            const tbody = document.getElementById('tekaTableBody_base');
+            if (!tbody) return;
+            const searchInput = document.getElementById('searchTekaBaseInput');
+            const query = searchInput ? (searchInput.value || '').trim().toUpperCase() : '';
+            const catalog = window.CATALOGO_TEKA_BASE || {};
+
+            let entries = Object.entries(catalog);
+            if (query) {
+                entries = entries.filter(([code, desc]) => {
+                    return code.toUpperCase().includes(query) || (desc && desc.toUpperCase().includes(query));
+                });
+            }
+
+            const countDisplay = document.getElementById('tekaBaseCountDisplay');
+            if (countDisplay) {
+                countDisplay.textContent = `${entries.length} productos ${query ? 'encontrados' : 'cargados'}`;
+            }
+
+            const displayEntries = query ? entries : entries.slice(0, 300);
+
+            tbody.innerHTML = displayEntries.map(([code, desc]) => {
+                return `<tr class="border-b border-stone-200 hover:bg-blue-50/50 transition-colors">
+                    <td class="p-3 text-center font-bold text-fix-main font-mono">${code}</td>
+                    <td class="p-3 text-left font-semibold text-stone-700">${desc || ''}</td>
+                </tr>`;
+            }).join('');
+
+            if (!query && entries.length > 300) {
+                tbody.innerHTML += `<tr><td colspan="2" class="p-3 text-center text-xs text-stone-500 font-bold italic bg-stone-50">Mostrando los primeros 300 de 905 productos. Usa el buscador superior para encontrar cualquier código o modelo en segundos.</td></tr>`;
+            }
+        };
+
+        function getEquipmentCost(v, eq, catType) {
+            let costo = (eq.costoBase || 0);
+            const descUpper = ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase();
+            const isEqBBQ = descUpper.includes('BBQ') || descUpper.includes('BARBACOA');
+            const isEqIsla = descUpper.includes('ISLA');
+            const count = (v.equipos || []).length;
+
+            if (catType === 'BBQ' || isEqBBQ) {
+                return 29.00;
+            } else if (catType === 'ALMACEN') {
+                return 15.00;
+            } else if (catType === 'GARANTIAS') {
+                return costo;
+            } else if (catType === 'MULTI' || catType === 'PROMOCION') {
+                if (isEqIsla) return 30.00;
+                return (count === 2) ? 20.00 : 15.00;
+            } else if (catType === 'SINGLE' || catType === 'UNPRODUCTO') {
+                if (isEqIsla) return 45.00;
+                return (costo > 0) ? costo : 25.00;
+            }
+            return (costo > 0) ? costo : 25.00;
+        }
+
+        function getNormalizedEquipos(v) {
+            if (v.equipos && v.equipos.length > 0) return v.equipos;
+            return [{
+                descProducto: v.mantenimientoEquipo || v.asunto || "SERVICIO TÉCNICO",
+                manualName: "",
+                codProducto: "",
+                serieEquipo: "",
+                costoBase: 25.00
+            }];
+        }
+
         function renderReporteTeka() {
-            const body = document.getElementById('tekaReporteBody'); if(!body) return;
-            const start = document.getElementById('maestroDateStart').value; 
-            const end = document.getElementById('maestroDateEnd').value;
-            
-            let filtered = visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Mantenimiento' && v.tipoAtencion !== 'Garantía' && v.estado === 'Atendido');
-            if(start && end) filtered = filtered.filter(v => v.fechaInstalacion >= start && v.fechaInstalacion <= end);
-            filtered.sort((a, b) => (a.fechaInstalacion || "").localeCompare(b.fechaInstalacion || ""));
+            const start = document.getElementById('maestroDateStart') ? document.getElementById('maestroDateStart').value : '';
+            const end = document.getElementById('maestroDateEnd') ? document.getElementById('maestroDateEnd').value : '';
+
+            // Filtrar servicios atendidos en el rango del ciclo
+            let filtered = visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Mantenimiento' && v.estado === 'Atendido');
+            if (start && end) {
+                filtered = filtered.filter(v => {
+                    const f = v.fechaInstalacion || v.fechaVisita || '';
+                    return f >= start && f <= end;
+                });
+            }
+            // Orden cronológico estricto por fecha según especificación
+            filtered.sort((a, b) => ((a.fechaInstalacion || a.fechaVisita || '')).localeCompare(b.fechaInstalacion || b.fechaVisita || ''));
 
             const isBBQVisit = (v) => (v.equipos || []).some(eq => ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase().includes('BBQ') || ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase().includes('BARBACOA'));
+            const isGarantiaVisit = (v) => (v.tipoAtencion === 'Garantía' || v.tipoServicioGlobal === 'Garantía');
             const isAlmacenVisit = (v) => {
                 if (v.tipoAtencion === 'Almacén' || v.tipoAtencion === 'Almacén / Exhibición') return true;
                 const cliente = (v.nombreCliente || '').toUpperCase();
                 const obs = ((v.observacionesAdmin || '') + ' ' + (v.observaciones || '')).toUpperCase();
-                if (cliente.includes('EXHIBICION') || cliente.includes('EXHIBICIÓN') || cliente.includes('SHOWROOM') || cliente.includes('ALMACEN')) return true;
-                if (obs.includes('EXHIBICION') || obs.includes('EXHIBICIÓN') || obs.includes('SHOWROOM') || obs.includes('ALMACEN')) return true;
-                const eqs = v.equipos || [];
-                if (eqs.length === 2 && eqs.every(e => e.costoBase === 15) && cliente.includes('JOSEFINA')) return true;
-                return false;
+                return cliente.includes('EXHIBICION') || cliente.includes('EXHIBICIÓN') || cliente.includes('SHOWROOM') || cliente.includes('ALMACEN') || cliente.includes('ALMACÉN') || obs.includes('EXHIBICION') || obs.includes('ALMACEN');
             };
 
-            const bbqs = filtered.filter(v => isBBQVisit(v));
-            const almacenes = filtered.filter(v => !isBBQVisit(v) && isAlmacenVisit(v));
-            const multis = filtered.filter(v => !isBBQVisit(v) && !isAlmacenVisit(v) && (v.equipos || []).length > 1);
-            const singles = filtered.filter(v => !isBBQVisit(v) && !isAlmacenVisit(v) && (v.equipos || []).length <= 1);
+            const garantiasVisits = filtered.filter(v => isGarantiaVisit(v));
+            const bbqsVisits = filtered.filter(v => !isGarantiaVisit(v) && isBBQVisit(v));
+            const almacenesVisits = filtered.filter(v => !isGarantiaVisit(v) && !isBBQVisit(v) && isAlmacenVisit(v));
+            const promocionVisits = filtered.filter(v => !isGarantiaVisit(v) && !isBBQVisit(v) && !isAlmacenVisit(v) && (v.equipos || []).length > 1);
+            const unProductoVisits = filtered.filter(v => !isGarantiaVisit(v) && !isBBQVisit(v) && !isAlmacenVisit(v) && (v.equipos || []).length <= 1);
+            const consolidadoVisits = filtered;
 
-            let rowCount = 1;
             let granTotalMO = 0;
+            let promoEquiposCount = 0;
+            let unProdEquiposCount = 0;
+            let bbqEquiposCount = 0;
+            let garantiasEquiposCount = 0;
+            let almacenEquiposCount = 0;
+            let consolidadoEquiposCount = 0;
 
-            const renderSection = (title, list, catType) => {
-                if (list.length === 0) return "";
-                let html = `<tr><td colspan="22" class="p-5 glass-panel bg-white/80 text-fix-main text-[11px] font-black italic tracking-widest uppercase border-y border-white/90 shadow-sm">${title} (${list.length} SERVICIOS)</td></tr>`;
-                html += list.flatMap(v => (v.equipos || []).map(eq => {
-                    let costo = (eq.costoBase || 0);
-                    const descUpper = ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase();
-                    const isEqBBQ = descUpper.includes('BBQ') || descUpper.includes('BARBACOA');
-                    const isEqIsla = descUpper.includes('ISLA');
-                    const count = (v.equipos || []).length;
-                    
-                    if (catType === 'BBQ' || isEqBBQ) {
-                        costo = 29.00;
-                    } else if (catType === 'ALMACEN') {
-                        costo = 15.00;
-                    } else if (catType === 'MULTI') {
-                        if (isEqIsla) costo = 30.00;
-                        else costo = (count === 2) ? 20.00 : 15.00;
-                    } else if (catType === 'SINGLE') {
-                        if (isEqIsla) costo = 45.00;
-                        else costo = (costo > 0) ? costo : 25.00;
-                    } else {
-                        if (costo === 0) costo = 25.00;
-                    }
-                    granTotalMO += costo;
-                    return `<tr class="border-b border-white/50 row-hover font-black uppercase"><td class="report-cell text-center font-mono glass-input bg-white/90">${rowCount++}</td><td class="report-cell font-mono text-stone-700">${v.fechaEmision || ''}</td><td class="report-cell text-stone-700">${v.lugarCompra || 'OTRO'}</td><td class="report-cell font-mono text-stone-700">${v.numFactura || '-'}</td><td class="report-cell font-mono text-stone-700">${eq.codProducto || '-'}</td><td class="report-cell italic text-stone-500"></td><td class="report-cell font-mono tracking-widest text-stone-700">${eq.serieEquipo || '-'}</td><td class="report-cell font-black text-stone-800">SAP</td><td class="report-cell text-stone-800">CAPELO</td><td class="report-cell text-stone-800">CUENCA</td><td class="report-cell font-mono text-stone-800">${v.fechaInstalacion}</td><td class="report-cell font-black italic text-fix-main">${v.nombreCliente}</td><td class="report-cell max-w-[150px] truncate text-stone-700">${v.callePrincipal || '-'}</td><td class="report-cell font-mono text-stone-700">${v.telefono || '-'}</td><td class="report-cell font-black text-right font-mono text-stone-900">$${costo.toFixed(2)}</td><td class="report-cell text-stone-800">CLIENTE FINAL</td><td class="report-cell text-stone-800">CAPELO</td><td class="report-cell italic text-stone-500"></td><td class="report-cell font-mono text-stone-700">${v.numFactura || '-'}</td><td class="report-cell font-mono text-stone-700">${v.cedula || '-'}</td><td class="report-cell lowercase text-stone-600">${v.email || '-'}</td><td class="report-cell text-center"><button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/80 w-7 h-7 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button></td></tr>`;
-                })).join('');
-                return html;
+            // 1. RENDER GARANTIAS
+            const tbodyGarantias = document.getElementById('tekaTableBody_garantias');
+            if (tbodyGarantias) {
+                if (garantiasVisits.length === 0) {
+                    tbodyGarantias.innerHTML = '<tr><td colspan="18" class="p-8 text-center text-stone-400 font-black italic">Sin servicios de garantía en este periodo</td></tr>';
+                } else {
+                    let html = '';
+                    let seq = 1;
+                    garantiasVisits.forEach(v => {
+                        const eqs = getNormalizedEquipos(v);
+                        eqs.forEach(eq => {
+                            garantiasEquiposCount++;
+                            const cod = eq.codProducto || '';
+                            const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
+                            const fecVisita = v.fechaInstalacion || v.fechaVisita || '';
+                            const costo = eq.costoBase || 0;
+                            granTotalMO += costo;
+                            const obsGar = (v.observacionesAdmin || v.observaciones || '').trim().toUpperCase() || 'GARANTIA FINALIZADA CON EXITO';
+
+                            html += `<tr class="border-b border-purple-100 hover:bg-purple-50/40 font-mono transition-colors">
+                                <td class="p-2.5 text-center font-bold text-stone-500">${seq++}</td>
+                                <td class="p-2.5 text-center text-stone-600">${v.fechaEmision || '-'}</td>
+                                <td class="p-2.5 text-center font-bold text-stone-800">${fecVisita}</td>
+                                <td class="p-2.5 text-center">1</td>
+                                <td class="p-2.5 text-center text-stone-600">${eq.codRepuesto || '-'}</td>
+                                <td class="p-2.5 font-sans text-stone-700">${eq.descRepuesto || 'REVISIÓN TÉCNICA'}</td>
+                                <td class="p-2.5 text-center font-bold text-purple-900">${cod || '-'}</td>
+                                <td class="p-2.5 font-sans font-bold text-stone-800 max-w-[200px] truncate" title="${desc}">${desc || '-'}</td>
+                                <td class="p-2.5 text-center text-stone-600">${eq.serieEquipo || '-'}</td>
+                                <td class="p-2.5 text-center font-black text-purple-700">SAP</td>
+                                <td class="p-2.5 font-sans text-stone-700 font-bold">CAPELO</td>
+                                <td class="p-2.5 font-sans font-bold text-fix-main italic">${v.nombreCliente || ''}</td>
+                                <td class="p-2.5 font-sans text-stone-600 max-w-[180px] truncate" title="${obsGar}">${obsGar}</td>
+                                <td class="p-2.5 text-right font-bold text-stone-900">$${costo.toFixed(2)}</td>
+                                <td class="p-2.5 text-stone-600">${v.cedula || '-'}</td>
+                                <td class="p-2.5 font-sans lowercase text-stone-500 max-w-[140px] truncate" title="${v.email || ''}">${v.email || '-'}</td>
+                                <td class="p-2.5 text-stone-700">${v.telefono || '-'}</td>
+                                <td class="p-2.5 text-center text-stone-700">${v.numFactura || '-'}</td>
+                            </tr>`;
+                        });
+                    });
+                    tbodyGarantias.innerHTML = html;
+                }
+            }
+
+            // Función genérica para renderizar pestañas de servicio (PROMOCION, UN PRODUCTO, BBQ, ALMACEN)
+            const renderStandardServiceRows = (tbodyId, list, catType, countSetter) => {
+                const tb = document.getElementById(tbodyId);
+                if (!tb) return;
+                if (list.length === 0) {
+                    tb.innerHTML = '<tr><td colspan="19" class="p-8 text-center text-stone-400 font-black italic">Sin servicios registrados en este periodo</td></tr>';
+                    return;
+                }
+                let html = '';
+                let seq = 1;
+                list.forEach(v => {
+                    const eqs = getNormalizedEquipos(v);
+                    eqs.forEach(eq => {
+                        if (countSetter) countSetter();
+                        const costo = getEquipmentCost(v, eq, catType);
+                        granTotalMO += costo;
+                        const cod = eq.codProducto || '';
+                        const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
+                        const fecVisita = v.fechaInstalacion || v.fechaVisita || '';
+
+                        html += `<tr class="border-b border-stone-200 hover:bg-stone-50 font-mono transition-colors">
+                            <td class="p-2.5 text-center font-bold text-stone-500">${seq++}</td>
+                            <td class="p-2.5 text-center text-stone-600">${v.fechaEmision || '-'}</td>
+                            <td class="p-2.5 font-sans text-stone-700">${v.lugarCompra || 'OTRO'}</td>
+                            <td class="p-2.5 text-center text-stone-700">${v.numFactura || '-'}</td>
+                            <td class="p-2.5 text-center font-bold text-blue-900">${cod || '-'}</td>
+                            <td class="p-2.5 font-sans font-bold text-stone-800 max-w-[200px] truncate" title="${desc}">${desc || '-'}</td>
+                            <td class="p-2.5 text-center text-stone-600">${eq.serieEquipo || '-'}</td>
+                            <td class="p-2.5 text-center font-black text-amber-800">SAP</td>
+                            <td class="p-2.5 font-sans text-stone-700 font-bold">CAPELO</td>
+                            <td class="p-2.5 text-center text-stone-600">CUENCA</td>
+                            <td class="p-2.5 text-center font-bold text-stone-800">${fecVisita}</td>
+                            <td class="p-2.5 font-sans font-bold text-fix-main italic">${v.nombreCliente || ''}</td>
+                            <td class="p-2.5 font-sans text-stone-700 max-w-[180px] truncate" title="${v.callePrincipal || ''}">${v.callePrincipal || '-'}</td>
+                            <td class="p-2.5 text-stone-700">${v.telefono || '-'}</td>
+                            <td class="p-2.5 text-right font-bold text-stone-900">$${costo.toFixed(2)}</td>
+                            <td class="p-2.5 font-sans text-stone-700 font-bold">CAPELO</td>
+                            <td class="p-2.5 text-center text-stone-700">${v.numFactura || '-'}</td>
+                            <td class="p-2.5 text-stone-600">${v.cedula || '-'}</td>
+                            <td class="p-2.5 font-sans lowercase text-stone-500 max-w-[140px] truncate" title="${v.email || ''}">${v.email || '-'}</td>
+                        </tr>`;
+                    });
+                });
+                tb.innerHTML = html;
             };
 
-            body.innerHTML = 
-                renderSection("📋 REPORTE UN PRODUCTO (TARIFA $25.00)", singles, 'SINGLE') + 
-                renderSection("📚 REPORTE MULTI-PRODUCTO / PROMOCIONES (TARIFA $20.00 / $15.00)", multis, 'MULTI') + 
-                renderSection("🔥 REPORTE LÍNEA GOURMET BBQ (TARIFA $29.00)", bbqs, 'BBQ') +
-                renderSection("🏬 REPORTE ALMACENES / EXHIBICIÓN (TARIFA $15.00)", almacenes, 'ALMACEN');
+            renderStandardServiceRows('tekaTableBody_promocion', promocionVisits, 'MULTI', () => { promoEquiposCount++; });
+            renderStandardServiceRows('tekaTableBody_bbq', bbqsVisits, 'BBQ', () => { bbqEquiposCount++; });
+            renderStandardServiceRows('tekaTableBody_unproducto', unProductoVisits, 'SINGLE', () => { unProdEquiposCount++; });
+            renderStandardServiceRows('tekaTableBody_almacen', almacenesVisits, 'ALMACEN', () => { almacenEquiposCount++; });
 
-            const summaryBox = document.getElementById('tekaSummaryTotal');
-            if(summaryBox) summaryBox.textContent = "$" + granTotalMO.toFixed(2);
+            // RENDER CONSOLIDADO
+            const tbodyConsolidado = document.getElementById('tekaTableBody_consolidado');
+            if (tbodyConsolidado) {
+                if (consolidadoVisits.length === 0) {
+                    tbodyConsolidado.innerHTML = '<tr><td colspan="20" class="p-8 text-center text-stone-400 font-black italic">No hay visitas atendidas en este periodo</td></tr>';
+                } else {
+                    let html = '';
+                    let seq = 1;
+                    consolidadoVisits.forEach(v => {
+                        const eqs = getNormalizedEquipos(v);
+                        const isGar = isGarantiaVisit(v);
+                        eqs.forEach(eq => {
+                            consolidadoEquiposCount++;
+                            let cat = 'SINGLE';
+                            if (isGar) cat = 'GARANTIAS';
+                            else if (isBBQVisit(v)) cat = 'BBQ';
+                            else if (isAlmacenVisit(v)) cat = 'ALMACEN';
+                            else if (eqs.length > 1) cat = 'MULTI';
+                            const costo = getEquipmentCost(v, eq, cat);
+
+                            const cod = eq.codProducto || '';
+                            const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
+                            const fecVisita = v.fechaInstalacion || v.fechaVisita || '';
+                            const fecLlamada = getDiaAnterior(fecVisita);
+                            const adh = eq.adhesivo || eq.numeroAdhesivo || v.adhesivo || '-';
+
+                            html += `<tr class="border-b border-stone-200 hover:bg-blue-50/40 font-mono transition-colors">
+                                <td class="p-2.5 text-center font-bold text-stone-500">${seq++}</td>
+                                <td class="p-2.5 text-center text-stone-600">${v.fechaEmision || '-'}</td>
+                                <td class="p-2.5 font-sans font-bold text-fix-main italic">${v.nombreCliente || ''}</td>
+                                <td class="p-2.5 font-sans text-stone-700 max-w-[180px] truncate" title="${v.callePrincipal || ''}">${v.callePrincipal || '-'}</td>
+                                <td class="p-2.5 text-stone-700">${v.telefono || '-'}</td>
+                                <td class="p-2.5 font-sans text-stone-600">${v.asunto || (isGar ? 'GARANTÍA' : 'INSTALACIÓN')}</td>
+                                <td class="p-2.5 text-center font-bold text-blue-900">${cod || '-'}</td>
+                                <td class="p-2.5 font-sans text-stone-800 font-bold max-w-[220px] truncate" title="${desc}">${desc || '-'}</td>
+                                <td class="p-2.5 text-center"><span class="px-2 py-0.5 rounded-full text-[8px] font-black bg-emerald-100 text-emerald-800">${v.estado || 'ATENDIDO'}</span></td>
+                                <td class="p-2.5 font-sans text-stone-600">${v.lugarCompra || 'OTRO'}</td>
+                                <td class="p-2.5 text-center font-bold text-stone-800">${fecVisita}</td>
+                                <td class="p-2.5 font-sans text-stone-700 font-bold">CAPELO</td>
+                                <td class="p-2.5 text-center text-stone-700">${adh}</td>
+                                <td class="p-2.5 text-center font-black text-blue-900">SAP</td>
+                                <td class="p-2.5 text-center text-stone-600">${eq.serieEquipo || '-'}</td>
+                                <td class="p-2.5 text-right font-bold text-stone-900">$${costo.toFixed(2)}</td>
+                                <td class="p-2.5 text-center font-bold text-stone-700">${fecLlamada || '-'}</td>
+                                <td class="p-2.5 font-sans lowercase text-stone-500 max-w-[140px] truncate" title="${v.email || ''}">${v.email || '-'}</td>
+                                <td class="p-2.5 text-stone-600">${v.cedula || '-'}</td>
+                                <td class="p-2.5 font-sans text-stone-600 font-bold">TRABAJO REALIZADO SIN NOVEDAD</td>
+                            </tr>`;
+                        });
+                    });
+                    tbodyConsolidado.innerHTML = html;
+                }
+            }
+
+            // Actualizar KPIs
+            const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+            setVal('kpiTekaConsolidado', consolidadoEquiposCount);
+            setVal('kpiTekaPromocion', promoEquiposCount);
+            setVal('kpiTekaUnProducto', unProdEquiposCount);
+            setVal('kpiTekaBBQ', bbqEquiposCount);
+            setVal('kpiTekaGarantias', garantiasEquiposCount);
+            setVal('kpiTekaAlmacen', almacenEquiposCount);
+            setVal('kpiTekaGranTotal', '$' + granTotalMO.toFixed(2));
+
+            // Actualizar badges en pestañas
+            setVal('badge_consolidado', consolidadoEquiposCount);
+            setVal('badge_promocion', promoEquiposCount);
+            setVal('badge_unproducto', unProdEquiposCount);
+            setVal('badge_bbq', bbqEquiposCount);
+            setVal('badge_garantias', garantiasEquiposCount);
+            setVal('badge_almacen', almacenEquiposCount);
         }
+
+        window.exportarSoloConsolidadoTeka = function() {
+            exportarFormatoOficialTeka(true);
+        };
+
+        window.exportarFormatoOficialTeka = async function(soloConsolidado = false) {
+            if (typeof ExcelJS === 'undefined') {
+                showMessage("⚠️ Biblioteca ExcelJS cargando... intente nuevamente en un momento", "fix-error");
+                return;
+            }
+
+            try {
+                showMessage(soloConsolidado ? "⏳ Exportando Consolidado (Calibri 14)..." : "⏳ Generando Reporte Oficial TEKA (7 Pestañas, Calibri 14)...", "fix-pending");
+
+                const start = document.getElementById('maestroDateStart') ? document.getElementById('maestroDateStart').value : '';
+                const end = document.getElementById('maestroDateEnd') ? document.getElementById('maestroDateEnd').value : '';
+                
+                let filtered = visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Mantenimiento' && v.estado === 'Atendido');
+                if (start && end) {
+                    filtered = filtered.filter(v => {
+                        const f = v.fechaInstalacion || v.fechaVisita || '';
+                        return f >= start && f <= end;
+                    });
+                }
+                filtered.sort((a, b) => ((a.fechaInstalacion || a.fechaVisita || '')).localeCompare(b.fechaInstalacion || b.fechaVisita || ''));
+
+                const isBBQVisit = (v) => (v.equipos || []).some(eq => ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase().includes('BBQ') || ((eq.descProducto || '') + ' ' + (eq.manualName || '')).toUpperCase().includes('BARBACOA'));
+                const isGarantiaVisit = (v) => (v.tipoAtencion === 'Garantía' || v.tipoServicioGlobal === 'Garantía');
+                const isAlmacenVisit = (v) => {
+                    if (v.tipoAtencion === 'Almacén' || v.tipoAtencion === 'Almacén / Exhibición') return true;
+                    const cliente = (v.nombreCliente || '').toUpperCase();
+                    const obs = ((v.observacionesAdmin || '') + ' ' + (v.observaciones || '')).toUpperCase();
+                    return cliente.includes('EXHIBICION') || cliente.includes('EXHIBICIÓN') || cliente.includes('SHOWROOM') || cliente.includes('ALMACEN') || cliente.includes('ALMACÉN') || obs.includes('EXHIBICION') || obs.includes('ALMACEN');
+                };
+
+                const garantiasVisits = filtered.filter(v => isGarantiaVisit(v));
+                const bbqsVisits = filtered.filter(v => !isGarantiaVisit(v) && isBBQVisit(v));
+                const almacenesVisits = filtered.filter(v => !isGarantiaVisit(v) && !isBBQVisit(v) && isAlmacenVisit(v));
+                const promocionVisits = filtered.filter(v => !isGarantiaVisit(v) && !isBBQVisit(v) && !isAlmacenVisit(v) && (v.equipos || []).length > 1);
+                const unProductoVisits = filtered.filter(v => !isGarantiaVisit(v) && !isBBQVisit(v) && !isAlmacenVisit(v) && (v.equipos || []).length <= 1);
+                const consolidadoVisits = filtered;
+
+                // Determinar nombre del mes y año del corte
+                let cycleEnd = end ? new Date(end + 'T12:00:00') : new Date();
+                const mesUpper = MESES_ES[cycleEnd.getMonth()];
+                const mesCap = mesUpper.charAt(0) + mesUpper.slice(1).toLowerCase();
+                const anio = cycleEnd.getFullYear();
+
+                const wb = new ExcelJS.Workbook();
+                wb.creator = "CRISTIAN CAPELO";
+                wb.created = new Date();
+
+                // Estilos con tipografía CALIBRI 14 OBLIGATORIA
+                const FONT_BODY = { name: 'Calibri', size: 14, bold: false };
+                const FONT_BOLD = { name: 'Calibri', size: 14, bold: true };
+                const FONT_TITLE_MAIN = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF1E3A8A' } };
+                const FONT_HEADER = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+                const FONT_ROW1 = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF1F2937' } };
+
+                const BORDER_BOX = {
+                    top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                    left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                    bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                    right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+                };
+
+                const FILL_ROW1 = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+
+                const setupColumns = (ws) => {
+                    ws.getColumn(1).width = 6;   // Col A: #
+                    ws.getColumn(2).width = 16;  // Col B: Fecha Compra
+                    ws.getColumn(3).width = 24;  // Col C: Lugar / Cliente
+                    ws.getColumn(4).width = 24;  // Col D: Factura / Dirección
+                    ws.getColumn(5).width = 18;  // Col E: Código / Teléfono
+                    ws.getColumn(6).width = 38;  // Col F: Descripción / Asunto
+                    ws.getColumn(7).width = 18;  // Col G: Serie / Código
+                    ws.getColumn(8).width = 16;  // Col H: Garantía / Descripción
+                    ws.getColumn(9).width = 16;  // Col I: Técnico / Estado
+                    ws.getColumn(10).width = 16; // Col J: Ciudad / Lugar
+                    ws.getColumn(11).width = 18; // Col K: Fecha Inst. / Visita
+                    ws.getColumn(12).width = 30; // Col L: Cliente / Técnico
+                    ws.getColumn(13).width = 32; // Col M: Dirección / Adhesivo
+                    ws.getColumn(14).width = 18; // Col N: Celular / Garantía
+                    ws.getColumn(15).width = 15; // Col O: Precio / Serie
+                    ws.getColumn(16).width = 24; // Col P: Info / Vr.
+                    ws.getColumn(17).width = 22; // Col Q: Técnico Atendió / Fecha llamada
+                    ws.getColumn(18).width = 18; // Col R: Viático / Correo
+                    ws.getColumn(19).width = 20; // Col S: Factura / Cédula
+                    ws.getColumn(20).width = 20; // Col T: Cédula / Obs
+                    ws.getColumn(21).width = 30; // Col U: Correo
+                };
+
+                const applyRow1Numbering = (ws, totalCols) => {
+                    const r1 = ws.getRow(1);
+                    r1.height = 24;
+                    r1.getCell(1).value = "N°";
+                    r1.getCell(1).font = FONT_ROW1;
+                    r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+                    r1.getCell(1).fill = FILL_ROW1;
+                    r1.getCell(1).border = BORDER_BOX;
+
+                    for (let c = 2; c <= totalCols; c++) {
+                        const cell = r1.getCell(c);
+                        cell.value = c - 1;
+                        cell.font = FONT_ROW1;
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                        cell.fill = FILL_ROW1;
+                        cell.border = BORDER_BOX;
+                    }
+                };
+
+                // PESTAÑAS EN EL ORDEN OFICIAL EXACTO:
+                // 1. GARANTIAS
+                // 2. PROMOCION
+                // 3. BBQ
+                // 4. BASE
+                // 5. CONSOLIDADO
+                // 6. UN PRODUCTO
+                // 7. ALMACEN
+
+                // 1. HOJA: GARANTIAS
+                if (!soloConsolidado) {
+                    const wsGar = wb.addWorksheet('GARANTIAS');
+                    setupColumns(wsGar);
+                    applyRow1Numbering(wsGar, 19);
+
+                    wsGar.getCell('C3').value = "TEKA ECUADOR S.A. ";
+                    wsGar.getCell('C3').font = FONT_TITLE_MAIN;
+                    wsGar.getCell('C4').value = "Registro Único de Contribuyente: 1791883144001";
+                    wsGar.getCell('C4').font = FONT_BOLD;
+
+                    wsGar.getCell('B5').value = "De Cristian Capelo";
+                    wsGar.getCell('B5').font = FONT_BOLD;
+                    wsGar.getCell('E5').value = "                  TRABAJOS EN GARANTÍAS";
+                    wsGar.getCell('E5').font = FONT_BOLD;
+                    wsGar.getCell('M5').value = `${mesUpper} ${anio}`;
+                    wsGar.getCell('M5').font = FONT_BOLD;
+
+                    wsGar.getCell('B6').value = "Para Ing. Fernández";
+                    wsGar.getCell('B6').font = FONT_BOLD;
+
+                    wsGar.getCell('B7').value = `AL 19 DE ${mesUpper}`;
+                    wsGar.getCell('B7').font = FONT_BOLD;
+                    wsGar.getCell('H7').value = "ESTA SE LLENA POR DEFECTO";
+                    wsGar.getCell('H7').font = FONT_BODY;
+
+                    const garHeaders = [
+                        'Fecha de Compra', 'Fecha de Intervención', 'Cantidad', 'Código del repuesto', 
+                        'Descripción del Repuesto', 'Codigo del Producto ', 'Descripción del Producto', 
+                        'Serie', 'Garantía', 'Técnico ', 'Cliente', 'Observación', 'valor a pagar ', 
+                        'Cédula', 'Correo', 'telefono del cliente', 'VIÁTICO ', 'FACTURA NUMERO'
+                    ];
+                    const r8 = wsGar.getRow(8);
+                    r8.getCell(1).value = "N°";
+                    r8.getCell(1).font = FONT_HEADER;
+                    r8.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF581C87' } };
+                    r8.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+                    r8.getCell(1).border = BORDER_BOX;
+
+                    garHeaders.forEach((h, idx) => {
+                        const cell = r8.getCell(idx + 2);
+                        cell.value = h;
+                        cell.font = FONT_HEADER;
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF581C87' } };
+                        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                        cell.border = BORDER_BOX;
+                    });
+                    r8.height = 32;
+
+                    let garRowIndex = 9;
+                    let garItemSeq = 1;
+                    garantiasVisits.forEach(v => {
+                        const eqs = getNormalizedEquipos(v);
+                        eqs.forEach(eq => {
+                            const cod = eq.codProducto || '';
+                            const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
+                            const obsGar = (v.observacionesAdmin || v.observaciones || '').trim().toUpperCase() || 'GARANTIA FINALIZADA CON EXITO';
+                            const row = wsGar.getRow(garRowIndex++);
+                            row.getCell(1).value = garItemSeq++;
+                            row.getCell(2).value = v.fechaEmision || '';
+                            row.getCell(3).value = v.fechaInstalacion || v.fechaVisita || '';
+                            row.getCell(4).value = 1;
+                            row.getCell(5).value = eq.codRepuesto || '';
+                            row.getCell(6).value = eq.descRepuesto || 'REVISIÓN TÉCNICA';
+                            row.getCell(7).value = cod;
+                            row.getCell(8).value = desc;
+                            row.getCell(9).value = eq.serieEquipo || '';
+                            row.getCell(10).value = 'SAP';
+                            row.getCell(11).value = 'CAPELO';
+                            row.getCell(12).value = v.nombreCliente || '';
+                            row.getCell(13).value = obsGar;
+                            row.getCell(14).value = eq.costoBase || 0;
+                            row.getCell(15).value = v.cedula || '';
+                            row.getCell(16).value = (v.email || '').toLowerCase();
+                            row.getCell(17).value = v.telefono || '';
+                            row.getCell(18).value = '';
+                            row.getCell(19).value = v.numFactura || '';
+
+                            for (let c = 1; c <= 19; c++) {
+                                const cell = row.getCell(c);
+                                cell.font = FONT_BODY;
+                                cell.border = BORDER_BOX;
+                                cell.alignment = { vertical: 'middle' };
+                            }
+                        });
+                    });
+                }
+
+                // 2. HOJA: PROMOCION (Multi-equipo)
+                if (!soloConsolidado) {
+                    const wsPromo = wb.addWorksheet('PROMOCION');
+                    setupColumns(wsPromo);
+                    applyRow1Numbering(wsPromo, 21);
+
+                    wsPromo.getCell('C3').value = "TEKA ECUADOR S.A. ";
+                    wsPromo.getCell('C3').font = FONT_TITLE_MAIN;
+                    wsPromo.getCell('C4').value = "Registro Único de Contribuyente: 1791883144001";
+                    wsPromo.getCell('C4').font = FONT_BOLD;
+                    wsPromo.getCell('J4').value = "PROMOCION  ";
+                    wsPromo.getCell('J4').font = FONT_BOLD;
+                    wsPromo.getCell('N4').value = `CAPELO ${mesUpper} ${anio}`;
+                    wsPromo.getCell('N4').font = FONT_BOLD;
+
+                    const promoHeaders = [
+                        'FECHA DE COMPRA ', 'LUGAR DE COMRPA ', 'NUMERO DE FACTURA DE COMPRA', 'CODIGO DEL PRODUCTO ',
+                        'DESCRIPCION DE PRODUCTO ', 'SERIE DEL EQUIPO ', 'GARANTIA DEL EQUIPO', 'TECNICO ', 'CIUDAD ',
+                        'FECHA DE INSTALACION ', 'NOMBRE DEL CLIENTE', 'DIRECCION INSTALACION ', 'CELULAR DEL CLIENTE',
+                        'PRECIO', 'COMO LLEGO LA INFORMACION ', 'TÉCNICO QUE ATENDIÓ', 'VIÁTICO ', 'FACTURA NUMERO',
+                        'CEDULA O RUC', 'CORREO DEL CLIENTE '
+                    ];
+                    const r5Promo = wsPromo.getRow(5);
+                    r5Promo.getCell(1).value = "N°";
+                    r5Promo.getCell(1).font = FONT_HEADER;
+                    r5Promo.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF92400E' } };
+                    r5Promo.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+                    r5Promo.getCell(1).border = BORDER_BOX;
+
+                    promoHeaders.forEach((h, idx) => {
+                        const cell = r5Promo.getCell(idx + 2);
+                        cell.value = h;
+                        cell.font = FONT_HEADER;
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF92400E' } };
+                        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                        cell.border = BORDER_BOX;
+                    });
+                    r5Promo.height = 32;
+
+                    let promoRowIndex = 6;
+                    let promoItemSeq = 1;
+                    promocionVisits.forEach(v => {
+                        const eqs = getNormalizedEquipos(v);
+                        eqs.forEach(eq => {
+                            const costo = getEquipmentCost(v, eq, 'MULTI');
+                            const cod = eq.codProducto || '';
+                            const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
+                            const row = wsPromo.getRow(promoRowIndex++);
+                            row.getCell(1).value = promoItemSeq++;
+                            row.getCell(2).value = v.fechaEmision || '';
+                            row.getCell(3).value = v.lugarCompra || 'OTRO';
+                            row.getCell(4).value = v.numFactura || '';
+                            row.getCell(5).value = cod;
+                            row.getCell(6).value = desc;
+                            row.getCell(7).value = eq.serieEquipo || '';
+                            row.getCell(8).value = 'SAP';
+                            row.getCell(9).value = 'CAPELO';
+                            row.getCell(10).value = 'CUENCA';
+                            row.getCell(11).value = v.fechaInstalacion || v.fechaVisita || '';
+                            row.getCell(12).value = v.nombreCliente || '';
+                            row.getCell(13).value = v.callePrincipal || '';
+                            row.getCell(14).value = v.telefono || '';
+                            row.getCell(15).value = costo;
+                            row.getCell(16).value = 'CLIENTE FINAL';
+                            row.getCell(17).value = 'CAPELO';
+                            row.getCell(18).value = '';
+                            row.getCell(19).value = v.numFactura || '';
+                            row.getCell(20).value = v.cedula || '';
+                            row.getCell(21).value = (v.email || '').toLowerCase();
+
+                            for (let c = 1; c <= 21; c++) {
+                                const cell = row.getCell(c);
+                                cell.font = FONT_BODY;
+                                cell.border = BORDER_BOX;
+                                cell.alignment = { vertical: 'middle' };
+                            }
+                        });
+                    });
+                }
+
+                // 3. HOJA: BBQ
+                if (!soloConsolidado) {
+                    const wsBBQ = wb.addWorksheet('BBQ');
+                    setupColumns(wsBBQ);
+                    applyRow1Numbering(wsBBQ, 21);
+
+                    wsBBQ.getCell('C3').value = "     TEKA ECUADOR S.A. ";
+                    wsBBQ.getCell('C3').font = FONT_TITLE_MAIN;
+                    wsBBQ.getCell('C4').value = "    Registro Único de Contribuyente: 1791883144001";
+                    wsBBQ.getCell('C4').font = FONT_BOLD;
+                    wsBBQ.getCell('I4').value = "BBQ";
+                    wsBBQ.getCell('I4').font = FONT_BOLD;
+                    wsBBQ.getCell('M4').value = `CAPELO ${mesUpper}`;
+                    wsBBQ.getCell('M4').font = FONT_BOLD;
+                    wsBBQ.getCell('U4').value = `${mesUpper}_${String(anio).slice(-2)}`;
+                    wsBBQ.getCell('U4').font = FONT_BOLD;
+
+                    const bbqHeaders = [
+                        'FECHA DE COMPRA ', 'LUGAR DE COMRPA ', 'NUMERO DE FACTURA DE COMPRA', 'CODIGO DEL PRODUCTO ',
+                        'DESCRIPCION DE PRODUCTO ', 'SERIE DEL EQUIPO ', 'GARANTIA DEL EQUIPO', 'TECNICO ', 'CIUDAD ',
+                        'FECHA INSTALACION ', 'NOMBRE DEL CLIENTE', 'DIRECCION INSTALACION ', 'CELULAR DEL CLIENTE',
+                        'PRECIO', 'COMO LLEGO INFORMACION ', 'TECNICO QUE ATENDIO', 'VIATICOS', 'FACTURA NUMERO',
+                        'CEDULA O RUC', 'CORREO DEL CLIENTE'
+                    ];
+                    const r5BBQ = wsBBQ.getRow(5);
+                    r5BBQ.getCell(1).value = "N°";
+                    r5BBQ.getCell(1).font = FONT_HEADER;
+                    r5BBQ.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC2410C' } };
+                    r5BBQ.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+                    r5BBQ.getCell(1).border = BORDER_BOX;
+
+                    bbqHeaders.forEach((h, idx) => {
+                        const cell = r5BBQ.getCell(idx + 2);
+                        cell.value = h;
+                        cell.font = FONT_HEADER;
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC2410C' } };
+                        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                        cell.border = BORDER_BOX;
+                    });
+                    r5BBQ.height = 32;
+
+                    let bbqRowIndex = 6;
+                    let bbqItemSeq = 1;
+                    bbqsVisits.forEach(v => {
+                        const eqs = getNormalizedEquipos(v);
+                        eqs.forEach(eq => {
+                            const costo = 29.00;
+                            const cod = eq.codProducto || '';
+                            const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
+                            const row = wsBBQ.getRow(bbqRowIndex++);
+                            row.getCell(1).value = bbqItemSeq++;
+                            row.getCell(2).value = v.fechaEmision || '';
+                            row.getCell(3).value = v.lugarCompra || 'OTRO';
+                            row.getCell(4).value = v.numFactura || '';
+                            row.getCell(5).value = cod;
+                            row.getCell(6).value = desc;
+                            row.getCell(7).value = eq.serieEquipo || '';
+                            row.getCell(8).value = 'SAP';
+                            row.getCell(9).value = 'CAPELO';
+                            row.getCell(10).value = 'CUENCA';
+                            row.getCell(11).value = v.fechaInstalacion || v.fechaVisita || '';
+                            row.getCell(12).value = v.nombreCliente || '';
+                            row.getCell(13).value = v.callePrincipal || '';
+                            row.getCell(14).value = v.telefono || '';
+                            row.getCell(15).value = costo;
+                            row.getCell(16).value = 'CLIENTE FINAL';
+                            row.getCell(17).value = 'CAPELO';
+                            row.getCell(18).value = '';
+                            row.getCell(19).value = v.numFactura || '';
+                            row.getCell(20).value = v.cedula || '';
+                            row.getCell(21).value = (v.email || '').toLowerCase();
+
+                            for (let c = 1; c <= 21; c++) {
+                                const cell = row.getCell(c);
+                                cell.font = FONT_BODY;
+                                cell.border = BORDER_BOX;
+                                cell.alignment = { vertical: 'middle' };
+                            }
+                        });
+                    });
+                }
+
+                // 4. HOJA: BASE  (905 productos base oficiales)
+                if (!soloConsolidado) {
+                    const wsBase = wb.addWorksheet('BASE ');
+                    wsBase.getColumn(1).width = 20;
+                    wsBase.getColumn(2).width = 80;
+
+                    const r1Base = wsBase.getRow(1);
+                    r1Base.getCell(1).value = "Cód. Artículo";
+                    r1Base.getCell(2).value = "Producto";
+                    r1Base.getCell(1).font = FONT_HEADER;
+                    r1Base.getCell(2).font = FONT_HEADER;
+                    r1Base.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+                    r1Base.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+                    r1Base.height = 28;
+
+                    const r2Base = wsBase.getRow(2);
+                    r2Base.getCell(1).value = "Almacén";
+                    r2Base.getCell(2).value = "Alm1";
+                    r2Base.getCell(1).font = FONT_BODY;
+                    r2Base.getCell(2).font = FONT_BODY;
+
+                    let baseRowIndex = 3;
+                    const catalogEntries = Object.entries(window.CATALOGO_TEKA_BASE || {});
+                    catalogEntries.forEach(([code, desc]) => {
+                        const row = wsBase.getRow(baseRowIndex++);
+                        row.getCell(1).value = code;
+                        row.getCell(2).value = desc;
+                        row.getCell(1).font = FONT_BODY;
+                        row.getCell(2).font = FONT_BODY;
+                        row.getCell(1).border = BORDER_BOX;
+                        row.getCell(2).border = BORDER_BOX;
+                    });
+                }
+
+                // 5. HOJA: CONSOLIDADO (Todas las visitas del periodo)
+                const wsConsol = wb.addWorksheet('CONSOLIDADO');
+                setupColumns(wsConsol);
+                applyRow1Numbering(wsConsol, 20);
+
+                wsConsol.getCell('B3').value = "TEKA ECUADOR S.A.";
+                wsConsol.getCell('B3').font = FONT_TITLE_MAIN;
+                wsConsol.getCell('B4').value = "Técnico:  Cristian Capelo";
+                wsConsol.getCell('B4').font = FONT_BOLD;
+                wsConsol.getCell('B5').value = `Clientes Visitados al 19 de ${mesCap} ${anio}`;
+                wsConsol.getCell('B5').font = FONT_BOLD;
+
+                const consolHeaders = [
+                    'FECHA DE COMPRA', 'NOMBRE ', 'DIRECCIÓN', 'TELÉFONO', 'ASUNTO ', 'CÓDIGO ',
+                    'DESCRIPCION ', 'ESTADO', 'LUGAR DE COMPRA', 'FECHA DE VISITA', 'TECNICO',
+                    'NUMERO DE ADHESIVO', 'GARANTÍA', 'SERIE', 'Vr.', 'FECHA DE LLAMADA',
+                    'CORREO', 'CEDULA', 'OBSERVACIONES'
+                ];
+                const r6Consol = wsConsol.getRow(6);
+                r6Consol.getCell(1).value = "N°";
+                r6Consol.getCell(1).font = FONT_HEADER;
+                r6Consol.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+                r6Consol.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+                r6Consol.getCell(1).border = BORDER_BOX;
+
+                consolHeaders.forEach((h, idx) => {
+                    const cell = r6Consol.getCell(idx + 2);
+                    cell.value = h;
+                    cell.font = FONT_HEADER;
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+                    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                    cell.border = BORDER_BOX;
+                });
+                r6Consol.height = 32;
+
+                let consolRowIndex = 7;
+                let consolItemSeq = 1;
+                consolidadoVisits.forEach(v => {
+                    const eqs = getNormalizedEquipos(v);
+                    const isGar = isGarantiaVisit(v);
+                    eqs.forEach(eq => {
+                        let cat = 'SINGLE';
+                        if (isGar) cat = 'GARANTIAS';
+                        else if (isBBQVisit(v)) cat = 'BBQ';
+                        else if (isAlmacenVisit(v)) cat = 'ALMACEN';
+                        else if (eqs.length > 1) cat = 'MULTI';
+                        const costo = getEquipmentCost(v, eq, cat);
+
+                        const cod = eq.codProducto || '';
+                        const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
+                        const fecVisita = v.fechaInstalacion || v.fechaVisita || '';
+                        const fecLlamada = getDiaAnterior(fecVisita);
+                        const adh = eq.adhesivo || eq.numeroAdhesivo || v.adhesivo || '';
+
+                        const row = wsConsol.getRow(consolRowIndex++);
+                        row.getCell(1).value = consolItemSeq++;
+                        row.getCell(2).value = v.fechaEmision || '';
+                        row.getCell(3).value = v.nombreCliente || '';
+                        row.getCell(4).value = v.callePrincipal || '';
+                        row.getCell(5).value = v.telefono || '';
+                        row.getCell(6).value = v.asunto || (isGar ? 'GARANTÍA' : 'INSTALACIÓN');
+                        row.getCell(7).value = cod;
+                        row.getCell(8).value = desc;
+                        row.getCell(9).value = v.estado || 'ATENDIDO';
+                        row.getCell(10).value = v.lugarCompra || 'OTRO';
+                        row.getCell(11).value = fecVisita;
+                        row.getCell(12).value = 'CAPELO';
+                        row.getCell(13).value = adh;
+                        row.getCell(14).value = 'SAP';
+                        row.getCell(15).value = eq.serieEquipo || '';
+                        row.getCell(16).value = costo;
+                        row.getCell(17).value = fecLlamada;
+                        row.getCell(18).value = (v.email || '').toLowerCase();
+                        row.getCell(19).value = v.cedula || '';
+                        row.getCell(20).value = 'TRABAJO REALIZADO SIN NOVEDAD';
+
+                        for (let c = 1; c <= 20; c++) {
+                            const cell = row.getCell(c);
+                            cell.font = FONT_BODY;
+                            cell.border = BORDER_BOX;
+                            cell.alignment = { vertical: 'middle' };
+                        }
+                    });
+                });
+
+                // 6. HOJA: UN PRODUCTO (Visitas individuales)
+                if (!soloConsolidado) {
+                    const wsUnProd = wb.addWorksheet('UN PRODUCTO');
+                    setupColumns(wsUnProd);
+                    applyRow1Numbering(wsUnProd, 21);
+
+                    wsUnProd.getCell('C3').value = "TEKA ECUADOR S.A. ";
+                    wsUnProd.getCell('C3').font = FONT_TITLE_MAIN;
+                    wsUnProd.getCell('C4').value = "Registro Único de Contribuyente: 1791883144001";
+                    wsUnProd.getCell('C4').font = FONT_BOLD;
+                    wsUnProd.getCell('J4').value = "UN PRODUCTO  ";
+                    wsUnProd.getCell('J4').font = FONT_BOLD;
+                    wsUnProd.getCell('N4').value = `CAPELO ${mesUpper} ${anio}`;
+                    wsUnProd.getCell('N4').font = FONT_BOLD;
+
+                    const unProdHeaders = [
+                        'FECHA DE COMPRA ', 'LUGAR DE COMPRA ', 'NUMERO DE FACTURA DE COMPRA', 'CODIGO DEL PRODUCTO ',
+                        'DESCRIPCION DE PRODUCTO ', 'SERIE DEL EQUIPO ', 'GARANTIA DEL EQUIPO', 'TECNICO ', 'CIUDAD ',
+                        'FECHA DE INSTALACION ', 'NOMBRE DEL CLIENTE', 'DIRECCION INSTALACION ', 'CELULAR DEL CLIENTE',
+                        'PRECIO', 'COMO LLEGO LA INFORMACION ', 'TÉCNICO QUE ATENDIÓ', 'VIÁTICO ', 'FACTURA NUMERO',
+                        'CEDULA O RUC', 'CORREO DEL CLIENTE '
+                    ];
+                    const r5UnProd = wsUnProd.getRow(5);
+                    r5UnProd.getCell(1).value = "N°";
+                    r5UnProd.getCell(1).font = FONT_HEADER;
+                    r5UnProd.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF065F46' } };
+                    r5UnProd.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+                    r5UnProd.getCell(1).border = BORDER_BOX;
+
+                    unProdHeaders.forEach((h, idx) => {
+                        const cell = r5UnProd.getCell(idx + 2);
+                        cell.value = h;
+                        cell.font = FONT_HEADER;
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF065F46' } };
+                        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                        cell.border = BORDER_BOX;
+                    });
+                    r5UnProd.height = 32;
+
+                    let unProdRowIndex = 6;
+                    let unProdItemSeq = 1;
+                    unProductoVisits.forEach(v => {
+                        const eqs = getNormalizedEquipos(v);
+                        eqs.forEach(eq => {
+                            const costo = getEquipmentCost(v, eq, 'SINGLE');
+                            const cod = eq.codProducto || '';
+                            const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
+                            const row = wsUnProd.getRow(unProdRowIndex++);
+                            row.getCell(1).value = unProdItemSeq++;
+                            row.getCell(2).value = v.fechaEmision || '';
+                            row.getCell(3).value = v.lugarCompra || 'OTRO';
+                            row.getCell(4).value = v.numFactura || '';
+                            row.getCell(5).value = cod;
+                            row.getCell(6).value = desc;
+                            row.getCell(7).value = eq.serieEquipo || '';
+                            row.getCell(8).value = 'SAP';
+                            row.getCell(9).value = 'CAPELO';
+                            row.getCell(10).value = 'CUENCA';
+                            row.getCell(11).value = v.fechaInstalacion || v.fechaVisita || '';
+                            row.getCell(12).value = v.nombreCliente || '';
+                            row.getCell(13).value = v.callePrincipal || '';
+                            row.getCell(14).value = v.telefono || '';
+                            row.getCell(15).value = costo;
+                            row.getCell(16).value = 'CLIENTE FINAL';
+                            row.getCell(17).value = 'CAPELO';
+                            row.getCell(18).value = '';
+                            row.getCell(19).value = v.numFactura || '';
+                            row.getCell(20).value = v.cedula || '';
+                            row.getCell(21).value = (v.email || '').toLowerCase();
+
+                            for (let c = 1; c <= 21; c++) {
+                                const cell = row.getCell(c);
+                                cell.font = FONT_BODY;
+                                cell.border = BORDER_BOX;
+                                cell.alignment = { vertical: 'middle' };
+                            }
+                        });
+                    });
+                }
+
+                // 7. HOJA: ALMACEN (Exhibición / Showroom / Tienda)
+                if (!soloConsolidado) {
+                    const wsAlm = wb.addWorksheet('ALMACEN');
+                    setupColumns(wsAlm);
+                    applyRow1Numbering(wsAlm, 21);
+
+                    wsAlm.getCell('C3').value = "TEKA ECUADOR S.A. ";
+                    wsAlm.getCell('C3').font = FONT_TITLE_MAIN;
+                    wsAlm.getCell('C4').value = "Registro Único de Contribuyente: 1791883144001";
+                    wsAlm.getCell('C4').font = FONT_BOLD;
+                    wsAlm.getCell('J4').value = "ALMACEN  ";
+                    wsAlm.getCell('J4').font = FONT_BOLD;
+                    wsAlm.getCell('N4').value = `CAPELO ${mesUpper} ${anio}`;
+                    wsAlm.getCell('N4').font = FONT_BOLD;
+
+                    const almHeaders = [
+                        'FECHA DE COMPRA ', 'LUGAR DE COMPRA ', 'NUMERO DE FACTURA DE COMPRA', 'CODIGO DEL PRODUCTO ',
+                        'DESCRIPCION DE PRODUCTO ', 'SERIE DEL EQUIPO ', 'GARANTIA DEL EQUIPO', 'TECNICO ', 'CIUDAD ',
+                        'FECHA DE INSTALACION ', 'NOMBRE DEL CLIENTE', 'DIRECCION INSTALACION ', 'CELULAR DEL CLIENTE',
+                        'PRECIO', 'COMO LLEGO LA INFORMACION ', 'TÉCNICO QUE ATENDIÓ', 'VIÁTICO ', 'FACTURA NUMERO',
+                        'CEDULA O RUC', 'CORREO DEL CLIENTE '
+                    ];
+                    const r5Alm = wsAlm.getRow(5);
+                    r5Alm.getCell(1).value = "N°";
+                    r5Alm.getCell(1).font = FONT_HEADER;
+                    r5Alm.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D9488' } };
+                    r5Alm.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+                    r5Alm.getCell(1).border = BORDER_BOX;
+
+                    almHeaders.forEach((h, idx) => {
+                        const cell = r5Alm.getCell(idx + 2);
+                        cell.value = h;
+                        cell.font = FONT_HEADER;
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D9488' } };
+                        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                        cell.border = BORDER_BOX;
+                    });
+                    r5Alm.height = 32;
+
+                    let almRowIndex = 6;
+                    let almItemSeq = 1;
+                    almacenesVisits.forEach(v => {
+                        const eqs = getNormalizedEquipos(v);
+                        eqs.forEach(eq => {
+                            const costo = 15.00;
+                            const cod = eq.codProducto || '';
+                            const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
+                            const row = wsAlm.getRow(almRowIndex++);
+                            row.getCell(1).value = almItemSeq++;
+                            row.getCell(2).value = v.fechaEmision || '';
+                            row.getCell(3).value = v.lugarCompra || 'OTRO';
+                            row.getCell(4).value = v.numFactura || '';
+                            row.getCell(5).value = cod;
+                            row.getCell(6).value = desc;
+                            row.getCell(7).value = eq.serieEquipo || '';
+                            row.getCell(8).value = 'SAP';
+                            row.getCell(9).value = 'CAPELO';
+                            row.getCell(10).value = 'CUENCA';
+                            row.getCell(11).value = v.fechaInstalacion || v.fechaVisita || '';
+                            row.getCell(12).value = v.nombreCliente || '';
+                            row.getCell(13).value = v.callePrincipal || '';
+                            row.getCell(14).value = v.telefono || '';
+                            row.getCell(15).value = costo;
+                            row.getCell(16).value = 'CLIENTE FINAL';
+                            row.getCell(17).value = 'CAPELO';
+                            row.getCell(18).value = '';
+                            row.getCell(19).value = v.numFactura || '';
+                            row.getCell(20).value = v.cedula || '';
+                            row.getCell(21).value = (v.email || '').toLowerCase();
+
+                            for (let c = 1; c <= 21; c++) {
+                                const cell = row.getCell(c);
+                                cell.font = FONT_BODY;
+                                cell.border = BORDER_BOX;
+                                cell.alignment = { vertical: 'middle' };
+                            }
+                        });
+                    });
+                }
+
+                // Asegurar que absolutamente todas las celdas en todas las hojas tengan fuente Calibri tamaño 14
+                wb.eachSheet((worksheet) => {
+                    worksheet.eachRow({ includeEmpty: false }, (row) => {
+                        row.eachCell({ includeEmpty: false }, (cell) => {
+                            const isBold = (cell.font && cell.font.bold) ? true : false;
+                            const color = (cell.font && cell.font.color) ? cell.font.color : undefined;
+                            cell.font = {
+                                name: 'Calibri',
+                                size: 14,
+                                bold: isBold,
+                                color: color
+                            };
+                        });
+                    });
+                });
+
+                // Descargar archivo binario
+                const buffer = await wb.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                const fileName = soloConsolidado 
+                    ? `CONSOLIDADO_TEKA_CAPELO_${mesUpper}_${anio}.xlsx`
+                    : `REPORTE_TEKA_CAPELO_${mesUpper}_${anio}.xlsx`;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                showMessage(`✅ ${fileName} descargado exitosamente (Calibri 14)`, "fix-report");
+
+            } catch (err) {
+                console.error("Error al exportar reporte oficial TEKA:", err);
+                showMessage("❌ Error al exportar Excel TEKA: " + err.message, "fix-error");
+            }
+        };
+
+
+
+        window.lookupEditTekaCode = function(inputEl, index) {
+            const code = (inputEl.value || '').trim();
+            const rows = document.querySelectorAll('.equipment-edit-row');
+            if (!rows[index] || !window.CATALOGO_TEKA_BASE) return;
+            const manualInput = rows[index].querySelector('.edit-eq-manual');
+            const selectEl = rows[index].querySelector('.edit-eq-select');
+            if (window.CATALOGO_TEKA_BASE[code]) {
+                const desc = window.CATALOGO_TEKA_BASE[code];
+                if (manualInput) manualInput.value = desc;
+                if (selectEl) {
+                    const upperDesc = desc.toUpperCase();
+                    for (let opt of selectEl.options) {
+                        if (opt.value && upperDesc.includes(opt.value.toUpperCase())) {
+                            selectEl.value = opt.value;
+                            window.updateEditPrice(selectEl, index);
+                            break;
+                        }
+                    }
+                }
+                inputEl.classList.add('bg-emerald-50', 'border-emerald-500');
+            } else {
+                inputEl.classList.remove('bg-emerald-50', 'border-emerald-500');
+            }
+        };
+
 
         function renderInventoryView() {
             const container = document.getElementById('inventoryTableBody'); if(!container) return;
@@ -2801,8 +3889,8 @@
                             <input type="text" class="edit-eq-manual w-full p-4 text-[10px] font-black uppercase rounded-xl glass-input outline-none text-stone-800" value="${eq.manualName || ''}" placeholder="MODELO / NOMBRE MANUAL">
                         </div>
                         <div class="grid grid-cols-2 gap-4">
-                            <div><label class="text-[8px] text-stone-600 font-black ml-1 mb-1 block">CÓDIGO SAP</label><input type="text" class="edit-eq-code w-full p-4 text-[10px] font-black rounded-xl glass-input uppercase text-stone-800" value="${eq.codProducto || ''}"></div>
-                            <div><label class="text-[8px] text-stone-600 font-black ml-1 mb-1 block">NÚMERO SERIE</label><input type="text" class="edit-eq-serie w-full p-4 text-[10px] font-black rounded-xl glass-input uppercase text-stone-800" value="${eq.serieEquipo || ''}"></div>
+                            <div><label class="text-[8px] text-stone-600 font-black ml-1 mb-1 block">CÓDIGO SAP (BASE)</label><input type="text" class="edit-eq-code w-full p-4 text-[10px] font-black rounded-xl glass-input uppercase text-stone-800 font-mono" value="${eq.codProducto || ''}" oninput="lookupEditTekaCode(this, ${i})" placeholder="EJ: 915061"></div>
+                            <div><label class="text-[8px] text-stone-600 font-black ml-1 mb-1 block">NÚMERO SERIE</label><input type="text" class="edit-eq-serie w-full p-4 text-[10px] font-black rounded-xl glass-input uppercase text-stone-800 font-mono" value="${eq.serieEquipo || ''}" placeholder="SERIE..."></div>
                         </div>
                         <div class="mt-3"><label class="text-[9px] text-fix-main font-black italic block mb-2">💰 PRECIO LIQUIDACIÓN / COBRO:</label><input type="number" step="0.01" value="${defaultCost.toFixed(2)}" class="edit-eq-cost w-full p-4 text-base font-mono font-black rounded-xl glass-input bg-stone-100/80 border border-stone-300 text-fix-report outline-none"></div>
                     </div>
@@ -2810,7 +3898,24 @@
             }
 
             container.querySelectorAll('.edit-eq-select').forEach((sel, idx) => {
-                sel.onchange = function() { window.updateEditPrice(this, idx); };
+                sel.onchange = function() {
+                    window.updateEditPrice(this, idx);
+                    const rows = document.querySelectorAll('.equipment-edit-row');
+                    if (rows[idx] && window.CATALOGO_TEKA_BASE) {
+                        const codeInput = rows[idx].querySelector('.edit-eq-code');
+                        const manualInput = rows[idx].querySelector('.edit-eq-manual');
+                        const val = (this.value || '').toUpperCase();
+                        if (codeInput && !codeInput.value && val) {
+                            for (const [code, desc] of Object.entries(window.CATALOGO_TEKA_BASE)) {
+                                if (desc.toUpperCase().includes(val)) {
+                                    codeInput.value = code;
+                                    if (manualInput && !manualInput.value) manualInput.value = desc;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                };
             });
         }
 
@@ -2967,12 +4072,13 @@ function getEditModalData() {
                     for(let i=1; i<=num; i++) { 
                         const eqName = data["descProducto_" + i]; 
                         const manualName = data["manualName_" + i];
-                        if(eqName || manualName) {
+                        const cod = (data["codProducto_" + i] || "").trim();
+                        if(eqName || manualName || cod) {
                             eqs.push({ 
-                                descProducto: (manualName || eqName).toUpperCase(), 
-                                manualName: manualName.toUpperCase(),
+                                descProducto: (manualName || eqName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || "").toUpperCase(), 
+                                manualName: (manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || "").toUpperCase(),
                                 costoBase: parseFloat(data["costoEquipo_" + i]) || 0, 
-                                codProducto: "", 
+                                codProducto: cod.toUpperCase(), 
                                 serieEquipo: "" 
                             }); 
                         }
@@ -3224,12 +4330,292 @@ function getEditModalData() {
             return { monday: formatLocal(monday), friday: formatLocal(friday) };
         }
 
+        /* ==========================================================================
+           INTEGRACIÓN GEMINI IA: LECTURA DE FACTURAS Y ASISTENTE POR VOZ
+           ========================================================================== */
+
+        function getGeminiApiKey() {
+            return localStorage.getItem('fix_gemini_api_key') || '';
+        }
+
+        function saveGeminiApiKey() {
+            const input = document.getElementById('geminiApiKeyInput');
+            if (!input) return;
+            const key = input.value.trim();
+            if (!key) {
+                showMessage("⚠️ Ingrese una clave válida", "fix-pending");
+                return;
+            }
+            localStorage.setItem('fix_gemini_api_key', key);
+            closeGeminiApiKeyModal();
+            showMessage("✅ API Key de Gemini guardada", "fix-report");
+        }
+
+        function openGeminiApiKeyModal() {
+            const modal = document.getElementById('geminiKeyModal');
+            const input = document.getElementById('geminiApiKeyInput');
+            if (modal) {
+                modal.classList.remove('hidden');
+                if (input) input.value = getGeminiApiKey();
+            }
+        }
+
+        function closeGeminiApiKeyModal() {
+            const modal = document.getElementById('geminiKeyModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        // --- ZONA DRAG & DROP PARA FACTURAS ---
+        function initInvoiceDropZone() {
+            const dropZone = document.getElementById('invoiceDropZone');
+            const fileInput = document.getElementById('invoiceFileInput');
+            if (!dropZone || !fileInput) return;
+
+            ['dragenter', 'dragover'].forEach(evt => {
+                dropZone.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.add('border-fix-main', 'bg-blue-100/70', 'scale-[1.01]');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(evt => {
+                dropZone.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.remove('border-fix-main', 'bg-blue-100/70', 'scale-[1.01]');
+                });
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer?.files;
+                if (files && files.length > 0) {
+                    parseInvoiceWithGemini(files[0]);
+                }
+            });
+
+            dropZone.addEventListener('click', (e) => {
+                if (e.target.closest('button')) return;
+                fileInput.click();
+            });
+        }
+
+        function handleInvoiceFileSelect(event) {
+            const files = event.target.files;
+            if (files && files.length > 0) {
+                parseInvoiceWithGemini(files[0]);
+            }
+        }
+
+        async function parseInvoiceWithGemini(file) {
+            const apiKey = getGeminiApiKey();
+            if (!apiKey) {
+                openGeminiApiKeyModal();
+                showMessage("⚠️ Ingrese su API Key de Gemini", "fix-pending");
+                return;
+            }
+
+            const dropZoneContent = document.getElementById('dropZoneContent');
+            const dropZoneLoading = document.getElementById('dropZoneLoading');
+            if (dropZoneContent) dropZoneContent.classList.add('hidden');
+            if (dropZoneLoading) {
+                dropZoneLoading.classList.remove('hidden');
+                dropZoneLoading.classList.add('flex');
+            }
+
+            try {
+                const base64Url = await convertToBase64(file);
+                const mimeType = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+                const base64Data = base64Url.split(',')[1];
+
+                const promptText = `Eres un asistente contable experto para Ecuador / Latinoamérica.
+Lee la factura adjunta (en formato PDF o imagen) y extrae con total exactitud ÚNICAMENTE los siguientes 8 datos para el registro:
+1. nombreCliente: Nombre completo o Razón Social del cliente / comprador a quien se emite la factura (ej: "JUAN CARLOS PEREZ").
+2. callePrincipal: Dirección domiciliaria o calle principal del cliente (ej: "AV. DE LAS AMÉRICAS Y ESPAÑA").
+3. cedula: Cédula de identidad, RUC o pasaporte del cliente/comprador.
+4. telefono: Teléfono celular o convencional del cliente.
+5. email: Correo electrónico del cliente.
+6. numFactura: Número completo o secuencial de la factura de compra (ej: "001-002-000123456").
+7. lugarCompra: Nombre comercial del almacén o tienda emisora de la factura. Preferiblemente elige la que coincida entre estas opciones: ${JSON.stringify(LUGARES_COMPRA)}. Si es otra, indica el nombre comercial de la tienda emisora.
+8. fechaEmision: Fecha de emisión de la factura estrictamente en formato YYYY-MM-DD (ej: "2025-06-14").
+
+Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
+{
+  "nombreCliente": "",
+  "callePrincipal": "",
+  "cedula": "",
+  "telefono": "",
+  "email": "",
+  "numFactura": "",
+  "lugarCompra": "",
+  "fechaEmision": ""
+}
+Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agregues bloques markdown ni texto extra.`;
+
+                const candidateEndpoints = [
+                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
+                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',
+                    'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent'
+                ];
+
+                let lastError = null;
+                let invoiceData = null;
+
+                for (const endpoint of candidateEndpoints) {
+                    try {
+                        const url = `${endpoint}?key=${apiKey}`;
+                        const resp = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{
+                                    parts: [
+                                        { text: promptText },
+                                        {
+                                            inlineData: {
+                                                mimeType: mimeType,
+                                                data: base64Data
+                                            }
+                                        }
+                                    ]
+                                }],
+                                generationConfig: {
+                                    responseMimeType: "application/json",
+                                    temperature: 0.1
+                                }
+                            })
+                        });
+
+                        if (resp.status === 404) {
+                            lastError = new Error("Modelo no encontrado en este endpoint (404)");
+                            continue;
+                        }
+
+                        if (!resp.ok) {
+                            const errData = await resp.text();
+                            throw new Error(`Error API (${resp.status}): ${errData}`);
+                        }
+
+                        const jsonResp = await resp.json();
+                        let resultText = jsonResp.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (!resultText) throw new Error("No se obtuvo respuesta del modelo Gemini");
+
+                        resultText = resultText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+                        invoiceData = JSON.parse(resultText);
+                        break;
+                    } catch (e) {
+                        lastError = e;
+                        if (e.message && e.message.includes('404')) {
+                            continue;
+                        }
+                        throw e;
+                    }
+                }
+
+                if (!invoiceData) {
+                    throw lastError || new Error("No se pudo procesar la factura con los modelos disponibles.");
+                }
+
+                populateInvoiceFields(invoiceData);
+                showMessage("✅ Factura procesada y datos cargados", "fix-report");
+            } catch (err) {
+                console.error("Error al procesar factura con Gemini:", err);
+                showMessage("❌ Error al procesar factura: " + (err.message ? err.message.substring(0, 45) : 'Error desconocido'), "fix-error");
+            } finally {
+                if (dropZoneContent) dropZoneContent.classList.remove('hidden');
+                if (dropZoneLoading) {
+                    dropZoneLoading.classList.add('hidden');
+                    dropZoneLoading.classList.remove('flex');
+                }
+            }
+        }
+
+        function populateInvoiceFields(data) {
+            if (!data) return;
+            const form = document.getElementById('visitForm');
+            if (!form) return;
+
+            function highlightAndSet(el, value) {
+                if (!el || !value) return;
+                el.value = value;
+                el.classList.add('gemini-field-highlight');
+                setTimeout(() => {
+                    el.classList.remove('gemini-field-highlight');
+                }, 3000);
+            }
+
+            if (data.nombreCliente) {
+                const el = form.elements['nombreCliente'] || document.querySelector('input[name="nombreCliente"]');
+                highlightAndSet(el, data.nombreCliente.toUpperCase());
+            }
+
+            if (data.callePrincipal) {
+                const el = form.elements['callePrincipal'] || document.querySelector('input[name="callePrincipal"]');
+                highlightAndSet(el, data.callePrincipal.toUpperCase());
+            }
+
+            if (data.cedula) {
+                const el = form.elements['cedula'] || document.querySelector('input[name="cedula"]');
+                highlightAndSet(el, data.cedula.trim());
+            }
+
+            if (data.telefono) {
+                const el = form.elements['telefono'] || document.querySelector('input[name="telefono"]');
+                highlightAndSet(el, data.telefono.trim());
+            }
+
+            if (data.email) {
+                const el = form.elements['email'] || document.querySelector('input[name="email"]');
+                highlightAndSet(el, data.email.toLowerCase().trim());
+            }
+
+            if (data.numFactura) {
+                const el = form.elements['numFactura'] || document.querySelector('input[name="numFactura"]');
+                highlightAndSet(el, data.numFactura.toUpperCase().trim());
+            }
+
+            if (data.fechaEmision) {
+                const el = document.getElementById('inputEmision');
+                highlightAndSet(el, data.fechaEmision.trim());
+            }
+
+            if (data.lugarCompra) {
+                const selectLugar = document.getElementById('selectLugar');
+                if (selectLugar) {
+                    const rawLugar = data.lugarCompra.toUpperCase().trim();
+                    let matched = false;
+                    for (let i = 0; i < selectLugar.options.length; i++) {
+                        const optVal = selectLugar.options[i].value.toUpperCase().trim();
+                        if (optVal && (rawLugar.includes(optVal) || optVal.includes(rawLugar))) {
+                            selectLugar.selectedIndex = i;
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if (!matched) {
+                        for (let i = 0; i < selectLugar.options.length; i++) {
+                            if (selectLugar.options[i].value === 'OTRO') {
+                                selectLugar.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                    selectLugar.classList.add('gemini-field-highlight');
+                    setTimeout(() => {
+                        selectLugar.classList.remove('gemini-field-highlight');
+                    }, 3000);
+                }
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const pad = (n) => String(n).padStart(2, '0');
             const dHoy = new Date();
             const hoyLocal = `${dHoy.getFullYear()}-${pad(dHoy.getMonth() + 1)}-${pad(dHoy.getDate())}`;
             
-            ['filterDateInput', 'filterDateInputRutero', 'maestroDateStart', 'maestroDateEnd', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd', 'garantiaMaestroStart', 'garantiaMaestroEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoyLocal; });
+            ['filterDateInput', 'filterDateInputRutero', 'maintScheduleDate', 'maintBalanceStart', 'maintBalanceEnd', 'movFecha', 'searchDateStart', 'searchDateEnd', 'garantiaMaestroStart', 'garantiaMaestroEnd'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = hoyLocal; });
             
             if(document.getElementById('cajaDateStart')) document.getElementById('cajaDateStart').value = hoyLocal;
             if(document.getElementById('cajaDateEnd')) document.getElementById('cajaDateEnd').value = hoyLocal;
@@ -3239,6 +4625,8 @@ function getEditModalData() {
             if(document.getElementById('searchDateStart')) document.getElementById('searchDateStart').value = date6MonthsLocal;
 
             startSync();
+            setCicloActualTeka();
+            renderTekaBaseTable();
 
             const p = new URLSearchParams(window.location.search); 
             const t = p.get('tech');
@@ -3264,6 +4652,7 @@ function getEditModalData() {
             if(warrantySelect) { TIPOS_EQUIPO.forEach(e => { if(e) warrantySelect.add(new Option(e, e)); }); }
 
             renderInsumosAdmin(); window.expandEquipmentUI();
+            initInvoiceDropZone();
 
             if (isFirebaseFallback) {
                 setTimeout(() => { showMessage("🔌 MODO SIN CONEXIÓN (MOCK DE RESERVA ACTIVO)", "fix-accent"); }, 1500);
@@ -3281,6 +4670,9 @@ function getEditModalData() {
         </button>
         <button onclick="changeMasterView('reporte_admin')" class="mobile-nav-btn flex flex-col items-center p-2 text-fix-main scale-105 bg-blue-50 rounded-xl shadow-sm border border-blue-100 font-bold transition-all" data-view="reporte_admin">
             <span class="text-xl leading-none">📝</span><span class="text-[9px] mt-1 font-bold">Registro</span>
+        </button>
+        <button onclick="changeMasterView('reporte_teka')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="reporte_teka">
+            <span class="text-xl leading-none">📋</span><span class="text-[9px] mt-1 font-bold">TEKA</span>
         </button>
         <button onclick="changeMasterView('mantenimiento')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="mantenimiento">
             <span class="text-xl leading-none">⚙️</span><span class="text-[9px] mt-1 font-bold">Mant.</span>
@@ -3328,13 +4720,13 @@ function getEditModalData() {
         <nav id="adminNav" class="hidden md:flex flex-wrap justify-center bg-white border border-slate-200 p-2 rounded-xl gap-1.5 mb-6 shadow-sm admin-only">
             <button onclick="changeMasterView('dashboard')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">📊</span> Resultados Totales</button>
             <button onclick="changeMasterView('reporte_admin')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-fix-main text-white shadow-sm"><span class="text-base">📝</span> Registro</button>
+            <button onclick="changeMasterView('reporte_teka')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-black text-xs transition-all bg-blue-100 text-blue-900 hover:bg-blue-200 border border-blue-300 shadow-sm" title="Reporte Mensual Oficial TEKA (Corte al Día 19)"><span class="text-base">📋</span> Reporte TEKA (Oficial)</button>
             <button onclick="changeMasterView('mantenimiento')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">⚙️</span> Mant.</button>
             <button onclick="changeMasterView('pendientes')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">⏳</span> Segui.</button>
             <button onclick="changeMasterView('garantias')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">🛡️</span> Garan.</button>
             <button onclick="changeMasterView('taller')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">🏢</span> Taller</button>
             <button onclick="changeMasterView('inventory')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">📦</span> Invent.</button>
             <button onclick="changeMasterView('rutero')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">🚚</span> Logist.</button>
-            <button onclick="changeMasterView('reporte_teka')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">📚</span> Maestro</button>
             <button onclick="changeMasterView('contabilidad')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">💰</span> Caja</button>
             <button onclick="changeMasterView('buscador')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">🔍</span> Buscador</button>
             <button onclick="changeMasterView('clientes')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">👥</span> Clientes</button>
@@ -3650,6 +5042,36 @@ function getEditModalData() {
                 <div class="glass-card p-4 rounded-3xl"><input type="date" id="filterDateInput" onchange="syncDates('filterDateInput')" class="bg-transparent w-full text-center text-2xl font-black italic text-fix-main outline-none border-none font-mono drop-shadow-sm"></div>
                 <div class="glass-card p-6 md:p-8 rounded-2xl">
                     <form id="visitForm" onsubmit="event.preventDefault();">
+                        <!-- ZONA INTELIGENTE DE ARRASTRE DE FACTURAS CON GEMINI -->
+                        <div id="invoiceDropZone" class="mb-6 p-4 rounded-2xl border-2 border-dashed border-blue-400/80 hover:border-fix-main bg-blue-50/50 hover:bg-blue-100/50 transition-all cursor-pointer text-center relative group shadow-sm">
+                            <input type="file" id="invoiceFileInput" accept="application/pdf,image/png,image/jpeg,image/webp,image/jpg" class="hidden" onchange="handleInvoiceFileSelect(event)">
+                            <div id="dropZoneContent" class="flex flex-col items-center justify-center gap-1.5 py-2">
+                                <div class="w-10 h-10 rounded-full bg-blue-600/10 text-fix-main flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                                    📄
+                                </div>
+                                <div>
+                                    <p class="text-xs font-black uppercase text-fix-main tracking-wide">
+                                        Arrastra aquí la Factura (PDF o Foto) o haz clic para subir
+                                    </p>
+                                    <p class="text-[9px] text-stone-500 font-bold uppercase mt-0.5">
+                                        Gemini IA autocompletará los datos del registro
+                                    </p>
+                                </div>
+                                <div class="flex items-center justify-center gap-2 mt-1">
+                                    <span class="text-[8px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-black uppercase">PDF</span>
+                                    <span class="text-[8px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-black uppercase">JPG / PNG</span>
+                                    <button type="button" onclick="event.stopPropagation(); openGeminiApiKeyModal();" class="text-[9px] text-stone-500 hover:text-fix-main underline font-black ml-2" title="Configurar clave API de Gemini">
+                                        🔑 Configurar API Key
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="dropZoneLoading" class="hidden py-4 flex-col items-center justify-center gap-2">
+                                <div class="animate-spin rounded-full h-7 w-7 border-4 border-fix-main border-t-transparent"></div>
+                                <p class="text-xs font-black uppercase text-fix-main animate-pulse">Analizando factura con Gemini...</p>
+                                <p class="text-[9px] text-stone-500 font-bold">Extrayendo datos de cliente y emisión</p>
+                            </div>
+                        </div>
+
                         <div class="glass-panel p-6 grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 border border-white/70">
                             <input type="text" name="nombreCliente" placeholder="CLIENTE*" required class="p-4 glass-input rounded-xl font-black uppercase text-xs text-stone-800">
                             <input type="text" name="callePrincipal" placeholder="CALLE*" required class="p-4 bg-amber-50/70 backdrop-blur-md border border-white rounded-xl font-black uppercase text-xs shadow-sm text-stone-800">
@@ -3841,32 +5263,345 @@ function getEditModalData() {
                 </div>
             </div>
 
-            <div id="reporteTekaView" class="hidden lg:col-span-3 glass-card p-6 md:p-8 rounded-2xl font-black uppercase admin-only">
-                <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
-                    <div>
-                        <h2 class="text-lg font-black uppercase italic font-sans underline text-fix-main tracking-tighter">Maestro Consolidado SAP</h2>
-                        <div class="flex gap-2 mt-4 font-black">
-                            <input type="date" id="maestroDateStart" class="glass-input p-2.5 rounded-xl text-[10px] outline-none border font-black text-stone-800">
-                            <input type="date" id="maestroDateEnd" class="glass-input p-2.5 rounded-xl text-[10px] outline-none border font-black text-stone-800">
-                            <button onclick="renderReporteTeka()" class="glass-card bg-fix-main/90 border-white/60 text-white px-5 rounded-xl text-[10px] shadow-md hover:scale-105 transition-transform">FILTRAR</button>
+            <!-- VISTA DEDICADA: REPORTE MENSUAL OFICIAL TEKA -->
+            <div id="reporteTekaView" class="hidden lg:col-span-3 space-y-6 admin-only">
+                <div class="glass-card p-6 md:p-8 rounded-3xl font-black uppercase shadow-xl border border-white/90">
+                    
+                    <!-- Header Principal -->
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 pb-6 border-b border-stone-200">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-blue-900 text-white text-[10px] px-2.5 py-1 rounded-lg font-black tracking-wider">TEKA ECUADOR S.A.</span>
+                                <span class="text-xs text-stone-500 font-bold">RUC: 1791883144001 • CRISTIAN CAPELO</span>
+                            </div>
+                            <h2 class="text-xl md:text-2xl font-black uppercase italic text-fix-main mt-1.5 tracking-tight flex items-center gap-2">
+                                📊 Reporte Mensual de Servicios (Corte Día 19)
+                            </h2>
+                            <p class="text-[10px] text-stone-500 font-normal normal-case mt-0.5">
+                                Consulta diaria de avance por 7 pestañas ordenadas y exportación oficial en formato Excel (Tipografía Calibri 14).
+                            </p>
+                        </div>
+
+                        <!-- Botones de Descarga Excel Oficial -->
+                        <div class="flex flex-wrap gap-2.5 items-center">
+                            <button onclick="exportarFormatoOficialTeka()" class="glass-card bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3.5 rounded-2xl font-black text-xs uppercase shadow-lg shadow-emerald-900/20 active:scale-95 transition-all flex items-center gap-2.5 border border-emerald-400">
+                                <span class="text-xl">📥</span>
+                                <div class="text-left">
+                                    <span class="block text-xs font-black">EXCEL COMPLETO (7 PESTAÑAS)</span>
+                                    <span class="block text-[8px] font-normal opacity-90">Calibri 14 • Formato Oficial Teka</span>
+                                </div>
+                            </button>
+                            <button onclick="exportarSoloConsolidadoTeka()" class="glass-card bg-blue-700 hover:bg-blue-800 text-white px-5 py-3.5 rounded-2xl font-black text-xs uppercase shadow-lg shadow-blue-900/20 active:scale-95 transition-all flex items-center gap-2.5 border border-blue-400">
+                                <span class="text-xl">📋</span>
+                                <div class="text-left">
+                                    <span class="block text-xs font-black">SOLO CONSOLIDADO (.XLSX)</span>
+                                    <span class="block text-[8px] font-normal opacity-90">Calibri 14 • Visitas del Mes</span>
+                                </div>
+                            </button>
                         </div>
                     </div>
-                    <button onclick="downloadCSV()" class="glass-card bg-emerald-700/90 border-white/60 text-white px-6 py-3.5 rounded-xl font-black text-[10px] uppercase shadow-md italic active:scale-95 transition-all hover:scale-105">📊 EXCEL SAP</button>
-                </div>
-                <div class="overflow-x-auto rounded-[1.5rem] border border-white/80 mb-8 shadow-sm bg-white/30 backdrop-blur-md">
-                    <table class="w-full border-collapse admin-table">
-                        <thead><tr><th>NRO</th><th>EMISION</th><th>LUGAR</th><th>FACTURA</th><th>CODIGO</th><th>DESCRIPCION</th><th>SERIE</th><th>SAP</th><th>TECNICO</th><th>CIUDAD</th><th>ATENCION</th><th>CLIENTE</th><th>CALLE</th><th>TELEFONO</th><th>PRECIO</th><th>LLEGADA INFO</th><th>ATENDIO</th><th>VIATICO</th><th>FAC REP</th><th>CEDULA</th><th>CORREO</th><th>X</th></tr></thead>
-                        <tbody id="tekaReporteBody" class="uppercase font-bold text-[8px] text-stone-800"></tbody>
-                    </table>
-                </div>
-                <div class="flex justify-end no-print">
-                    <div class="glass-card bg-stone-900/90 border-white/20 text-white p-6 md:p-8 rounded-[2rem] inline-block min-w-[300px] shadow-2xl">
-                        <p class="text-[10px] text-fix-report uppercase tracking-widest font-black italic mb-3 underline">Resumen Financiero (M.O.):</p>
-                        <div class="flex justify-between items-end mb-2">
-                            <span class="text-xs text-stone-300">TOTAL SAP:</span>
-                            <span id="tekaSummaryTotal" class="text-4xl font-mono font-black text-white drop-shadow-md">$0.00</span>
+
+                    <!-- Barra de Filtro de Ciclo (Corte 19) -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 bg-stone-50/80 p-4 rounded-2xl border border-stone-200 mt-4">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <span class="text-[10px] font-black text-stone-600">CICLO DE CORTE:</span>
+                            <input type="date" id="maestroDateStart" class="glass-input p-2.5 rounded-xl text-xs font-mono font-bold text-stone-800 outline-none border border-stone-300">
+                            <span class="text-xs text-stone-400 font-bold">hasta</span>
+                            <input type="date" id="maestroDateEnd" class="glass-input p-2.5 rounded-xl text-xs font-mono font-bold text-stone-800 outline-none border border-stone-300">
+                            <button onclick="renderReporteTeka()" class="bg-fix-main hover:bg-blue-900 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-md transition-all">
+                                🔍 Filtrar
+                            </button>
+                            <button onclick="setCicloActualTeka()" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-2.5 rounded-xl text-[10px] font-black border border-amber-300 transition-all">
+                                🔄 Ciclo Actual (Corte 19)
+                            </button>
+                            <button onclick="setCicloMesAnteriorTeka()" class="bg-stone-200 hover:bg-stone-300 text-stone-800 px-3 py-2.5 rounded-xl text-[10px] font-black transition-all">
+                                ⏪ Mes Anterior
+                            </button>
+                        </div>
+                        <div id="tekaCycleIndicator" class="text-xs font-black text-fix-main bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200">
+                            Periodo: AL DÍA 19
                         </div>
                     </div>
+
+                    <!-- Tarjetas de Resumen KPI (7 Tarjetas) -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mt-5 text-center">
+                        <div class="p-4 rounded-2xl bg-blue-50/80 border border-blue-200">
+                            <span class="text-[8px] text-stone-500 font-black block">CONSOLIDADO</span>
+                            <span id="kpiTekaConsolidado" class="text-2xl font-mono font-black text-fix-main">0</span>
+                            <span class="text-[8px] text-stone-400 block mt-0.5">Visitas Totales</span>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-amber-50/80 border border-amber-200">
+                            <span class="text-[8px] text-stone-500 font-black block">PROMOCIÓN</span>
+                            <span id="kpiTekaPromocion" class="text-2xl font-mono font-black text-amber-800">0</span>
+                            <span class="text-[8px] text-stone-400 block mt-0.5">Suma Equipos</span>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-orange-50/80 border border-orange-200">
+                            <span class="text-[8px] text-stone-500 font-black block">BBQ / PARRILLAS</span>
+                            <span id="kpiTekaBBQ" class="text-2xl font-mono font-black text-orange-700">0</span>
+                            <span class="text-[8px] text-stone-400 block mt-0.5">Barbacoas ($29)</span>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-purple-50/80 border border-purple-200">
+                            <span class="text-[8px] text-stone-500 font-black block">GARANTÍAS</span>
+                            <span id="kpiTekaGarantias" class="text-2xl font-mono font-black text-purple-700">0</span>
+                            <span class="text-[8px] text-stone-400 block mt-0.5">De Fábrica</span>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200">
+                            <span class="text-[8px] text-stone-500 font-black block">UN PRODUCTO</span>
+                            <span id="kpiTekaUnProducto" class="text-2xl font-mono font-black text-emerald-700">0</span>
+                            <span class="text-[8px] text-stone-400 block mt-0.5">Individuales</span>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-teal-50/80 border border-teal-200">
+                            <span class="text-[8px] text-stone-500 font-black block">ALMACÉN</span>
+                            <span id="kpiTekaAlmacen" class="text-2xl font-mono font-black text-teal-700">0</span>
+                            <span class="text-[8px] text-stone-400 block mt-0.5">Exhibición ($15)</span>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-stone-900 text-white border border-stone-800 shadow-md col-span-2 md:col-span-1">
+                            <span class="text-[8px] text-stone-300 font-black block">M.O. LIQUIDACIÓN</span>
+                            <span id="kpiTekaGranTotal" class="text-2xl font-mono font-black text-emerald-400">$0.00</span>
+                            <span class="text-[8px] text-stone-400 block mt-0.5">Total Liquidable</span>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Pestañas (Sub-Tabs) en Orden Oficial Exacto -->
+                    <div class="flex flex-wrap gap-2 mt-6 border-b border-stone-300 pb-2">
+                        <button onclick="switchTekaTab('garantias')" id="tabBtn_garantias" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-fix-main text-white shadow-sm transition-all flex items-center gap-1.5">
+                            <span>🛡️</span> 1. GARANTÍAS (<span id="badge_garantias">0</span>)
+                        </button>
+                        <button onclick="switchTekaTab('promocion')" id="tabBtn_promocion" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5">
+                            <span>⭐</span> 2. PROMOCIÓN (<span id="badge_promocion">0</span>)
+                        </button>
+                        <button onclick="switchTekaTab('bbq')" id="tabBtn_bbq" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5">
+                            <span>🔥</span> 3. BBQ (<span id="badge_bbq">0</span>)
+                        </button>
+                        <button onclick="switchTekaTab('base')" id="tabBtn_base" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5">
+                            <span>📚</span> 4. BASE (905 ARTÍCULOS)
+                        </button>
+                        <button onclick="switchTekaTab('consolidado')" id="tabBtn_consolidado" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5">
+                            <span>📋</span> 5. CONSOLIDADO (<span id="badge_consolidado">0</span>)
+                        </button>
+                        <button onclick="switchTekaTab('unproducto')" id="tabBtn_unproducto" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5">
+                            <span>🔹</span> 6. UN PRODUCTO (<span id="badge_unproducto">0</span>)
+                        </button>
+                        <button onclick="switchTekaTab('almacen')" id="tabBtn_almacen" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5">
+                            <span>🏬</span> 7. ALMACÉN (<span id="badge_almacen">0</span>)
+                        </button>
+                    </div>
+
+                    <!-- Contenedor Pestaña 1: GARANTIAS -->
+                    <div id="tekaTab_garantias" class="teka-tab-content mt-4">
+                        <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
+                            <table class="w-full border-collapse admin-table font-sans">
+                                <thead>
+                                    <tr class="bg-purple-900 text-white text-[9px] font-black text-center">
+                                        <th class="p-3 w-10 text-center">#</th>
+                                        <th class="p-3">FECHA COMPRA</th>
+                                        <th class="p-3">FECHA INTERVENCIÓN</th>
+                                        <th class="p-3">CANT.</th>
+                                        <th class="p-3">CÓD. REPUESTO</th>
+                                        <th class="p-3">DESC. REPUESTO</th>
+                                        <th class="p-3">CÓD. PRODUCTO</th>
+                                        <th class="p-3">DESC. PRODUCTO</th>
+                                        <th class="p-3">SERIE</th>
+                                        <th class="p-3">GARANTÍA</th>
+                                        <th class="p-3">TÉCNICO</th>
+                                        <th class="p-3">CLIENTE</th>
+                                        <th class="p-3">OBSERVACIÓN / FALLA</th>
+                                        <th class="p-3">VALOR ($)</th>
+                                        <th class="p-3">CÉDULA</th>
+                                        <th class="p-3">CORREO</th>
+                                        <th class="p-3">TELÉFONO</th>
+                                        <th class="p-3">FACTURA COMPRA</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tekaTableBody_garantias" class="text-[9px] font-semibold text-stone-800 uppercase"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor Pestaña 2: PROMOCION -->
+                    <div id="tekaTab_promocion" class="teka-tab-content mt-4 hidden">
+                        <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
+                            <table class="w-full border-collapse admin-table font-sans">
+                                <thead>
+                                    <tr class="bg-amber-800 text-white text-[9px] font-black text-center">
+                                        <th class="p-3 w-10 text-center">#</th>
+                                        <th class="p-3">FECHA COMPRA</th>
+                                        <th class="p-3">LUGAR COMPRA</th>
+                                        <th class="p-3">FACTURA COMPRA</th>
+                                        <th class="p-3">CÓDIGO PRODUCTO</th>
+                                        <th class="p-3">DESCRIPCIÓN PRODUCTO</th>
+                                        <th class="p-3">SERIE</th>
+                                        <th class="p-3">GARANTÍA</th>
+                                        <th class="p-3">TÉCNICO</th>
+                                        <th class="p-3">CIUDAD</th>
+                                        <th class="p-3">FECHA INSTALACIÓN</th>
+                                        <th class="p-3">CLIENTE</th>
+                                        <th class="p-3">DIRECCIÓN</th>
+                                        <th class="p-3">CELULAR</th>
+                                        <th class="p-3">PRECIO ($)</th>
+                                        <th class="p-3">ATENDIÓ</th>
+                                        <th class="p-3">FACTURA</th>
+                                        <th class="p-3">CÉDULA/RUC</th>
+                                        <th class="p-3">CORREO</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tekaTableBody_promocion" class="text-[9px] font-semibold text-stone-800 uppercase"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor Pestaña 3: BBQ -->
+                    <div id="tekaTab_bbq" class="teka-tab-content mt-4 hidden">
+                        <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
+                            <table class="w-full border-collapse admin-table font-sans">
+                                <thead>
+                                    <tr class="bg-orange-800 text-white text-[9px] font-black text-center">
+                                        <th class="p-3 w-10 text-center">#</th>
+                                        <th class="p-3">FECHA COMPRA</th>
+                                        <th class="p-3">LUGAR COMPRA</th>
+                                        <th class="p-3">FACTURA COMPRA</th>
+                                        <th class="p-3">CÓDIGO PRODUCTO</th>
+                                        <th class="p-3">DESCRIPCIÓN PRODUCTO</th>
+                                        <th class="p-3">SERIE</th>
+                                        <th class="p-3">GARANTÍA</th>
+                                        <th class="p-3">TÉCNICO</th>
+                                        <th class="p-3">CIUDAD</th>
+                                        <th class="p-3">FECHA INSTALACIÓN</th>
+                                        <th class="p-3">CLIENTE</th>
+                                        <th class="p-3">DIRECCIÓN</th>
+                                        <th class="p-3">CELULAR</th>
+                                        <th class="p-3">PRECIO ($)</th>
+                                        <th class="p-3">ATENDIÓ</th>
+                                        <th class="p-3">FACTURA</th>
+                                        <th class="p-3">CÉDULA/RUC</th>
+                                        <th class="p-3">CORREO</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tekaTableBody_bbq" class="text-[9px] font-semibold text-stone-800 uppercase"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor Pestaña 4: BASE (Catálogo 905 productos) -->
+                    <div id="tekaTab_base" class="teka-tab-content mt-4 hidden">
+                        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 mb-4 flex flex-col md:flex-row justify-between items-center gap-3">
+                            <div class="flex-1 w-full">
+                                <input type="text" id="searchTekaBaseInput" oninput="renderTekaBaseTable()" placeholder="Buscar por código (ej: 915061) o por nombre (ej: FREGADERO, HORNO)..." class="w-full p-3.5 glass-input bg-white rounded-xl text-xs font-bold text-stone-800 outline-none border border-stone-300 shadow-inner">
+                            </div>
+                            <span id="tekaBaseCountDisplay" class="text-xs font-black text-fix-main whitespace-nowrap bg-white px-3 py-2 rounded-xl border border-stone-200 shadow-sm">
+                                905 productos cargados
+                            </span>
+                        </div>
+                        <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/80 max-h-[500px]">
+                            <table class="w-full border-collapse admin-table font-sans">
+                                <thead class="sticky top-0 bg-stone-800 text-white text-[10px] font-black">
+                                    <tr>
+                                        <th class="p-3 w-40 text-center">CÓDIGO ARTÍCULO</th>
+                                        <th class="p-3 text-left">DESCRIPCIÓN OFICIAL PRODUCTO</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tekaTableBody_base" class="text-[10px] font-bold text-stone-800 uppercase font-mono"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor Pestaña 5: CONSOLIDADO -->
+                    <div id="tekaTab_consolidado" class="teka-tab-content mt-4 hidden">
+                        <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
+                            <table class="w-full border-collapse admin-table font-sans">
+                                <thead>
+                                    <tr class="bg-blue-900 text-white text-[9px] font-black text-center">
+                                        <th class="p-3 w-10 text-center">#</th>
+                                        <th class="p-3">FECHA COMPRA</th>
+                                        <th class="p-3">NOMBRE CLIENTE</th>
+                                        <th class="p-3">DIRECCIÓN</th>
+                                        <th class="p-3">TELÉFONO</th>
+                                        <th class="p-3">ASUNTO</th>
+                                        <th class="p-3">CÓDIGO BASE</th>
+                                        <th class="p-3">DESCRIPCIÓN</th>
+                                        <th class="p-3">ESTADO</th>
+                                        <th class="p-3">LUGAR COMPRA</th>
+                                        <th class="p-3">FECHA VISITA</th>
+                                        <th class="p-3">TÉCNICO</th>
+                                        <th class="p-3">ADHESIVO</th>
+                                        <th class="p-3">GARANTÍA</th>
+                                        <th class="p-3">SERIE</th>
+                                        <th class="p-3">VR. ($)</th>
+                                        <th class="p-3">FECHA LLAMADA</th>
+                                        <th class="p-3">CORREO</th>
+                                        <th class="p-3">CÉDULA</th>
+                                        <th class="p-3">OBSERVACIONES</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tekaTableBody_consolidado" class="text-[9px] font-semibold text-stone-800 uppercase"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor Pestaña 6: UN PRODUCTO -->
+                    <div id="tekaTab_unproducto" class="teka-tab-content mt-4 hidden">
+                        <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
+                            <table class="w-full border-collapse admin-table font-sans">
+                                <thead>
+                                    <tr class="bg-emerald-800 text-white text-[9px] font-black text-center">
+                                        <th class="p-3 w-10 text-center">#</th>
+                                        <th class="p-3">FECHA COMPRA</th>
+                                        <th class="p-3">LUGAR COMPRA</th>
+                                        <th class="p-3">FACTURA COMPRA</th>
+                                        <th class="p-3">CÓDIGO PRODUCTO</th>
+                                        <th class="p-3">DESCRIPCIÓN PRODUCTO</th>
+                                        <th class="p-3">SERIE</th>
+                                        <th class="p-3">GARANTÍA</th>
+                                        <th class="p-3">TÉCNICO</th>
+                                        <th class="p-3">CIUDAD</th>
+                                        <th class="p-3">FECHA INSTALACIÓN</th>
+                                        <th class="p-3">CLIENTE</th>
+                                        <th class="p-3">DIRECCIÓN</th>
+                                        <th class="p-3">CELULAR</th>
+                                        <th class="p-3">PRECIO ($)</th>
+                                        <th class="p-3">ATENDIÓ</th>
+                                        <th class="p-3">FACTURA</th>
+                                        <th class="p-3">CÉDULA/RUC</th>
+                                        <th class="p-3">CORREO</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tekaTableBody_unproducto" class="text-[9px] font-semibold text-stone-800 uppercase"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor Pestaña 7: ALMACEN -->
+                    <div id="tekaTab_almacen" class="teka-tab-content mt-4 hidden">
+                        <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
+                            <table class="w-full border-collapse admin-table font-sans">
+                                <thead>
+                                    <tr class="bg-teal-800 text-white text-[9px] font-black text-center">
+                                        <th class="p-3 w-10 text-center">#</th>
+                                        <th class="p-3">FECHA COMPRA</th>
+                                        <th class="p-3">LUGAR COMPRA</th>
+                                        <th class="p-3">FACTURA COMPRA</th>
+                                        <th class="p-3">CÓDIGO PRODUCTO</th>
+                                        <th class="p-3">DESCRIPCIÓN PRODUCTO</th>
+                                        <th class="p-3">SERIE</th>
+                                        <th class="p-3">GARANTÍA</th>
+                                        <th class="p-3">TÉCNICO</th>
+                                        <th class="p-3">CIUDAD</th>
+                                        <th class="p-3">FECHA INSTALACIÓN</th>
+                                        <th class="p-3">CLIENTE</th>
+                                        <th class="p-3">DIRECCIÓN</th>
+                                        <th class="p-3">CELULAR</th>
+                                        <th class="p-3">PRECIO ($)</th>
+                                        <th class="p-3">ATENDIÓ</th>
+                                        <th class="p-3">FACTURA</th>
+                                        <th class="p-3">CÉDULA/RUC</th>
+                                        <th class="p-3">CORREO</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tekaTableBody_almacen" class="text-[9px] font-semibold text-stone-800 uppercase"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
@@ -4012,6 +5747,33 @@ function getEditModalData() {
                 <button onclick="saveFinanceAdjustment()" class="glass-card bg-emerald-700/90 border-white/60 text-white py-4 rounded-xl font-black active:scale-95 transition-all uppercase shadow-lg">💾 AJUSTAR</button>
                 <button onclick="closeEditFinanceModal()" class="glass-input bg-white/70 border-white/80 text-stone-600 py-4 rounded-xl font-black uppercase active:scale-95 shadow-sm">SALIR</button>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL CONFIGURACIÓN API KEY DE GEMINI -->
+    <div id="geminiKeyModal" class="hidden fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[100000] flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-md rounded-2xl shadow-2xl p-6 font-black uppercase text-stone-800 border border-white/90">
+            <div class="flex justify-between items-center mb-4 border-b border-stone-300/60 pb-3">
+                <h3 class="text-sm font-black text-fix-main flex items-center gap-2">
+                    🔑 API Key de Google Gemini
+                </h3>
+                <button onclick="closeGeminiApiKeyModal()" class="text-stone-400 hover:text-stone-800 text-lg">✕</button>
+            </div>
+            <p class="text-[10px] text-stone-600 mb-3 font-normal normal-case">
+                Ingresa tu clave de API de Google Gemini para habilitar la lectura automática de facturas. Quedará guardada de forma segura en este navegador.
+            </p>
+            <input type="password" id="geminiApiKeyInput" placeholder="AIzaSy..." class="w-full p-3 glass-input bg-white/90 rounded-xl text-xs font-mono text-stone-800 outline-none border border-stone-300 shadow-inner mb-4">
+            <div class="flex gap-2">
+                <button onclick="saveGeminiApiKey()" class="flex-1 bg-fix-main hover:bg-blue-900 text-white py-3 rounded-xl text-xs font-black uppercase transition-all shadow-md">
+                    💾 Guardar Clave
+                </button>
+                <button onclick="closeGeminiApiKeyModal()" class="px-4 glass-input bg-white/70 text-stone-600 rounded-xl text-xs font-black uppercase">
+                    Cancelar
+                </button>
+            </div>
+            <p class="text-[8px] text-stone-400 mt-3 text-center normal-case">
+                Puedes obtener tu clave gratuita en <a href="https://aistudio.google.com/" target="_blank" class="underline text-fix-main font-bold">aistudio.google.com</a>
+            </p>
         </div>
     </div>
 
