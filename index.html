@@ -4460,15 +4460,28 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                     });
                     if (listResp.ok) {
                         const listData = await listResp.json();
-                        const models = (listData.models || []).filter(m => 
-                            m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent')
-                        );
-                        // Priorizar modelos veloces y eficientes (flash)
-                        const flashModels = models.filter(m => m.name && m.name.toLowerCase().includes('flash'));
-                        const otherModels = models.filter(m => !m.name || !m.name.toLowerCase().includes('flash'));
-                        const sortedModels = [...flashModels, ...otherModels];
+                        // Palabras clave de modelos que NO soportan visión / lectura de facturas
+                        const nonVisionKeywords = ['tts', 'audio', 'speech', 'embed', 'imagen', 'live', 'realtime', 'voice'];
+                        const validModels = (listData.models || []).filter(m => {
+                            if (!m.supportedGenerationMethods || !m.supportedGenerationMethods.includes('generateContent')) return false;
+                            const name = (m.name || '').toLowerCase();
+                            return !nonVisionKeywords.some(kw => name.includes(kw));
+                        });
 
-                        candidateEndpoints = sortedModels.map(m => `https://generativelanguage.googleapis.com/v1beta/${m.name}:generateContent`);
+                        // Priorizar modelos Flash visuales estándar (2.5-flash, 2.0-flash, 3.8-flash, etc.)
+                        function scoreModel(name) {
+                            const n = (name || '').toLowerCase();
+                            if (n.includes('gemini-2.5-flash') && !n.includes('lite') && !n.includes('preview')) return 100;
+                            if (n.includes('gemini-2.0-flash') && !n.includes('lite')) return 90;
+                            if (n.includes('gemini-3.8-flash')) return 85;
+                            if (n.includes('gemini-3.5-flash')) return 80;
+                            if (n.includes('flash')) return 70;
+                            if (n.includes('pro')) return 60;
+                            return 10;
+                        }
+                        validModels.sort((a, b) => scoreModel(b.name) - scoreModel(a.name));
+
+                        candidateEndpoints = validModels.map(m => `https://generativelanguage.googleapis.com/v1beta/${m.name}:generateContent`);
                     } else if (listResp.status === 400 || listResp.status === 403) {
                         const errJson = await listResp.json().catch(() => null);
                         const msg = errJson?.error?.message || `Clave API no autorizada (${listResp.status})`;
@@ -4481,7 +4494,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                     console.warn("No se pudo listar modelos dinámicamente, usando lista por defecto:", discoveryErr);
                 }
 
-                // Si no se obtuvieron dinámicamente, usar los modelos modernos activos de Gemini
+                // Si no se obtuvieron dinámicamente, usar los modelos visuales estándar de Gemini
                 if (candidateEndpoints.length === 0) {
                     candidateEndpoints = [
                         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
@@ -4489,8 +4502,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent',
                         'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
                         'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
-                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent',
-                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent'
+                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent'
                     ];
                 }
 
@@ -4526,7 +4538,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         });
 
                         if (resp.status === 404) {
-                            lastError = new Error("Modelo no encontrado en este endpoint (404)");
+                            lastError = new Error("Modelo no encontrado (404)");
                             continue;
                         }
 
@@ -4542,9 +4554,12 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                 if (errText) detailedMsg = errText.substring(0, 80);
                             }
                             lastError = new Error(detailedMsg);
-                            if (resp.status === 400 || resp.status === 403) {
+                            // Solo interrumpir si la clave es inválida
+                            const isFatalAuth = detailedMsg.includes('API_KEY_INVALID') || detailedMsg.includes('API key not valid');
+                            if (isFatalAuth) {
                                 throw lastError;
                             }
+                            // Si el modelo da error de modalidad u otro 400, continuar con el siguiente candidato
                             continue;
                         }
 
@@ -4557,7 +4572,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         break;
                     } catch (e) {
                         lastError = e;
-                        if (e.message && (e.message.includes('404') || e.message.includes('not found'))) {
+                        if (e.message && (e.message.includes('404') || e.message.includes('not found') || e.message.includes('modality') || e.message.includes('not enabled'))) {
                             continue;
                         }
                         throw e;
