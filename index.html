@@ -4452,13 +4452,47 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
 }
 Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agregues bloques markdown ni texto extra.`;
 
-                const candidateEndpoints = [
-                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
-                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
-                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',
-                    'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent'
-                ];
+                // Descubrimiento dinámico de modelos activos con la API Key del usuario
+                let candidateEndpoints = [];
+                try {
+                    const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+                        headers: { 'x-goog-api-key': apiKey }
+                    });
+                    if (listResp.ok) {
+                        const listData = await listResp.json();
+                        const models = (listData.models || []).filter(m => 
+                            m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent')
+                        );
+                        // Priorizar modelos veloces y eficientes (flash)
+                        const flashModels = models.filter(m => m.name && m.name.toLowerCase().includes('flash'));
+                        const otherModels = models.filter(m => !m.name || !m.name.toLowerCase().includes('flash'));
+                        const sortedModels = [...flashModels, ...otherModels];
+
+                        candidateEndpoints = sortedModels.map(m => `https://generativelanguage.googleapis.com/v1beta/${m.name}:generateContent`);
+                    } else if (listResp.status === 400 || listResp.status === 403) {
+                        const errJson = await listResp.json().catch(() => null);
+                        const msg = errJson?.error?.message || `Clave API no autorizada (${listResp.status})`;
+                        throw new Error(msg);
+                    }
+                } catch (discoveryErr) {
+                    if (discoveryErr.message && (discoveryErr.message.includes('API key') || discoveryErr.message.includes('API_KEY'))) {
+                        throw discoveryErr;
+                    }
+                    console.warn("No se pudo listar modelos dinámicamente, usando lista por defecto:", discoveryErr);
+                }
+
+                // Si no se obtuvieron dinámicamente, usar los modelos modernos activos de Gemini
+                if (candidateEndpoints.length === 0) {
+                    candidateEndpoints = [
+                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent',
+                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
+                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
+                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent',
+                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent'
+                    ];
+                }
 
                 let lastError = null;
                 let invoiceData = null;
@@ -4468,7 +4502,10 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         const url = `${endpoint}?key=${apiKey}`;
                         const resp = await fetch(url, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'x-goog-api-key': apiKey
+                            },
                             body: JSON.stringify({
                                 contents: [{
                                     parts: [
@@ -4494,8 +4531,21 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         }
 
                         if (!resp.ok) {
-                            const errData = await resp.text();
-                            throw new Error(`Error API (${resp.status}): ${errData}`);
+                            const errText = await resp.text().catch(() => '');
+                            let detailedMsg = `Error API (${resp.status})`;
+                            try {
+                                const parsed = JSON.parse(errText);
+                                if (parsed.error && parsed.error.message) {
+                                    detailedMsg = parsed.error.message;
+                                }
+                            } catch (_) {
+                                if (errText) detailedMsg = errText.substring(0, 80);
+                            }
+                            lastError = new Error(detailedMsg);
+                            if (resp.status === 400 || resp.status === 403) {
+                                throw lastError;
+                            }
+                            continue;
                         }
 
                         const jsonResp = await resp.json();
@@ -4507,7 +4557,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         break;
                     } catch (e) {
                         lastError = e;
-                        if (e.message && e.message.includes('404')) {
+                        if (e.message && (e.message.includes('404') || e.message.includes('not found'))) {
                             continue;
                         }
                         throw e;
@@ -4522,7 +4572,8 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                 showMessage("✅ Factura procesada y datos cargados", "fix-report");
             } catch (err) {
                 console.error("Error al procesar factura con Gemini:", err);
-                showMessage("❌ Error al procesar factura: " + (err.message ? err.message.substring(0, 45) : 'Error desconocido'), "fix-error");
+                const userMsg = err.message ? err.message.substring(0, 90) : 'Error desconocido';
+                showMessage("❌ " + userMsg, "fix-error");
             } finally {
                 if (dropZoneContent) dropZoneContent.classList.remove('hidden');
                 if (dropZoneLoading) {
