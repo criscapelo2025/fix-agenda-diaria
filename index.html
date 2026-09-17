@@ -339,6 +339,209 @@
         
         const COSTOS_EQUIPO = { "Horno Eléctrico": 25.00, "Horno a Gas": 29.00, "Cocina Inducción": 25.00, "Cocina a Gas": 29.00, "Cocina Mixta": 29.00, "Microondas": 25.00, "Microcampana": 39.00, "Campana Tradicional": 15.00, "Campana Decorativa": 36.00, "Campana Isla": 45.00, "Refrigerador": 30.00, "Triturador": 15.00, "Grifería": 13.00, "Fregadero": 13.00, "Lavavajillas": 25.00, "Cafetera": 25.00, "PARRILLA BBQ": 29.00, "Vinera": 25.00, "Lavadora": 25.00, "Secadora": 25.00, "Batidora": 15.00, "Calefón": 25.00, "Otros": 25.00 };
 
+        // Tarifas fijas oficiales para Garantías concluidas con éxito (Reportes TEKA / Maestro de Garantías)
+        const COSTOS_GARANTIA = {
+            "Cocina Inducción": 12.50,
+            "Cocina a Gas": 12.50,
+            "Cocina Mixta": 12.50,
+            "Horno Eléctrico": 15.00,
+            "Horno a Gas": 18.75,
+            "Microondas": 15.00,
+            "Vinera": 15.00,
+            "Campana Tradicional": 12.50,
+            "Campana Decorativa": 12.50,
+            "Campana Isla": 15.00,
+            "Refrigerador": 18.75,
+            "Lavavajillas": 15.00,
+            "Cafetera": 15.00,
+            "Microcampana": 15.00,
+            "Triturador": 12.50,
+            "PARRILLA BBQ": 15.00,
+            "BBQ": 15.00,
+            "Grifería": 12.50,
+            "Fregadero": 12.50,
+            "Lavadora": 15.00,
+            "Secadora": 15.00,
+            "Batidora": 12.50,
+            "Calefón": 15.00,
+            "Otros": 15.00
+        };
+
+        function getGarantiaCost(eqOrDesc) {
+            let name = '';
+            let manual = '';
+            let cod = '';
+            let existingCost = 0;
+
+            if (typeof eqOrDesc === 'string') {
+                name = eqOrDesc;
+            } else if (eqOrDesc && typeof eqOrDesc === 'object') {
+                name = eqOrDesc.descProducto || '';
+                manual = eqOrDesc.manualName || '';
+                cod = eqOrDesc.codProducto || '';
+                existingCost = parseFloat(eqOrDesc.costoBase) || 0;
+            }
+
+            if ((!name || name.trim() === '') && cod && window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) {
+                name = window.CATALOGO_TEKA_BASE[cod];
+            }
+
+            const rawText = (name + ' ' + manual + ' ' + (window.CATALOGO_TEKA_BASE && cod ? (window.CATALOGO_TEKA_BASE[cod] || '') : '')).trim();
+            const text = rawText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
+            // 1. Hornos
+            if (text.includes("HORNO A GAS") || text.includes("HORNO GAS")) return 18.75;
+            if (text.includes("HORNO ELECTRICO") || text.includes("HORNO")) return 15.00;
+
+            // 2. Campanas & Microcampana
+            if (text.includes("MICROCAMPANA")) return 15.00;
+            if (text.includes("CAMPANA ISLA") || (text.includes("CAMPANA") && text.includes("ISLA"))) return 15.00;
+            if (text.includes("CAMPANA TRADICIONAL")) return 12.50;
+            if (text.includes("CAMPANA DECORATIVA")) return 12.50;
+            if (text.includes("CAMPANA")) return 12.50;
+
+            // 3. Cocinas
+            if (text.includes("COCINA INDUCCION") || text.includes("INDUCCION")) return 12.50;
+            if (text.includes("COCINA A GAS") || text.includes("COCINA GAS")) return 12.50;
+            if (text.includes("COCINA MIXTA") || text.includes("MIXTA")) return 12.50;
+            if (text.includes("COCINA") || text.includes("ENCIMERA") || text.includes("PLACA")) return 12.50;
+
+            // 4. Refrigeración & Vineras
+            if (text.includes("REFRIGERADOR") || text.includes("NEVERA") || text.includes("FRIGORIFICO")) return 18.75;
+            if (text.includes("VINERA") || text.includes("CAVA")) return 15.00;
+
+            // 5. Otros electrodomésticos
+            if (text.includes("MICROONDAS")) return 15.00;
+            if (text.includes("LAVAVAJILLAS") || text.includes("LAVAVAJILLA")) return 15.00;
+            if (text.includes("CAFETERA")) return 15.00;
+            if (text.includes("TRITURADOR")) return 12.50;
+            if (text.includes("BBQ") || text.includes("BARBACOA") || text.includes("PARRILLA")) return 15.00;
+
+            // 6. Sanitarios y lavado
+            if (text.includes("GRIFERIA") || text.includes("GRIFO")) return 12.50;
+            if (text.includes("FREGADERO")) return 12.50;
+            if (text.includes("LAVADORA")) return 15.00;
+            if (text.includes("SECADORA")) return 15.00;
+            if (text.includes("BATIDORA")) return 12.50;
+            if (text.includes("CALEFON")) return 15.00;
+
+            // Si tiene un costo manual válido que no sea el dummy anterior (14.23 ni 0)
+            if (existingCost > 0 && Math.abs(existingCost - 14.23) > 0.01) {
+                return existingCost;
+            }
+
+            return 15.00;
+        }
+        window.getGarantiaCost = getGarantiaCost;
+
+        function getGarantiaSummaryLabel(eqOrDesc) {
+            let name = '';
+            let manual = '';
+            let cod = '';
+
+            if (typeof eqOrDesc === 'string') {
+                name = eqOrDesc;
+            } else if (eqOrDesc && typeof eqOrDesc === 'object') {
+                name = eqOrDesc.descProducto || '';
+                manual = eqOrDesc.manualName || '';
+                cod = eqOrDesc.codProducto || '';
+            }
+
+            if ((!name || name.trim() === '') && cod && window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) {
+                name = window.CATALOGO_TEKA_BASE[cod];
+            }
+
+            const rawText = (name + ' ' + manual + ' ' + (window.CATALOGO_TEKA_BASE && cod ? (window.CATALOGO_TEKA_BASE[cod] || '') : '')).trim();
+            const text = rawText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
+            // 1. Hornos
+            if (text.includes("HORNO A GAS") || text.includes("HORNO GAS")) return "HORNO A GAS";
+            if (text.includes("HORNO ELECTRICO") || text.includes("HORNO")) return "HORNO ELECTRICO";
+
+            // 2. Campanas & Microcampana
+            if (text.includes("MICROCAMPANA")) return "MICROCAMPANA";
+            if (text.includes("CAMPANA ISLA") || (text.includes("CAMPANA") && text.includes("ISLA")) || text.includes("ISLA")) return "CAMPANA ISLA";
+            if (text.includes("CAMPANA TRADICIONAL")) return "CAMPANA TRADICIONAL";
+            if (text.includes("CAMPANA DECORATIVA")) return "CAMPANA DECORATIVA";
+            if (text.includes("CAMPANA")) return "CAMPANA TRADICIONAL";
+
+            // 3. Cocinas
+            if (text.includes("COCINA INDUCCION") || text.includes("INDUCCION")) return "COCINA INDUCCION";
+            if (text.includes("COCINA A GAS") || text.includes("COCINA GAS")) return "COCINA A GAS";
+            if (text.includes("COCINA MIXTA") || text.includes("MIXTA")) return "COCINA MIXTA";
+            if (text.includes("COCINA") || text.includes("ENCIMERA") || text.includes("PLACA")) return "COCINAS";
+
+            // 4. Refrigeración & Vineras
+            if (text.includes("REFRIGERADOR") || text.includes("NEVERA") || text.includes("FRIGORIFICO")) return "REFRIGERADOR";
+            if (text.includes("VINERA") || text.includes("CAVA")) return "VINERA";
+
+            // 5. Otros electrodomésticos
+            if (text.includes("MICROONDAS")) return "MICROONDAS";
+            if (text.includes("LAVAVAJILLAS") || text.includes("LAVAVAJILLA")) return "LAVAVAJILLAS";
+            if (text.includes("CAFETERA")) return "CAFETERA";
+            if (text.includes("TRITURADOR")) return "TRITURADOR";
+            if (text.includes("BBQ") || text.includes("BARBACOA") || text.includes("PARRILLA")) return "PARRILLA BBQ";
+
+            // 6. Sanitarios y lavado
+            if (text.includes("GRIFERIA") || text.includes("GRIFO")) return "GRIFERIA";
+            if (text.includes("FREGADERO")) return "FREGADERO";
+            if (text.includes("LAVADORA")) return "LAVADORA";
+            if (text.includes("SECADORA")) return "SECADORA";
+            if (text.includes("BATIDORA")) return "BATIDORA";
+            if (text.includes("CALEFON")) return "CALEFON";
+
+            const cleaned = (name || manual || "PRODUCTO").trim().toUpperCase();
+            return cleaned || "PRODUCTO";
+        }
+        window.getGarantiaSummaryLabel = getGarantiaSummaryLabel;
+
+        function formatFechaReporte(dStr) {
+            if (!dStr) return '';
+            if (dStr instanceof Date && !isNaN(dStr)) {
+                const d = dStr.getDate();
+                const m = dStr.getMonth() + 1;
+                const y = String(dStr.getFullYear()).slice(-2);
+                return `${d}/${m}/${y}`;
+            }
+            const s = String(dStr).trim();
+            if (!s || s === '-' || s === 'null' || s === 'undefined') return '';
+
+            // Formato YYYY-MM-DD
+            const ymd = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            if (ymd) {
+                const y = ymd[1].slice(-2);
+                const m = parseInt(ymd[2], 10);
+                const d = parseInt(ymd[3], 10);
+                return `${d}/${m}/${y}`;
+            }
+
+            // Formato DD-MM-YYYY o DD/MM/YYYY
+            const dmy = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
+            if (dmy) {
+                const d = parseInt(dmy[1], 10);
+                const m = parseInt(dmy[2], 10);
+                let y = dmy[3];
+                if (y.length === 4) y = y.slice(-2);
+                return `${d}/${m}/${y}`;
+            }
+
+            const parsed = new Date(s);
+            if (!isNaN(parsed.getTime())) {
+                const d = parsed.getUTCDate();
+                const m = parsed.getUTCMonth() + 1;
+                const y = String(parsed.getUTCFullYear()).slice(-2);
+                return `${d}/${m}/${y}`;
+            }
+            return s;
+        }
+        window.formatFechaReporte = formatFechaReporte;
+
+        function formatMonedaReporte(val) {
+            const num = parseFloat(val) || 0;
+            return '$' + num.toFixed(2).replace('.', ',');
+        }
+        window.formatMonedaReporte = formatMonedaReporte;
+
         const ACCESORIOS_DEFAULT = { 'Enchufe 110V': 5.00, 'Enchufe 220 20V': 10.00, 'Enchufe 220V 50V': 10.00, 'Manguera c/bridas': 5.00, 'Ducto 4 pulgadas metro': 5.00, 'Enchufe chinito': 5.00, 'Acople': 5.00, 'Segunda visita': 12.00, 'Visita fuera de garantía': 20.00, 'Movilización $20': 20.00, 'Movilización $10': 10.00 };
 
         let visitsArray = [];      
@@ -346,6 +549,8 @@
         let inventoryEntries = [];
         let currentView = 'reporte_admin';
         let currentTechUser = null; 
+        window.setVisitsArray = function(v) { visitsArray = v; };
+        window.getVisitsArray = function() { return visitsArray; }; 
 
         window.exportarDatos = function() {
             try {
@@ -496,7 +701,9 @@
                 if(financialDashboard) financialDashboard.classList.add('opacity-30', 'pointer-events-none');
                 document.querySelectorAll('#productInputsContainer select').forEach(function(s) { s.required = false; });
                 if(warrantySelect) warrantySelect.required = true;
-                document.getElementById('displayCostoInstalacion').textContent = "$14.23";
+                const eqVal = warrantySelect ? warrantySelect.value : "";
+                const costGar = getGarantiaCost(eqVal);
+                document.getElementById('displayCostoInstalacion').textContent = "$" + costGar.toFixed(2);
                 document.getElementById('displayTotalAccesorios').textContent = "$0.00";
                 document.getElementById('displayTotalFinal').textContent = "$0.00";
             } else {
@@ -514,7 +721,10 @@
             if (!typeEl) return;
             const type = typeEl.value;
             if (type === 'Garantía') {
-                document.getElementById('displayCostoInstalacion').textContent = "$14.23";
+                const warrantySelect = document.getElementById('warrantyEquipmentSelect');
+                const eqVal = warrantySelect ? warrantySelect.value : "";
+                const costGar = getGarantiaCost(eqVal);
+                document.getElementById('displayCostoInstalacion').textContent = "$" + costGar.toFixed(2);
                 document.getElementById('displayTotalAccesorios').textContent = "$0.00";
                 document.getElementById('displayTotalFinal').textContent = "$0.00";
                 return;
@@ -913,6 +1123,12 @@
 
                 if (s === 'A Taller') { updateObj.fechaIngresoTaller = new Date().toISOString().split('T')[0]; }
                 if (s === 'Garantia en Tramite') { updateObj.fechaIngresoGarantia = new Date().toISOString().split('T')[0]; }
+                if ((v.tipoAtencion === 'Garantía' || t === 'Garantía') && v.equipos && v.equipos.length > 0) {
+                    updateObj.equipos = v.equipos.map(eq => {
+                        const c = (eq.costoBase && eq.costoBase > 0 && Math.abs(eq.costoBase - 14.23) > 0.01) ? eq.costoBase : getGarantiaCost(eq);
+                        return Object.assign({}, eq, { costoBase: c });
+                    });
+                }
 
                 database.ref('visits/' + id).update(updateObj).then(function() { 
                     showMessage("✅ Guardado", "fix-report"); 
@@ -1718,32 +1934,35 @@
                 return;
             }
 
-            body.innerHTML = filtered.flatMap(v => (v.equipos || []).map(eq => {
-                const obs = (v.commentarioCliente || v.razonNoAtencion || '').replace(/(\r\n|\n|\r)/gm, " ");
-                const repuesto = (v.repuestoSolicitadoGarantia || '-').replace(/(\r\n|\n|\r)/gm, " ");
-                const valorGarantia = (v.financiera && v.financiera.totalCliente > 0) ? v.financiera.totalCliente : 14.23;
+            body.innerHTML = filtered.flatMap(v => {
+                const eqs = (v.equipos && v.equipos.length > 0) ? v.equipos : [{ descProducto: v.asunto || "GARANTÍA", costoBase: 0 }];
+                return eqs.map(eq => {
+                    const obs = (v.commentarioCliente || v.razonNoAtencion || '').replace(/(\r\n|\n|\r)/gm, " ");
+                    const repuesto = (v.repuestoSolicitadoGarantia || '-').replace(/(\r\n|\n|\r)/gm, " ");
+                    const valorGarantia = getGarantiaCost(eq);
 
-                return `<tr class="border-b border-white/50 row-hover font-black uppercase whitespace-nowrap">
-                    <td class="report-cell font-mono text-stone-800">${v.fechaEmision || ''}</td>
-                    <td class="report-cell font-mono text-stone-800">${v.fechaInstalacion}</td>
-                    <td class="report-cell text-center text-stone-800">1</td>
-                    <td class="report-cell font-mono text-stone-700">${repuesto}</td>
-                    <td class="report-cell text-stone-600">-</td>
-                    <td class="report-cell font-mono text-stone-800">${eq.codProducto || '-'}</td>
-                    <td class="report-cell text-stone-800">${eq.descProducto || '-'}</td>
-                    <td class="report-cell font-mono tracking-widest text-stone-800">${eq.serieEquipo || '-'}</td>
-                    <td class="report-cell font-black text-emerald-700">SI</td>
-                    <td class="report-cell text-stone-800">${v.tecnico || '-'}</td>
-                    <td class="report-cell font-black italic text-fix-main">${v.nombreCliente}</td>
-                    <td class="report-cell max-w-[200px] truncate text-stone-700" title="${obs}">${obs || '-'}</td>
-                    <td class="report-cell font-mono text-right text-stone-800 font-bold">$${valorGarantia.toFixed(2)}</td>
-                    <td class="report-cell font-mono text-stone-800">${v.cedula || '-'}</td>
-                    <td class="report-cell lowercase text-stone-600">${v.email || '-'}</td>
-                    <td class="report-cell font-mono text-stone-800">${v.telefono || '-'}</td>
-                    <td class="report-cell text-stone-800"></td>
-                    <td class="report-cell font-mono text-stone-800">${v.numFactura || '-'}</td>
-                </tr>`;
-            })).join('');
+                    return `<tr class="border-b border-white/50 row-hover font-black uppercase whitespace-nowrap">
+                        <td class="report-cell font-mono text-stone-800">${v.fechaEmision || ''}</td>
+                        <td class="report-cell font-mono text-stone-800">${v.fechaInstalacion}</td>
+                        <td class="report-cell text-center text-stone-800">1</td>
+                        <td class="report-cell font-mono text-stone-700">${repuesto}</td>
+                        <td class="report-cell text-stone-600">-</td>
+                        <td class="report-cell font-mono text-stone-800">${eq.codProducto || '-'}</td>
+                        <td class="report-cell text-stone-800">${eq.descProducto || '-'}</td>
+                        <td class="report-cell font-mono tracking-widest text-stone-800">${eq.serieEquipo || '-'}</td>
+                        <td class="report-cell font-black text-emerald-700">SI</td>
+                        <td class="report-cell text-stone-800">${v.tecnico || '-'}</td>
+                        <td class="report-cell font-black italic text-fix-main">${v.nombreCliente}</td>
+                        <td class="report-cell max-w-[200px] truncate text-stone-700" title="${obs}">${obs || '-'}</td>
+                        <td class="report-cell font-mono text-right text-stone-800 font-bold">$${valorGarantia.toFixed(2)}</td>
+                        <td class="report-cell font-mono text-stone-800">${v.cedula || '-'}</td>
+                        <td class="report-cell lowercase text-stone-600">${v.email || '-'}</td>
+                        <td class="report-cell font-mono text-stone-800">${v.telefono || '-'}</td>
+                        <td class="report-cell text-stone-800"></td>
+                        <td class="report-cell font-mono text-stone-800">${v.numFactura || '-'}</td>
+                    </tr>`;
+                });
+            }).join('');
         }
 
         window.downloadGarantiasCSV = function() {
@@ -2208,11 +2427,18 @@
                 let visitUnits = 0;
 
                 if (isGarantia) {
-                    const val = (v.financiera && v.financiera.totalCliente > 0) ? v.financiera.totalCliente : 14.23;
+                    let garTotal = 0;
+                    if (eqs.length === 0) {
+                        garTotal = getGarantiaCost(v.asunto || '');
+                    } else {
+                        eqs.forEach(eq => {
+                            garTotal += getGarantiaCost(eq);
+                        });
+                    }
                     const u = Math.max(1, eqs.length);
-                    mEntry.gar += val;
+                    mEntry.gar += garTotal;
                     mEntry.gar_u += u;
-                    visitTotal += val;
+                    visitTotal += garTotal;
                     visitUnits += u;
                 } else if (hasBBQ) {
                     eqs.forEach(eq => {
@@ -2267,7 +2493,7 @@
                 // Actualizar productos
                 eqs.forEach(eq => {
                     const pName = (eq.descProducto || eq.manualName || 'OTRO EQUIPO TEKA').trim().toUpperCase();
-                    const pPrice = eq.costoBase || 25.00;
+                    const pPrice = isGarantia ? getGarantiaCost(eq) : (eq.costoBase || 25.00);
                     if (!productsMap[pName]) {
                         productsMap[pName] = { product: pName, count: 0, sales: 0 };
                     }
@@ -2583,7 +2809,7 @@
             } else if (catType === 'ALMACEN') {
                 return 15.00;
             } else if (catType === 'GARANTIAS') {
-                return costo;
+                return (costo > 0 && Math.abs(costo - 14.23) > 0.01) ? costo : getGarantiaCost(eq);
             } else if (catType === 'MULTI' || catType === 'PROMOCION') {
                 if (isEqIsla) return 30.00;
                 return (count === 2) ? 20.00 : 15.00;
@@ -2646,9 +2872,17 @@
 
             // 1. RENDER GARANTIAS
             const tbodyGarantias = document.getElementById('tekaTableBody_garantias');
+            const tbodySummaryGar = document.getElementById('tekaSummaryBody_garantias');
+            const tfootSummaryGar = document.getElementById('tekaSummaryFoot_garantias');
+            const garSummaryMap = {};
+
             if (tbodyGarantias) {
                 if (garantiasVisits.length === 0) {
                     tbodyGarantias.innerHTML = '<tr><td colspan="18" class="p-8 text-center text-stone-400 font-black italic">Sin servicios de garantía en este periodo</td></tr>';
+                    if (tbodySummaryGar && tfootSummaryGar) {
+                        tbodySummaryGar.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-stone-400 italic">Sin garantías registradas en este periodo</td></tr>';
+                        tfootSummaryGar.innerHTML = '';
+                    }
                 } else {
                     let html = '';
                     let seq = 1;
@@ -2659,14 +2893,22 @@
                             const cod = eq.codProducto || '';
                             const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
                             const fecVisita = v.fechaInstalacion || v.fechaVisita || '';
-                            const costo = eq.costoBase || 0;
+                            const costo = getEquipmentCost(v, eq, 'GARANTIAS');
                             granTotalMO += costo;
                             const obsGar = (v.observacionesAdmin || v.observaciones || '').trim().toUpperCase() || 'GARANTIA FINALIZADA CON EXITO';
 
+                            const sLabel = (typeof getGarantiaSummaryLabel === 'function') ? getGarantiaSummaryLabel(eq) : (desc || 'PRODUCTO');
+                            const sKey = `${sLabel}_${costo.toFixed(2)}`;
+                            if (!garSummaryMap[sKey]) {
+                                garSummaryMap[sKey] = { label: sLabel, unitCost: costo, count: 0, total: 0 };
+                            }
+                            garSummaryMap[sKey].count += 1;
+                            garSummaryMap[sKey].total += costo;
+
                             html += `<tr class="border-b border-purple-100 hover:bg-purple-50/40 font-mono transition-colors">
                                 <td class="p-2.5 text-center font-bold text-stone-500">${seq++}</td>
-                                <td class="p-2.5 text-center text-stone-600">${v.fechaEmision || '-'}</td>
-                                <td class="p-2.5 text-center font-bold text-stone-800">${fecVisita}</td>
+                                <td class="p-2.5 text-center text-stone-600">${formatFechaReporte(v.fechaEmision) || '-'}</td>
+                                <td class="p-2.5 text-center font-bold text-stone-800">${formatFechaReporte(fecVisita) || '-'}</td>
                                 <td class="p-2.5 text-center">1</td>
                                 <td class="p-2.5 text-center text-stone-600">${eq.codRepuesto || '-'}</td>
                                 <td class="p-2.5 font-sans text-stone-700">${eq.descRepuesto || 'REVISIÓN TÉCNICA'}</td>
@@ -2677,7 +2919,7 @@
                                 <td class="p-2.5 font-sans text-stone-700 font-bold">CAPELO</td>
                                 <td class="p-2.5 font-sans font-bold text-fix-main italic">${v.nombreCliente || ''}</td>
                                 <td class="p-2.5 font-sans text-stone-600 max-w-[180px] truncate" title="${obsGar}">${obsGar}</td>
-                                <td class="p-2.5 text-right font-bold text-stone-900">$${costo.toFixed(2)}</td>
+                                <td class="p-2.5 text-right font-bold text-stone-900">${formatMonedaReporte(costo)}</td>
                                 <td class="p-2.5 text-stone-600">${v.cedula || '-'}</td>
                                 <td class="p-2.5 font-sans lowercase text-stone-500 max-w-[140px] truncate" title="${v.email || ''}">${v.email || '-'}</td>
                                 <td class="p-2.5 text-stone-700">${v.telefono || '-'}</td>
@@ -2686,6 +2928,28 @@
                         });
                     });
                     tbodyGarantias.innerHTML = html;
+
+                    if (tbodySummaryGar && tfootSummaryGar) {
+                        const garItems = Object.values(garSummaryMap);
+                        let totalCant = 0;
+                        let totalMonto = 0;
+                        tbodySummaryGar.innerHTML = garItems.map(it => {
+                            totalCant += it.count;
+                            totalMonto += it.total;
+                            return `<tr class="hover:bg-purple-50/50 transition-colors">
+                                <td class="p-2 text-center font-bold text-stone-800">${it.count}</td>
+                                <td class="p-2 font-sans font-bold text-stone-800">${it.label}</td>
+                                <td class="p-2 text-right text-stone-700">${formatMonedaReporte(it.unitCost)}</td>
+                                <td class="p-2 text-right font-bold text-purple-900">${formatMonedaReporte(it.total)}</td>
+                            </tr>`;
+                        }).join('');
+                        tfootSummaryGar.innerHTML = `<tr>
+                            <td class="p-2.5 text-center font-black">${totalCant}</td>
+                            <td class="p-2.5 font-sans font-black">TOTAL</td>
+                            <td class="p-2.5"></td>
+                            <td class="p-2.5 text-right font-black text-amber-300">${formatMonedaReporte(totalMonto)}</td>
+                        </tr>`;
+                    }
                 }
             }
 
@@ -2711,7 +2975,7 @@
 
                         html += `<tr class="border-b border-stone-200 hover:bg-stone-50 font-mono transition-colors">
                             <td class="p-2.5 text-center font-bold text-stone-500">${seq++}</td>
-                            <td class="p-2.5 text-center text-stone-600">${v.fechaEmision || '-'}</td>
+                            <td class="p-2.5 text-center text-stone-600">${formatFechaReporte(v.fechaEmision) || '-'}</td>
                             <td class="p-2.5 font-sans text-stone-700">${v.lugarCompra || 'OTRO'}</td>
                             <td class="p-2.5 text-center text-stone-700">${v.numFactura || '-'}</td>
                             <td class="p-2.5 text-center font-bold text-blue-900">${cod || '-'}</td>
@@ -2720,11 +2984,11 @@
                             <td class="p-2.5 text-center font-black text-amber-800">SAP</td>
                             <td class="p-2.5 font-sans text-stone-700 font-bold">CAPELO</td>
                             <td class="p-2.5 text-center text-stone-600">CUENCA</td>
-                            <td class="p-2.5 text-center font-bold text-stone-800">${fecVisita}</td>
+                            <td class="p-2.5 text-center font-bold text-stone-800">${formatFechaReporte(fecVisita) || '-'}</td>
                             <td class="p-2.5 font-sans font-bold text-fix-main italic">${v.nombreCliente || ''}</td>
                             <td class="p-2.5 font-sans text-stone-700 max-w-[180px] truncate" title="${v.callePrincipal || ''}">${v.callePrincipal || '-'}</td>
                             <td class="p-2.5 text-stone-700">${v.telefono || '-'}</td>
-                            <td class="p-2.5 text-right font-bold text-stone-900">$${costo.toFixed(2)}</td>
+                            <td class="p-2.5 text-right font-bold text-stone-900">${formatMonedaReporte(costo)}</td>
                             <td class="p-2.5 font-sans text-stone-700 font-bold">CAPELO</td>
                             <td class="p-2.5 text-center text-stone-700">${v.numFactura || '-'}</td>
                             <td class="p-2.5 text-stone-600">${v.cedula || '-'}</td>
@@ -2739,6 +3003,58 @@
             renderStandardServiceRows('tekaTableBody_bbq', bbqsVisits, 'BBQ', () => { bbqEquiposCount++; });
             renderStandardServiceRows('tekaTableBody_unproducto', unProductoVisits, 'SINGLE', () => { unProdEquiposCount++; });
             renderStandardServiceRows('tekaTableBody_almacen', almacenesVisits, 'ALMACEN', () => { almacenEquiposCount++; });
+
+            // RENDER RESUMEN PROMOCIÓN (3 Tarifas: $15, $20, $30 + Total)
+            let promoCount15 = 0;
+            let promoCount20 = 0;
+            let promoCount30 = 0;
+            promocionVisits.forEach(v => {
+                const eqs = getNormalizedEquipos(v);
+                eqs.forEach(eq => {
+                    const c = getEquipmentCost(v, eq, 'MULTI');
+                    if (Math.abs(c - 15) < 0.01) promoCount15++;
+                    else if (Math.abs(c - 20) < 0.01) promoCount20++;
+                    else if (Math.abs(c - 30) < 0.01) promoCount30++;
+                    else {
+                        if (c <= 15) promoCount15++;
+                        else if (c <= 20) promoCount20++;
+                        else promoCount30++;
+                    }
+                });
+            });
+
+            const tbodySummaryPromo = document.getElementById('tekaSummaryBody_promocion');
+            const tfootSummaryPromo = document.getElementById('tekaSummaryFoot_promocion');
+            if (tbodySummaryPromo && tfootSummaryPromo) {
+                const totalPromoCount = promoCount15 + promoCount20 + promoCount30;
+                const totalPromoMonto = (promoCount15 * 15) + (promoCount20 * 20) + (promoCount30 * 30);
+                tbodySummaryPromo.innerHTML = `
+                    <tr class="hover:bg-amber-50/50 transition-colors">
+                        <td class="p-2 text-center font-bold text-stone-800">${promoCount15}</td>
+                        <td class="p-2 font-sans font-bold text-stone-800">PRODUCTO</td>
+                        <td class="p-2 text-right text-stone-700">$15,00</td>
+                        <td class="p-2 text-right font-bold text-amber-900">${formatMonedaReporte(promoCount15 * 15)}</td>
+                    </tr>
+                    <tr class="hover:bg-amber-50/50 transition-colors">
+                        <td class="p-2 text-center font-bold text-stone-800">${promoCount20}</td>
+                        <td class="p-2 font-sans font-bold text-stone-800">PRODUCTO</td>
+                        <td class="p-2 text-right text-stone-700">$20,00</td>
+                        <td class="p-2 text-right font-bold text-amber-900">${formatMonedaReporte(promoCount20 * 20)}</td>
+                    </tr>
+                    <tr class="hover:bg-amber-50/50 transition-colors">
+                        <td class="p-2 text-center font-bold text-stone-800">${promoCount30}</td>
+                        <td class="p-2 font-sans font-bold text-stone-800">PRODUCTO</td>
+                        <td class="p-2 text-right text-stone-700">$30,00</td>
+                        <td class="p-2 text-right font-bold text-amber-900">${formatMonedaReporte(promoCount30 * 30)}</td>
+                    </tr>
+                `;
+                tfootSummaryPromo.innerHTML = `<tr>
+                    <td class="p-2.5 text-center font-black">${totalPromoCount}</td>
+                    <td class="p-2.5 font-sans font-black">TOTAL</td>
+                    <td class="p-2.5"></td>
+                    <td class="p-2.5 text-right font-black text-amber-300">${formatMonedaReporte(totalPromoMonto)}</td>
+                </tr>`;
+            }
 
             // RENDER CONSOLIDADO
             const tbodyConsolidado = document.getElementById('tekaTableBody_consolidado');
@@ -2768,7 +3084,7 @@
 
                             html += `<tr class="border-b border-stone-200 hover:bg-blue-50/40 font-mono transition-colors">
                                 <td class="p-2.5 text-center font-bold text-stone-500">${seq++}</td>
-                                <td class="p-2.5 text-center text-stone-600">${v.fechaEmision || '-'}</td>
+                                <td class="p-2.5 text-center text-stone-600">${formatFechaReporte(v.fechaEmision) || '-'}</td>
                                 <td class="p-2.5 font-sans font-bold text-fix-main italic">${v.nombreCliente || ''}</td>
                                 <td class="p-2.5 font-sans text-stone-700 max-w-[180px] truncate" title="${v.callePrincipal || ''}">${v.callePrincipal || '-'}</td>
                                 <td class="p-2.5 text-stone-700">${v.telefono || '-'}</td>
@@ -2777,13 +3093,13 @@
                                 <td class="p-2.5 font-sans text-stone-800 font-bold max-w-[220px] truncate" title="${desc}">${desc || '-'}</td>
                                 <td class="p-2.5 text-center"><span class="px-2 py-0.5 rounded-full text-[8px] font-black bg-emerald-100 text-emerald-800">${v.estado || 'ATENDIDO'}</span></td>
                                 <td class="p-2.5 font-sans text-stone-600">${v.lugarCompra || 'OTRO'}</td>
-                                <td class="p-2.5 text-center font-bold text-stone-800">${fecVisita}</td>
+                                <td class="p-2.5 text-center font-bold text-stone-800">${formatFechaReporte(fecVisita) || '-'}</td>
                                 <td class="p-2.5 font-sans text-stone-700 font-bold">CAPELO</td>
                                 <td class="p-2.5 text-center text-stone-700">${adh}</td>
                                 <td class="p-2.5 text-center font-black text-blue-900">SAP</td>
                                 <td class="p-2.5 text-center text-stone-600">${eq.serieEquipo || '-'}</td>
-                                <td class="p-2.5 text-right font-bold text-stone-900">$${costo.toFixed(2)}</td>
-                                <td class="p-2.5 text-center font-bold text-stone-700">${fecLlamada || '-'}</td>
+                                <td class="p-2.5 text-right font-bold text-stone-900">${formatMonedaReporte(costo)}</td>
+                                <td class="p-2.5 text-center font-bold text-stone-700">${formatFechaReporte(fecLlamada) || '-'}</td>
                                 <td class="p-2.5 font-sans lowercase text-stone-500 max-w-[140px] truncate" title="${v.email || ''}">${v.email || '-'}</td>
                                 <td class="p-2.5 text-stone-600">${v.cedula || '-'}</td>
                                 <td class="p-2.5 font-sans text-stone-600 font-bold">TRABAJO REALIZADO SIN NOVEDAD</td>
@@ -2802,7 +3118,7 @@
             setVal('kpiTekaBBQ', bbqEquiposCount);
             setVal('kpiTekaGarantias', garantiasEquiposCount);
             setVal('kpiTekaAlmacen', almacenEquiposCount);
-            setVal('kpiTekaGranTotal', '$' + granTotalMO.toFixed(2));
+            setVal('kpiTekaGranTotal', formatMonedaReporte(granTotalMO));
 
             // Actualizar badges en pestañas
             setVal('badge_consolidado', consolidadoEquiposCount);
@@ -2812,6 +3128,7 @@
             setVal('badge_garantias', garantiasEquiposCount);
             setVal('badge_almacen', almacenEquiposCount);
         }
+        window.renderReporteTeka = renderReporteTeka;
 
         window.exportarSoloConsolidadoTeka = function() {
             exportarFormatoOficialTeka(true);
@@ -2879,6 +3196,8 @@
                 };
 
                 const FILL_ROW1 = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+                const FILL_HEADER = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
+                const CURRENCY_FMT = '"$"#,##0.00';
 
                 const setupColumns = (ws) => {
                     ws.getColumn(1).width = 6;   // Col A: #
@@ -2967,7 +3286,7 @@
                     const r8 = wsGar.getRow(8);
                     r8.getCell(1).value = "N°";
                     r8.getCell(1).font = FONT_HEADER;
-                    r8.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF581C87' } };
+                    r8.getCell(1).fill = FILL_HEADER;
                     r8.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
                     r8.getCell(1).border = BORDER_BOX;
 
@@ -2975,7 +3294,7 @@
                         const cell = r8.getCell(idx + 2);
                         cell.value = h;
                         cell.font = FONT_HEADER;
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF581C87' } };
+                        cell.fill = FILL_HEADER;
                         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                         cell.border = BORDER_BOX;
                     });
@@ -2983,16 +3302,26 @@
 
                     let garRowIndex = 9;
                     let garItemSeq = 1;
+                    const garSummaryMap = {};
                     garantiasVisits.forEach(v => {
                         const eqs = getNormalizedEquipos(v);
                         eqs.forEach(eq => {
                             const cod = eq.codProducto || '';
                             const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
                             const obsGar = (v.observacionesAdmin || v.observaciones || '').trim().toUpperCase() || 'GARANTIA FINALIZADA CON EXITO';
+                            const costo = getEquipmentCost(v, eq, 'GARANTIAS');
+
+                            const sLabel = (typeof getGarantiaSummaryLabel === 'function') ? getGarantiaSummaryLabel(eq) : (desc || 'PRODUCTO');
+                            const sKey = `${sLabel}_${costo.toFixed(2)}`;
+                            if (!garSummaryMap[sKey]) {
+                                garSummaryMap[sKey] = { label: sLabel, unitCost: costo, count: 0 };
+                            }
+                            garSummaryMap[sKey].count += 1;
+
                             const row = wsGar.getRow(garRowIndex++);
                             row.getCell(1).value = garItemSeq++;
-                            row.getCell(2).value = v.fechaEmision || '';
-                            row.getCell(3).value = v.fechaInstalacion || v.fechaVisita || '';
+                            row.getCell(2).value = formatFechaReporte(v.fechaEmision);
+                            row.getCell(3).value = formatFechaReporte(v.fechaInstalacion || v.fechaVisita);
                             row.getCell(4).value = 1;
                             row.getCell(5).value = eq.codRepuesto || '';
                             row.getCell(6).value = eq.descRepuesto || 'REVISIÓN TÉCNICA';
@@ -3003,7 +3332,7 @@
                             row.getCell(11).value = 'CAPELO';
                             row.getCell(12).value = v.nombreCliente || '';
                             row.getCell(13).value = obsGar;
-                            row.getCell(14).value = eq.costoBase || 0;
+                            row.getCell(14).value = costo;
                             row.getCell(15).value = v.cedula || '';
                             row.getCell(16).value = (v.email || '').toLowerCase();
                             row.getCell(17).value = v.telefono || '';
@@ -3015,9 +3344,95 @@
                                 cell.font = FONT_BODY;
                                 cell.border = BORDER_BOX;
                                 cell.alignment = { vertical: 'middle' };
+                                if (c === 14) {
+                                    cell.numFmt = CURRENCY_FMT;
+                                    cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                                }
                             }
                         });
                     });
+
+                    // Totales y Resumen Garantías
+                    const dataLastRowGar = garRowIndex - 1;
+                    const sumRowGar = wsGar.getRow(garRowIndex++);
+                    sumRowGar.height = 24;
+                    const cellSumN = sumRowGar.getCell(14);
+                    if (dataLastRowGar >= 9) {
+                        cellSumN.value = { formula: `SUM(N9:N${dataLastRowGar})` };
+                    } else {
+                        cellSumN.value = 0;
+                    }
+                    cellSumN.font = FONT_BOLD;
+                    cellSumN.numFmt = CURRENCY_FMT;
+                    cellSumN.border = BORDER_BOX;
+                    cellSumN.alignment = { horizontal: 'right', vertical: 'middle' };
+
+                    // Resumen por producto: Col G(7)=Cant, Col H(8)=Desc, Col I(9)=V.Unit, Col J(10)=Total
+                    const garSummaryStart = garRowIndex;
+                    const summaryItems = Object.values(garSummaryMap);
+                    if (summaryItems.length === 0) {
+                        const emptyRow = wsGar.getRow(garRowIndex++);
+                        emptyRow.height = 22;
+                        emptyRow.getCell(7).value = 0;
+                        emptyRow.getCell(8).value = "SIN GARANTÍAS";
+                        emptyRow.getCell(9).value = 0;
+                        emptyRow.getCell(10).value = 0;
+                        for (let c = 7; c <= 10; c++) {
+                            const cl = emptyRow.getCell(c);
+                            cl.font = FONT_BODY;
+                            cl.border = BORDER_BOX;
+                            if (c >= 9) cl.numFmt = CURRENCY_FMT;
+                        }
+                    } else {
+                        summaryItems.forEach(it => {
+                            const r = wsGar.getRow(garRowIndex++);
+                            r.height = 22;
+                            r.getCell(7).value = it.count;
+                            r.getCell(8).value = it.label;
+                            r.getCell(9).value = it.unitCost;
+                            r.getCell(10).value = { formula: `G${r.number}*I${r.number}` };
+
+                            for (let c = 7; c <= 10; c++) {
+                                const cl = r.getCell(c);
+                                cl.font = FONT_BODY;
+                                cl.border = BORDER_BOX;
+                                cl.alignment = { vertical: 'middle' };
+                                if (c === 7) cl.alignment = { horizontal: 'center', vertical: 'middle' };
+                                if (c === 8) cl.alignment = { horizontal: 'left', vertical: 'middle' };
+                                if (c >= 9) {
+                                    cl.numFmt = CURRENCY_FMT;
+                                    cl.alignment = { horizontal: 'right', vertical: 'middle' };
+                                }
+                            }
+                        });
+                    }
+                    const garSummaryEnd = garRowIndex - 1;
+
+                    // Fila Total Resumen Garantías
+                    const totRowGar = wsGar.getRow(garRowIndex++);
+                    totRowGar.height = 26;
+                    const totG = totRowGar.getCell(7);
+                    totG.value = { formula: `SUM(G${garSummaryStart}:G${garSummaryEnd})` };
+                    totG.font = FONT_BOLD;
+                    totG.border = BORDER_BOX;
+                    totG.alignment = { horizontal: 'center', vertical: 'middle' };
+
+                    const totH = totRowGar.getCell(8);
+                    totH.value = "TOTAL";
+                    totH.font = FONT_BOLD;
+                    totH.border = BORDER_BOX;
+                    totH.alignment = { horizontal: 'left', vertical: 'middle' };
+
+                    const totI = totRowGar.getCell(9);
+                    totI.value = "";
+                    totI.border = BORDER_BOX;
+
+                    const totJ = totRowGar.getCell(10);
+                    totJ.value = { formula: `SUM(J${garSummaryStart}:J${garSummaryEnd})` };
+                    totJ.font = FONT_BOLD;
+                    totJ.numFmt = CURRENCY_FMT;
+                    totJ.border = BORDER_BOX;
+                    totJ.alignment = { horizontal: 'right', vertical: 'middle' };
                 }
 
                 // 2. HOJA: PROMOCION (Multi-equipo)
@@ -3045,7 +3460,7 @@
                     const r5Promo = wsPromo.getRow(5);
                     r5Promo.getCell(1).value = "N°";
                     r5Promo.getCell(1).font = FONT_HEADER;
-                    r5Promo.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF92400E' } };
+                    r5Promo.getCell(1).fill = FILL_HEADER;
                     r5Promo.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
                     r5Promo.getCell(1).border = BORDER_BOX;
 
@@ -3053,7 +3468,7 @@
                         const cell = r5Promo.getCell(idx + 2);
                         cell.value = h;
                         cell.font = FONT_HEADER;
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF92400E' } };
+                        cell.fill = FILL_HEADER;
                         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                         cell.border = BORDER_BOX;
                     });
@@ -3061,15 +3476,28 @@
 
                     let promoRowIndex = 6;
                     let promoItemSeq = 1;
+                    let pCount15 = 0;
+                    let pCount20 = 0;
+                    let pCount30 = 0;
+
                     promocionVisits.forEach(v => {
                         const eqs = getNormalizedEquipos(v);
                         eqs.forEach(eq => {
                             const costo = getEquipmentCost(v, eq, 'MULTI');
+                            if (Math.abs(costo - 15) < 0.01) pCount15++;
+                            else if (Math.abs(costo - 20) < 0.01) pCount20++;
+                            else if (Math.abs(costo - 30) < 0.01) pCount30++;
+                            else {
+                                if (costo <= 15) pCount15++;
+                                else if (costo <= 20) pCount20++;
+                                else pCount30++;
+                            }
+
                             const cod = eq.codProducto || '';
                             const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
                             const row = wsPromo.getRow(promoRowIndex++);
                             row.getCell(1).value = promoItemSeq++;
-                            row.getCell(2).value = v.fechaEmision || '';
+                            row.getCell(2).value = formatFechaReporte(v.fechaEmision);
                             row.getCell(3).value = v.lugarCompra || 'OTRO';
                             row.getCell(4).value = v.numFactura || '';
                             row.getCell(5).value = cod;
@@ -3078,7 +3506,7 @@
                             row.getCell(8).value = 'SAP';
                             row.getCell(9).value = 'CAPELO';
                             row.getCell(10).value = 'CUENCA';
-                            row.getCell(11).value = v.fechaInstalacion || v.fechaVisita || '';
+                            row.getCell(11).value = formatFechaReporte(v.fechaInstalacion || v.fechaVisita);
                             row.getCell(12).value = v.nombreCliente || '';
                             row.getCell(13).value = v.callePrincipal || '';
                             row.getCell(14).value = v.telefono || '';
@@ -3095,9 +3523,85 @@
                                 cell.font = FONT_BODY;
                                 cell.border = BORDER_BOX;
                                 cell.alignment = { vertical: 'middle' };
+                                if (c === 15) {
+                                    cell.numFmt = CURRENCY_FMT;
+                                    cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                                }
                             }
                         });
                     });
+
+                    // Totales y Resumen Promoción
+                    const dataLastRowPromo = promoRowIndex - 1;
+                    const sumRowPromo = wsPromo.getRow(promoRowIndex++);
+                    sumRowPromo.height = 24;
+                    const cellSumO = sumRowPromo.getCell(15);
+                    if (dataLastRowPromo >= 6) {
+                        cellSumO.value = { formula: `SUM(O6:O${dataLastRowPromo})` };
+                    } else {
+                        cellSumO.value = 0;
+                    }
+                    cellSumO.font = FONT_BOLD;
+                    cellSumO.numFmt = CURRENCY_FMT;
+                    cellSumO.border = BORDER_BOX;
+                    cellSumO.alignment = { horizontal: 'right', vertical: 'middle' };
+
+                    // 3 líneas fijas (15, 20, 30) en Col H(8)=Cant, Col I(9)=Desc, Col J(10)=Precio, Col K(11)=Total
+                    const promoSummaryStart = promoRowIndex;
+                    const promoTariffs = [
+                        { count: pCount15, desc: 'PRODUCTO', price: 15 },
+                        { count: pCount20, desc: 'PRODUCTO', price: 20 },
+                        { count: pCount30, desc: 'PRODUCTO', price: 30 }
+                    ];
+
+                    promoTariffs.forEach(t => {
+                        const r = wsPromo.getRow(promoRowIndex++);
+                        r.height = 22;
+                        r.getCell(8).value = t.count;
+                        r.getCell(9).value = t.desc;
+                        r.getCell(10).value = t.price;
+                        r.getCell(11).value = { formula: `H${r.number}*J${r.number}` };
+
+                        for (let c = 8; c <= 11; c++) {
+                            const cl = r.getCell(c);
+                            cl.font = FONT_BODY;
+                            cl.border = BORDER_BOX;
+                            cl.alignment = { vertical: 'middle' };
+                            if (c === 8) cl.alignment = { horizontal: 'center', vertical: 'middle' };
+                            if (c === 9) cl.alignment = { horizontal: 'left', vertical: 'middle' };
+                            if (c >= 10) {
+                                cl.numFmt = CURRENCY_FMT;
+                                cl.alignment = { horizontal: 'right', vertical: 'middle' };
+                            }
+                        }
+                    });
+                    const promoSummaryEnd = promoRowIndex - 1;
+
+                    // 4ta fila: Total Resumen Promoción
+                    const totRowPromo = wsPromo.getRow(promoRowIndex++);
+                    totRowPromo.height = 26;
+                    const totPromoH = totRowPromo.getCell(8);
+                    totPromoH.value = { formula: `SUM(H${promoSummaryStart}:H${promoSummaryEnd})` };
+                    totPromoH.font = FONT_BOLD;
+                    totPromoH.border = BORDER_BOX;
+                    totPromoH.alignment = { horizontal: 'center', vertical: 'middle' };
+
+                    const totPromoI = totRowPromo.getCell(9);
+                    totPromoI.value = "TOTAL";
+                    totPromoI.font = FONT_BOLD;
+                    totPromoI.border = BORDER_BOX;
+                    totPromoI.alignment = { horizontal: 'left', vertical: 'middle' };
+
+                    const totPromoJ = totRowPromo.getCell(10);
+                    totPromoJ.value = "";
+                    totPromoJ.border = BORDER_BOX;
+
+                    const totPromoK = totRowPromo.getCell(11);
+                    totPromoK.value = { formula: `SUM(K${promoSummaryStart}:K${promoSummaryEnd})` };
+                    totPromoK.font = FONT_BOLD;
+                    totPromoK.numFmt = CURRENCY_FMT;
+                    totPromoK.border = BORDER_BOX;
+                    totPromoK.alignment = { horizontal: 'right', vertical: 'middle' };
                 }
 
                 // 3. HOJA: BBQ
@@ -3127,7 +3631,7 @@
                     const r5BBQ = wsBBQ.getRow(5);
                     r5BBQ.getCell(1).value = "N°";
                     r5BBQ.getCell(1).font = FONT_HEADER;
-                    r5BBQ.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC2410C' } };
+                    r5BBQ.getCell(1).fill = FILL_HEADER;
                     r5BBQ.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
                     r5BBQ.getCell(1).border = BORDER_BOX;
 
@@ -3135,7 +3639,7 @@
                         const cell = r5BBQ.getCell(idx + 2);
                         cell.value = h;
                         cell.font = FONT_HEADER;
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC2410C' } };
+                        cell.fill = FILL_HEADER;
                         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                         cell.border = BORDER_BOX;
                     });
@@ -3151,7 +3655,7 @@
                             const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
                             const row = wsBBQ.getRow(bbqRowIndex++);
                             row.getCell(1).value = bbqItemSeq++;
-                            row.getCell(2).value = v.fechaEmision || '';
+                            row.getCell(2).value = formatFechaReporte(v.fechaEmision);
                             row.getCell(3).value = v.lugarCompra || 'OTRO';
                             row.getCell(4).value = v.numFactura || '';
                             row.getCell(5).value = cod;
@@ -3160,7 +3664,7 @@
                             row.getCell(8).value = 'SAP';
                             row.getCell(9).value = 'CAPELO';
                             row.getCell(10).value = 'CUENCA';
-                            row.getCell(11).value = v.fechaInstalacion || v.fechaVisita || '';
+                            row.getCell(11).value = formatFechaReporte(v.fechaInstalacion || v.fechaVisita);
                             row.getCell(12).value = v.nombreCliente || '';
                             row.getCell(13).value = v.callePrincipal || '';
                             row.getCell(14).value = v.telefono || '';
@@ -3177,9 +3681,27 @@
                                 cell.font = FONT_BODY;
                                 cell.border = BORDER_BOX;
                                 cell.alignment = { vertical: 'middle' };
+                                if (c === 15) {
+                                    cell.numFmt = CURRENCY_FMT;
+                                    cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                                }
                             }
                         });
                     });
+
+                    const dataLastRowBBQ = bbqRowIndex - 1;
+                    const sumRowBBQ = wsBBQ.getRow(bbqRowIndex++);
+                    sumRowBBQ.height = 24;
+                    const cellSumBBQ = sumRowBBQ.getCell(15);
+                    if (dataLastRowBBQ >= 6) {
+                        cellSumBBQ.value = { formula: `SUM(O6:O${dataLastRowBBQ})` };
+                    } else {
+                        cellSumBBQ.value = 0;
+                    }
+                    cellSumBBQ.font = FONT_BOLD;
+                    cellSumBBQ.numFmt = CURRENCY_FMT;
+                    cellSumBBQ.border = BORDER_BOX;
+                    cellSumBBQ.alignment = { horizontal: 'right', vertical: 'middle' };
                 }
 
                 // 4. HOJA: BASE  (905 productos base oficiales)
@@ -3193,8 +3715,8 @@
                     r1Base.getCell(2).value = "Producto";
                     r1Base.getCell(1).font = FONT_HEADER;
                     r1Base.getCell(2).font = FONT_HEADER;
-                    r1Base.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
-                    r1Base.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+                    r1Base.getCell(1).fill = FILL_HEADER;
+                    r1Base.getCell(2).fill = FILL_HEADER;
                     r1Base.height = 28;
 
                     const r2Base = wsBase.getRow(2);
@@ -3237,7 +3759,7 @@
                 const r6Consol = wsConsol.getRow(6);
                 r6Consol.getCell(1).value = "N°";
                 r6Consol.getCell(1).font = FONT_HEADER;
-                r6Consol.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+                r6Consol.getCell(1).fill = FILL_HEADER;
                 r6Consol.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
                 r6Consol.getCell(1).border = BORDER_BOX;
 
@@ -3245,7 +3767,7 @@
                     const cell = r6Consol.getCell(idx + 2);
                     cell.value = h;
                     cell.font = FONT_HEADER;
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+                    cell.fill = FILL_HEADER;
                     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                     cell.border = BORDER_BOX;
                 });
@@ -3272,7 +3794,7 @@
 
                         const row = wsConsol.getRow(consolRowIndex++);
                         row.getCell(1).value = consolItemSeq++;
-                        row.getCell(2).value = v.fechaEmision || '';
+                        row.getCell(2).value = formatFechaReporte(v.fechaEmision);
                         row.getCell(3).value = v.nombreCliente || '';
                         row.getCell(4).value = v.callePrincipal || '';
                         row.getCell(5).value = v.telefono || '';
@@ -3281,13 +3803,13 @@
                         row.getCell(8).value = desc;
                         row.getCell(9).value = v.estado || 'ATENDIDO';
                         row.getCell(10).value = v.lugarCompra || 'OTRO';
-                        row.getCell(11).value = fecVisita;
+                        row.getCell(11).value = formatFechaReporte(fecVisita);
                         row.getCell(12).value = 'CAPELO';
                         row.getCell(13).value = adh;
                         row.getCell(14).value = 'SAP';
                         row.getCell(15).value = eq.serieEquipo || '';
                         row.getCell(16).value = costo;
-                        row.getCell(17).value = fecLlamada;
+                        row.getCell(17).value = formatFechaReporte(fecLlamada);
                         row.getCell(18).value = (v.email || '').toLowerCase();
                         row.getCell(19).value = v.cedula || '';
                         row.getCell(20).value = 'TRABAJO REALIZADO SIN NOVEDAD';
@@ -3297,6 +3819,10 @@
                             cell.font = FONT_BODY;
                             cell.border = BORDER_BOX;
                             cell.alignment = { vertical: 'middle' };
+                            if (c === 16) {
+                                cell.numFmt = CURRENCY_FMT;
+                                cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                            }
                         }
                     });
                 });
@@ -3326,7 +3852,7 @@
                     const r5UnProd = wsUnProd.getRow(5);
                     r5UnProd.getCell(1).value = "N°";
                     r5UnProd.getCell(1).font = FONT_HEADER;
-                    r5UnProd.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF065F46' } };
+                    r5UnProd.getCell(1).fill = FILL_HEADER;
                     r5UnProd.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
                     r5UnProd.getCell(1).border = BORDER_BOX;
 
@@ -3334,7 +3860,7 @@
                         const cell = r5UnProd.getCell(idx + 2);
                         cell.value = h;
                         cell.font = FONT_HEADER;
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF065F46' } };
+                        cell.fill = FILL_HEADER;
                         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                         cell.border = BORDER_BOX;
                     });
@@ -3350,7 +3876,7 @@
                             const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
                             const row = wsUnProd.getRow(unProdRowIndex++);
                             row.getCell(1).value = unProdItemSeq++;
-                            row.getCell(2).value = v.fechaEmision || '';
+                            row.getCell(2).value = formatFechaReporte(v.fechaEmision);
                             row.getCell(3).value = v.lugarCompra || 'OTRO';
                             row.getCell(4).value = v.numFactura || '';
                             row.getCell(5).value = cod;
@@ -3359,7 +3885,7 @@
                             row.getCell(8).value = 'SAP';
                             row.getCell(9).value = 'CAPELO';
                             row.getCell(10).value = 'CUENCA';
-                            row.getCell(11).value = v.fechaInstalacion || v.fechaVisita || '';
+                            row.getCell(11).value = formatFechaReporte(v.fechaInstalacion || v.fechaVisita);
                             row.getCell(12).value = v.nombreCliente || '';
                             row.getCell(13).value = v.callePrincipal || '';
                             row.getCell(14).value = v.telefono || '';
@@ -3376,9 +3902,27 @@
                                 cell.font = FONT_BODY;
                                 cell.border = BORDER_BOX;
                                 cell.alignment = { vertical: 'middle' };
+                                if (c === 15) {
+                                    cell.numFmt = CURRENCY_FMT;
+                                    cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                                }
                             }
                         });
                     });
+
+                    const dataLastRowUnProd = unProdRowIndex - 1;
+                    const sumRowUnProd = wsUnProd.getRow(unProdRowIndex++);
+                    sumRowUnProd.height = 24;
+                    const cellSumUnProd = sumRowUnProd.getCell(15);
+                    if (dataLastRowUnProd >= 6) {
+                        cellSumUnProd.value = { formula: `SUM(O6:O${dataLastRowUnProd})` };
+                    } else {
+                        cellSumUnProd.value = 0;
+                    }
+                    cellSumUnProd.font = FONT_BOLD;
+                    cellSumUnProd.numFmt = CURRENCY_FMT;
+                    cellSumUnProd.border = BORDER_BOX;
+                    cellSumUnProd.alignment = { horizontal: 'right', vertical: 'middle' };
                 }
 
                 // 7. HOJA: ALMACEN (Exhibición / Showroom / Tienda)
@@ -3406,7 +3950,7 @@
                     const r5Alm = wsAlm.getRow(5);
                     r5Alm.getCell(1).value = "N°";
                     r5Alm.getCell(1).font = FONT_HEADER;
-                    r5Alm.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D9488' } };
+                    r5Alm.getCell(1).fill = FILL_HEADER;
                     r5Alm.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
                     r5Alm.getCell(1).border = BORDER_BOX;
 
@@ -3414,7 +3958,7 @@
                         const cell = r5Alm.getCell(idx + 2);
                         cell.value = h;
                         cell.font = FONT_HEADER;
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D9488' } };
+                        cell.fill = FILL_HEADER;
                         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                         cell.border = BORDER_BOX;
                     });
@@ -3430,7 +3974,7 @@
                             const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
                             const row = wsAlm.getRow(almRowIndex++);
                             row.getCell(1).value = almItemSeq++;
-                            row.getCell(2).value = v.fechaEmision || '';
+                            row.getCell(2).value = formatFechaReporte(v.fechaEmision);
                             row.getCell(3).value = v.lugarCompra || 'OTRO';
                             row.getCell(4).value = v.numFactura || '';
                             row.getCell(5).value = cod;
@@ -3439,7 +3983,7 @@
                             row.getCell(8).value = 'SAP';
                             row.getCell(9).value = 'CAPELO';
                             row.getCell(10).value = 'CUENCA';
-                            row.getCell(11).value = v.fechaInstalacion || v.fechaVisita || '';
+                            row.getCell(11).value = formatFechaReporte(v.fechaInstalacion || v.fechaVisita);
                             row.getCell(12).value = v.nombreCliente || '';
                             row.getCell(13).value = v.callePrincipal || '';
                             row.getCell(14).value = v.telefono || '';
@@ -3456,9 +4000,27 @@
                                 cell.font = FONT_BODY;
                                 cell.border = BORDER_BOX;
                                 cell.alignment = { vertical: 'middle' };
+                                if (c === 15) {
+                                    cell.numFmt = CURRENCY_FMT;
+                                    cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                                }
                             }
                         });
                     });
+
+                    const dataLastRowAlm = almRowIndex - 1;
+                    const sumRowAlm = wsAlm.getRow(almRowIndex++);
+                    sumRowAlm.height = 24;
+                    const cellSumAlm = sumRowAlm.getCell(15);
+                    if (dataLastRowAlm >= 6) {
+                        cellSumAlm.value = { formula: `SUM(O6:O${dataLastRowAlm})` };
+                    } else {
+                        cellSumAlm.value = 0;
+                    }
+                    cellSumAlm.font = FONT_BOLD;
+                    cellSumAlm.numFmt = CURRENCY_FMT;
+                    cellSumAlm.border = BORDER_BOX;
+                    cellSumAlm.alignment = { horizontal: 'right', vertical: 'middle' };
                 }
 
                 // Asegurar que absolutamente todas las celdas en todas las hojas tengan fuente Calibri tamaño 14
@@ -3859,12 +4421,19 @@
 
             container.innerHTML = '';
 
+            const currentTipo = document.getElementById('edit_tipoAtencion') ? document.getElementById('edit_tipoAtencion').value : '';
+            const isGarantiaEdit = (currentTipo === 'Garantía');
+
             for(let i = 0; i < count; i++) {
                 const eq = equiposActuales[i] || { descProducto: "", manualName: "", costoBase: 0, codProducto: "", serieEquipo: "" };
                 let currentDesc = (eq.descProducto || "").toUpperCase();
                 let defaultCost = eq.costoBase;
                 
-                if (currentDesc.includes("BBQ") || currentDesc.includes("BARBACOA")) {
+                if (isGarantiaEdit) {
+                    if (eq.costoBase === 0 || Math.abs(eq.costoBase - 14.23) < 0.01) {
+                        defaultCost = getGarantiaCost(eq);
+                    }
+                } else if (currentDesc.includes("BBQ") || currentDesc.includes("BARBACOA")) {
                     if (eq.costoBase === 0) defaultCost = 29.00;
                 } else if (currentDesc.includes("ISLA")) {
                     if (eq.costoBase === 0) defaultCost = (count === 1) ? 45.00 : 30.00;
@@ -3923,8 +4492,11 @@
              const costInputs = document.querySelectorAll('.edit-eq-cost');
              const selectedVal = (selectEl.value || "").toUpperCase();
              const totalEqs = document.querySelectorAll('.edit-eq-select').length || 1;
+             const isGar = document.getElementById('edit_tipoAtencion')?.value === 'Garantía';
              if(!costInputs[index]) return;
-             if (selectedVal.includes("BBQ") || selectedVal.includes("BARBACOA")) {
+             if (isGar) {
+                 costInputs[index].value = getGarantiaCost(selectEl.value).toFixed(2);
+             } else if (selectedVal.includes("BBQ") || selectedVal.includes("BARBACOA")) {
                  costInputs[index].value = "29.00";
              } else if (selectedVal.includes("ISLA")) {
                  costInputs[index].value = (totalEqs === 1) ? "45.00" : "30.00";
@@ -3947,12 +4519,16 @@ function getEditModalData() {
 
             const originalVisit = visitsArray.find(item => item.id === document.getElementById('edit_id').value);
             const isMaint = originalVisit && (originalVisit.esMantenimiento || originalVisit.tipoAtencion === 'Mantenimiento');
+            const isGar = document.getElementById('edit_tipoAtencion')?.value === 'Garantía';
 
             for(let i=0; i<selects.length; i++) {
-                const cost = parseFloat(selectsCosts[i].value) || 0;
+                let cost = parseFloat(selectsCosts[i].value) || 0;
                 let desc = selects[i].value.toUpperCase();
                 let manual = manualNames[i].value.toUpperCase();
                 const targetDesc = manual || desc;
+                if (isGar && (cost === 0 || Math.abs(cost - 14.23) < 0.01)) {
+                    cost = getGarantiaCost(targetDesc);
+                }
                 updatedEquipos.push({ 
                     descProducto: targetDesc, 
                     manualName: manual, 
@@ -4065,7 +4641,8 @@ function getEditModalData() {
                 if (data.tipoServicioGlobal === 'Garantía') {
                     const wEqSel = document.getElementById('warrantyEquipmentSelect');
                     const wEq = wEqSel ? wEqSel.value : "";
-                    eqs.push({ descProducto: wEq.toUpperCase(), manualName: "", costoBase: 0, codProducto: "", serieEquipo: "" });
+                    const costGar = getGarantiaCost(wEq);
+                    eqs.push({ descProducto: wEq.toUpperCase(), manualName: "", costoBase: costGar, codProducto: "", serieEquipo: "" });
                 }
                 else { 
                     const num = parseInt(data.numEquipos) || 1; 
@@ -4715,7 +5292,15 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
             if(elTipoEdit && elTipoEdit.options.length === 0) { TIPOS_SERVICIO.forEach(s => elTipoEdit.add(new Option(s, s))); }
             
             const warrantySelect = document.getElementById('warrantyEquipmentSelect');
-            if(warrantySelect) { TIPOS_EQUIPO.forEach(e => { if(e) warrantySelect.add(new Option(e, e)); }); }
+            if(warrantySelect) { 
+                TIPOS_EQUIPO.forEach(e => { 
+                    if(e) {
+                        const price = getGarantiaCost(e);
+                        warrantySelect.add(new Option(`${e} ($${price.toFixed(2)})`, e)); 
+                    }
+                }); 
+                warrantySelect.onchange = calculateFinancials;
+            }
 
             renderInsumosAdmin(); window.expandEquipmentUI();
             initInvoiceDropZone();
@@ -5174,7 +5759,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         </div>
                         
                         <div id="warrantyFields" class="hidden space-y-4 p-6 glass-panel bg-stone-100/50 border border-stone-300/50 italic">
-                            <p class="text-[10px] font-black text-fix-main underline uppercase ml-1">DATOS DE GARANTÍA (SIN COSTO)</p>
+                            <p class="text-[10px] font-black text-fix-main underline uppercase ml-1">DATOS DE GARANTÍA (TARIFA OFICIAL DE FÁBRICA / REPORTE TEKA)</p>
                             <select id="warrantyEquipmentSelect" class="w-full p-4 glass-input rounded-xl font-black text-xs uppercase outline-none text-stone-800"></select>
                             <textarea id="warrantyDamageDesc" placeholder="DESCRIBA LA FALLA..." class="w-full p-5 glass-input rounded-2xl font-black text-xs uppercase min-h-[100px] outline-none text-stone-800"></textarea>
                         </div>
@@ -5409,7 +5994,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <div class="p-4 rounded-2xl bg-purple-50/80 border border-purple-200">
                             <span class="text-[8px] text-stone-500 font-black block">GARANTÍAS</span>
                             <span id="kpiTekaGarantias" class="text-2xl font-mono font-black text-purple-700">0</span>
-                            <span class="text-[8px] text-stone-400 block mt-0.5">De Fábrica</span>
+                            <span class="text-[8px] text-stone-400 block mt-0.5">Tarifas $12.50 - $18.75</span>
                         </div>
                         <div class="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200">
                             <span class="text-[8px] text-stone-500 font-black block">UN PRODUCTO</span>
@@ -5458,7 +6043,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
                             <table class="w-full border-collapse admin-table font-sans">
                                 <thead>
-                                    <tr class="bg-purple-900 text-white text-[9px] font-black text-center">
+                                    <tr class="bg-black text-white text-[9px] font-black text-center">
                                         <th class="p-3 w-10 text-center">#</th>
                                         <th class="p-3">FECHA COMPRA</th>
                                         <th class="p-3">FECHA INTERVENCIÓN</th>
@@ -5482,6 +6067,32 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                 <tbody id="tekaTableBody_garantias" class="text-[9px] font-semibold text-stone-800 uppercase"></tbody>
                             </table>
                         </div>
+
+                        <!-- Resumen Liquidación Garantías -->
+                        <div class="mt-6 flex justify-end">
+                            <div class="w-full max-w-2xl bg-white/95 backdrop-blur rounded-2xl border border-purple-200 shadow-md p-4">
+                                <div class="flex items-center justify-between pb-3 border-b border-purple-100 mb-3">
+                                    <h4 class="text-xs font-black uppercase text-purple-900 flex items-center gap-2">
+                                        <span>📊</span> RESUMEN LIQUIDACIÓN GARANTÍAS
+                                    </h4>
+                                    <span class="text-[10px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-100">Tarifas Oficiales TEKA</span>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full border-collapse font-sans">
+                                        <thead>
+                                            <tr class="bg-black text-white text-[10px] font-black uppercase text-center">
+                                                <th class="p-2.5 w-16">CANT.</th>
+                                                <th class="p-2.5 text-left">DESCRIPCIÓN</th>
+                                                <th class="p-2.5 text-right w-28">VALOR UNIT.</th>
+                                                <th class="p-2.5 text-right w-32">SUMA TOTAL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tekaSummaryBody_garantias" class="divide-y divide-purple-100 font-mono text-[11px] text-stone-800 uppercase"></tbody>
+                                        <tfoot id="tekaSummaryFoot_garantias" class="bg-stone-900 text-white font-mono font-black text-xs"></tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Contenedor Pestaña 2: PROMOCION -->
@@ -5489,7 +6100,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
                             <table class="w-full border-collapse admin-table font-sans">
                                 <thead>
-                                    <tr class="bg-amber-800 text-white text-[9px] font-black text-center">
+                                    <tr class="bg-black text-white text-[9px] font-black text-center">
                                         <th class="p-3 w-10 text-center">#</th>
                                         <th class="p-3">FECHA COMPRA</th>
                                         <th class="p-3">LUGAR COMPRA</th>
@@ -5514,6 +6125,32 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                 <tbody id="tekaTableBody_promocion" class="text-[9px] font-semibold text-stone-800 uppercase"></tbody>
                             </table>
                         </div>
+
+                        <!-- Resumen Liquidación Promoción -->
+                        <div class="mt-6 flex justify-end">
+                            <div class="w-full max-w-2xl bg-white/95 backdrop-blur rounded-2xl border border-amber-200 shadow-md p-4">
+                                <div class="flex items-center justify-between pb-3 border-b border-amber-100 mb-3">
+                                    <h4 class="text-xs font-black uppercase text-amber-900 flex items-center gap-2">
+                                        <span>📊</span> RESUMEN LIQUIDACIÓN PROMOCIÓN (MULTI-EQUIPO)
+                                    </h4>
+                                    <span class="text-[10px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">3 Tarifas Fijas TEKA</span>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full border-collapse font-sans">
+                                        <thead>
+                                            <tr class="bg-black text-white text-[10px] font-black uppercase text-center">
+                                                <th class="p-2.5 w-16">CANT.</th>
+                                                <th class="p-2.5 text-left">DESCRIPCIÓN</th>
+                                                <th class="p-2.5 text-right w-28">PRECIO UNIT.</th>
+                                                <th class="p-2.5 text-right w-32">SUMA TOTAL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tekaSummaryBody_promocion" class="divide-y divide-amber-100 font-mono text-[11px] text-stone-800 uppercase"></tbody>
+                                        <tfoot id="tekaSummaryFoot_promocion" class="bg-stone-900 text-white font-mono font-black text-xs"></tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Contenedor Pestaña 3: BBQ -->
@@ -5521,7 +6158,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
                             <table class="w-full border-collapse admin-table font-sans">
                                 <thead>
-                                    <tr class="bg-orange-800 text-white text-[9px] font-black text-center">
+                                    <tr class="bg-black text-white text-[9px] font-black text-center">
                                         <th class="p-3 w-10 text-center">#</th>
                                         <th class="p-3">FECHA COMPRA</th>
                                         <th class="p-3">LUGAR COMPRA</th>
@@ -5560,7 +6197,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         </div>
                         <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/80 max-h-[500px]">
                             <table class="w-full border-collapse admin-table font-sans">
-                                <thead class="sticky top-0 bg-stone-800 text-white text-[10px] font-black">
+                                <thead class="sticky top-0 bg-black text-white text-[10px] font-black">
                                     <tr>
                                         <th class="p-3 w-40 text-center">CÓDIGO ARTÍCULO</th>
                                         <th class="p-3 text-left">DESCRIPCIÓN OFICIAL PRODUCTO</th>
@@ -5576,7 +6213,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
                             <table class="w-full border-collapse admin-table font-sans">
                                 <thead>
-                                    <tr class="bg-blue-900 text-white text-[9px] font-black text-center">
+                                    <tr class="bg-black text-white text-[9px] font-black text-center">
                                         <th class="p-3 w-10 text-center">#</th>
                                         <th class="p-3">FECHA COMPRA</th>
                                         <th class="p-3">NOMBRE CLIENTE</th>
@@ -5609,7 +6246,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
                             <table class="w-full border-collapse admin-table font-sans">
                                 <thead>
-                                    <tr class="bg-emerald-800 text-white text-[9px] font-black text-center">
+                                    <tr class="bg-black text-white text-[9px] font-black text-center">
                                         <th class="p-3 w-10 text-center">#</th>
                                         <th class="p-3">FECHA COMPRA</th>
                                         <th class="p-3">LUGAR COMPRA</th>
@@ -5641,7 +6278,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
                             <table class="w-full border-collapse admin-table font-sans">
                                 <thead>
-                                    <tr class="bg-teal-800 text-white text-[9px] font-black text-center">
+                                    <tr class="bg-black text-white text-[9px] font-black text-center">
                                         <th class="p-3 w-10 text-center">#</th>
                                         <th class="p-3">FECHA COMPRA</th>
                                         <th class="p-3">LUGAR COMPRA</th>
@@ -5753,7 +6390,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                 <div class="md:col-span-3 text-[10px] text-fix-main font-black mt-4 mb-1 italic underline uppercase ml-1">Logística y Venta</div>
                 <div><label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">N° DOCUMENTO COMPRA</label><input type="text" id="edit_numFactura" class="w-full p-3 glass-input rounded-xl text-xs font-mono text-stone-800 shadow-inner outline-none"></div>
                 <div><label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">LUGAR COMPRA</label><select id="edit_lugarCompra" class="w-full p-3 glass-input rounded-xl text-[10px] uppercase outline-none text-stone-800 shadow-inner"></select></div>
-                <div><label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">TIPO SERVICIO</label><select id="edit_tipoAtencion" class="w-full p-3 glass-input rounded-xl text-[10px] uppercase outline-none text-stone-800 shadow-inner"></select></div>
+                <div><label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">TIPO SERVICIO</label><select id="edit_tipoAtencion" onchange="window.rebuildEditEquipmentInputs()" class="w-full p-3 glass-input rounded-xl text-[10px] uppercase outline-none text-stone-800 shadow-inner"></select></div>
                 <div><label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">FECHA ATENCION</label><input type="date" id="edit_fecha" class="w-full p-3 glass-input rounded-xl text-xs font-mono text-stone-800 shadow-inner outline-none"></div>
                 <div><label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">FECHA EMISIÓN (COMPRA)</label><input type="date" id="edit_fechaEmision" class="w-full p-3 glass-input rounded-xl text-xs font-mono text-stone-800 shadow-inner outline-none"></div>
                 <div><label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">TÉCNICO</label><select id="edit_tecnico" class="w-full p-3 glass-input rounded-xl text-[10px] uppercase outline-none text-stone-800 shadow-inner"></select></div>
