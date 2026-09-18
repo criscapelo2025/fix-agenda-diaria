@@ -6510,16 +6510,29 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                 changeMasterView('rutero'); 
             } 
             
-            LISTA_TECNICOS.forEach(item => { ['selectTecnico', 'ruteroTechFilter', 'selectTecnicoMaint', 'edit_tecnico', 'movTecnico', 'cajaTechFilter', 'pendingTechFilter', 'searchTechFilter'].forEach(id => { const el = document.getElementById(id); if(el && (el.options.length <= 1)) el.add(new Option(item || (id.includes('Filter') ? "TODOS LOS TÉCNICOS" : "--- TÉCNICO ---"), item)); }); });
+            // Carga de Técnicos en todos los selectores
+            const techTargetIds = ['selectTecnico', 'ruteroTechFilter', 'selectTecnicoMaint', 'edit_tecnico', 'movTecnico', 'cajaTechFilter', 'pendingTechFilter', 'searchTechFilter'];
+            techTargetIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerHTML = '';
+                    LISTA_TECNICOS.forEach(item => {
+                        el.add(new Option(item || (id.includes('Filter') ? "TODOS LOS TÉCNICOS" : "--- SELECCIONAR TÉCNICO ---"), item));
+                    });
+                }
+            });
             
-            const elLugar = document.getElementById('selectLugar');
-            const elLugarEdit = document.getElementById('edit_lugarCompra');
-            if (elLugar && elLugar.options.length <= 1) {
-                LUGARES_COMPRA.forEach(i => { elLugar.add(new Option(i || "--- LUGAR COMPRA ---", i)); });
-            }
-            if (elLugarEdit && elLugarEdit.options.length === 0) {
-                LUGARES_COMPRA.forEach(i => { elLugarEdit.add(new Option(i || "--- LUGAR COMPRA ---", i)); });
-            }
+            // Carga de Lugares de Compra en selectores
+            const lugarTargetIds = ['selectLugar', 'edit_lugarCompra'];
+            lugarTargetIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerHTML = '';
+                    LUGARES_COMPRA.forEach(item => {
+                        el.add(new Option(item || "--- SELECCIONAR LUGAR DE COMPRA ---", item));
+                    });
+                }
+            });
             const elTipoEdit = document.getElementById('edit_tipoAtencion');
             if(elTipoEdit && elTipoEdit.options.length === 0) { TIPOS_SERVICIO.forEach(s => elTipoEdit.add(new Option(s, s))); }
             
@@ -6960,67 +6973,49 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         </div>
 
                         <div class="glass-panel p-6 grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 border border-white/70">
-                            <div class="flex flex-col relative">
-                                <span class="text-[8px] font-black text-stone-600 absolute top-1.5 left-3 italic z-10 uppercase">CLIENTE *</span>
-                                <input type="text" name="nombreCliente" placeholder="NOMBRE COMPLETO" required class="p-4 pt-6 glass-input rounded-xl font-black uppercase text-xs text-stone-800">
+                            <div>
+                                <label class="block text-[9px] font-black uppercase text-stone-600 mb-1.5 ml-1">CLIENTE *</label>
+                                <input type="text" name="nombreCliente" placeholder="NOMBRE COMPLETO" required class="w-full p-3.5 glass-input rounded-xl font-black uppercase text-xs text-stone-800 outline-none">
                             </div>
-                            <div class="flex flex-col relative">
-                                <span class="text-[8px] font-black text-stone-600 absolute top-1.5 left-3 italic z-10 uppercase">CALLE PRINCIPAL *</span>
-                                <input type="text" name="callePrincipal" placeholder="CALLE Y DIRECCIÓN" required class="p-4 pt-6 bg-amber-50/70 backdrop-blur-md border border-white rounded-xl font-black uppercase text-xs shadow-sm text-stone-800">
+                            <div>
+                                <label class="block text-[9px] font-black uppercase text-stone-600 mb-1.5 ml-1">CALLE PRINCIPAL *</label>
+                                <input type="text" name="callePrincipal" placeholder="CALLE Y DIRECCIÓN" required class="w-full p-3.5 bg-amber-50/70 backdrop-blur-md border border-white rounded-xl font-black uppercase text-xs shadow-sm text-stone-800 outline-none">
                             </div>
-                            <div class="flex flex-col relative">
-                                <span class="text-[8px] font-black text-stone-600 absolute top-1.5 left-3 italic z-10 uppercase">CÉDULA / RUC</span>
-                                <input type="text" name="cedula" placeholder="N° CÉDULA" class="p-4 pt-6 glass-input rounded-xl font-black text-xs text-center font-mono text-stone-800">
+                            <div>
+                                <label class="block text-[9px] font-black uppercase text-stone-600 mb-1.5 ml-1">CÉDULA / RUC</label>
+                                <input type="text" name="cedula" placeholder="N° CÉDULA O RUC" class="w-full p-3.5 glass-input rounded-xl font-black text-xs text-center font-mono text-stone-800 outline-none">
                             </div>
-                            <div class="flex flex-col relative">
-                                <span class="text-[8px] font-black text-stone-600 absolute top-1.5 left-3 italic z-10 uppercase">TELÉFONO *</span>
-                                <input type="tel" name="telefono" placeholder="TELÉFONO O CELULAR" required class="p-4 pt-6 glass-input rounded-xl font-black text-xs text-center font-mono text-stone-800">
+                            <div>
+                                <label class="block text-[9px] font-black uppercase text-stone-600 mb-1.5 ml-1">TELÉFONO *</label>
+                                <input type="tel" name="telefono" placeholder="TELÉFONO O CELULAR" required class="w-full p-3.5 glass-input rounded-xl font-black text-xs text-center font-mono text-stone-800 outline-none">
                             </div>
-                            <div class="flex flex-col relative">
-                                <span class="text-[8px] font-black text-fix-main absolute top-1.5 left-3 italic z-10 uppercase">📧 EMAIL / CORREO</span>
-                                <input type="email" name="email" id="inputEmail" placeholder="ejemplo@correo.com" class="p-4 pt-6 glass-input rounded-xl font-black text-xs text-stone-800 lowercase">
+                            <div>
+                                <label class="block text-[9px] font-black uppercase text-fix-main mb-1.5 ml-1">📧 EMAIL / CORREO ELECTRÓNICO</label>
+                                <input type="email" name="email" id="inputEmail" placeholder="ejemplo@correo.com" class="w-full p-3.5 glass-input rounded-xl font-black text-xs text-stone-800 lowercase outline-none">
                             </div>
-                            <div class="flex flex-col relative">
-                                <span class="text-[8px] font-black text-stone-600 absolute top-1.5 left-3 italic z-10 uppercase">N° FACTURA COMPRA</span>
-                                <input type="text" name="numFactura" placeholder="N° FACTURA" class="p-4 pt-6 glass-input rounded-xl font-black text-xs text-center uppercase text-stone-800">
+                            <div>
+                                <label class="block text-[9px] font-black uppercase text-stone-600 mb-1.5 ml-1">N° FACTURA COMPRA</label>
+                                <input type="text" name="numFactura" placeholder="N° FACTURA" class="w-full p-3.5 glass-input rounded-xl font-black text-xs text-center uppercase text-stone-800 outline-none">
                             </div>
-                            <div class="flex flex-col relative md:col-span-2">
-                                <span class="text-[8px] font-black text-stone-600 absolute top-1.5 left-3 italic z-10 uppercase">LINK GPS / UBICACIÓN (OPCIONAL)</span>
-                                <input type="text" name="direccion" placeholder="LINK GOOGLE MAPS O WAZE" class="p-4 pt-6 glass-input rounded-xl font-black text-xs text-stone-800">
+                            <div class="md:col-span-2">
+                                <label class="block text-[9px] font-black uppercase text-stone-600 mb-1.5 ml-1">LINK GPS / UBICACIÓN (OPCIONAL)</label>
+                                <input type="text" name="direccion" placeholder="LINK GOOGLE MAPS O WAZE" class="w-full p-3.5 glass-input rounded-xl font-black text-xs text-stone-800 outline-none">
                             </div>
-                            <div class="flex flex-col relative">
-                                <span class="text-[8px] font-black text-stone-600 absolute top-1.5 left-3 italic z-10 uppercase">TÉCNICO ASIGNADO</span>
-                                <select name="tecnico" id="selectTecnico" class="p-4 pt-6 glass-input rounded-xl font-black text-[10px] uppercase italic text-stone-800 outline-none">
-                                    <option value="">--- SELECCIONAR TÉCNICO ---</option>
-                                </select>
+                            <div>
+                                <label class="block text-[9px] font-black uppercase text-stone-700 mb-1.5 ml-1">TÉCNICO ASIGNADO *</label>
+                                <select name="tecnico" id="selectTecnico" class="w-full p-3.5 glass-input rounded-xl font-black text-xs uppercase italic text-stone-800 outline-none bg-white/90 shadow-sm"></select>
                             </div>
-                            <div class="flex flex-col relative">
-                                <span class="text-[8px] font-black text-amber-900 absolute top-1.5 left-3 italic z-10 uppercase">🏬 LUGAR DE COMPRA</span>
-                                <select id="selectLugar" name="lugarCompra" class="p-4 pt-6 glass-input rounded-xl font-black text-[10px] uppercase italic text-stone-800 outline-none">
-                                    <option value="">--- SELECCIONAR LUGAR COMPRA ---</option>
-                                    <option value="COMERCIAL SOLIS">COMERCIAL SOLIS</option>
-                                    <option value="COMERCIAL KYWI">COMERCIAL KYWI</option>
-                                    <option value="COMO HOGAR">COMO HOGAR</option>
-                                    <option value="SUKASA">SUKASA</option>
-                                    <option value="MACAOFERTAS">MACAOFERTAS</option>
-                                    <option value="MARCO MERCARD">MARCO MERCARD</option>
-                                    <option value="MERCARD">MERCARD</option>
-                                    <option value="TEKA DIRECTO">TEKA DIRECTO</option>
-                                    <option value="HOME VEGA">HOME VEGA</option>
-                                    <option value="LUNA PAZMIÑO">LUNA PAZMIÑO</option>
-                                    <option value="ALMACENES BOYACÁ">ALMACENES BOYACÁ</option>
-                                    <option value="VTORIA HOGAR">VTORIA HOGAR</option>
-                                    <option value="ALMACENES CHORDELEG">ALMACENES CHORDELEG</option>
-                                    <option value="OTRO">OTRO</option>
-                                </select>
+                            <div>
+                                <label class="block text-[9px] font-black uppercase text-amber-900 mb-1.5 ml-1">🏬 LUGAR DE COMPRA</label>
+                                <select id="selectLugar" name="lugarCompra" class="w-full p-3.5 glass-input rounded-xl font-black text-xs uppercase italic text-stone-800 outline-none bg-white/90 shadow-sm"></select>
                             </div>
-                            <div class="flex flex-col relative">
-                                <span class="text-[8px] font-black text-stone-600 absolute top-1.5 left-3 italic z-10 uppercase">EMISIÓN FACTURA</span>
-                                <input type="date" name="fechaEmision" id="inputEmision" class="p-4 pt-6 glass-input rounded-xl font-black text-xs text-center font-mono text-stone-800 outline-none">
+                            <div>
+                                <label class="block text-[9px] font-black uppercase text-stone-600 mb-1.5 ml-1">FECHA EMISIÓN FACTURA</label>
+                                <input type="date" name="fechaEmision" id="inputEmision" class="w-full p-3.5 glass-input rounded-xl font-black text-xs text-center font-mono text-stone-800 outline-none">
                             </div>
-                            <div class="flex flex-col relative md:col-span-2">
-                                <span class="text-[8px] font-black text-fix-main absolute top-1.5 left-3 italic z-10 uppercase">TIPO DE SERVICIO</span>
-                                <select name="tipoServicioGlobal" id="tipoServicioGlobal" onchange="toggleServiceTypeUI()" class="p-4 pt-6 glass-input rounded-xl font-black text-[10px] uppercase text-fix-main italic shadow-sm border-stone-300 outline-none">
+                            <div>
+                                <label class="block text-[9px] font-black uppercase text-fix-main mb-1.5 ml-1">TIPO DE SERVICIO *</label>
+                                <select name="tipoServicioGlobal" id="tipoServicioGlobal" onchange="toggleServiceTypeUI()" class="w-full p-3.5 glass-input rounded-xl font-black text-xs uppercase text-fix-main italic shadow-sm border-stone-300 outline-none bg-white/90">
                                     <option value="Instalación">Instalación Estándar</option>
                                     <option value="Garantía">Garantía de Fábrica</option>
                                     <option value="Almacén / Exhibición">Exhibición en Tienda / Showroom (Tarifa $15.00)</option>
