@@ -24,6 +24,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script src="teka_catalog.js"></script>
+    <script src="teka_repuestos.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -1126,7 +1127,7 @@
                 return;
             }
             currentView = view;
-            const sections = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'clientesView', 'dashboardView'];
+            const sections = ['formContainer', 'contabilidadView', 'reporteTekaView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'clientesView', 'dashboardView', 'catalogoView'];
             sections.forEach(function(id) { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
 
             if(view === 'reporte_admin') { 
@@ -1144,6 +1145,7 @@
             else if(view === 'garantias') { const gv = document.getElementById('garantiasView'); if(gv) gv.classList.remove('hidden'); renderGarantias(); renderMaestroGarantias(); }
             else if(view === 'taller') { const tv = document.getElementById('tallerView'); if(tv) tv.classList.remove('hidden'); renderTaller(); }
             else if(view === 'buscador') { const bv = document.getElementById('buscadorView'); if(bv) bv.classList.remove('hidden'); renderBuscador(); }
+            else if(view === 'catalogo') { const cv = document.getElementById('catalogoView'); if(cv) cv.classList.remove('hidden'); renderCatalogoView(); }
             else { const el = document.getElementById(view + 'View'); if(el) el.classList.remove('hidden'); }
             
             if(view === 'rutero') renderRutero();
@@ -2529,8 +2531,17 @@
                                 <div class="glass-panel bg-stone-100/40 border-stone-200/50 p-5 font-black italic">
                                     <div class="grid grid-cols-1 gap-4 mb-4">
                                         <div>
-                                            <label class="text-[8px] uppercase block mb-1 text-stone-600">1. REPUESTO O PARTE A SOLICITAR:</label>
-                                            <textarea id="garantias_repuesto_${v.id}" placeholder="Especifique los repuestos o códigos a solicitar..." class="w-full p-4 glass-input rounded-xl text-[10px] font-black uppercase min-h-[80px] outline-none text-stone-800">${v.repuestoSolicitadoGarantia || ''}</textarea>
+                                            <div class="flex items-center justify-between mb-1">
+                                                <label class="text-[8px] uppercase font-black text-amber-900">1. REPUESTO O PARTE A SOLICITAR:</label>
+                                                <button type="button" onclick="openRepuestoPicker('garantia_view', 0, '${v.id}')" class="px-2 py-0.5 bg-amber-700 hover:bg-amber-800 text-white rounded-md text-[8px] font-black uppercase shadow-xs">
+                                                    🔍 LISTA 2026
+                                                </button>
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                                <input type="text" id="garantias_cod_repuesto_${v.id}" value="${v.equipos?.[0]?.codRepuesto || ''}" placeholder="CÓDIGO REPUESTO" oninput="lookupGarantiaViewRepuesto(this.value, '${v.id}')" class="p-2.5 glass-input rounded-lg text-[9px] font-mono font-black uppercase border border-stone-300">
+                                                <input type="text" id="garantias_desc_repuesto_${v.id}" value="${v.equipos?.[0]?.descRepuesto || ''}" placeholder="DESCRIPCIÓN REPUESTO" class="p-2.5 glass-input rounded-lg text-[9px] font-bold uppercase border border-stone-300">
+                                            </div>
+                                            <textarea id="garantias_repuesto_${v.id}" placeholder="Especifique notas o detalles adicionales del repuesto..." class="w-full p-3 glass-input rounded-xl text-[10px] font-black uppercase min-h-[60px] outline-none text-stone-800">${v.repuestoSolicitadoGarantia || ''}</textarea>
                                         </div>
                                         <div>
                                             <label class="text-[8px] uppercase block mb-1 text-stone-600">2. OBSERVACIÓN / TRÁMITE INTERNO:</label>
@@ -2558,15 +2569,33 @@
         }
 
         window.saveGarantiaUpdate = function(id) {
-            const repuesto = document.getElementById('garantias_repuesto_' + id).value.toUpperCase();
-            const obs = document.getElementById('garantias_obs_' + id).value.toUpperCase();
-            const fechaProg = document.getElementById('garantias_fecha_prog_' + id).value;
+            const repuesto = document.getElementById('garantias_repuesto_' + id)?.value.toUpperCase() || '';
+            const obs = document.getElementById('garantias_obs_' + id)?.value.toUpperCase() || '';
+            const fechaProg = document.getElementById('garantias_fecha_prog_' + id)?.value || '';
+            const codRep = document.getElementById('garantias_cod_repuesto_' + id)?.value.trim().toUpperCase() || '';
+            const descRep = document.getElementById('garantias_desc_repuesto_' + id)?.value.trim().toUpperCase() || '';
 
-            database.ref('visits/' + id).update({
-                repuestoSolicitadoGarantia: repuesto,
+            const v = visitsArray.find(item => item.id === id);
+            let updatedEquipos = v && v.equipos ? [...v.equipos] : [];
+            if (updatedEquipos.length > 0) {
+                updatedEquipos[0] = {
+                    ...updatedEquipos[0],
+                    conRepuesto: (codRep !== '' || descRep !== ''),
+                    codRepuesto: codRep,
+                    descRepuesto: descRep || (codRep ? '' : 'REVISIÓN TÉCNICA')
+                };
+            }
+
+            const updates = {
+                repuestoSolicitadoGarantia: repuesto || (codRep ? `${codRep} - ${descRep}` : ''),
                 observacionGarantia: obs,
                 fechaNuevaVisita: fechaProg
-            }).then(() => {
+            };
+            if (updatedEquipos.length > 0) {
+                updates.equipos = updatedEquipos;
+            }
+
+            database.ref('visits/' + id).update(updates).then(() => {
                 showMessage("💾 TRÁMITE ACTUALIZADO", "fix-report");
                 renderGarantias();
                 renderRutero();
@@ -3398,7 +3427,7 @@
         }
 
         window.switchTekaTab = function(tabName) {
-            const tabs = ['garantias', 'promocion', 'bbq', 'base', 'consolidado', 'unproducto', 'almacen'];
+            const tabs = ['garantias', 'promocion', 'bbq', 'consolidado', 'unproducto', 'almacen'];
             tabs.forEach(t => {
                 const content = document.getElementById('tekaTab_' + t);
                 const btn = document.getElementById('tabBtn_' + t);
@@ -3414,9 +3443,6 @@
                     }
                 }
             });
-            if (tabName === 'base') {
-                renderTekaBaseTable();
-            }
         };
 
         window.setCicloActualTeka = function() {
@@ -3441,12 +3467,48 @@
             renderReporteTeka();
         };
 
-        window.renderTekaBaseTable = function() {
-            const tbody = document.getElementById('tekaTableBody_base');
+        // ==========================================
+        // GESTIÓN DEL CATÁLOGO MAESTRO (BASE Y REPUESTOS)
+        // ==========================================
+        window.catalogoActiveSubtab = 'productos';
+
+        window.switchCatalogoSubtab = function(tabName) {
+            window.catalogoActiveSubtab = tabName;
+            const contentProds = document.getElementById('catalogoTab_productos');
+            const contentReps = document.getElementById('catalogoTab_repuestos');
+            const btnProds = document.getElementById('tabBtn_cat_productos');
+            const btnReps = document.getElementById('tabBtn_cat_repuestos');
+
+            if (tabName === 'productos') {
+                if (contentProds) contentProds.classList.remove('hidden');
+                if (contentReps) contentReps.classList.add('hidden');
+                if (btnProds) btnProds.className = 'px-5 py-3 rounded-xl font-black text-xs uppercase bg-fix-main text-white shadow-md transition-all flex items-center gap-2';
+                if (btnReps) btnReps.className = 'px-5 py-3 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-2';
+                renderCatalogoProductos();
+            } else {
+                if (contentProds) contentProds.classList.add('hidden');
+                if (contentReps) contentReps.classList.remove('hidden');
+                if (btnReps) btnReps.className = 'px-5 py-3 rounded-xl font-black text-xs uppercase bg-amber-700 text-white shadow-md transition-all flex items-center gap-2';
+                if (btnProds) btnProds.className = 'px-5 py-3 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-2';
+                renderCatalogoRepuestos();
+            }
+        };
+
+        window.renderCatalogoView = function() {
+            if (window.catalogoActiveSubtab === 'repuestos') {
+                renderCatalogoRepuestos();
+            } else {
+                renderCatalogoProductos();
+            }
+        };
+
+        window.renderCatalogoProductos = function() {
+            const tbody = document.getElementById('catalogoTableBody_productos');
             if (!tbody) return;
-            const searchInput = document.getElementById('searchTekaBaseInput');
+            const searchInput = document.getElementById('searchCatalogoProductosInput');
             const query = searchInput ? (searchInput.value || '').trim().toUpperCase() : '';
             const catalog = window.CATALOGO_TEKA_BASE || {};
+            const customCatalog = window.CUSTOM_CATALOG || {};
 
             let entries = Object.entries(catalog);
             if (query) {
@@ -3455,23 +3517,294 @@
                 });
             }
 
-            const countDisplay = document.getElementById('tekaBaseCountDisplay');
+            const countDisplay = document.getElementById('catalogoProductosCountDisplay');
+            const totalCount = Object.keys(catalog).length;
+            const customCount = Object.keys(customCatalog).length;
             if (countDisplay) {
-                countDisplay.textContent = `${entries.length} productos ${query ? 'encontrados' : 'cargados'}`;
+                countDisplay.innerHTML = `<b>${entries.length}</b> de <b>${totalCount}</b> productos (${customCount} manuales)`;
             }
 
-            const displayEntries = query ? entries : entries.slice(0, 300);
+            const displayEntries = query ? entries.slice(0, 100) : entries.slice(0, 60);
 
             tbody.innerHTML = displayEntries.map(([code, desc]) => {
+                const isCustom = !!customCatalog[code] || !!customCatalog[code.replace(/[\.\$#\[\]\/]/g, '_')];
+                const badge = isCustom
+                    ? `<span class="px-2 py-0.5 rounded-md text-[8px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">🟢 MANUAL</span>`
+                    : `<span class="px-2 py-0.5 rounded-md text-[8px] font-black bg-slate-100 text-slate-700 border border-slate-200">OFICIAL BASE</span>`;
+                
+                const safeKey = code.replace(/[\.\$#\[\]\/]/g, '_');
+                const actions = isCustom
+                    ? `<div class="flex gap-1 justify-center">
+                        <button onclick="editCustomProduct('${safeKey}', '${code.replace(/'/g, "\\'")}', '${desc.replace(/'/g, "\\'")}')" class="px-2 py-1 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 text-[9px] font-black" title="Editar">✏️</button>
+                        <button onclick="deleteCustomProduct('${safeKey}', '${code.replace(/'/g, "\\'")}')" class="px-2 py-1 bg-rose-100 text-rose-800 rounded-lg hover:bg-rose-200 text-[9px] font-black" title="Eliminar">🗑️</button>
+                       </div>`
+                    : `<span class="text-stone-400 text-[9px] italic">Base fija</span>`;
+
                 return `<tr class="border-b border-stone-200 hover:bg-blue-50/50 transition-colors">
-                    <td class="p-3 text-center font-bold text-fix-main font-mono">${code}</td>
-                    <td class="p-3 text-left font-semibold text-stone-700">${desc || ''}</td>
+                    <td class="p-3 text-center font-bold text-fix-main font-mono text-xs">${code}</td>
+                    <td class="p-3 text-left font-semibold text-stone-800 text-xs">${desc || ''}</td>
+                    <td class="p-3 text-center">${badge}</td>
+                    <td class="p-3 text-center">${actions}</td>
                 </tr>`;
             }).join('');
 
-            if (!query && entries.length > 300) {
-                tbody.innerHTML += `<tr><td colspan="2" class="p-3 text-center text-xs text-stone-500 font-bold italic bg-stone-50">Mostrando los primeros 300 de 905 productos. Usa el buscador superior para encontrar cualquier código o modelo en segundos.</td></tr>`;
+            if (entries.length > displayEntries.length) {
+                tbody.innerHTML += `<tr><td colspan="4" class="p-3 text-center text-xs text-stone-500 font-bold italic bg-stone-50">Mostrando los primeros ${displayEntries.length} de ${entries.length} productos. Usa el buscador superior para encontrar cualquier código o modelo en segundos.</td></tr>`;
             }
+        };
+
+        window.renderCatalogoRepuestos = function() {
+            const tbody = document.getElementById('catalogoTableBody_repuestos');
+            if (!tbody) return;
+            const searchInput = document.getElementById('searchCatalogoRepuestosInput');
+            const query = searchInput ? (searchInput.value || '').trim().toUpperCase() : '';
+            const allRepuestos = window.LISTA_REPUESTOS_TEKA || [];
+
+            let filtered = allRepuestos;
+            if (query) {
+                filtered = allRepuestos.filter(r => {
+                    return (r.cod && r.cod.toUpperCase().includes(query)) || (r.desc && r.desc.toUpperCase().includes(query));
+                });
+            }
+
+            const countDisplay = document.getElementById('catalogoRepuestosCountDisplay');
+            if (countDisplay) {
+                countDisplay.innerHTML = `<b>${filtered.length}</b> de <b>${allRepuestos.length}</b> repuestos cargados (Lista Oficial 2026)`;
+            }
+
+            const displayList = query ? filtered.slice(0, 100) : filtered.slice(0, 60);
+
+            tbody.innerHTML = displayList.map(r => {
+                return `<tr class="border-b border-stone-200 hover:bg-amber-50/50 transition-colors">
+                    <td class="p-3 text-center font-bold text-amber-900 font-mono text-xs">${r.cod}</td>
+                    <td class="p-3 text-left font-semibold text-stone-800 text-xs">${r.desc}</td>
+                    <td class="p-3 text-right font-mono font-black text-emerald-700 text-xs">$${(r.precio || 0).toFixed(2)}</td>
+                    <td class="p-3 text-center">
+                        <button onclick="navigator.clipboard.writeText('${r.cod}'); showMessage('📋 Código copiado: ${r.cod}', 'fix-report');" class="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-[9px] font-black uppercase transition-all active:scale-95" title="Copiar código">
+                            Copiar
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            if (filtered.length > displayList.length) {
+                tbody.innerHTML += `<tr><td colspan="4" class="p-3 text-center text-xs text-stone-500 font-bold italic bg-stone-50">Mostrando los primeros ${displayList.length} de ${filtered.length} repuestos. Usa el buscador superior para encontrar cualquier repuesto o código en segundos.</td></tr>`;
+            }
+        };
+
+        window.openModalNuevoProducto = function() {
+            document.getElementById('newProdCode').value = '';
+            document.getElementById('newProdDesc').value = '';
+            document.getElementById('modalNuevoProductoTitle').textContent = '➕ Agregar Nuevo Producto / Código';
+            document.getElementById('modalNuevoProducto').classList.remove('hidden');
+        };
+
+        window.closeModalNuevoProducto = function() {
+            document.getElementById('modalNuevoProducto').classList.add('hidden');
+        };
+
+        window.saveCustomProduct = function() {
+            const codeInput = document.getElementById('newProdCode');
+            const descInput = document.getElementById('newProdDesc');
+            if (!codeInput || !descInput) return;
+            const code = (codeInput.value || '').trim();
+            const desc = (descInput.value || '').trim().toUpperCase();
+            if (!code || !desc) {
+                return showMessage("⚠️ Ingrese código y descripción", "fix-accent");
+            }
+            const safeKey = code.replace(/[\.\$#\[\]\/]/g, '_');
+            const productObj = {
+                codigo: code,
+                descripcion: desc,
+                fechaCreacion: new Date().toISOString(),
+                creadoPor: currentTechUser || 'ADMIN'
+            };
+            database.ref('catalogo_custom/' + safeKey).set(productObj).then(() => {
+                if (!window.CATALOGO_TEKA_BASE) window.CATALOGO_TEKA_BASE = {};
+                window.CATALOGO_TEKA_BASE[code] = desc;
+                showMessage("✅ Producto guardado en catálogo", "fix-report");
+                closeModalNuevoProducto();
+                renderCatalogoProductos();
+            }).catch(err => {
+                console.error(err);
+                showMessage("❌ Error al guardar producto", "fix-error");
+            });
+        };
+
+        window.editCustomProduct = function(safeKey, code, desc) {
+            document.getElementById('newProdCode').value = code;
+            document.getElementById('newProdDesc').value = desc;
+            document.getElementById('modalNuevoProductoTitle').textContent = '✏️ Editar Producto ' + code;
+            document.getElementById('modalNuevoProducto').classList.remove('hidden');
+        };
+
+        window.deleteCustomProduct = function(safeKey, code) {
+            showConfirmModal(`¿Eliminar el producto código ${code} del catálogo?`, function() {
+                database.ref('catalogo_custom/' + safeKey).remove().then(() => {
+                    if (window.CATALOGO_TEKA_BASE) delete window.CATALOGO_TEKA_BASE[code];
+                    if (window.CUSTOM_CATALOG) delete window.CUSTOM_CATALOG[safeKey];
+                    showMessage("🗑️ Producto eliminado", "fix-error");
+                    renderCatalogoProductos();
+                });
+            });
+        };
+
+        // ==========================================
+        // REPUESTOS EN GARANTÍAS (REGISTRO, EDICIÓN Y PICKER)
+        // ==========================================
+        window.toggleWarrantyRepuestoUI = function(val) {
+            const container = document.getElementById('warrantyRepuestoContainer');
+            if (!container) return;
+            if (val === 'SI') {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+                const cInput = document.getElementById('warrantyCodRepuesto');
+                const dInput = document.getElementById('warrantyDescRepuesto');
+                const pInput = document.getElementById('warrantyPrecioRepuesto');
+                const hint = document.getElementById('warrantyRepuestoHint');
+                if (cInput) cInput.value = '';
+                if (dInput) dInput.value = '';
+                if (pInput) pInput.value = '';
+                if (hint) hint.innerHTML = '';
+            }
+        };
+
+        window.lookupWarrantyRepuestoCode = function(val) {
+            const code = (val || '').trim();
+            const descEl = document.getElementById('warrantyDescRepuesto');
+            const priceEl = document.getElementById('warrantyPrecioRepuesto');
+            const hintEl = document.getElementById('warrantyRepuestoHint');
+            const map = window.MAPA_REPUESTOS_TEKA || {};
+
+            if (code && map[code]) {
+                const item = map[code];
+                if (descEl) descEl.value = item.desc;
+                if (priceEl) priceEl.value = '$' + (item.precio || 0).toFixed(2);
+                if (hintEl) hintEl.innerHTML = `<span class="text-emerald-700 font-black">✅ ${item.desc} — $${(item.precio || 0).toFixed(2)} (Sin IVA)</span>`;
+            } else if (code.length > 1) {
+                if (priceEl) priceEl.value = '';
+                if (hintEl) hintEl.innerHTML = `<span class="text-stone-500 italic">Código no encontrado en Lista 2026 (puedes escribir la descripción manual)</span>`;
+            } else {
+                if (priceEl) priceEl.value = '';
+                if (hintEl) hintEl.innerHTML = '';
+            }
+        };
+
+        window.toggleEditRepuestoFields = function(selectEl, index) {
+            const box = document.querySelector('.edit-repuesto-box-' + index);
+            if (!box) return;
+            if (selectEl.value === 'SI') {
+                box.classList.remove('hidden');
+            } else {
+                box.classList.add('hidden');
+                const cInput = box.querySelector('.edit-eq-rep-code');
+                const dInput = box.querySelector('.edit-eq-rep-desc');
+                if (cInput) cInput.value = '';
+                if (dInput) dInput.value = 'REVISIÓN TÉCNICA';
+            }
+        };
+
+        window.lookupEditRepuesto = function(inputEl, index) {
+            const code = (inputEl.value || '').trim();
+            const box = document.querySelector('.edit-repuesto-box-' + index);
+            if (!box) return;
+            const descEl = box.querySelector('.edit-eq-rep-desc');
+            const map = window.MAPA_REPUESTOS_TEKA || {};
+            if (code && map[code]) {
+                const item = map[code];
+                if (descEl) descEl.value = item.desc;
+            }
+        };
+
+        window.lookupGarantiaViewRepuesto = function(val, id) {
+            const code = (val || '').trim();
+            const descEl = document.getElementById('garantias_desc_repuesto_' + id);
+            const map = window.MAPA_REPUESTOS_TEKA || {};
+            if (code && map[code]) {
+                const item = map[code];
+                if (descEl) descEl.value = item.desc;
+            }
+        };
+
+        // Modal Picker de Repuestos
+        window.repuestoPickerTarget = null; // { type: 'register' | 'edit' | 'garantia_view', index: 0, id: null }
+
+        window.openRepuestoPicker = function(type, index = 0, id = null) {
+            window.repuestoPickerTarget = { type, index, id };
+            const modal = document.getElementById('modalRepuestoPicker');
+            const searchInput = document.getElementById('searchRepuestoPickerInput');
+            if (searchInput) searchInput.value = '';
+            if (modal) modal.classList.remove('hidden');
+            filterRepuestoPicker();
+        };
+
+        window.closeRepuestoPicker = function() {
+            const modal = document.getElementById('modalRepuestoPicker');
+            if (modal) modal.classList.add('hidden');
+            window.repuestoPickerTarget = null;
+        };
+
+        window.filterRepuestoPicker = function() {
+            const tbody = document.getElementById('repuestoPickerTableBody');
+            if (!tbody) return;
+            const query = (document.getElementById('searchRepuestoPickerInput')?.value || '').trim().toUpperCase();
+            const all = window.LISTA_REPUESTOS_TEKA || [];
+            let list = all;
+            if (query) {
+                list = all.filter(r => (r.cod && r.cod.toUpperCase().includes(query)) || (r.desc && r.desc.toUpperCase().includes(query)));
+            }
+            const display = query ? list.slice(0, 60) : list.slice(0, 30);
+            tbody.innerHTML = display.map(r => {
+                return `<tr class="border-b border-stone-200 hover:bg-amber-50/60 transition-colors">
+                    <td class="p-2.5 font-mono font-bold text-amber-900 text-xs text-center">${r.cod}</td>
+                    <td class="p-2.5 font-semibold text-stone-800 text-xs">${r.desc}</td>
+                    <td class="p-2.5 font-mono font-bold text-emerald-700 text-xs text-right">$${(r.precio || 0).toFixed(2)}</td>
+                    <td class="p-2.5 text-center">
+                        <button type="button" onclick="selectRepuestoFromPicker('${r.cod.replace(/'/g, "\\'")}', '${r.desc.replace(/'/g, "\\'")}', ${r.precio || 0})" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-black uppercase shadow-xs transition-all active:scale-95">
+                            Seleccionar
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        };
+
+        window.selectRepuestoFromPicker = function(cod, desc, precio) {
+            const target = window.repuestoPickerTarget;
+            if (!target) return closeRepuestoPicker();
+
+            if (target.type === 'register') {
+                const cInput = document.getElementById('warrantyCodRepuesto');
+                const dInput = document.getElementById('warrantyDescRepuesto');
+                const pInput = document.getElementById('warrantyPrecioRepuesto');
+                const rRadio = document.querySelector('input[name="warrantyConRepuesto"][value="SI"]');
+                if (rRadio) { rRadio.checked = true; toggleWarrantyRepuestoUI('SI'); }
+                if (cInput) cInput.value = cod;
+                if (dInput) dInput.value = desc;
+                if (pInput) pInput.value = '$' + (precio || 0).toFixed(2);
+                lookupWarrantyRepuestoCode(cod);
+            } else if (target.type === 'edit') {
+                const box = document.querySelector('.edit-repuesto-box-' + target.index);
+                if (box) {
+                    box.classList.remove('hidden');
+                    const selConRep = box.parentElement.querySelector('.edit-eq-con-repuesto');
+                    if (selConRep) selConRep.value = 'SI';
+                    const cInput = box.querySelector('.edit-eq-rep-code');
+                    const dInput = box.querySelector('.edit-eq-rep-desc');
+                    if (cInput) cInput.value = cod;
+                    if (dInput) dInput.value = desc;
+                }
+            } else if (target.type === 'garantia_view' && target.id) {
+                const cInput = document.getElementById('garantias_cod_repuesto_' + target.id);
+                const dInput = document.getElementById('garantias_desc_repuesto_' + target.id);
+                if (cInput) cInput.value = cod;
+                if (dInput) dInput.value = desc;
+                const textarea = document.getElementById('garantias_repuesto_' + target.id);
+                if (textarea) textarea.value = `${cod} - ${desc}`;
+            }
+
+            closeRepuestoPicker();
+            showMessage(`✅ Repuesto: ${cod} - ${desc}`, 'fix-report');
         };
 
         function getEquipmentCost(v, eq, catType) {
@@ -5083,13 +5416,20 @@
 
             if (inputEquipos === null) {
                 const currentRows = container.querySelectorAll('.equipment-edit-row');
-                currentRows.forEach(row => {
+                currentRows.forEach((row, rIdx) => {
+                    const selConRep = row.querySelector('.edit-eq-con-repuesto');
+                    const conRepVal = selConRep ? (selConRep.value === 'SI') : false;
+                    const cRepInput = row.querySelector('.edit-eq-rep-code');
+                    const dRepInput = row.querySelector('.edit-eq-rep-desc');
                     equiposActuales.push({
                         descProducto: row.querySelector('.edit-eq-select').value,
                         manualName: row.querySelector('.edit-eq-manual').value,
                         codProducto: row.querySelector('.edit-eq-code').value,
                         serieEquipo: row.querySelector('.edit-eq-serie').value,
-                        costoBase: parseFloat(row.querySelector('.edit-eq-cost').value) || 0
+                        costoBase: parseFloat(row.querySelector('.edit-eq-cost').value) || 0,
+                        conRepuesto: conRepVal,
+                        codRepuesto: cRepInput ? cRepInput.value.trim().toUpperCase() : '',
+                        descRepuesto: dRepInput ? dRepInput.value.trim().toUpperCase() : (conRepVal ? '' : 'REVISIÓN TÉCNICA')
                     });
                 });
             } else {
@@ -5102,7 +5442,7 @@
             const isGarantiaEdit = (currentTipo === 'Garantía');
 
             for(let i = 0; i < count; i++) {
-                const eq = equiposActuales[i] || { descProducto: "", manualName: "", costoBase: 0, codProducto: "", serieEquipo: "" };
+                const eq = equiposActuales[i] || { descProducto: "", manualName: "", costoBase: 0, codProducto: "", serieEquipo: "", conRepuesto: false, codRepuesto: "", descRepuesto: "" };
                 let currentDesc = (eq.descProducto || "").toUpperCase();
                 let defaultCost = eq.costoBase;
                 
@@ -5119,6 +5459,10 @@
                     else if (count === 2) defaultCost = 20;
                     else defaultCost = 15;
                 }
+
+                const hasRepuesto = eq.conRepuesto === true || (eq.codRepuesto && eq.codRepuesto.trim() !== '');
+                const repCode = eq.codRepuesto || '';
+                const repDesc = eq.descRepuesto || '';
 
                 container.innerHTML += `
                 <div class="equipment-edit-row p-5 glass-panel bg-white/70 mb-5 shadow-sm italic font-black border border-white/90">
@@ -5138,6 +5482,35 @@
                             <div><label class="text-[8px] text-stone-600 font-black ml-1 mb-1 block">CÓDIGO SAP (BASE)</label><input type="text" class="edit-eq-code w-full p-4 text-[10px] font-black rounded-xl glass-input uppercase text-stone-800 font-mono" value="${eq.codProducto || ''}" oninput="lookupEditTekaCode(this, ${i})" placeholder="EJ: 915061"></div>
                             <div><label class="text-[8px] text-stone-600 font-black ml-1 mb-1 block">NÚMERO SERIE</label><input type="text" class="edit-eq-serie w-full p-4 text-[10px] font-black rounded-xl glass-input uppercase text-stone-800 font-mono" value="${eq.serieEquipo || ''}" placeholder="SERIE..."></div>
                         </div>
+
+                        <!-- Sección de Repuesto en Edición -->
+                        <div class="mt-2 p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+                            <div class="flex items-center justify-between">
+                                <label class="text-[9px] font-black text-amber-900 flex items-center gap-1.5">
+                                    🔧 ¿LLEVA REPUESTO EN GARANTÍA?
+                                </label>
+                                <select class="edit-eq-con-repuesto p-1.5 rounded-lg text-[9px] font-black border border-amber-300 bg-white" onchange="toggleEditRepuestoFields(this, ${i})">
+                                    <option value="NO" ${!hasRepuesto ? 'selected' : ''}>NO (SOLO REVISIÓN)</option>
+                                    <option value="SI" ${hasRepuesto ? 'selected' : ''}>SÍ (CON REPUESTO)</option>
+                                </select>
+                            </div>
+                            <div class="edit-repuesto-box-${i} ${hasRepuesto ? '' : 'hidden'} space-y-2 pt-2 border-t border-amber-200">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-[8px] text-amber-950 font-bold block mb-1">CÓDIGO REPUESTO (LISTA 2026)</label>
+                                        <div class="flex gap-1.5">
+                                            <input type="text" class="edit-eq-rep-code w-full p-2.5 text-[9px] font-black rounded-lg glass-input uppercase font-mono border border-stone-300" value="${repCode}" oninput="lookupEditRepuesto(this, ${i})" placeholder="EJ: 81483008">
+                                            <button type="button" onclick="openRepuestoPicker('edit', ${i})" class="px-2.5 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-lg text-[9px] font-black shrink-0 shadow-xs" title="Buscar en lista 2026">🔍</button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-[8px] text-amber-950 font-bold block mb-1">DESCRIPCIÓN REPUESTO</label>
+                                        <input type="text" class="edit-eq-rep-desc w-full p-2.5 text-[9px] font-bold rounded-lg glass-input uppercase border border-stone-300" value="${repDesc}" placeholder="DESCRIPCIÓN...">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="mt-3"><label class="text-[9px] text-fix-main font-black italic block mb-2">💰 PRECIO LIQUIDACIÓN / COBRO:</label><input type="number" step="0.01" value="${defaultCost.toFixed(2)}" class="edit-eq-cost w-full p-4 text-base font-mono font-black rounded-xl glass-input bg-stone-100/80 border border-stone-300 text-fix-report outline-none"></div>
                     </div>
                 </div>`;
@@ -5197,6 +5570,7 @@ function getEditModalData() {
             const originalVisit = visitsArray.find(item => item.id === document.getElementById('edit_id').value);
             const isMaint = originalVisit && (originalVisit.esMantenimiento || originalVisit.tipoAtencion === 'Mantenimiento');
             const isGar = document.getElementById('edit_tipoAtencion')?.value === 'Garantía';
+            const editRows = document.querySelectorAll('.equipment-edit-row');
 
             for(let i=0; i<selects.length; i++) {
                 let cost = parseFloat(selectsCosts[i].value) || 0;
@@ -5206,12 +5580,26 @@ function getEditModalData() {
                 if (isGar && (cost === 0 || Math.abs(cost - 14.23) < 0.01)) {
                     cost = getGarantiaCost(targetDesc);
                 }
+                const rowEl = editRows[i];
+                const selConRep = rowEl ? rowEl.querySelector('.edit-eq-con-repuesto') : null;
+                const conRep = selConRep ? (selConRep.value === 'SI') : false;
+                const repCodeEl = rowEl ? rowEl.querySelector('.edit-eq-rep-code') : null;
+                const repDescEl = rowEl ? rowEl.querySelector('.edit-eq-rep-desc') : null;
+                const codRepVal = repCodeEl ? repCodeEl.value.trim().toUpperCase() : '';
+                let descRepVal = repDescEl ? repDescEl.value.trim().toUpperCase() : '';
+                if (!conRep && !descRepVal) {
+                    descRepVal = 'REVISIÓN TÉCNICA';
+                }
+
                 updatedEquipos.push({ 
                     descProducto: targetDesc, 
                     manualName: manual, 
                     costoBase: cost, 
                     codProducto: codes[i].value.toUpperCase(), 
-                    serieEquipo: series[i].value.toUpperCase() 
+                    serieEquipo: series[i].value.toUpperCase(),
+                    conRepuesto: conRep,
+                    codRepuesto: codRepVal,
+                    descRepuesto: descRepVal || 'REVISIÓN TÉCNICA'
                 });
             }
 
@@ -5319,7 +5707,20 @@ function getEditModalData() {
                     const wEqSel = document.getElementById('warrantyEquipmentSelect');
                     const wEq = wEqSel ? wEqSel.value : "";
                     const costGar = getGarantiaCost(wEq);
-                    eqs.push({ descProducto: wEq.toUpperCase(), manualName: "", costoBase: costGar, codProducto: "", serieEquipo: "" });
+                    const conRepRadio = document.querySelector('input[name="warrantyConRepuesto"]:checked');
+                    const conRep = conRepRadio ? (conRepRadio.value === 'SI') : false;
+                    const codRep = conRep ? (document.getElementById('warrantyCodRepuesto')?.value || '').trim().toUpperCase() : '';
+                    const descRep = conRep ? (document.getElementById('warrantyDescRepuesto')?.value || '').trim().toUpperCase() : 'REVISIÓN TÉCNICA';
+                    eqs.push({ 
+                        descProducto: wEq.toUpperCase(), 
+                        manualName: "", 
+                        costoBase: costGar, 
+                        codProducto: "", 
+                        serieEquipo: "",
+                        conRepuesto: conRep,
+                        codRepuesto: codRep,
+                        descRepuesto: descRep || 'REVISIÓN TÉCNICA'
+                    });
                 }
                 else { 
                     const num = parseInt(data.numEquipos) || 1; 
@@ -5405,6 +5806,18 @@ function getEditModalData() {
                 renderInventoryView(); 
             }, error => {
                 console.error("Database error (inventory_entries):", error);
+            });
+            database.ref('catalogo_custom').on('value', snap => { 
+                window.CUSTOM_CATALOG = snap.val() || {}; 
+                if (!window.CATALOGO_TEKA_BASE) window.CATALOGO_TEKA_BASE = {};
+                for (const [key, item] of Object.entries(window.CUSTOM_CATALOG)) {
+                    const c = typeof item === 'object' ? item.codigo : key;
+                    const d = typeof item === 'object' ? item.descripcion : item;
+                    if (c && d) window.CATALOGO_TEKA_BASE[c] = d;
+                }
+                if (currentView === 'catalogo') renderCatalogoView();
+            }, error => {
+                console.error("Database error (catalogo_custom):", error);
             });
         }
 
@@ -6017,6 +6430,9 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
         <button onclick="changeMasterView('clientes')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="clientes">
             <span class="text-xl leading-none">👥</span><span class="text-[9px] mt-1 font-bold">Clientes</span>
         </button>
+        <button onclick="changeMasterView('catalogo')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="catalogo">
+            <span class="text-xl leading-none">📚</span><span class="text-[9px] mt-1 font-bold">Catálogo</span>
+        </button>
     </nav>
 
     <div class="max-w-[2800px] mx-auto pb-32 md:pb-10 relative">
@@ -6058,6 +6474,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
             <button onclick="changeMasterView('contabilidad')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">💰</span> Caja</button>
             <button onclick="changeMasterView('buscador')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">🔍</span> Buscador</button>
             <button onclick="changeMasterView('clientes')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">👥</span> Clientes</button>
+            <button onclick="changeMasterView('catalogo')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200" title="Catálogo de Productos y Repuestos"><span class="text-base">📚</span> Catálogo</button>
         </nav>
     </header>
 
@@ -6439,6 +6856,48 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <p class="text-[10px] font-black text-fix-main underline uppercase ml-1">DATOS DE GARANTÍA (TARIFA OFICIAL DE FÁBRICA / REPORTE TEKA)</p>
                             <select id="warrantyEquipmentSelect" class="w-full p-4 glass-input rounded-xl font-black text-xs uppercase outline-none text-stone-800"></select>
                             <textarea id="warrantyDamageDesc" placeholder="DESCRIBA LA FALLA..." class="w-full p-5 glass-input rounded-2xl font-black text-xs uppercase min-h-[100px] outline-none text-stone-800"></textarea>
+
+                            <!-- SECCIÓN: REPUESTO EN GARANTÍA -->
+                            <div class="p-4 bg-amber-50/90 rounded-2xl border border-amber-300 shadow-sm space-y-3 font-black not-italic">
+                                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                                    <span class="text-xs text-amber-950 font-black uppercase tracking-tight flex items-center gap-1.5">
+                                        🔧 ¿LLEVA REPUESTO ESTA GARANTÍA?
+                                    </span>
+                                    <div class="flex items-center gap-4 bg-white/90 px-3 py-1.5 rounded-xl border border-amber-200">
+                                        <label class="inline-flex items-center gap-1 text-xs cursor-pointer">
+                                            <input type="radio" name="warrantyConRepuesto" value="NO" checked onchange="toggleWarrantyRepuestoUI('NO')" class="accent-amber-700">
+                                            <span class="text-stone-700 font-black">NO</span>
+                                        </label>
+                                        <label class="inline-flex items-center gap-1 text-xs cursor-pointer">
+                                            <input type="radio" name="warrantyConRepuesto" value="SI" onchange="toggleWarrantyRepuestoUI('SI')" class="accent-amber-700">
+                                            <span class="text-amber-800 font-black">SÍ (CON REPUESTO)</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div id="warrantyRepuestoContainer" class="hidden space-y-3 pt-2 border-t border-amber-200">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div class="md:col-span-1">
+                                            <label class="text-[9px] text-amber-950 block mb-1">CÓD. REPUESTO (LISTA 2026):</label>
+                                            <div class="flex gap-1.5">
+                                                <input type="text" id="warrantyCodRepuesto" oninput="lookupWarrantyRepuestoCode(this.value)" placeholder="EJ: 81483008" class="p-3 glass-input bg-white rounded-xl text-xs font-mono font-black uppercase outline-none border border-amber-300 w-full">
+                                                <button type="button" onclick="openRepuestoPicker('register', 0)" class="px-3 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-black shrink-0 shadow-sm" title="Buscar en lista 2026">🔍</button>
+                                            </div>
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <label class="text-[9px] text-amber-950 block mb-1">DESCRIPCIÓN REPUESTO:</label>
+                                            <input type="text" id="warrantyDescRepuesto" placeholder="DESCRIPCIÓN OFICIAL..." class="p-3 glass-input bg-white rounded-xl text-xs font-bold uppercase outline-none border border-amber-300 w-full">
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div id="warrantyRepuestoHint" class="text-[10px] font-bold"></div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-[9px] text-stone-500 font-bold">PVP (SIN IVA):</span>
+                                            <input type="text" id="warrantyPrecioRepuesto" readonly placeholder="$0.00" class="w-24 p-1.5 glass-input bg-white rounded-lg text-xs font-mono font-black text-right text-emerald-800 border border-amber-200">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <div id="financialDashboardRegistration" class="mt-8 grid grid-cols-3 gap-4 text-center">
@@ -6705,17 +7164,14 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <button onclick="switchTekaTab('bbq')" id="tabBtn_bbq" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5">
                             <span>🔥</span> 3. BBQ (<span id="badge_bbq">0</span>)
                         </button>
-                        <button onclick="switchTekaTab('base')" id="tabBtn_base" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5">
-                            <span>📚</span> 4. BASE (905 ARTÍCULOS)
-                        </button>
                         <button onclick="switchTekaTab('consolidado')" id="tabBtn_consolidado" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5">
-                            <span>📋</span> 5. CONSOLIDADO (<span id="badge_consolidado">0</span>)
+                            <span>📋</span> 4. CONSOLIDADO (<span id="badge_consolidado">0</span>)
                         </button>
                         <button onclick="switchTekaTab('unproducto')" id="tabBtn_unproducto" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5">
-                            <span>🔹</span> 6. UN PRODUCTO (<span id="badge_unproducto">0</span>)
+                            <span>🔹</span> 5. UN PRODUCTO (<span id="badge_unproducto">0</span>)
                         </button>
                         <button onclick="switchTekaTab('almacen')" id="tabBtn_almacen" class="teka-tab-btn px-4 py-2.5 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-1.5">
-                            <span>🏬</span> 7. ALMACÉN (<span id="badge_almacen">0</span>)
+                            <span>🏬</span> 6. ALMACÉN (<span id="badge_almacen">0</span>)
                         </button>
                     </div>
 
@@ -6866,30 +7322,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         </div>
                     </div>
 
-                    <!-- Contenedor Pestaña 4: BASE (Catálogo 905 productos) -->
-                    <div id="tekaTab_base" class="teka-tab-content mt-4 hidden">
-                        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 mb-4 flex flex-col md:flex-row justify-between items-center gap-3">
-                            <div class="flex-1 w-full">
-                                <input type="text" id="searchTekaBaseInput" oninput="renderTekaBaseTable()" placeholder="Buscar por código (ej: 915061) o por nombre (ej: FREGADERO, HORNO)..." class="w-full p-3.5 glass-input bg-white rounded-xl text-xs font-bold text-stone-800 outline-none border border-stone-300 shadow-inner">
-                            </div>
-                            <span id="tekaBaseCountDisplay" class="text-xs font-black text-fix-main whitespace-nowrap bg-white px-3 py-2 rounded-xl border border-stone-200 shadow-sm">
-                                905 productos cargados
-                            </span>
-                        </div>
-                        <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/80 max-h-[500px]">
-                            <table class="w-full border-collapse admin-table font-sans">
-                                <thead class="sticky top-0 bg-black text-white text-[10px] font-black">
-                                    <tr>
-                                        <th class="p-3 w-40 text-center">CÓDIGO ARTÍCULO</th>
-                                        <th class="p-3 text-left">DESCRIPCIÓN OFICIAL PRODUCTO</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tekaTableBody_base" class="text-[10px] font-bold text-stone-800 uppercase font-mono"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Contenedor Pestaña 5: CONSOLIDADO -->
+                    <!-- Contenedor Pestaña 4: CONSOLIDADO -->
                     <div id="tekaTab_consolidado" class="teka-tab-content mt-4 hidden">
                         <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/70">
                             <table class="w-full border-collapse admin-table font-sans">
@@ -6982,6 +7415,95 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                     </tr>
                                 </thead>
                                 <tbody id="tekaTableBody_almacen" class="text-[9px] font-semibold text-stone-800 uppercase"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- VISTA DEDICADA: CATÁLOGO DE PRODUCTOS Y REPUESTOS TEKA -->
+            <div id="catalogoView" class="hidden lg:col-span-3 space-y-6 admin-only">
+                <div class="glass-card p-6 md:p-8 rounded-3xl font-black uppercase shadow-xl border border-white/90">
+                    
+                    <!-- Header Catálogo -->
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 pb-6 border-b border-stone-200">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-blue-900 text-white text-[10px] px-2.5 py-1 rounded-lg font-black tracking-wider">MAESTRO TEKA</span>
+                                <span class="text-xs text-stone-500 font-bold">BASE OFICIAL + LISTA PRECIOS 2026</span>
+                            </div>
+                            <h2 class="text-xl md:text-2xl font-black uppercase italic text-fix-main mt-1.5 tracking-tight flex items-center gap-2">
+                                📚 Catálogo de Productos y Repuestos
+                            </h2>
+                            <p class="text-[10px] text-stone-500 font-normal normal-case mt-0.5">
+                                Consulta, busca y gestiona los códigos de equipos base y los repuestos oficiales con precios 2026.
+                            </p>
+                        </div>
+
+                        <!-- Botón Agregar Nuevo Producto Manual -->
+                        <button onclick="openModalNuevoProducto()" class="glass-card bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3.5 rounded-2xl font-black text-xs uppercase shadow-lg shadow-emerald-900/20 active:scale-95 transition-all flex items-center gap-2 border border-emerald-400">
+                            <span class="text-lg">➕</span>
+                            <span>AGREGAR PRODUCTO MANUAL</span>
+                        </button>
+                    </div>
+
+                    <!-- Subtabs del Catálogo -->
+                    <div class="flex flex-wrap gap-2.5 mt-5">
+                        <button id="tabBtn_cat_productos" onclick="switchCatalogoSubtab('productos')" class="px-5 py-3 rounded-xl font-black text-xs uppercase bg-fix-main text-white shadow-md transition-all flex items-center gap-2">
+                            <span>📦</span>
+                            <span>PRODUCTOS BASE</span>
+                        </button>
+                        <button id="tabBtn_cat_repuestos" onclick="switchCatalogoSubtab('repuestos')" class="px-5 py-3 rounded-xl font-black text-xs uppercase bg-stone-100 text-stone-700 hover:bg-stone-200 transition-all flex items-center gap-2">
+                            <span>🔧</span>
+                            <span>LISTA PRECIOS REPUESTOS 2026</span>
+                        </button>
+                    </div>
+
+                    <!-- Contenedor Subtab 1: Productos Base -->
+                    <div id="catalogoTab_productos" class="space-y-4 mt-6">
+                        <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-stone-50/80 p-4 rounded-2xl border border-stone-200">
+                            <div class="flex-grow">
+                                <input type="text" id="searchCatalogoProductosInput" oninput="renderCatalogoProductos()" placeholder="🔍 BUSCAR PRODUCTO POR CÓDIGO O DESCRIPCIÓN (ej. 111010098, HSB, CAMPANA)..." class="w-full p-3 glass-input bg-white rounded-xl text-xs font-bold uppercase text-stone-800 outline-none border border-stone-300 shadow-inner">
+                            </div>
+                            <div id="catalogoProductosCountDisplay" class="text-xs text-stone-600 font-bold shrink-0 self-center"></div>
+                        </div>
+
+                        <div class="overflow-x-auto border border-stone-200 rounded-2xl bg-white shadow-sm">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-blue-900 text-white text-[9px] uppercase tracking-wider">
+                                    <tr>
+                                        <th class="p-3 text-center w-36">CÓDIGO ARTÍCULO</th>
+                                        <th class="p-3">DESCRIPCIÓN DEL PRODUCTO</th>
+                                        <th class="p-3 text-center w-32">TIPO</th>
+                                        <th class="p-3 text-center w-32">ACCIONES</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="catalogoTableBody_productos" class="divide-y divide-stone-200 text-xs"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor Subtab 2: Repuestos Lista 2026 -->
+                    <div id="catalogoTab_repuestos" class="hidden space-y-4 mt-6">
+                        <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-amber-50/70 p-4 rounded-2xl border border-amber-200">
+                            <div class="flex-grow">
+                                <input type="text" id="searchCatalogoRepuestosInput" oninput="renderCatalogoRepuestos()" placeholder="🔍 BUSCAR REPUESTO POR CÓDIGO O DESCRIPCIÓN (ej. 81483008, tarjeta, quemador, bisagra)..." class="w-full p-3 glass-input bg-white rounded-xl text-xs font-bold uppercase text-stone-800 outline-none border border-amber-300 shadow-inner">
+                            </div>
+                            <div id="catalogoRepuestosCountDisplay" class="text-xs text-amber-900 font-bold shrink-0 self-center"></div>
+                        </div>
+
+                        <div class="overflow-x-auto border border-stone-200 rounded-2xl bg-white shadow-sm">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-amber-900 text-white text-[9px] uppercase tracking-wider">
+                                    <tr>
+                                        <th class="p-3 text-center w-36">CÓDIGO REPUESTO</th>
+                                        <th class="p-3">DESCRIPCIÓN OFICIAL</th>
+                                        <th class="p-3 text-right w-36">PRECIO SIN IVA</th>
+                                        <th class="p-3 text-center w-28">COPIAR</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="catalogoTableBody_repuestos" class="divide-y divide-stone-200 text-xs"></tbody>
                             </table>
                         </div>
                     </div>
@@ -7158,6 +7680,80 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
             <p class="text-[8px] text-stone-400 mt-3 text-center normal-case">
                 Puedes obtener tu clave gratuita en <a href="https://aistudio.google.com/" target="_blank" class="underline text-fix-main font-bold">aistudio.google.com</a>
             </p>
+        </div>
+    </div>
+
+    <!-- MODAL NUEVO / EDITAR PRODUCTO DEL CATÁLOGO -->
+    <div id="modalNuevoProducto" class="hidden fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[100000] flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-lg rounded-3xl shadow-2xl p-6 font-black uppercase text-stone-800 border border-white/90">
+            <div class="flex justify-between items-center mb-5 border-b border-stone-200 pb-3">
+                <h3 id="modalNuevoProductoTitle" class="text-sm font-black text-fix-main flex items-center gap-2">
+                    ➕ AGREGAR PRODUCTO AL CATÁLOGO
+                </h3>
+                <button onclick="closeModalNuevoProducto()" class="text-stone-400 hover:text-stone-800 text-lg font-bold">✕</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-black text-stone-600 block mb-1.5">CÓDIGO SAP / ARTÍCULO:</label>
+                    <input type="text" id="newProdCode" placeholder="EJ: 111010098" class="w-full p-3.5 glass-input bg-white/90 rounded-xl text-xs font-mono font-bold text-stone-800 outline-none border border-stone-300">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-stone-600 block mb-1.5">DESCRIPCIÓN DEL PRODUCTO:</label>
+                    <input type="text" id="newProdDesc" placeholder="EJ: HSB 6350 FBK E10 EC" class="w-full p-3.5 glass-input bg-white/90 rounded-xl text-xs font-bold uppercase text-stone-800 outline-none border border-stone-300">
+                </div>
+                <p class="text-[9px] text-stone-500 font-normal normal-case italic">
+                    Este producto quedará disponible de inmediato en las búsquedas del sistema, autocompletado y en el Reporte TEKA (pestaña BASE).
+                </p>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="saveCustomProduct()" class="flex-1 bg-fix-main hover:bg-blue-900 text-white py-3.5 rounded-xl text-xs font-black uppercase transition-all shadow-md active:scale-95">
+                    💾 GUARDAR PRODUCTO
+                </button>
+                <button onclick="closeModalNuevoProducto()" class="px-5 glass-input bg-white/70 text-stone-600 rounded-xl text-xs font-black uppercase hover:bg-stone-100">
+                    CANCELAR
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL SELECTOR RÁPIDO DE REPUESTOS (LISTA 2026) -->
+    <div id="modalRepuestoPicker" class="hidden fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[100000] flex items-center justify-center p-3 md:p-6">
+        <div class="glass-card w-full max-w-3xl max-h-[90vh] flex flex-col rounded-3xl shadow-2xl p-5 md:p-6 font-black uppercase text-stone-800 border border-white/90">
+            <div class="flex justify-between items-center pb-3 border-b border-stone-200">
+                <div>
+                    <h3 class="text-sm md:text-base font-black text-amber-900 flex items-center gap-2">
+                        🔍 Catálogo Oficial de Repuestos TEKA 2026
+                    </h3>
+                    <p class="text-[9px] text-stone-500 font-normal normal-case mt-0.5">
+                        Filtra por código o descripción y haz clic en "Seleccionar" para vincularlo a la garantía.
+                    </p>
+                </div>
+                <button onclick="closeRepuestoPicker()" class="text-stone-400 hover:text-stone-800 text-xl font-bold px-2">✕</button>
+            </div>
+            
+            <div class="pt-3 pb-3">
+                <input type="text" id="searchRepuestoPickerInput" oninput="filterRepuestoPicker()" placeholder="🔍 BUSCAR REPUESTO POR CÓDIGO O NOMBRE (ej. 81483008, quemador, bisagra)..." class="w-full p-3.5 glass-input bg-white/90 rounded-xl text-xs font-bold uppercase text-stone-800 outline-none border border-stone-300 shadow-inner">
+            </div>
+
+            <div class="flex-grow overflow-y-auto border border-stone-200 rounded-2xl">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-amber-900 text-white text-[9px] sticky top-0 uppercase tracking-wider">
+                        <tr>
+                            <th class="p-2.5 text-center w-28">CÓDIGO</th>
+                            <th class="p-2.5">DESCRIPCIÓN REPUESTO</th>
+                            <th class="p-2.5 text-right w-28">PVP SIN IVA</th>
+                            <th class="p-2.5 text-center w-28">ACCIÓN</th>
+                        </tr>
+                    </thead>
+                    <tbody id="repuestoPickerTableBody" class="divide-y divide-stone-200 text-xs"></tbody>
+                </table>
+            </div>
+
+            <div class="pt-3 flex justify-end">
+                <button onclick="closeRepuestoPicker()" class="px-6 py-2.5 glass-input bg-white/80 text-stone-600 rounded-xl text-xs font-black uppercase hover:bg-stone-100">
+                    CERRAR
+                </button>
+            </div>
         </div>
     </div>
 
