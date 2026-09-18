@@ -1291,6 +1291,7 @@
 
                 let moParaCaja = 0; let totalAccs = 0; const accs = [];
                 const isMantenimiento = v.esMantenimiento || v.tipoAtencion === 'Mantenimiento';
+                const isGarantiaCase = (v.tipoAtencion === 'Garantía' || t === 'Garantía' || s === 'Garantia en Tramite');
 
                 if (!isMantenimiento) {
                     const primaryAccs = isCard ? document.querySelectorAll(".card-acc-" + id) : document.querySelectorAll(".acc-" + id);
@@ -1337,7 +1338,6 @@
                          }
                      }
                      
-                      const isGarantiaCase = (v.tipoAtencion === 'Garantía' || t === 'Garantía' || s === 'Garantia en Tramite');
                       if (!isGarantiaCase) { 
                           const eqs = v.equipos || [];
                           const eqCount = eqs.length;
