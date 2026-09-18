@@ -1201,32 +1201,100 @@
             }
         };
 
-        window.closeVisitByTech = function(id) {
+        window.closeVisitByTech = function(id, source) {
             try {
-                const sEl = document.getElementById("card_status_" + id) || document.getElementById("status_" + id);
-                const tEl = document.getElementById("card_type_" + id) || document.getElementById("type_" + id);
-                const pEl = document.getElementById("card_payment_" + id) || document.getElementById("payment_" + id);
-                const rEl = document.getElementById("card_reason_" + id) || document.getElementById("reason_" + id);
-                if(!sEl || !tEl) return showMessage("❌ Error en formulario", "fix-error");
+                // Si no se pasó source explícito, determinar de dónde provino la llamada
+                if (!source) {
+                    if (window.event && window.event.target) {
+                        if (window.event.target.closest('#ruteroCardsContainer') || window.event.target.closest('.tech-card')) {
+                            source = 'card';
+                        } else if (window.event.target.closest('#ruteroListBody') || window.event.target.closest('.detail-row') || window.event.target.closest('tr')) {
+                            source = 'desktop';
+                        }
+                    }
+                }
+                if (!source) {
+                    const deskStatus = document.getElementById("status_" + id);
+                    const cardStatus = document.getElementById("card_status_" + id);
+                    if (deskStatus && deskStatus.value && deskStatus.value !== 'PENDIENTE') {
+                        source = 'desktop';
+                    } else if (cardStatus && cardStatus.value && cardStatus.value !== 'PENDIENTE') {
+                        source = 'card';
+                    } else {
+                        source = currentTechUser ? 'card' : 'desktop';
+                    }
+                }
+
+                const isCard = source === 'card';
+
+                const sEl = isCard 
+                    ? (document.getElementById("card_status_" + id) || document.getElementById("status_" + id))
+                    : (document.getElementById("status_" + id) || document.getElementById("card_status_" + id));
+                const tEl = isCard 
+                    ? (document.getElementById("card_type_" + id) || document.getElementById("type_" + id))
+                    : (document.getElementById("type_" + id) || document.getElementById("card_type_" + id));
+                const pEl = isCard 
+                    ? (document.getElementById("card_payment_" + id) || document.getElementById("payment_" + id))
+                    : (document.getElementById("payment_" + id) || document.getElementById("card_payment_" + id));
+                const rEl = isCard 
+                    ? (document.getElementById("card_reason_" + id) || document.getElementById("reason_" + id))
+                    : (document.getElementById("reason_" + id) || document.getElementById("card_reason_" + id));
+                const commentEl = isCard 
+                    ? (document.getElementById("card_client_comment_" + id) || document.getElementById("client_comment_" + id))
+                    : (document.getElementById("client_comment_" + id) || document.getElementById("card_client_comment_" + id));
+
+                if(!sEl) return showMessage("❌ Error en formulario", "fix-error");
                 
-                const s = sEl.value; 
-                const t = tEl.value; 
-                const pay = pEl ? pEl.value : "EFECTIVO"; 
-                const r = rEl ? rEl.value : "";
-                const commentEl = document.getElementById("card_client_comment_" + id) || document.getElementById("client_comment_" + id);
-                const comment = commentEl ? commentEl.value : "";
-                const photos = window["photos_" + id] || [];
-                
+                let s = sEl.value;
+                // Si el elemento principal seleccionado tiene 'PENDIENTE', verificar si en el formulario alternativo se seleccionó un estado
+                if (s === 'PENDIENTE') {
+                    const altEl = isCard ? document.getElementById("status_" + id) : document.getElementById("card_status_" + id);
+                    if (altEl && altEl.value && altEl.value !== 'PENDIENTE') {
+                        s = altEl.value;
+                    }
+                }
+
                 if(s === 'PENDIENTE') return showMessage("⚠️ Seleccione estado", "fix-accent");
                 const v = visitsArray.find(function(item) { return item.id === id; });
                 if(!v) return showMessage("❌ No encontrado", "fix-error");
+
+                let t = tEl ? tEl.value : "";
+                if (!t) {
+                    const altT = isCard ? document.getElementById("type_" + id) : document.getElementById("card_type_" + id);
+                    if (altT && altT.value) t = altT.value;
+                }
+                if (!t) t = v.tipoAtencion || "Servicio Técnico";
+
+                let pay = pEl ? pEl.value : "";
+                if (!pay) {
+                    const altPay = isCard ? document.getElementById("payment_" + id) : document.getElementById("card_payment_" + id);
+                    if (altPay && altPay.value) pay = altPay.value;
+                }
+                if (!pay) pay = "EFECTIVO";
+
+                let r = rEl ? rEl.value : "";
+                if (!r) {
+                    const altR = isCard ? document.getElementById("reason_" + id) : document.getElementById("card_reason_" + id);
+                    if (altR && altR.value) r = altR.value;
+                }
+
+                let comment = commentEl ? commentEl.value : "";
+                if (!comment) {
+                    const altComment = isCard ? document.getElementById("client_comment_" + id) : document.getElementById("card_client_comment_" + id);
+                    if (altComment && altComment.value) comment = altComment.value;
+                }
+
+                const existingPhotos = (v && v.fotosRegistro) || [];
+                const photos = window["photos_" + id] || existingPhotos;
 
                 let moParaCaja = 0; let totalAccs = 0; const accs = [];
                 const isMantenimiento = v.esMantenimiento || v.tipoAtencion === 'Mantenimiento';
 
                 if (!isMantenimiento) {
-                    const accCards = document.querySelectorAll(".card-acc-" + id);
-                    const accEls = accCards.length > 0 ? accCards : document.querySelectorAll(".acc-" + id);
+                    const primaryAccs = isCard ? document.querySelectorAll(".card-acc-" + id) : document.querySelectorAll(".acc-" + id);
+                    const fallbackAccs = isCard ? document.querySelectorAll(".acc-" + id) : document.querySelectorAll(".card-acc-" + id);
+                    const accEls = primaryAccs.length > 0 ? primaryAccs : fallbackAccs;
+
                     accEls.forEach(function(i) {
                          const q = parseInt(i.value) || 0;
                          if(q > 0) {
@@ -1238,8 +1306,26 @@
                              }
                          }
                      });
-                     const mDescEl = document.getElementById("card_manual_acc_desc_" + id) || document.getElementById("manual_acc_desc_" + id);
-                     const mPriceEl = document.getElementById("card_manual_acc_price_" + id) || document.getElementById("manual_acc_price_" + id);
+                     if (accs.length === 0 && fallbackAccs.length > 0 && fallbackAccs !== accEls) {
+                         fallbackAccs.forEach(function(i) {
+                             const q = parseInt(i.value) || 0;
+                             if(q > 0) {
+                                 const p = parseFloat(i.dataset.price);
+                                 const name = i.dataset.name || "";
+                                 accs.push({ nombre: name, cantidad: q, precio: p });
+                                 if (name.toUpperCase() !== "SEGUNDA VISITA") {
+                                     totalAccs += q * p;
+                                 }
+                             }
+                         });
+                     }
+
+                     const mDescEl = isCard 
+                        ? (document.getElementById("card_manual_acc_desc_" + id) || document.getElementById("manual_acc_desc_" + id))
+                        : (document.getElementById("manual_acc_desc_" + id) || document.getElementById("card_manual_acc_desc_" + id));
+                     const mPriceEl = isCard 
+                        ? (document.getElementById("card_manual_acc_price_" + id) || document.getElementById("manual_acc_price_" + id))
+                        : (document.getElementById("manual_acc_price_" + id) || document.getElementById("card_manual_acc_price_" + id));
                      if(mDescEl && mPriceEl && mDescEl.value && parseFloat(mPriceEl.value) > 0) {
                          const mDesc = mDescEl.value.toUpperCase();
                          const mPrice = parseFloat(mPriceEl.value);
@@ -1295,7 +1381,8 @@
                 }
 
                 database.ref('visits/' + id).update(updateObj).then(function() { 
-                    showMessage("✅ Visita guardada y registrada en Gestionadas", "fix-report"); 
+                    showMessage("✅ Visita guardada correctamente", "fix-report"); 
+                    delete window["photos_" + id];
                     renderRutero(); 
                     renderPendientes(); 
                     renderTaller();
@@ -1796,7 +1883,7 @@
                         const existing = (v.accesoriosVendidos || []).find(a => a.nombre === n);
                         return `<div class="flex justify-between items-center mb-2 glass-input bg-white/80 p-2 rounded-lg font-black border border-white/60"><span class="text-[8px] uppercase text-stone-700">${n} ($${p.toFixed(2)})</span><input type="number" min="0" value="${existing ? existing.cantidad : 0}" data-name="${n}" data-price="${p}" class="acc-${v.id} w-12 text-center text-[10px] font-black text-fix-main glass-input rounded-md shadow-inner outline-none bg-white"></div>`;
                     }).join('')}
-                </div>` : ''}<textarea id="reason_${v.id}" placeholder="NOTA INTERNA TÉCNICA..." class="w-full p-4 text-xs glass-input rounded-xl mb-4 font-bold uppercase italic outline-none text-stone-800"></textarea><button onclick="closeVisitByTech('${v.id}')" class="w-full glass-card bg-fix-report/90 border-emerald-500 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 text-center">💾 GUARDAR CIERRE</button></div></div></td></tr>`;
+                </div>` : ''}<textarea id="reason_${v.id}" placeholder="NOTA INTERNA TÉCNICA..." class="w-full p-4 text-xs glass-input rounded-xl mb-4 font-bold uppercase italic outline-none text-stone-800"></textarea><button onclick="closeVisitByTech('${v.id}', 'desktop')" class="w-full glass-card bg-fix-report/90 border-emerald-500 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 text-center">💾 GUARDAR CIERRE</button></div></div></td></tr>`;
             }).join('');
 
             function isItemGestionado(v, d) {
@@ -2177,7 +2264,7 @@
                                         </div>
 
                                         <!-- Botón Guardar Cierre -->
-                                        <button onclick="closeVisitByTech('${v.id}')" class="w-full py-3.5 ${isGestionada ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'} active:scale-95 text-white rounded-xl text-xs font-black uppercase shadow-md transition-all flex items-center justify-center gap-2">
+                                        <button onclick="closeVisitByTech('${v.id}', 'card')" class="w-full py-3.5 ${isGestionada ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'} active:scale-95 text-white rounded-xl text-xs font-black uppercase shadow-md transition-all flex items-center justify-center gap-2">
                                             <span>💾</span><span>${isGestionada ? 'ACTUALIZAR CIERRE TÉCNICO' : 'GUARDAR CIERRE TÉCNICO'}</span>
                                         </button>
                                     </div>
