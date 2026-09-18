@@ -602,6 +602,11 @@
         let inventoryEntries = [];
         let currentView = 'reporte_admin';
         let currentTechUser = null; 
+        window.techRuteroTab = 'por_atender'; // 'por_atender' | 'gestionadas' | 'todas'
+        window.setTechRuteroTab = function(tab) {
+            window.techRuteroTab = tab;
+            renderRutero();
+        };
         window.setVisitsArray = function(v) { visitsArray = v; };
         window.getVisitsArray = function() { return visitsArray; }; 
 
@@ -1206,7 +1211,7 @@
                 }
 
                 database.ref('visits/' + id).update(updateObj).then(function() { 
-                    showMessage("✅ Guardado", "fix-report"); 
+                    showMessage("✅ Visita guardada y registrada en Gestionadas", "fix-report"); 
                     renderRutero(); 
                     renderPendientes(); 
                     renderTaller();
@@ -1710,221 +1715,350 @@
                 </div>` : ''}<textarea id="reason_${v.id}" placeholder="NOTA INTERNA TÉCNICA..." class="w-full p-4 text-xs glass-input rounded-xl mb-4 font-bold uppercase italic outline-none text-stone-800"></textarea><button onclick="closeVisitByTech('${v.id}')" class="w-full glass-card bg-fix-report/90 border-emerald-500 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 text-center">💾 GUARDAR CIERRE</button></div></div></td></tr>`;
             }).join('');
 
-            // 2. RENDER TARJETAS MÓVILES / TÉCNICOS (Una por una, ultra intuitiva y rápida)
+            function isItemGestionado(v, d) {
+                const estado = (v.estado || "").toUpperCase();
+                if (estado === 'PENDIENTE') return false;
+                if (estado === 'A TALLER' && v.fechaEntregaProgramada === d) {
+                    const wasAttendedToday = v.attendedDate && v.attendedDate.split('T')[0] === d;
+                    if (!wasAttendedToday) return false;
+                }
+                if (estado === 'GARANTIA EN TRAMITE' && v.fechaNuevaVisita === d) {
+                    const wasAttendedToday = v.attendedDate && v.attendedDate.split('T')[0] === d;
+                    if (!wasAttendedToday) return false;
+                }
+                return true;
+            }
+
+            // 2. RENDER TARJETAS MÓVILES / TÉCNICOS (Segmentadas por pestañas: Por Atender vs Gestionadas)
             if(cardsContainer) {
-                cardsContainer.innerHTML = itemsWithTime.map(({ v, index, timeStr }) => {
-                    const isDelivery = v.estado === 'A Taller' && v.fechaEntregaProgramada === date;
-                    const isGarantiaVisit = v.estado === 'Garantia en Tramite' && v.fechaNuevaVisita === date;
-                    
-                    let tipoServBadge = '';
-                    if (isDelivery) {
-                        tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-stone-800 text-white shadow-xs tracking-wider flex items-center gap-1">🚚 ENTREGA TALLER</span>';
-                    } else if (isGarantiaVisit) {
-                        tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-amber-500 text-white shadow-xs tracking-wider flex items-center gap-1">🛡️ VISITA GARANTÍA</span>';
-                    } else if (v.esMantenimiento || v.tipoAtencion === 'Mantenimiento') {
-                        tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-indigo-600 text-white shadow-xs tracking-wider flex items-center gap-1">⚙️ MANTENIMIENTO</span>';
-                    } else if (v.tipoAtencion === 'Garantía') {
-                        tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-blue-600 text-white shadow-xs tracking-wider flex items-center gap-1">🛡️ GARANTÍA</span>';
+                const pendientesItems = itemsWithTime.filter(item => !isItemGestionado(item.v, date));
+                const gestionadasItems = itemsWithTime.filter(item => isItemGestionado(item.v, date));
+                const totalCount = itemsWithTime.length;
+                const countPendientes = pendientesItems.length;
+                const countGestionadas = gestionadasItems.length;
+
+                const activeTab = window.techRuteroTab || 'por_atender';
+                let itemsToShow = [];
+                if (activeTab === 'por_atender') itemsToShow = pendientesItems;
+                else if (activeTab === 'gestionadas') itemsToShow = gestionadasItems;
+                else itemsToShow = itemsWithTime;
+
+                // Barra flotante de pestañas para el técnico
+                const tabsHeaderHtml = `
+                <div class="sticky top-2 z-20 bg-slate-900/95 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-slate-700/80 mb-4 flex items-center gap-1.5 text-xs font-black">
+                    <button type="button" onclick="setTechRuteroTab('por_atender')" class="flex-1 py-2.5 px-2 text-center rounded-xl uppercase transition-all flex items-center justify-center gap-1.5 ${activeTab === 'por_atender' ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-400/50' : 'text-slate-300 hover:text-white hover:bg-slate-800/80'}">
+                        <span>⏳ Por Atender</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${activeTab === 'por_atender' ? 'bg-white text-blue-800' : 'bg-slate-800 text-slate-300 border border-slate-700'}">${countPendientes}</span>
+                    </button>
+                    <button type="button" onclick="setTechRuteroTab('gestionadas')" class="flex-1 py-2.5 px-2 text-center rounded-xl uppercase transition-all flex items-center justify-center gap-1.5 ${activeTab === 'gestionadas' ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400/50' : 'text-slate-300 hover:text-white hover:bg-slate-800/80'}">
+                        <span>✅ Gestionadas</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${activeTab === 'gestionadas' ? 'bg-white text-emerald-800' : 'bg-slate-800 text-slate-300 border border-slate-700'}">${countGestionadas}</span>
+                    </button>
+                    <button type="button" onclick="setTechRuteroTab('todas')" class="py-2.5 px-3 text-center rounded-xl uppercase transition-all flex items-center justify-center gap-1 ${activeTab === 'todas' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/80'}">
+                        <span>Todas</span>
+                        <span class="text-[10px] font-mono opacity-80">(${totalCount})</span>
+                    </button>
+                </div>`;
+
+                let cardsContentHtml = '';
+
+                if (itemsToShow.length === 0) {
+                    if (activeTab === 'por_atender') {
+                        cardsContentHtml = `
+                        <div class="p-8 text-center bg-white border-2 border-emerald-400 rounded-2xl shadow-sm space-y-3">
+                            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl shadow-inner">🎉</div>
+                            <h4 class="text-base font-black text-slate-900 uppercase">¡Ruta de hoy completada!</h4>
+                            <p class="text-xs text-slate-600 font-semibold max-w-sm mx-auto">No te quedan visitas pendientes por atender. Puedes revisar o verificar las visitas completadas en la pestaña de gestionadas.</p>
+                            <div class="pt-2">
+                                <button type="button" onclick="setTechRuteroTab('gestionadas')" class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black uppercase shadow-md transition-all">
+                                    <span>Ver visitas gestionadas (${countGestionadas})</span>
+                                    <span>➔</span>
+                                </button>
+                            </div>
+                        </div>`;
+                    } else if (activeTab === 'gestionadas') {
+                        cardsContentHtml = `
+                        <div class="p-8 text-center bg-white border border-slate-200 rounded-2xl shadow-sm space-y-3">
+                            <div class="w-14 h-14 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto text-2xl">⏳</div>
+                            <h4 class="text-sm font-black text-slate-800 uppercase">Aún no hay visitas gestionadas hoy</h4>
+                            <p class="text-xs text-slate-500 max-w-xs mx-auto">A medida que atiendas y guardes el cierre técnico de cada cliente en "Por Atender", se trasladarán automáticamente a esta sección.</p>
+                            <div class="pt-2">
+                                <button type="button" onclick="setTechRuteroTab('por_atender')" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-black uppercase shadow-sm transition-all">
+                                    <span>Ir a visitas por atender (${countPendientes})</span>
+                                </button>
+                            </div>
+                        </div>`;
                     } else {
-                        tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-emerald-600 text-white shadow-xs tracking-wider flex items-center gap-1">🛠️ INSTALACIÓN</span>';
+                        cardsContentHtml = '<div class="p-10 text-center text-stone-500 italic font-black uppercase text-sm bg-white rounded-2xl shadow-sm border border-stone-200">Sin servicios hoy</div>';
                     }
+                } else {
+                    cardsContentHtml = itemsToShow.map(({ v, index, timeStr }) => {
+                        const isDelivery = v.estado === 'A Taller' && v.fechaEntregaProgramada === date;
+                        const isGarantiaVisit = v.estado === 'Garantia en Tramite' && v.fechaNuevaVisita === date;
+                        const isGestionada = isItemGestionado(v, date);
+                        const estadoUpper = (v.estado || "").toUpperCase();
 
-                    const estadoUpper = (v.estado || "").toUpperCase();
-                    let estadoBadgeStyle = 'bg-stone-100 text-stone-700 border-stone-300';
-                    if (estadoUpper === 'ATENDIDO') estadoBadgeStyle = 'bg-emerald-500 text-white border-emerald-600';
-                    else if (estadoUpper === 'A TALLER') estadoBadgeStyle = 'bg-orange-500 text-white border-orange-600';
-                    else if (estadoUpper === 'GARANTIA EN TRAMITE') estadoBadgeStyle = 'bg-amber-500 text-white border-amber-600';
-                    else if (estadoUpper.includes('PENDIENTE')) estadoBadgeStyle = 'bg-amber-100 text-amber-900 border-amber-300 font-bold';
-                    else if (estadoUpper === 'NO ATENDIDO') estadoBadgeStyle = 'bg-rose-500 text-white border-rose-600';
+                        // Encabezado de resultado / banner destacado si ya fue gestionada
+                        let bannerGestionadaHtml = '';
+                        let cardBorderClass = 'border border-slate-200/90 bg-white';
 
-                    const estadoBadge = `<span class="px-2.5 py-0.5 rounded-md border text-[9px] font-black uppercase shadow-xs ${estadoBadgeStyle}">${estadoUpper}</span>`;
+                        if (isGestionada) {
+                            if (estadoUpper === 'ATENDIDO') {
+                                cardBorderClass = 'border-2 border-emerald-500 bg-emerald-50/15 shadow-sm';
+                                const horaCierre = v.attendedDate ? new Date(v.attendedDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'ATENDIDO';
+                                bannerGestionadaHtml = `
+                                <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-4 py-2 flex items-center justify-between text-xs font-black uppercase tracking-wide">
+                                    <span class="flex items-center gap-1.5"><span class="text-sm">✅</span><span>VISITA FINALIZADA CON ÉXITO</span></span>
+                                    <span class="bg-emerald-900/50 px-2 py-0.5 rounded text-[10px] font-mono">🕒 ${horaCierre}</span>
+                                </div>`;
+                            } else if (estadoUpper === 'A TALLER') {
+                                cardBorderClass = 'border-2 border-orange-400 bg-orange-50/15 shadow-sm';
+                                bannerGestionadaHtml = `
+                                <div class="bg-gradient-to-r from-orange-500 to-amber-600 text-white px-4 py-2 flex items-center justify-between text-xs font-black uppercase tracking-wide">
+                                    <span class="flex items-center gap-1.5"><span class="text-sm">🏢</span><span>EQUIPO RETIRADO A TALLER</span></span>
+                                    <span class="bg-orange-900/50 px-2 py-0.5 rounded text-[10px] font-mono">TALLER</span>
+                                </div>`;
+                            } else if (estadoUpper === 'NO ATENDIDO') {
+                                cardBorderClass = 'border-2 border-rose-400 bg-rose-50/15 shadow-sm';
+                                bannerGestionadaHtml = `
+                                <div class="bg-gradient-to-r from-rose-600 to-rose-700 text-white px-4 py-2 flex items-center justify-between text-xs font-black uppercase tracking-wide">
+                                    <span class="flex items-center gap-1.5"><span class="text-sm">❌</span><span>VISITA NO ATENDIDA</span></span>
+                                    <span class="bg-rose-900/50 px-2 py-0.5 rounded text-[10px] font-mono">FALLIDA</span>
+                                </div>`;
+                            } else {
+                                cardBorderClass = 'border-2 border-amber-400 bg-amber-50/15 shadow-sm';
+                                bannerGestionadaHtml = `
+                                <div class="bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 py-2 flex items-center justify-between text-xs font-black uppercase tracking-wide">
+                                    <span class="flex items-center gap-1.5"><span class="text-sm">⏳</span><span>GARANTÍA / TRÁMITE PENDIENTE</span></span>
+                                    <span class="bg-amber-900/50 px-2 py-0.5 rounded text-[10px] font-mono">TRÁMITE</span>
+                                </div>`;
+                            }
+                        }
+                        
+                        let tipoServBadge = '';
+                        if (isDelivery) {
+                            tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-stone-800 text-white shadow-xs tracking-wider flex items-center gap-1">🚚 ENTREGA TALLER</span>';
+                        } else if (isGarantiaVisit) {
+                            tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-amber-500 text-white shadow-xs tracking-wider flex items-center gap-1">🛡️ VISITA GARANTÍA</span>';
+                        } else if (v.esMantenimiento || v.tipoAtencion === 'Mantenimiento') {
+                            tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-indigo-600 text-white shadow-xs tracking-wider flex items-center gap-1">⚙️ MANTENIMIENTO</span>';
+                        } else if (v.tipoAtencion === 'Garantía') {
+                            tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-blue-600 text-white shadow-xs tracking-wider flex items-center gap-1">🛡️ GARANTÍA</span>';
+                        } else {
+                            tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-emerald-600 text-white shadow-xs tracking-wider flex items-center gap-1">🛠️ INSTALACIÓN</span>';
+                        }
 
-                    const mapLink = (v.direccion && v.direccion.toString().includes('http')) 
-                                    ? v.direccion 
-                                    : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(v.direccion || v.callePrincipal || '');
+                        let estadoBadgeStyle = 'bg-stone-100 text-stone-700 border-stone-300';
+                        if (estadoUpper === 'ATENDIDO') estadoBadgeStyle = 'bg-emerald-500 text-white border-emerald-600';
+                        else if (estadoUpper === 'A TALLER') estadoBadgeStyle = 'bg-orange-500 text-white border-orange-600';
+                        else if (estadoUpper === 'GARANTIA EN TRAMITE') estadoBadgeStyle = 'bg-amber-500 text-white border-amber-600';
+                        else if (estadoUpper.includes('PENDIENTE')) estadoBadgeStyle = 'bg-amber-100 text-amber-900 border-amber-300 font-bold';
+                        else if (estadoUpper === 'NO ATENDIDO') estadoBadgeStyle = 'bg-rose-500 text-white border-rose-600';
 
-                    const equipoDesc = v.esMantenimiento 
-                        ? (v.mantenimientoEquipo || 'Mantenimiento preventivo')
-                        : ((v.equipos && v.equipos.length) ? v.equipos.map(e => e.descProducto).join(' • ') : 'Servicio Técnico');
+                        const estadoBadge = `<span class="px-2.5 py-0.5 rounded-md border text-[9px] font-black uppercase shadow-xs ${estadoBadgeStyle}">${estadoUpper}</span>`;
 
-                    const cleanPhone = (v.telefono || '').toString().replace(/\D/g, '');
+                        const mapLink = (v.direccion && v.direccion.toString().includes('http')) 
+                                        ? v.direccion 
+                                        : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(v.direccion || v.callePrincipal || '');
 
-                    return `
-                    <div class="tech-card overflow-hidden bg-white border border-slate-200/90 rounded-2xl shadow-sm mb-4 transition-all" id="card_visit_${v.id}">
-                        <!-- Barra superior: Parada, Hora estimada, Tipo de servicio y Estado -->
-                        <div class="bg-gradient-to-r from-slate-50 to-slate-100/80 px-4 py-2.5 border-b border-slate-200/80 flex items-center justify-between gap-2 flex-wrap">
-                            <div class="flex items-center gap-2">
-                                <span class="bg-slate-900 text-white text-[11px] font-mono font-black px-2 py-0.5 rounded-md shadow-xs">#${index + 1}</span>
-                                <span class="text-xs font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">🕒 ${timeStr}</span>
-                            </div>
-                            <div class="flex items-center gap-1.5 flex-wrap">
-                                ${tipoServBadge}
-                                ${estadoBadge}
-                            </div>
-                        </div>
+                        const equipoDesc = v.esMantenimiento 
+                            ? (v.mantenimientoEquipo || 'Mantenimiento preventivo')
+                            : ((v.equipos && v.equipos.length) ? v.equipos.map(e => e.descProducto).join(' • ') : 'Servicio Técnico');
 
-                        <!-- Bloque Principal Visible de Primera -->
-                        <div class="p-4 space-y-3">
-                            <div>
-                                <h3 class="text-base sm:text-lg font-black text-slate-900 leading-tight uppercase flex items-center gap-2">
-                                    ${v.nombreCliente} ${v.estado === 'A Taller' ? '<span title="En Taller">🏢</span>' : ''}
-                                </h3>
-                                <div class="mt-1.5 flex items-start gap-1.5 text-xs sm:text-sm font-semibold text-slate-700">
-                                    <span class="text-rose-500 font-bold text-sm leading-none shrink-0">📍</span>
-                                    <span class="leading-snug">${v.callePrincipal || v.direccion || 'Sin dirección registrada'}</span>
+                        const cleanPhone = (v.telefono || '').toString().replace(/\D/g, '');
+
+                        return `
+                        <div class="tech-card overflow-hidden ${cardBorderClass} rounded-2xl mb-4 transition-all" id="card_visit_${v.id}">
+                            ${bannerGestionadaHtml}
+                            <!-- Barra superior: Parada, Hora estimada, Tipo de servicio y Estado -->
+                            <div class="bg-gradient-to-r from-slate-50 to-slate-100/80 px-4 py-2.5 border-b border-slate-200/80 flex items-center justify-between gap-2 flex-wrap">
+                                <div class="flex items-center gap-2">
+                                    <span class="bg-slate-900 text-white text-[11px] font-mono font-black px-2 py-0.5 rounded-md shadow-xs">#${index + 1}</span>
+                                    <span class="text-xs font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">🕒 ${timeStr}</span>
+                                </div>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    ${tipoServBadge}
+                                    ${estadoBadge}
                                 </div>
                             </div>
 
-                            <div class="p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 flex items-start gap-2">
-                                <span class="text-blue-600 font-black text-xs shrink-0">⚙️</span>
-                                <div class="min-w-0 flex-1">
-                                    <span class="text-[9px] uppercase font-black tracking-wider text-slate-400 block mb-0.5">Equipos a Atender:</span>
-                                    <span class="font-bold text-slate-900 uppercase">${equipoDesc}</span>
+                            <!-- Bloque Principal Visible de Primera -->
+                            <div class="p-4 space-y-3">
+                                <div>
+                                    <h3 class="text-base sm:text-lg font-black text-slate-900 leading-tight uppercase flex items-center gap-2">
+                                        ${v.nombreCliente} ${v.estado === 'A Taller' ? '<span title="En Taller">🏢</span>' : ''}
+                                    </h3>
+                                    <div class="mt-1.5 flex items-start gap-1.5 text-xs sm:text-sm font-semibold text-slate-700">
+                                        <span class="text-rose-500 font-bold text-sm leading-none shrink-0">📍</span>
+                                        <span class="leading-snug">${v.callePrincipal || v.direccion || 'Sin dirección registrada'}</span>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <!-- OBSERVACIONES DE OFICINA VISIBLES DE PRIMERA -->
-                            ${v.observacionesAdmin ? `
-                            <div class="p-3 bg-amber-50/90 border-l-4 border-amber-500 rounded-r-xl shadow-xs">
-                                <div class="flex items-center gap-1.5 text-amber-900 font-black text-[10px] uppercase tracking-wider">
-                                    <span>🔔</span>
-                                    <span>OBSERVACIÓN IMPORTANTE DE OFICINA:</span>
+                                <div class="p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 flex items-start gap-2">
+                                    <span class="text-blue-600 font-black text-xs shrink-0">⚙️</span>
+                                    <div class="min-w-0 flex-1">
+                                        <span class="text-[9px] uppercase font-black tracking-wider text-slate-400 block mb-0.5">Equipos a Atender:</span>
+                                        <span class="font-bold text-slate-900 uppercase">${equipoDesc}</span>
+                                    </div>
                                 </div>
-                                <p class="text-xs text-amber-950 font-bold italic mt-1 leading-snug">${v.observacionesAdmin}</p>
-                            </div>` : ''}
 
-                            <!-- FALLA REPORTADA VISIBLE DE PRIMERA -->
-                            ${v.descFalla ? `
-                            <div class="p-3 bg-rose-50/90 border-l-4 border-rose-500 rounded-r-xl shadow-xs">
-                                <div class="flex items-center gap-1.5 text-rose-900 font-black text-[10px] uppercase tracking-wider">
-                                    <span>⚠️</span>
-                                    <span>FALLA REPORTADA POR CLIENTE:</span>
+                                <!-- OBSERVACIONES DE OFICINA VISIBLES DE PRIMERA -->
+                                ${v.observacionesAdmin ? `
+                                <div class="p-3 bg-amber-50/90 border-l-4 border-amber-500 rounded-r-xl shadow-xs">
+                                    <div class="flex items-center gap-1.5 text-amber-900 font-black text-[10px] uppercase tracking-wider">
+                                        <span>🔔</span>
+                                        <span>OBSERVACIÓN IMPORTANTE DE OFICINA:</span>
+                                    </div>
+                                    <p class="text-xs text-amber-950 font-bold italic mt-1 leading-snug">${v.observacionesAdmin}</p>
+                                </div>` : ''}
+
+                                <!-- FALLA REPORTADA VISIBLE DE PRIMERA -->
+                                ${v.descFalla ? `
+                                <div class="p-3 bg-rose-50/90 border-l-4 border-rose-500 rounded-r-xl shadow-xs">
+                                    <div class="flex items-center gap-1.5 text-rose-900 font-black text-[10px] uppercase tracking-wider">
+                                        <span>⚠️</span>
+                                        <span>FALLA REPORTADA POR CLIENTE:</span>
+                                    </div>
+                                    <p class="text-xs text-rose-950 font-bold italic mt-1 leading-snug">${v.descFalla}</p>
+                                </div>` : ''}
+
+                                <!-- DETALLES DE CIERRE REGISTRADO SI YA ESTÁ GESTIONADA -->
+                                ${isGestionada && (v.razonNoAtencion || v.commentarioCliente || (v.fotosRegistro && v.fotosRegistro.length)) ? `
+                                <div class="p-3 bg-slate-100/90 border border-slate-200 rounded-xl space-y-2 text-xs">
+                                    ${v.razonNoAtencion ? `<div><span class="text-[9px] font-black uppercase text-slate-500 block">Nota registrada:</span><p class="font-bold text-slate-800 italic">${v.razonNoAtencion}</p></div>` : ''}
+                                    ${v.commentarioCliente ? `<div><span class="text-[9px] font-black uppercase text-slate-500 block">Testimonio / Comentario registrado:</span><p class="font-bold text-slate-800">${v.commentarioCliente}</p></div>` : ''}
+                                    ${v.fotosRegistro && v.fotosRegistro.length ? `
+                                    <div>
+                                        <span class="text-[9px] font-black uppercase text-slate-500 block mb-1">Fotos de evidencia guardadas:</span>
+                                        <div class="flex gap-2 flex-wrap">${v.fotosRegistro.map(f => `<img src="${f}" class="w-12 h-12 object-cover rounded-lg border border-slate-300 shadow-xs">`).join('')}</div>
+                                    </div>` : ''}
+                                </div>` : ''}
+
+                                <!-- BOTONES DE ACCIÓN RÁPIDOS DE ALTO CONTRASTE -->
+                                <div class="pt-1 flex items-stretch gap-2">
+                                    <a href="${mapLink}" target="_blank" class="flex-1 flex items-center justify-center gap-1.5 py-3 px-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs uppercase rounded-xl shadow-md transition-all text-center">
+                                        <span class="text-base leading-none">📍</span>
+                                        <span>MAPA GPS</span>
+                                    </a>
+                                    <a href="tel:${v.telefono || ''}" class="flex-1 flex items-center justify-center gap-1.5 py-3 px-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs uppercase rounded-xl shadow-md transition-all text-center">
+                                        <span class="text-base leading-none">📞</span>
+                                        <span>LLAMAR</span>
+                                    </a>
+                                    <a href="https://wa.me/593${cleanPhone}" target="_blank" class="w-12 flex items-center justify-center py-3 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-base uppercase rounded-xl shadow-md transition-all text-center" title="Abrir WhatsApp">
+                                        <span>💬</span>
+                                    </a>
                                 </div>
-                                <p class="text-xs text-rose-950 font-bold italic mt-1 leading-snug">${v.descFalla}</p>
-                            </div>` : ''}
 
-                            <!-- BOTONES DE ACCIÓN RÁPIDOS DE ALTO CONTRASTE -->
-                            <div class="pt-1 flex items-stretch gap-2">
-                                <a href="${mapLink}" target="_blank" class="flex-1 flex items-center justify-center gap-1.5 py-3 px-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs uppercase rounded-xl shadow-md transition-all text-center">
-                                    <span class="text-base leading-none">📍</span>
-                                    <span>MAPA GPS</span>
-                                </a>
-                                <a href="tel:${v.telefono || ''}" class="flex-1 flex items-center justify-center gap-1.5 py-3 px-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs uppercase rounded-xl shadow-md transition-all text-center">
-                                    <span class="text-base leading-none">📞</span>
-                                    <span>LLAMAR</span>
-                                </a>
-                                <a href="https://wa.me/593${cleanPhone}" target="_blank" class="w-12 flex items-center justify-center py-3 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-base uppercase rounded-xl shadow-md transition-all text-center" title="Abrir WhatsApp">
-                                    <span>💬</span>
-                                </a>
-                            </div>
+                                <!-- BOTÓN DESPLEGABLE PARA DETALLES Y CIERRE TÉCNICO -->
+                                <button type="button" onclick="toggleCardDetail('${v.id}')" class="w-full mt-2 py-2.5 px-3 ${isGestionada ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200'} rounded-xl text-xs font-black uppercase flex items-center justify-between border transition-colors">
+                                    <span class="flex items-center gap-1.5">
+                                        <span>${isGestionada ? '🔍' : '📋'}</span>
+                                        <span>${isGestionada ? 'Revisar / Modificar Cierre Técnico' : 'Ver Detalles y Cierre Técnico'}</span>
+                                    </span>
+                                    <span id="chevron_${v.id}" class="text-xs font-mono font-bold ${isGestionada ? 'text-emerald-700' : 'text-slate-500'}">▼</span>
+                                </button>
 
-                            <!-- BOTÓN DESPLEGABLE PARA DETALLES Y CIERRE TÉCNICO -->
-                            <button type="button" onclick="toggleCardDetail('${v.id}')" class="w-full mt-2 py-2.5 px-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 rounded-xl text-xs font-black uppercase flex items-center justify-between border border-slate-200 transition-colors">
-                                <span class="flex items-center gap-1.5">
-                                    <span>📋</span>
-                                    <span>Ver Detalles y Cierre Técnico</span>
-                                </span>
-                                <span id="chevron_${v.id}" class="text-xs font-mono font-bold text-slate-500">▼</span>
-                            </button>
+                                <!-- SECCIÓN DESPLEGABLE: ORDEN Y FORMULARIO DE CIERRE TÉCNICO -->
+                                <div id="card_detail_${v.id}" class="hidden pt-3 border-t border-slate-200 space-y-4">
+                                    <!-- Información Detallada de Orden -->
+                                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
+                                        <p class="text-[10px] font-black text-blue-900 uppercase italic tracking-wider mb-2">📄 Información de la Orden</p>
+                                        <p><b>CÉDULA:</b> <span class="font-mono text-slate-800 font-bold">${v.cedula || '---'}</span></p>
+                                        <p><b>TELÉFONO:</b> <span class="font-mono text-slate-800 font-bold">${v.telefono || '---'}</span></p>
+                                        <p><b>EMAIL:</b> <span class="font-mono text-slate-800">${v.email || '---'}</span></p>
+                                        <p><b>FECHA COMPRA:</b> <span class="font-mono text-slate-800">${v.fechaEmision || '---'}</span></p>
+                                        <p><b>DOC. COMPRA:</b> <span class="font-mono text-slate-800">${v.numFactura || '---'}</span></p>
+                                        <p><b>LUGAR COMPRA:</b> <span class="text-slate-800 font-bold">${v.lugarCompra || '---'}</span></p>
+                                        <div class="pt-2 mt-2 border-t border-slate-200">
+                                            <button onclick="printServiceOrder('${v.id}')" class="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-black uppercase shadow-xs flex items-center justify-center gap-1.5">
+                                                <span>🖨️</span><span>IMPRIMIR ORDEN</span>
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            <!-- SECCIÓN DESPLEGABLE: ORDEN Y FORMULARIO DE CIERRE TÉCNICO -->
-                            <div id="card_detail_${v.id}" class="hidden pt-3 border-t border-slate-200 space-y-4">
-                                <!-- Información Detallada de Orden -->
-                                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
-                                    <p class="text-[10px] font-black text-blue-900 uppercase italic tracking-wider mb-2">📄 Información de la Orden</p>
-                                    <p><b>CÉDULA:</b> <span class="font-mono text-slate-800 font-bold">${v.cedula || '---'}</span></p>
-                                    <p><b>TELÉFONO:</b> <span class="font-mono text-slate-800 font-bold">${v.telefono || '---'}</span></p>
-                                    <p><b>EMAIL:</b> <span class="font-mono text-slate-800">${v.email || '---'}</span></p>
-                                    <p><b>FECHA COMPRA:</b> <span class="font-mono text-slate-800">${v.fechaEmision || '---'}</span></p>
-                                    <p><b>DOC. COMPRA:</b> <span class="font-mono text-slate-800">${v.numFactura || '---'}</span></p>
-                                    <p><b>LUGAR COMPRA:</b> <span class="text-slate-800 font-bold">${v.lugarCompra || '---'}</span></p>
-                                    <div class="pt-2 mt-2 border-t border-slate-200">
-                                        <button onclick="printServiceOrder('${v.id}')" class="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-black uppercase shadow-xs flex items-center justify-center gap-1.5">
-                                            <span>🖨️</span><span>IMPRIMIR ORDEN</span>
+                                    <!-- Formulario de Cierre Técnico Móvil -->
+                                    <div class="bg-blue-50/40 p-3.5 rounded-xl border border-blue-200 space-y-3">
+                                        <p class="text-[10px] font-black text-blue-900 uppercase italic tracking-wider flex items-center gap-1.5">
+                                            <span>🛠️</span><span>Formulario de Cierre Técnico</span>
+                                        </p>
+
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <div>
+                                                <label class="block text-[9px] font-black uppercase text-slate-600 mb-1">Estado de Cierre:</label>
+                                                <select id="card_status_${v.id}" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black uppercase text-slate-800 outline-none">
+                                                    <option value="PENDIENTE">--- ESTADO CIERRE ---</option>
+                                                    <option value="Atendido" ${v.estado === 'Atendido' ? 'selected' : ''}>✅ ATENDIDO / FINALIZADO</option>
+                                                    <option value="A Taller" ${v.estado === 'A Taller' ? 'selected' : ''}>🏢 A TALLER (REPARACIÓN)</option>
+                                                    <option value="Garantia en Tramite" ${v.estado === 'Garantia en Tramite' ? 'selected' : ''}>🛡️ GARANTÍA EN TRÁMITE</option>
+                                                    <option value="No Atendido" ${v.estado === 'No Atendido' ? 'selected' : ''}>❌ NO ATENDIDO (FALLIDO)</option>
+                                                    <option value="Pendiente (Tramite)" ${v.estado === 'Pendiente (Tramite)' ? 'selected' : ''}>⏳ PENDIENTE (REPUESTO)</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[9px] font-black uppercase text-slate-600 mb-1">Tipo de Servicio:</label>
+                                                <select id="card_type_${v.id}" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black uppercase text-slate-800 outline-none">
+                                                    ${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        ${!v.esMantenimiento ? `
+                                        <div>
+                                            <label class="block text-[9px] font-black uppercase text-slate-600 mb-1">Forma de Pago:</label>
+                                            <select id="card_payment_${v.id}" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black uppercase text-slate-800 outline-none">
+                                                <option value="EFECTIVO" ${v.financiera && v.financiera.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option>
+                                                <option value="TRANSFERENCIA" ${v.financiera && v.financiera.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option>
+                                            </select>
+                                        </div>` : `<input type="hidden" id="card_payment_${v.id}" value="EFECTIVO">`}
+
+                                        <!-- Fotos y Comentario -->
+                                        <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                                            <label class="block text-[9px] font-black uppercase text-slate-700">📸 Fotos de Evidencia (Máx 3):</label>
+                                            <input type="file" accept="image/*" multiple onchange="handleImageSelect(event, '${v.id}')" class="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                            <div id="card_photo_previews_${v.id}" class="flex gap-2 flex-wrap"></div>
+                                            <label class="block text-[9px] font-black uppercase text-slate-700 mt-2">Testimonio o Novedad:</label>
+                                            <textarea id="card_client_comment_${v.id}" placeholder="TESTIMONIO O NOVEDAD FINAL..." class="w-full p-2.5 text-xs font-bold uppercase bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800">${v.commentarioCliente || ''}</textarea>
+                                        </div>
+
+                                        <!-- Accesorios Vendidos -->
+                                        ${!v.esMantenimiento ? `
+                                        <div class="bg-white p-3 rounded-xl border border-slate-200">
+                                            <label class="block text-[9px] font-black uppercase text-slate-700 mb-2">🔩 Accesorios / Materiales:</label>
+                                            <div class="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                                                ${Object.entries(ACCESORIOS_DEFAULT).map(function(item) {
+                                                    const n = item[0]; const p = item[1];
+                                                    const existing = (v.accesoriosVendidos || []).find(a => a.nombre === n);
+                                                    return `
+                                                    <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                                        <span class="text-[10px] font-bold uppercase text-slate-700">${n} ($${p.toFixed(2)})</span>
+                                                        <input type="number" min="0" value="${existing ? existing.cantidad : 0}" data-name="${n}" data-price="${p}" class="card-acc-${v.id} w-14 text-center text-xs font-black text-blue-900 bg-white border border-slate-300 rounded-md p-1 outline-none">
+                                                    </div>`;
+                                                }).join('')}
+                                            </div>
+                                            <div class="mt-2 pt-2 border-t border-slate-200 flex gap-1.5">
+                                                <input type="text" id="card_manual_acc_desc_${v.id}" placeholder="OTRO ACCESORIO..." class="flex-1 p-2 text-[10px] font-bold uppercase bg-slate-50 border border-slate-300 rounded-lg outline-none">
+                                                <input type="number" step="0.01" id="card_manual_acc_price_${v.id}" placeholder="$0.00" class="w-16 p-2 text-[10px] font-bold text-center bg-slate-50 border border-slate-300 rounded-lg outline-none">
+                                            </div>
+                                        </div>` : ''}
+
+                                        <!-- Nota Interna Técnica -->
+                                        <div>
+                                            <label class="block text-[9px] font-black uppercase text-slate-700 mb-1">Nota Interna Técnica:</label>
+                                            <textarea id="card_reason_${v.id}" placeholder="NOTA INTERNA TÉCNICA..." class="w-full p-2.5 text-xs font-bold uppercase italic bg-white border border-slate-300 rounded-xl outline-none text-slate-800">${v.razonNoAtencion || ''}</textarea>
+                                        </div>
+
+                                        <!-- Botón Guardar Cierre -->
+                                        <button onclick="closeVisitByTech('${v.id}')" class="w-full py-3.5 ${isGestionada ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'} active:scale-95 text-white rounded-xl text-xs font-black uppercase shadow-md transition-all flex items-center justify-center gap-2">
+                                            <span>💾</span><span>${isGestionada ? 'ACTUALIZAR CIERRE TÉCNICO' : 'GUARDAR CIERRE TÉCNICO'}</span>
                                         </button>
                                     </div>
                                 </div>
-
-                                <!-- Formulario de Cierre Técnico Móvil -->
-                                <div class="bg-blue-50/40 p-3.5 rounded-xl border border-blue-200 space-y-3">
-                                    <p class="text-[10px] font-black text-blue-900 uppercase italic tracking-wider flex items-center gap-1.5">
-                                        <span>🛠️</span><span>Formulario de Cierre Técnico</span>
-                                    </p>
-
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        <div>
-                                            <label class="block text-[9px] font-black uppercase text-slate-600 mb-1">Estado de Cierre:</label>
-                                            <select id="card_status_${v.id}" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black uppercase text-slate-800 outline-none">
-                                                <option value="PENDIENTE">--- ESTADO CIERRE ---</option>
-                                                <option value="Atendido" ${v.estado === 'Atendido' ? 'selected' : ''}>✅ ATENDIDO / FINALIZADO</option>
-                                                <option value="A Taller" ${v.estado === 'A Taller' ? 'selected' : ''}>🏢 A TALLER (REPARACIÓN)</option>
-                                                <option value="Garantia en Tramite" ${v.estado === 'Garantia en Tramite' ? 'selected' : ''}>🛡️ GARANTÍA EN TRÁMITE</option>
-                                                <option value="No Atendido" ${v.estado === 'No Atendido' ? 'selected' : ''}>❌ NO ATENDIDO (FALLIDO)</option>
-                                                <option value="Pendiente (Tramite)" ${v.estado === 'Pendiente (Tramite)' ? 'selected' : ''}>⏳ PENDIENTE (REPUESTO)</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="block text-[9px] font-black uppercase text-slate-600 mb-1">Tipo de Servicio:</label>
-                                            <select id="card_type_${v.id}" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black uppercase text-slate-800 outline-none">
-                                                ${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    ${!v.esMantenimiento ? `
-                                    <div>
-                                        <label class="block text-[9px] font-black uppercase text-slate-600 mb-1">Forma de Pago:</label>
-                                        <select id="card_payment_${v.id}" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black uppercase text-slate-800 outline-none">
-                                            <option value="EFECTIVO" ${v.financiera && v.financiera.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option>
-                                            <option value="TRANSFERENCIA" ${v.financiera && v.financiera.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option>
-                                        </select>
-                                    </div>` : `<input type="hidden" id="card_payment_${v.id}" value="EFECTIVO">`}
-
-                                    <!-- Fotos y Comentario -->
-                                    <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
-                                        <label class="block text-[9px] font-black uppercase text-slate-700">📸 Fotos de Evidencia (Máx 3):</label>
-                                        <input type="file" accept="image/*" multiple onchange="handleImageSelect(event, '${v.id}')" class="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                        <div id="card_photo_previews_${v.id}" class="flex gap-2 flex-wrap"></div>
-                                        <label class="block text-[9px] font-black uppercase text-slate-700 mt-2">Testimonio o Novedad:</label>
-                                        <textarea id="card_client_comment_${v.id}" placeholder="TESTIMONIO O NOVEDAD FINAL..." class="w-full p-2.5 text-xs font-bold uppercase bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800"></textarea>
-                                    </div>
-
-                                    <!-- Accesorios Vendidos -->
-                                    ${!v.esMantenimiento ? `
-                                    <div class="bg-white p-3 rounded-xl border border-slate-200">
-                                        <label class="block text-[9px] font-black uppercase text-slate-700 mb-2">🔩 Accesorios / Materiales:</label>
-                                        <div class="max-h-36 overflow-y-auto space-y-1.5 pr-1">
-                                            ${Object.entries(ACCESORIOS_DEFAULT).map(function(item) {
-                                                const n = item[0]; const p = item[1];
-                                                const existing = (v.accesoriosVendidos || []).find(a => a.nombre === n);
-                                                return `
-                                                <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                                    <span class="text-[10px] font-bold uppercase text-slate-700">${n} ($${p.toFixed(2)})</span>
-                                                    <input type="number" min="0" value="${existing ? existing.cantidad : 0}" data-name="${n}" data-price="${p}" class="card-acc-${v.id} w-14 text-center text-xs font-black text-blue-900 bg-white border border-slate-300 rounded-md p-1 outline-none">
-                                                </div>`;
-                                            }).join('')}
-                                        </div>
-                                        <div class="mt-2 pt-2 border-t border-slate-200 flex gap-1.5">
-                                            <input type="text" id="card_manual_acc_desc_${v.id}" placeholder="OTRO ACCESORIO..." class="flex-1 p-2 text-[10px] font-bold uppercase bg-slate-50 border border-slate-300 rounded-lg outline-none">
-                                            <input type="number" step="0.01" id="card_manual_acc_price_${v.id}" placeholder="$0.00" class="w-16 p-2 text-[10px] font-bold text-center bg-slate-50 border border-slate-300 rounded-lg outline-none">
-                                        </div>
-                                    </div>` : ''}
-
-                                    <!-- Nota Interna Técnica -->
-                                    <div>
-                                        <label class="block text-[9px] font-black uppercase text-slate-700 mb-1">Nota Interna Técnica:</label>
-                                        <textarea id="card_reason_${v.id}" placeholder="NOTA INTERNA TÉCNICA..." class="w-full p-2.5 text-xs font-bold uppercase italic bg-white border border-slate-300 rounded-xl outline-none text-slate-800"></textarea>
-                                    </div>
-
-                                    <!-- Botón Guardar Cierre -->
-                                    <button onclick="closeVisitByTech('${v.id}')" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black uppercase shadow-md transition-all flex items-center justify-center gap-2">
-                                        <span>💾</span><span>GUARDAR CIERRE TÉCNICO</span>
-                                    </button>
-                                </div>
                             </div>
-                        </div>
-                    </div>`;
-                }).join('');
+                        </div>`;
+                    }).join('');
+                }
+
+                cardsContainer.innerHTML = tabsHeaderHtml + cardsContentHtml;
             }
         }
 
