@@ -175,6 +175,26 @@
             box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
             transition: transform 0.15s ease, box-shadow 0.15s ease;
         }
+
+        /* Carrusel de Visitas Deslizable para Técnicos */
+        .tech-carousel-track {
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+            scrollbar-width: none;
+        }
+        .tech-carousel-track::-webkit-scrollbar {
+            display: none;
+        }
+        .tech-carousel-slide {
+            flex: 0 0 100%;
+            width: 100%;
+            min-width: 100%;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+        }
         
         /* Tablas */
         .admin-table thead th { 
@@ -605,8 +625,72 @@
         window.techRuteroTab = 'por_atender'; // 'por_atender' | 'gestionadas' | 'todas'
         window.setTechRuteroTab = function(tab) {
             window.techRuteroTab = tab;
+            window.techCurrentSlide = 0;
             renderRutero();
         };
+        window.techViewLayout = 'carousel'; // 'carousel' | 'list'
+        window.techCurrentSlide = 0;
+        window.techTotalSlides = 0;
+
+        window.setTechLayout = function(layout) {
+            window.techViewLayout = layout;
+            window.techCurrentSlide = 0;
+            renderRutero();
+        };
+
+        window.techCarouselSlideTo = function(index) {
+            const track = document.getElementById('techCarouselTrack');
+            if (!track) return;
+            const slide = document.getElementById('slide_' + index);
+            if (slide) {
+                track.scrollTo({ left: slide.offsetLeft, behavior: 'smooth' });
+            }
+            window.techCurrentSlide = index;
+            updateCarouselUI(index, window.techTotalSlides);
+        };
+
+        window.techCarouselNext = function() {
+            const next = Math.min((window.techCurrentSlide || 0) + 1, (window.techTotalSlides || 1) - 1);
+            window.techCarouselSlideTo(next);
+        };
+
+        window.techCarouselPrev = function() {
+            const prev = Math.max((window.techCurrentSlide || 0) - 1, 0);
+            window.techCarouselSlideTo(prev);
+        };
+
+        window.onCarouselScroll = function(event) {
+            const track = event.target;
+            if (!track) return;
+            const slideWidth = track.offsetWidth;
+            if (!slideWidth) return;
+            const index = Math.round(track.scrollLeft / slideWidth);
+            if (index !== window.techCurrentSlide && index >= 0 && index < (window.techTotalSlides || 1)) {
+                window.techCurrentSlide = index;
+                updateCarouselUI(index, window.techTotalSlides);
+            }
+        };
+
+        function updateCarouselUI(index, total) {
+            const counterLabel = document.getElementById('carouselCounterLabel');
+            if (counterLabel) counterLabel.textContent = `Visita ${index + 1} de ${total}`;
+            
+            const prevBtn = document.getElementById('btnCarouselPrev');
+            const nextBtn = document.getElementById('btnCarouselNext');
+            if (prevBtn) prevBtn.disabled = (index <= 0);
+            if (nextBtn) nextBtn.disabled = (index >= total - 1);
+            
+            for (let i = 0; i < total; i++) {
+                const dot = document.getElementById('carousel_dot_' + i);
+                if (dot) {
+                    if (i === index) {
+                        dot.className = 'w-5 h-2.5 rounded-full bg-amber-400 transition-all shadow-xs';
+                    } else {
+                        dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-600 hover:bg-slate-500 transition-all';
+                    }
+                }
+            }
+        }
         window.setVisitsArray = function(v) { visitsArray = v; };
         window.getVisitsArray = function() { return visitsArray; }; 
 
@@ -1729,7 +1813,7 @@
                 return true;
             }
 
-            // 2. RENDER TARJETAS MÓVILES / TÉCNICOS (Segmentadas por pestañas: Por Atender vs Gestionadas)
+            // 2. RENDER TARJETAS MÓVILES / TÉCNICOS (Segmentadas por pestañas y modo Carrusel / Lista)
             if(cardsContainer) {
                 const pendientesItems = itemsWithTime.filter(item => !isItemGestionado(item.v, date));
                 const gestionadasItems = itemsWithTime.filter(item => isItemGestionado(item.v, date));
@@ -1743,9 +1827,16 @@
                 else if (activeTab === 'gestionadas') itemsToShow = gestionadasItems;
                 else itemsToShow = itemsWithTime;
 
-                // Barra flotante de pestañas para el técnico
+                window.techTotalSlides = itemsToShow.length;
+                if ((window.techCurrentSlide || 0) >= itemsToShow.length) {
+                    window.techCurrentSlide = Math.max(0, itemsToShow.length - 1);
+                }
+
+                const isCarousel = (window.techViewLayout !== 'list');
+
+                // 1. Barra flotante de pestañas para el técnico
                 const tabsHeaderHtml = `
-                <div class="sticky top-2 z-20 bg-slate-900/95 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-slate-700/80 mb-4 flex items-center gap-1.5 text-xs font-black">
+                <div class="sticky top-2 z-20 bg-slate-900/95 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-slate-700/80 mb-3 flex items-center gap-1.5 text-xs font-black">
                     <button type="button" onclick="setTechRuteroTab('por_atender')" class="flex-1 py-2.5 px-2 text-center rounded-xl uppercase transition-all flex items-center justify-center gap-1.5 ${activeTab === 'por_atender' ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-400/50' : 'text-slate-300 hover:text-white hover:bg-slate-800/80'}">
                         <span>⏳ Por Atender</span>
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${activeTab === 'por_atender' ? 'bg-white text-blue-800' : 'bg-slate-800 text-slate-300 border border-slate-700'}">${countPendientes}</span>
@@ -1759,6 +1850,44 @@
                         <span class="text-[10px] font-mono opacity-80">(${totalCount})</span>
                     </button>
                 </div>`;
+
+                // 2. Selector de Modo de Vista (Carrusel 1 por 1 vs Lista Vertical)
+                const viewSwitcherHtml = itemsToShow.length > 0 ? `
+                <div class="flex items-center justify-between gap-2 mb-3 px-1">
+                    <span class="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1.5">
+                        <span>${isCarousel ? '🎴' : '📑'}</span>
+                        <span>${isCarousel ? 'Desliza para ver cliente por cliente' : 'Vista en lista vertical'}</span>
+                    </span>
+                    <div class="inline-flex bg-slate-200/90 p-1 rounded-xl shadow-inner gap-1">
+                        <button type="button" onclick="setTechLayout('carousel')" class="px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${isCarousel ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
+                            🎴 Carrusel
+                        </button>
+                        <button type="button" onclick="setTechLayout('list')" class="px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${!isCarousel ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}">
+                            📑 Lista
+                        </button>
+                    </div>
+                </div>` : '';
+
+                // 3. Barra de Navegación del Carrusel (Anterior / Contador / Siguiente)
+                const currentSlide = window.techCurrentSlide || 0;
+                const carouselControlsHtml = (isCarousel && itemsToShow.length > 1) ? `
+                <div class="flex items-center justify-between gap-2 p-2.5 mb-3 bg-slate-900 text-white rounded-2xl shadow-md border border-slate-700">
+                    <button type="button" onclick="techCarouselPrev()" id="btnCarouselPrev" ${currentSlide <= 0 ? 'disabled' : ''} class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-25 disabled:pointer-events-none rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition-all active:scale-95 shadow-xs">
+                        <span>◀</span><span>Anterior</span>
+                    </button>
+                    <div class="flex flex-col items-center select-none">
+                        <span id="carouselCounterLabel" class="text-xs font-black uppercase tracking-wider text-amber-400 font-mono">Visita ${currentSlide + 1} de ${itemsToShow.length}</span>
+                        <!-- Dots interactivos -->
+                        <div class="flex gap-1.5 mt-1.5" id="carouselDotsContainer">
+                            ${itemsToShow.map((_, i) => `
+                                <button type="button" onclick="techCarouselSlideTo(${i})" class="${i === currentSlide ? 'w-5 h-2 rounded-full bg-amber-400 transition-all shadow-xs' : 'w-2 h-2 rounded-full bg-slate-700 hover:bg-slate-500 transition-all'}" id="carousel_dot_${i}" title="Ir a visita ${i+1}"></button>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <button type="button" onclick="techCarouselNext()" id="btnCarouselNext" ${currentSlide >= itemsToShow.length - 1 ? 'disabled' : ''} class="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-25 disabled:pointer-events-none rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition-all active:scale-95 shadow-xs">
+                        <span>Siguiente</span><span>▶</span>
+                    </button>
+                </div>` : '';
 
                 let cardsContentHtml = '';
 
@@ -1783,7 +1912,7 @@
                             <h4 class="text-sm font-black text-slate-800 uppercase">Aún no hay visitas gestionadas hoy</h4>
                             <p class="text-xs text-slate-500 max-w-xs mx-auto">A medida que atiendas y guardes el cierre técnico de cada cliente en "Por Atender", se trasladarán automáticamente a esta sección.</p>
                             <div class="pt-2">
-                                <button type="button" onclick="setTechRuteroTab('por_atender')" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-black uppercase shadow-sm transition-all">
+                                <button type="button" onclick="setTechRuteroTab('por_atender')" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-black uppercase shadow-md transition-all">
                                     <span>Ir a visitas por atender (${countPendientes})</span>
                                 </button>
                             </div>
@@ -1792,7 +1921,7 @@
                         cardsContentHtml = '<div class="p-10 text-center text-stone-500 italic font-black uppercase text-sm bg-white rounded-2xl shadow-sm border border-stone-200">Sin servicios hoy</div>';
                     }
                 } else {
-                    cardsContentHtml = itemsToShow.map(({ v, index, timeStr }) => {
+                    const cardsArr = itemsToShow.map(({ v, index, timeStr }, slideIdx) => {
                         const isDelivery = v.estado === 'A Taller' && v.fechaEntregaProgramada === date;
                         const isGarantiaVisit = v.estado === 'Garantia en Tramite' && v.fechaNuevaVisita === date;
                         const isGestionada = isItemGestionado(v, date);
@@ -1867,8 +1996,8 @@
 
                         const cleanPhone = (v.telefono || '').toString().replace(/\D/g, '');
 
-                        return `
-                        <div class="tech-card overflow-hidden ${cardBorderClass} rounded-2xl mb-4 transition-all" id="card_visit_${v.id}">
+                        const cardInnerHtml = `
+                        <div class="tech-card overflow-hidden ${cardBorderClass} rounded-2xl mb-2 transition-all" id="card_visit_${v.id}">
                             ${bannerGestionadaHtml}
                             <!-- Barra superior: Parada, Hora estimada, Tipo de servicio y Estado -->
                             <div class="bg-gradient-to-r from-slate-50 to-slate-100/80 px-4 py-2.5 border-b border-slate-200/80 flex items-center justify-between gap-2 flex-wrap">
@@ -2055,10 +2184,33 @@
                                 </div>
                             </div>
                         </div>`;
-                    }).join('');
+
+                        if (isCarousel) {
+                            return `<div class="tech-carousel-slide" id="slide_${slideIdx}">${cardInnerHtml}</div>`;
+                        } else {
+                            return cardInnerHtml;
+                        }
+                    });
+
+                    if (isCarousel) {
+                        cardsContentHtml = `<div id="techCarouselTrack" class="tech-carousel-track gap-3" onscroll="onCarouselScroll(event)">${cardsArr.join('')}</div>`;
+                    } else {
+                        cardsContentHtml = `<div class="space-y-4">${cardsArr.join('')}</div>`;
+                    }
                 }
 
-                cardsContainer.innerHTML = tabsHeaderHtml + cardsContentHtml;
+                cardsContainer.innerHTML = tabsHeaderHtml + viewSwitcherHtml + carouselControlsHtml + cardsContentHtml;
+                
+                // Si estamos en carrusel, posicionar en el slide activo
+                if (isCarousel && itemsToShow.length > 0) {
+                    setTimeout(() => {
+                        const track = document.getElementById('techCarouselTrack');
+                        const slide = document.getElementById('slide_' + (window.techCurrentSlide || 0));
+                        if (track && slide && window.techCurrentSlide > 0) {
+                            track.scrollTo({ left: slide.offsetLeft, behavior: 'instant' });
+                        }
+                    }, 50);
+                }
             }
         }
 
