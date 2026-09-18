@@ -2469,70 +2469,75 @@
             const equiposTallerList = ["Cocina", "Refrigerador", "Microondas", "Horno", "Campana", "Campana Decorativa", "Campana de Isla", "Lavadora", "Secadora", "Barbecue", "Triturador", "Lavavajillas", "Calefón", "Otros"];
 
             container.innerHTML = filtered.map(v => {
-                return `<div class="glass-card p-6 md:p-8 taller-card mb-6 hover:shadow-lg transition-all shadow-md border-white/80">
+                const eqRevisado = (v.equipos || []).map(e => e.descProducto || e.manualName).filter(Boolean).join(', ') || v.taller_equipo_trabajado || '---';
+                const tipoServicio = v.taller_tipo_servicio || v.tipoAtencion || 'REPARACIÓN';
+                const fechaDisplay = v.fechaIngresoTaller || v.fechaInstalacion || '---';
+
+                return `<div class="glass-card p-5 md:p-6 taller-card mb-5 hover:shadow-lg transition-all shadow-md border-white/80">
                     <div class="flex flex-col md:flex-row justify-between gap-6">
                         <div class="flex-grow">
-                            <div class="flex justify-between items-start mb-5 border-b border-white/60 pb-4">
+                            <!-- Encabezado minimalista: Nombre, Equipo, Tipo, Fecha, Técnico -->
+                            <div class="flex flex-wrap justify-between items-start gap-2 mb-4 border-b border-white/60 pb-3">
                                 <div>
-                                    <h3 class="text-base font-black text-fix-main underline italic uppercase">${v.nombreCliente}</h3>
-                                    <p class="text-[9px] font-bold text-stone-600 mt-1 uppercase">TÉCNICO INGRESO: ${v.tecnico} • FECHA REGISTRO: ${v.fechaInstalacion}</p>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h3 class="text-base font-black text-fix-main underline italic uppercase">${v.nombreCliente}</h3>
+                                        <span class="text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-950 border border-orange-200">EQUIPO: ${eqRevisado}</span>
+                                        <span class="text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full bg-stone-200/80 text-stone-800 border border-stone-300">TIPO: ${tipoServicio}</span>
+                                    </div>
+                                    <p class="text-[9px] font-bold text-stone-600 mt-1 uppercase">FECHA: ${fechaDisplay} • TÉCNICO: ${v.tecnico || '---'}</p>
                                 </div>
-                                <button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/70 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button>
+                                <button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/70 w-8 h-8 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm" title="Eliminar">🗑️</button>
                             </div>
                             
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div class="glass-panel p-5 italic">
-                                    <p class="text-[9px] font-black text-fix-taller uppercase mb-2 italic underline">Estado de Ingreso:</p>
-                                    <div class="text-[10px] text-stone-700 italic border-b border-white/60 pb-3 mb-3 uppercase">${v.razonNoAtencion || 'Sin observación'}</div>
-                                    <p class="text-[9px] font-black text-fix-main uppercase mb-2 italic underline">Equipo(s) de Ruta:</p>
-                                    <div class="text-[10px] font-black uppercase text-stone-700">${(v.equipos || []).map(e => '• ' + e.descProducto).join('<br>')}</div>
+                            <!-- Formulario Taller Compacto y Directo -->
+                            <div class="glass-panel bg-orange-50/40 border-orange-200/50 p-4 md:p-5 font-black italic rounded-2xl">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+                                    <div>
+                                        <label class="text-[8px] uppercase block mb-1 text-stone-600 font-black">1. EQUIPO TRABAJADO:</label>
+                                        <select id="taller_equipo_sel_${v.id}" class="w-full p-2.5 glass-input rounded-xl text-[10px] font-black uppercase outline-none text-stone-800 bg-white">
+                                            <option value="">--- ELEGIR EQUIPO ---</option>
+                                            ${equiposTallerList.map(eq => `<option value="${eq}" ${v.taller_equipo_trabajado === eq ? 'selected' : ''}>${eq}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[8px] uppercase block mb-1 text-stone-600 font-black">2. TIPO DE SERVICIO:</label>
+                                        <select id="taller_tipo_serv_${v.id}" class="w-full p-2.5 glass-input rounded-xl text-[10px] font-black uppercase outline-none text-stone-800 bg-white">
+                                            <option value="">--- ELEGIR TIPO ---</option>
+                                            <option value="Garantía" ${v.taller_tipo_servicio === 'Garantía' ? 'selected' : ''}>🛡️ GARANTÍA</option>
+                                            <option value="Reparación" ${v.taller_tipo_servicio === 'Reparación' ? 'selected' : ''}>🛠️ REPARACIÓN</option>
+                                            <option value="Mantenimiento" ${v.taller_tipo_servicio === 'Mantenimiento' ? 'selected' : ''}>⚙️ MANTENIMIENTO</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[8px] uppercase block mb-1 text-stone-600 font-black">FECHA INGRESO TALLER:</label>
+                                        <input type="date" id="taller_fecha_${v.id}" value="${v.fechaIngresoTaller || ''}" class="w-full p-2.5 glass-input rounded-xl text-[10px] font-black text-stone-800 outline-none bg-white">
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                        <label class="text-[8px] font-black text-fix-main uppercase block mb-1 tracking-tighter">📅 AGENDAR DÍA DE ENTREGA LOGÍSTICA:</label>
+                                        <input type="date" id="taller_fecha_entrega_prog_${v.id}" value="${v.fechaEntregaProgramada || ''}" class="w-full p-2.5 glass-input rounded-xl text-[10px] font-black text-stone-800 outline-none bg-white">
+                                    </div>
+                                    <div>
+                                        <label class="text-[8px] font-black text-fix-report uppercase block mb-1">VALOR TOTAL TRABAJO $:</label>
+                                        <input type="number" step="0.01" id="taller_costo_total_${v.id}" value="${v.financiera?.totalCliente || ''}" placeholder="0.00" class="w-full p-2.5 glass-input border-emerald-300/60 rounded-xl text-[11px] font-mono font-black text-fix-report text-right bg-white outline-none">
+                                    </div>
                                 </div>
 
-                                <div class="glass-panel bg-orange-50/40 border-orange-200/50 p-5 font-black italic">
-                                    <div class="grid grid-cols-1 gap-4 mb-4">
-                                        <div>
-                                            <label class="text-[8px] uppercase block mb-1 text-stone-600">1. SELECCIONAR EQUIPO TRABAJADO:</label>
-                                            <select id="taller_equipo_sel_${v.id}" class="w-full p-3 glass-input rounded-xl text-[10px] font-black uppercase outline-none text-stone-800">
-                                                <option value="">--- ELEGIR EQUIPO ---</option>
-                                                ${equiposTallerList.map(eq => `<option value="${eq}" ${v.taller_equipo_trabajado === eq ? 'selected' : ''}>${eq}</option>`).join('')}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="text-[8px] uppercase block mb-1 text-stone-600">2. TIPO DE SERVICIO EN TALLER:</label>
-                                            <select id="taller_tipo_serv_${v.id}" class="w-full p-3 glass-input rounded-xl text-[10px] font-black uppercase outline-none text-stone-800">
-                                                <option value="">--- ELEGIR TIPO ---</option>
-                                                <option value="Garantía" ${v.taller_tipo_servicio === 'Garantía' ? 'selected' : ''}>🛡️ GARANTÍA</option>
-                                                <option value="Reparación" ${v.taller_tipo_servicio === 'Reparación' ? 'selected' : ''}>🛠️ REPARACIÓN</option>
-                                                <option value="Mantenimiento" ${v.taller_tipo_servicio === 'Mantenimiento' ? 'selected' : ''}>⚙️ MANTENIMIENTO</option>
-                                            </select>
-                                        </div>
-                                        <div class="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label class="text-[8px] uppercase text-stone-600">Fecha Ingreso Taller:</label>
-                                                <input type="date" id="taller_fecha_${v.id}" value="${v.fechaIngresoTaller || ''}" class="w-full p-3 glass-input rounded-xl text-[10px] font-black text-stone-800 outline-none">
-                                            </div>
-                                            <div>
-                                                <label class="text-[8px] font-black text-fix-report uppercase">VALOR TOTAL TRABAJO $:</label>
-                                                <input type="number" step="0.01" id="taller_costo_total_${v.id}" value="${v.financiera?.totalCliente || ''}" placeholder="0.00" class="w-full p-3 glass-input border-emerald-300/60 rounded-xl text-[12px] font-mono font-black text-fix-report text-right bg-white/80 outline-none">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="mb-4 p-4 glass-input bg-stone-100/50 rounded-xl border-stone-200/50">
-                                        <label class="text-[8px] font-black text-fix-main uppercase block mb-2 tracking-tighter">📅 AGENDAR DÍA DE ENTREGA LOGÍSTICA:</label>
-                                        <input type="date" id="taller_fecha_entrega_prog_${v.id}" value="${v.fechaEntregaProgramada || ''}" class="w-full p-3 glass-input rounded-xl text-[10px] font-black text-stone-800 outline-none">
-                                    </div>
-                                    <label class="text-[8px] uppercase block mb-1 text-stone-600">3. OBSERVACIONES / REPUESTOS / NOVEDADES:</label>
-                                    <textarea id="taller_repuestos_${v.id}" placeholder="ESPECIFIQUE EL TRABAJO REALIZADO..." class="w-full p-4 glass-input rounded-xl text-[10px] font-black uppercase min-h-[80px] text-stone-800 outline-none">${v.repuestosSolicitadosTaller || ''}</textarea>
-                                    <button onclick="saveTallerUpdate('${v.id}')" class="w-full mt-4 glass-card bg-fix-main/90 border-white/50 text-white py-4 rounded-xl text-[10px] font-black uppercase active:scale-95 shadow-md text-center">💾 ACTUALIZAR DATOS TALLER</button>
+                                <div class="mb-3">
+                                    <label class="text-[8px] uppercase block mb-1 text-stone-600 font-black">3. OBSERVACIONES / REPUESTOS / NOVEDADES:</label>
+                                    <textarea id="taller_repuestos_${v.id}" placeholder="ESPECIFIQUE EL TRABAJO REALIZADO O NOVEDADES..." class="w-full p-3 glass-input rounded-xl text-[10px] font-black uppercase min-h-[60px] text-stone-800 outline-none bg-white">${v.repuestosSolicitadosTaller || ''}</textarea>
                                 </div>
+                                <button onclick="saveTallerUpdate('${v.id}')" class="w-full glass-card bg-fix-main/90 hover:bg-fix-main border-white/50 text-white py-3 rounded-xl text-[10px] font-black uppercase active:scale-95 shadow-md text-center transition-all">💾 ACTUALIZAR DATOS TALLER</button>
                             </div>
                         </div>
-                        <div class="w-full md:w-56 flex flex-col justify-center gap-4">
-                            <div class="glass-card bg-stone-900/90 text-white p-6 rounded-3xl text-center shadow-xl border-fix-accent/60">
-                                <p class="text-[9px] uppercase text-fix-accent font-black tracking-widest mb-2 italic">COSTO TOTAL</p>
-                                <p class="text-3xl font-mono font-black drop-shadow-md">$${(v.financiera?.totalCliente || 0).toFixed(2)}</p>
+                        <div class="w-full md:w-48 flex flex-col justify-center gap-3 shrink-0">
+                            <div class="glass-card bg-stone-900/90 text-white p-4 rounded-2xl text-center shadow-lg border-fix-accent/60">
+                                <p class="text-[8px] uppercase text-fix-accent font-black tracking-widest mb-1 italic">COSTO TOTAL</p>
+                                <p class="text-2xl font-mono font-black drop-shadow-md text-emerald-400">$${(v.financiera?.totalCliente || 0).toFixed(2)}</p>
                             </div>
-                            <button onclick="markAsDelivered('${v.id}')" class="glass-card bg-emerald-700/90 border-emerald-500 text-white py-6 rounded-3xl text-xs font-black uppercase italic shadow-lg active:scale-95 transition-all text-center hover:bg-emerald-800/90">🚀 ENTREGAR AL CLIENTE</button>
+                            <button onclick="markAsDelivered('${v.id}')" class="glass-card bg-emerald-700/90 border-emerald-500 text-white py-4 rounded-2xl text-xs font-black uppercase italic shadow-md active:scale-95 transition-all text-center hover:bg-emerald-800/90">🚀 ENTREGAR AL CLIENTE</button>
                         </div>
                     </div>
                 </div>`;
@@ -2585,70 +2590,67 @@
             if(filtered.length === 0) { container.innerHTML = '<p class="p-10 text-center text-stone-500 font-black uppercase italic">No hay garantías en trámite</p>'; return; }
 
             container.innerHTML = filtered.map(v => {
-                return `<div class="glass-card p-6 md:p-8 mb-6 hover:shadow-lg transition-all shadow-md border-white/80" style="border-left: 6px solid #1e3a8a; border-radius: 1rem;">
+                const eqRevisado = (v.equipos || []).map(e => e.descProducto || e.manualName).filter(Boolean).join(', ') || '---';
+                const fechaDisplay = v.fechaInstalacion || '---';
+
+                return `<div class="glass-card p-5 md:p-6 mb-5 hover:shadow-lg transition-all shadow-md border-white/80" style="border-left: 6px solid #1e3a8a; border-radius: 1rem;">
                     <div class="flex flex-col md:flex-row justify-between gap-6 font-black">
                         <div class="flex-grow">
-                            <div class="flex justify-between items-start mb-5 border-b border-white/60 pb-4">
+                            <!-- Encabezado minimalista: Nombre del cliente, equipo, fecha y técnico -->
+                            <div class="flex flex-wrap justify-between items-start gap-2 mb-4 border-b border-white/60 pb-3">
                                 <div>
-                                    <h3 class="text-base font-black text-fix-main underline italic uppercase">${v.nombreCliente}</h3>
-                                    <p class="text-[9px] font-bold text-stone-600 mt-1 uppercase">TÉCNICO INGRESO: ${v.tecnico || '---'} • FECHA VISITA ORIGINAL: ${v.fechaInstalacion}</p>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h3 class="text-base font-black text-fix-main underline italic uppercase">${v.nombreCliente}</h3>
+                                        <span class="text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-200">EQUIPO: ${eqRevisado}</span>
+                                    </div>
+                                    <p class="text-[9px] font-bold text-stone-600 mt-1 uppercase">FECHA VISITA: ${fechaDisplay} • TÉCNICO: ${v.tecnico || '---'}</p>
                                 </div>
-                                <button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/70 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button>
+                                <button onclick="deleteVisit('${v.id}')" class="text-fix-error glass-input bg-white/70 w-8 h-8 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm" title="Eliminar">🗑️</button>
                             </div>
                             
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div class="glass-panel p-5 italic">
-                                    <p class="text-[9px] font-black text-fix-main uppercase mb-2 italic underline">Nota / Comentario del Técnico:</p>
-                                    <div class="text-[10px] text-stone-700 italic border-b border-white/50 pb-3 mb-3 uppercase">${v.commentarioCliente || 'Sin comentario del técnico'}</div>
-                                    <p class="text-[9px] font-black text-fix-accent uppercase mb-2 italic underline">Detalle Falla/Novedad:</p>
-                                    <div class="text-[10px] text-stone-700 italic border-b border-white/50 pb-3 mb-3 uppercase">${v.razonNoAtencion || 'Sin observación'}</div>
-                                    <p class="text-[9px] font-black text-stone-600 uppercase mb-2 italic underline">Equipo(s) de Ruta:</p>
-                                    <div class="text-[10px] font-black uppercase text-stone-800">${(v.equipos || []).map(e => '• ' + e.descProducto).join('<br>')}</div>
-                                </div>
-
-                                <div class="glass-panel bg-stone-100/40 border-stone-200/50 p-5 font-black italic">
-                                    <div class="grid grid-cols-1 gap-4 mb-4">
-                                        <div>
-                                            <div class="flex items-center justify-between mb-2">
-                                                <label class="text-[9px] uppercase font-black text-amber-900">1. ¿LLEVA REPUESTO DE FÁBRICA?</label>
-                                                <select id="garantias_con_repuesto_${v.id}" onchange="toggleGarantiasViewRepuestoUI('${v.id}', this.value)" class="p-1 rounded-lg text-[9px] font-black border border-amber-300 bg-white">
-                                                    <option value="NO" ${!(v.equipos?.[0]?.conRepuesto) ? 'selected' : ''}>NO (SOLO REVISIÓN)</option>
-                                                    <option value="SI" ${v.equipos?.[0]?.conRepuesto ? 'selected' : ''}>SÍ (CON REPUESTO)</option>
-                                                </select>
+                            <!-- Formulario de Garantía Compacto -->
+                            <div class="glass-panel bg-stone-100/40 border-stone-200/50 p-4 md:p-5 font-black italic rounded-2xl">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <label class="text-[9px] uppercase font-black text-amber-900">1. ¿LLEVA REPUESTO DE FÁBRICA?</label>
+                                            <select id="garantias_con_repuesto_${v.id}" onchange="toggleGarantiasViewRepuestoUI('${v.id}', this.value)" class="p-1 rounded-lg text-[9px] font-black border border-amber-300 bg-white shadow-xs">
+                                                <option value="NO" ${!(v.equipos?.[0]?.conRepuesto) ? 'selected' : ''}>NO (SOLO REVISIÓN)</option>
+                                                <option value="SI" ${v.equipos?.[0]?.conRepuesto ? 'selected' : ''}>SÍ (CON REPUESTO)</option>
+                                            </select>
+                                        </div>
+                                        <div id="garantias_repuesto_box_${v.id}" class="${v.equipos?.[0]?.conRepuesto ? '' : 'hidden'} space-y-2 mb-2 p-2.5 bg-amber-50 rounded-xl border border-amber-200">
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-[8px] font-black text-amber-950">REPUESTO OFICIAL 2026:</span>
+                                                <button type="button" onclick="openRepuestoPicker('garantia_view', 0, '${v.id}')" class="px-2.5 py-1 bg-amber-700 hover:bg-amber-800 text-white rounded-lg text-[8px] font-black uppercase shadow-xs transition-all active:scale-95">
+                                                    🔍 BUSCAR EN LISTA
+                                                </button>
                                             </div>
-                                            <div id="garantias_repuesto_box_${v.id}" class="${v.equipos?.[0]?.conRepuesto ? '' : 'hidden'} space-y-2 mb-2 p-2.5 bg-amber-50 rounded-xl border border-amber-200">
-                                                <div class="flex items-center justify-between">
-                                                    <span class="text-[8px] font-bold text-amber-950">REPUESTO OFICIAL 2026:</span>
-                                                    <button type="button" onclick="openRepuestoPicker('garantia_view', 0, '${v.id}')" class="px-2.5 py-1 bg-amber-700 hover:bg-amber-800 text-white rounded-lg text-[8px] font-black uppercase shadow-xs">
-                                                        🔍 BUSCAR EN LISTA
-                                                    </button>
-                                                </div>
-                                                <div class="grid grid-cols-2 gap-2">
-                                                    <input type="text" id="garantias_cod_repuesto_${v.id}" value="${v.equipos?.[0]?.codRepuesto || ''}" placeholder="CÓDIGO (ej. 81483008)" oninput="lookupGarantiaViewRepuesto(this.value, '${v.id}')" class="p-2 glass-input bg-white rounded-lg text-[9px] font-mono font-black uppercase border border-stone-300">
-                                                    <input type="text" id="garantias_desc_repuesto_${v.id}" value="${v.equipos?.[0]?.descRepuesto || ''}" placeholder="DESCRIPCIÓN DEL REPUESTO" class="p-2 glass-input bg-white rounded-lg text-[9px] font-bold uppercase border border-stone-300">
-                                                </div>
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                <input type="text" id="garantias_cod_repuesto_${v.id}" value="${v.equipos?.[0]?.codRepuesto || ''}" placeholder="CÓDIGO (ej. 81483008)" oninput="lookupGarantiaViewRepuesto(this.value, '${v.id}')" class="p-2 glass-input bg-white rounded-lg text-[9px] font-mono font-black uppercase border border-stone-300">
+                                                <input type="text" id="garantias_desc_repuesto_${v.id}" value="${v.equipos?.[0]?.descRepuesto || ''}" placeholder="DESCRIPCIÓN DEL REPUESTO" class="p-2 glass-input bg-white rounded-lg text-[9px] font-bold uppercase border border-stone-300">
                                             </div>
-                                            <textarea id="garantias_repuesto_${v.id}" placeholder="Especifique notas o detalles adicionales del repuesto..." class="w-full p-3 glass-input rounded-xl text-[10px] font-black uppercase min-h-[50px] outline-none text-stone-800">${v.repuestoSolicitadoGarantia || ''}</textarea>
                                         </div>
-                                        <div>
-                                            <label class="text-[8px] uppercase block mb-1 text-stone-600">2. OBSERVACIÓN / TRÁMITE INTERNO:</label>
-                                            <textarea id="garantias_obs_${v.id}" placeholder="Notas sobre el estado del trámite en fábrica..." class="w-full p-4 glass-input rounded-xl text-[10px] font-black uppercase min-h-[80px] outline-none text-stone-800">${v.observacionGarantia || ''}</textarea>
-                                        </div>
-                                        <div class="glass-input p-4 rounded-xl bg-white/60 border-stone-200/50">
-                                            <label class="text-[8px] font-black text-fix-main uppercase block mb-2 tracking-tighter">📅 PLANIFICAR FECHA NUEVA VISITA:</label>
-                                            <input type="date" id="garantias_fecha_prog_${v.id}" value="${v.fechaNuevaVisita || ''}" class="w-full p-3 glass-input rounded-lg text-[10px] font-black outline-none text-stone-800">
-                                        </div>
+                                        <input type="hidden" id="garantias_repuesto_${v.id}" value="${v.repuestoSolicitadoGarantia || ''}">
                                     </div>
-                                    <button onclick="saveGarantiaUpdate('${v.id}')" class="w-full mt-3 glass-card bg-fix-main/90 border-white/50 text-white py-4 rounded-xl text-[10px] font-black uppercase active:scale-95 shadow-sm text-center">💾 ACTUALIZAR DATOS TRÁMITE</button>
+                                    <div>
+                                        <label class="text-[8px] font-black text-fix-main uppercase block mb-1 tracking-tighter">📅 PLANIFICAR FECHA NUEVA VISITA:</label>
+                                        <input type="date" id="garantias_fecha_prog_${v.id}" value="${v.fechaNuevaVisita || ''}" class="w-full p-2.5 glass-input rounded-xl text-[10px] font-black outline-none text-stone-800 bg-white">
+                                    </div>
                                 </div>
+                                <div class="mb-3">
+                                    <label class="text-[8px] uppercase block mb-1 text-stone-600 font-black">2. OBSERVACIONES / TRÁMITE INTERNO:</label>
+                                    <textarea id="garantias_obs_${v.id}" placeholder="Notas sobre el estado del trámite en fábrica u observaciones..." class="w-full p-3 glass-input rounded-xl text-[10px] font-black uppercase min-h-[60px] outline-none text-stone-800 bg-white">${v.observacionGarantia || ''}</textarea>
+                                </div>
+                                <button onclick="saveGarantiaUpdate('${v.id}')" class="w-full glass-card bg-fix-main/90 hover:bg-fix-main border-white/50 text-white py-3 rounded-xl text-[10px] font-black uppercase active:scale-95 shadow-sm text-center transition-all">💾 ACTUALIZAR DATOS TRÁMITE</button>
                             </div>
                         </div>
-                        <div class="w-full md:w-56 flex flex-col justify-center gap-4">
-                            <div class="glass-card bg-stone-900/90 text-white p-6 rounded-3xl text-center shadow-xl border-fix-accent/60">
-                                <p class="text-[9px] uppercase text-fix-accent font-black tracking-widest mb-2 italic">ESTADO DEL CASO</p>
-                                <p class="text-lg font-mono font-black text-emerald-400 drop-shadow-md">SOLICITADO</p>
+                        <div class="w-full md:w-48 flex flex-col justify-center gap-3 shrink-0">
+                            <div class="glass-card bg-stone-900/90 text-white p-4 rounded-2xl text-center shadow-md border-fix-accent/60">
+                                <p class="text-[8px] uppercase text-fix-accent font-black tracking-widest mb-1 italic">ESTADO DEL CASO</p>
+                                <p class="text-base font-mono font-black text-emerald-400 drop-shadow-sm">SOLICITADO</p>
                             </div>
-                            <button onclick="reScheduleGarantia('${v.id}')" class="glass-card bg-emerald-700/90 border-emerald-500 text-white py-6 rounded-3xl text-xs font-black uppercase italic shadow-md active:scale-95 transition-all text-center hover:bg-emerald-800/90">🚀 RE-AGENDAR A RUTA</button>
+                            <button onclick="reScheduleGarantia('${v.id}')" class="glass-card bg-emerald-700/90 border-emerald-500 text-white py-4 rounded-2xl text-xs font-black uppercase italic shadow-md active:scale-95 transition-all text-center hover:bg-emerald-800/90">🚀 RE-AGENDAR A RUTA</button>
                         </div>
                     </div>
                 </div>`;
