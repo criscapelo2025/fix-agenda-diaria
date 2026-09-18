@@ -119,9 +119,62 @@
         .currency-input { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; }
         @media print { .no-print { display: none !important; } }
         
-        /* BLOQUEO CRÍTICO DE SEGURIDAD TÉCNICOS */
+        /* BLOQUEO CRÍTICO DE SEGURIDAD Y OPTIMIZACIÓN MODO TÉCNICO */
         body.technician-mode .admin-only { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }
-        body.technician-mode header { margin-bottom: 0.5rem !important; padding-top: 0.5rem !important; }
+        
+        /* Encabezado Ultracompacto exclusivo en Modo Técnico */
+        body.technician-mode header {
+            padding: 0.5rem 0.85rem !important;
+            margin-bottom: 0.6rem !important;
+            border-radius: 1rem !important;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.2) !important;
+        }
+        body.technician-mode header .header-main-row {
+            flex-direction: row !important;
+            align-items: center !important;
+            gap: 0.6rem !important;
+        }
+        body.technician-mode header .header-logo,
+        body.technician-mode header .header-logo img {
+            width: 2.25rem !important;
+            height: 2.25rem !important;
+            min-width: 2.25rem !important;
+            min-height: 2.25rem !important;
+            border-radius: 0.5rem !important;
+        }
+        body.technician-mode header h1 {
+            font-size: 0.95rem !important;
+            line-height: 1.15 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+        body.technician-mode header .header-desc,
+        body.technician-mode header .header-version-pill {
+            display: none !important;
+        }
+        body.technician-mode header .header-meta-row {
+            margin-top: 0.15rem !important;
+            font-size: 0.7rem !important;
+            gap: 0.4rem !important;
+        }
+
+        /* En modo técnico, forzar vista de tarjetas una por una */
+        body.technician-mode #ruteroTableContainer {
+            display: none !important;
+        }
+        body.technician-mode #ruteroCardsContainer {
+            display: block !important;
+        }
+
+        /* Tarjetas de Clientes para Móviles y Técnicos */
+        .tech-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 1.25rem;
+            box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
         
         /* Tablas */
         .admin-table thead th { 
@@ -638,18 +691,28 @@
 
         async function handleImageSelect(event, id) {
             const files = event.target.files;
-            const container = document.getElementById("photo_previews_" + id);
-            if(!container) return;
-            container.innerHTML = '';
+            const containerTable = document.getElementById("photo_previews_" + id);
+            const containerCard = document.getElementById("card_photo_previews_" + id);
+            if(!containerTable && !containerCard) return;
+            if(containerTable) containerTable.innerHTML = '';
+            if(containerCard) containerCard.innerHTML = '';
             const photoData = [];
             for (let i = 0; i < Math.min(files.length, 3); i++) {
                 const file = files[i];
                 const base64 = await convertToBase64(file);
                 photoData.push(base64);
-                const img = document.createElement('img');
-                img.src = base64;
-                img.className = 'photo-preview';
-                container.appendChild(img);
+                if(containerTable) {
+                    const img = document.createElement('img');
+                    img.src = base64;
+                    img.className = 'photo-preview';
+                    containerTable.appendChild(img);
+                }
+                if(containerCard) {
+                    const img2 = document.createElement('img');
+                    img2.src = base64;
+                    img2.className = 'w-14 h-14 object-cover rounded-lg border border-slate-300 shadow-sm';
+                    containerCard.appendChild(img2);
+                }
             }
             window["photos_" + id] = photoData;
         }
@@ -1038,21 +1101,31 @@
             showMessage("🔓 MODO ADMINISTRADOR ACTIVADO", "fix-main");
         };
 
-        window.toggleDetail = function(id) { const det = document.getElementById("detail-" + id); if(det) det.classList.toggle('hidden'); }
+        window.toggleDetail = function(id) { const det = document.getElementById("detail-" + id); if(det) det.classList.toggle('hidden'); };
+
+        window.toggleCardDetail = function(id) {
+            const det = document.getElementById("card_detail_" + id);
+            const chev = document.getElementById("chevron_" + id);
+            if(det) {
+                det.classList.toggle('hidden');
+                if(chev) chev.textContent = det.classList.contains('hidden') ? '▼' : '▲';
+            }
+        };
 
         window.closeVisitByTech = function(id) {
             try {
-                const sEl = document.getElementById("status_" + id);
-                const tEl = document.getElementById("type_" + id);
-                const pEl = document.getElementById("payment_" + id);
-                const rEl = document.getElementById("reason_" + id);
+                const sEl = document.getElementById("card_status_" + id) || document.getElementById("status_" + id);
+                const tEl = document.getElementById("card_type_" + id) || document.getElementById("type_" + id);
+                const pEl = document.getElementById("card_payment_" + id) || document.getElementById("payment_" + id);
+                const rEl = document.getElementById("card_reason_" + id) || document.getElementById("reason_" + id);
                 if(!sEl || !tEl) return showMessage("❌ Error en formulario", "fix-error");
                 
                 const s = sEl.value; 
                 const t = tEl.value; 
                 const pay = pEl ? pEl.value : "EFECTIVO"; 
                 const r = rEl ? rEl.value : "";
-                const commentEl = document.getElementById("client_comment_" + id); const comment = commentEl ? commentEl.value : "";
+                const commentEl = document.getElementById("card_client_comment_" + id) || document.getElementById("client_comment_" + id);
+                const comment = commentEl ? commentEl.value : "";
                 const photos = window["photos_" + id] || [];
                 
                 if(s === 'PENDIENTE') return showMessage("⚠️ Seleccione estado", "fix-accent");
@@ -1063,7 +1136,9 @@
                 const isMantenimiento = v.esMantenimiento || v.tipoAtencion === 'Mantenimiento';
 
                 if (!isMantenimiento) {
-                    document.querySelectorAll(".acc-" + id).forEach(function(i) {
+                    const accCards = document.querySelectorAll(".card-acc-" + id);
+                    const accEls = accCards.length > 0 ? accCards : document.querySelectorAll(".acc-" + id);
+                    accEls.forEach(function(i) {
                          const q = parseInt(i.value) || 0;
                          if(q > 0) {
                              const p = parseFloat(i.dataset.price);
@@ -1074,8 +1149,8 @@
                              }
                          }
                      });
-                     const mDescEl = document.getElementById("manual_acc_desc_" + id);
-                     const mPriceEl = document.getElementById("manual_acc_price_" + id);
+                     const mDescEl = document.getElementById("card_manual_acc_desc_" + id) || document.getElementById("manual_acc_desc_" + id);
+                     const mPriceEl = document.getElementById("card_manual_acc_price_" + id) || document.getElementById("manual_acc_price_" + id);
                      if(mDescEl && mPriceEl && mDescEl.value && parseFloat(mPriceEl.value) > 0) {
                          const mDesc = mDescEl.value.toUpperCase();
                          const mPrice = parseFloat(mPriceEl.value);
@@ -1541,6 +1616,7 @@
 
         function renderRutero() {
             const list = document.getElementById('ruteroListBody'); if(!list) return;
+            const cardsContainer = document.getElementById('ruteroCardsContainer');
             const date = document.getElementById('filterDateInputRutero').value;
             let tech = currentTechUser || (document.getElementById('ruteroTechFilter') ? document.getElementById('ruteroTechFilter').value : "");
             
@@ -1550,14 +1626,25 @@
             );
             
             if(tech) filtered = filtered.filter(v => v.tecnico === tech);
-            if(filtered.length === 0) { list.innerHTML = '<tr><td colspan="9" class="p-10 text-center text-stone-500 italic font-black uppercase text-sm">Sin servicios hoy</td></tr>'; return; }
+            if(filtered.length === 0) { 
+                list.innerHTML = '<tr><td colspan="9" class="p-10 text-center text-stone-500 italic font-black uppercase text-sm">Sin servicios hoy</td></tr>';
+                if(cardsContainer) {
+                    cardsContainer.innerHTML = '<div class="p-10 text-center text-stone-500 italic font-black uppercase text-sm bg-white rounded-2xl shadow-sm border border-stone-200">Sin servicios hoy</div>';
+                }
+                return; 
+            }
             let sorted = filtered.slice().sort((a,b) => (parseInt(a.priority) || 0) - (parseInt(b.priority) || 0));
-            let currentMinutes = 9 * 60;
             
-            list.innerHTML = sorted.map((v, index) => {
+            let currentMinutes = 9 * 60;
+            const itemsWithTime = sorted.map((v, index) => {
                 const h = Math.floor(currentMinutes / 60); const m = currentMinutes % 60;
                 const timeStr = (h > 12 ? h - 12 : (h === 0 ? 12 : h)) + ":" + m.toString().padStart(2, '0') + " " + (h >= 12 ? 'PM' : 'AM');
                 currentMinutes += (60 + (Math.max(0, (v.equipos || []).length - 1) * 20)) + 15;
+                return { v, index, timeStr };
+            });
+            
+            // 1. RENDER TABLA ADMINISTRACIÓN (100% Intacta para escritorio)
+            list.innerHTML = itemsWithTime.map(({ v, index, timeStr }) => {
                 const initials = v.tecnico ? v.tecnico.split(' ').map(n => n[0]).join('').toUpperCase() : '---';
                 
                 const isDelivery = v.estado === 'A Taller' && v.fechaEntregaProgramada === date;
@@ -1622,6 +1709,223 @@
                     }).join('')}
                 </div>` : ''}<textarea id="reason_${v.id}" placeholder="NOTA INTERNA TÉCNICA..." class="w-full p-4 text-xs glass-input rounded-xl mb-4 font-bold uppercase italic outline-none text-stone-800"></textarea><button onclick="closeVisitByTech('${v.id}')" class="w-full glass-card bg-fix-report/90 border-emerald-500 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 text-center">💾 GUARDAR CIERRE</button></div></div></td></tr>`;
             }).join('');
+
+            // 2. RENDER TARJETAS MÓVILES / TÉCNICOS (Una por una, ultra intuitiva y rápida)
+            if(cardsContainer) {
+                cardsContainer.innerHTML = itemsWithTime.map(({ v, index, timeStr }) => {
+                    const isDelivery = v.estado === 'A Taller' && v.fechaEntregaProgramada === date;
+                    const isGarantiaVisit = v.estado === 'Garantia en Tramite' && v.fechaNuevaVisita === date;
+                    
+                    let tipoServBadge = '';
+                    if (isDelivery) {
+                        tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-stone-800 text-white shadow-xs tracking-wider flex items-center gap-1">🚚 ENTREGA TALLER</span>';
+                    } else if (isGarantiaVisit) {
+                        tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-amber-500 text-white shadow-xs tracking-wider flex items-center gap-1">🛡️ VISITA GARANTÍA</span>';
+                    } else if (v.esMantenimiento || v.tipoAtencion === 'Mantenimiento') {
+                        tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-indigo-600 text-white shadow-xs tracking-wider flex items-center gap-1">⚙️ MANTENIMIENTO</span>';
+                    } else if (v.tipoAtencion === 'Garantía') {
+                        tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-blue-600 text-white shadow-xs tracking-wider flex items-center gap-1">🛡️ GARANTÍA</span>';
+                    } else {
+                        tipoServBadge = '<span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-emerald-600 text-white shadow-xs tracking-wider flex items-center gap-1">🛠️ INSTALACIÓN</span>';
+                    }
+
+                    const estadoUpper = (v.estado || "").toUpperCase();
+                    let estadoBadgeStyle = 'bg-stone-100 text-stone-700 border-stone-300';
+                    if (estadoUpper === 'ATENDIDO') estadoBadgeStyle = 'bg-emerald-500 text-white border-emerald-600';
+                    else if (estadoUpper === 'A TALLER') estadoBadgeStyle = 'bg-orange-500 text-white border-orange-600';
+                    else if (estadoUpper === 'GARANTIA EN TRAMITE') estadoBadgeStyle = 'bg-amber-500 text-white border-amber-600';
+                    else if (estadoUpper.includes('PENDIENTE')) estadoBadgeStyle = 'bg-amber-100 text-amber-900 border-amber-300 font-bold';
+                    else if (estadoUpper === 'NO ATENDIDO') estadoBadgeStyle = 'bg-rose-500 text-white border-rose-600';
+
+                    const estadoBadge = `<span class="px-2.5 py-0.5 rounded-md border text-[9px] font-black uppercase shadow-xs ${estadoBadgeStyle}">${estadoUpper}</span>`;
+
+                    const mapLink = (v.direccion && v.direccion.toString().includes('http')) 
+                                    ? v.direccion 
+                                    : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(v.direccion || v.callePrincipal || '');
+
+                    const equipoDesc = v.esMantenimiento 
+                        ? (v.mantenimientoEquipo || 'Mantenimiento preventivo')
+                        : ((v.equipos && v.equipos.length) ? v.equipos.map(e => e.descProducto).join(' • ') : 'Servicio Técnico');
+
+                    const cleanPhone = (v.telefono || '').toString().replace(/\D/g, '');
+
+                    return `
+                    <div class="tech-card overflow-hidden bg-white border border-slate-200/90 rounded-2xl shadow-sm mb-4 transition-all" id="card_visit_${v.id}">
+                        <!-- Barra superior: Parada, Hora estimada, Tipo de servicio y Estado -->
+                        <div class="bg-gradient-to-r from-slate-50 to-slate-100/80 px-4 py-2.5 border-b border-slate-200/80 flex items-center justify-between gap-2 flex-wrap">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-slate-900 text-white text-[11px] font-mono font-black px-2 py-0.5 rounded-md shadow-xs">#${index + 1}</span>
+                                <span class="text-xs font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">🕒 ${timeStr}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                ${tipoServBadge}
+                                ${estadoBadge}
+                            </div>
+                        </div>
+
+                        <!-- Bloque Principal Visible de Primera -->
+                        <div class="p-4 space-y-3">
+                            <div>
+                                <h3 class="text-base sm:text-lg font-black text-slate-900 leading-tight uppercase flex items-center gap-2">
+                                    ${v.nombreCliente} ${v.estado === 'A Taller' ? '<span title="En Taller">🏢</span>' : ''}
+                                </h3>
+                                <div class="mt-1.5 flex items-start gap-1.5 text-xs sm:text-sm font-semibold text-slate-700">
+                                    <span class="text-rose-500 font-bold text-sm leading-none shrink-0">📍</span>
+                                    <span class="leading-snug">${v.callePrincipal || v.direccion || 'Sin dirección registrada'}</span>
+                                </div>
+                            </div>
+
+                            <div class="p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 flex items-start gap-2">
+                                <span class="text-blue-600 font-black text-xs shrink-0">⚙️</span>
+                                <div class="min-w-0 flex-1">
+                                    <span class="text-[9px] uppercase font-black tracking-wider text-slate-400 block mb-0.5">Equipos a Atender:</span>
+                                    <span class="font-bold text-slate-900 uppercase">${equipoDesc}</span>
+                                </div>
+                            </div>
+
+                            <!-- OBSERVACIONES DE OFICINA VISIBLES DE PRIMERA -->
+                            ${v.observacionesAdmin ? `
+                            <div class="p-3 bg-amber-50/90 border-l-4 border-amber-500 rounded-r-xl shadow-xs">
+                                <div class="flex items-center gap-1.5 text-amber-900 font-black text-[10px] uppercase tracking-wider">
+                                    <span>🔔</span>
+                                    <span>OBSERVACIÓN IMPORTANTE DE OFICINA:</span>
+                                </div>
+                                <p class="text-xs text-amber-950 font-bold italic mt-1 leading-snug">${v.observacionesAdmin}</p>
+                            </div>` : ''}
+
+                            <!-- FALLA REPORTADA VISIBLE DE PRIMERA -->
+                            ${v.descFalla ? `
+                            <div class="p-3 bg-rose-50/90 border-l-4 border-rose-500 rounded-r-xl shadow-xs">
+                                <div class="flex items-center gap-1.5 text-rose-900 font-black text-[10px] uppercase tracking-wider">
+                                    <span>⚠️</span>
+                                    <span>FALLA REPORTADA POR CLIENTE:</span>
+                                </div>
+                                <p class="text-xs text-rose-950 font-bold italic mt-1 leading-snug">${v.descFalla}</p>
+                            </div>` : ''}
+
+                            <!-- BOTONES DE ACCIÓN RÁPIDOS DE ALTO CONTRASTE -->
+                            <div class="pt-1 flex items-stretch gap-2">
+                                <a href="${mapLink}" target="_blank" class="flex-1 flex items-center justify-center gap-1.5 py-3 px-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs uppercase rounded-xl shadow-md transition-all text-center">
+                                    <span class="text-base leading-none">📍</span>
+                                    <span>MAPA GPS</span>
+                                </a>
+                                <a href="tel:${v.telefono || ''}" class="flex-1 flex items-center justify-center gap-1.5 py-3 px-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs uppercase rounded-xl shadow-md transition-all text-center">
+                                    <span class="text-base leading-none">📞</span>
+                                    <span>LLAMAR</span>
+                                </a>
+                                <a href="https://wa.me/593${cleanPhone}" target="_blank" class="w-12 flex items-center justify-center py-3 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-base uppercase rounded-xl shadow-md transition-all text-center" title="Abrir WhatsApp">
+                                    <span>💬</span>
+                                </a>
+                            </div>
+
+                            <!-- BOTÓN DESPLEGABLE PARA DETALLES Y CIERRE TÉCNICO -->
+                            <button type="button" onclick="toggleCardDetail('${v.id}')" class="w-full mt-2 py-2.5 px-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 rounded-xl text-xs font-black uppercase flex items-center justify-between border border-slate-200 transition-colors">
+                                <span class="flex items-center gap-1.5">
+                                    <span>📋</span>
+                                    <span>Ver Detalles y Cierre Técnico</span>
+                                </span>
+                                <span id="chevron_${v.id}" class="text-xs font-mono font-bold text-slate-500">▼</span>
+                            </button>
+
+                            <!-- SECCIÓN DESPLEGABLE: ORDEN Y FORMULARIO DE CIERRE TÉCNICO -->
+                            <div id="card_detail_${v.id}" class="hidden pt-3 border-t border-slate-200 space-y-4">
+                                <!-- Información Detallada de Orden -->
+                                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
+                                    <p class="text-[10px] font-black text-blue-900 uppercase italic tracking-wider mb-2">📄 Información de la Orden</p>
+                                    <p><b>CÉDULA:</b> <span class="font-mono text-slate-800 font-bold">${v.cedula || '---'}</span></p>
+                                    <p><b>TELÉFONO:</b> <span class="font-mono text-slate-800 font-bold">${v.telefono || '---'}</span></p>
+                                    <p><b>EMAIL:</b> <span class="font-mono text-slate-800">${v.email || '---'}</span></p>
+                                    <p><b>FECHA COMPRA:</b> <span class="font-mono text-slate-800">${v.fechaEmision || '---'}</span></p>
+                                    <p><b>DOC. COMPRA:</b> <span class="font-mono text-slate-800">${v.numFactura || '---'}</span></p>
+                                    <p><b>LUGAR COMPRA:</b> <span class="text-slate-800 font-bold">${v.lugarCompra || '---'}</span></p>
+                                    <div class="pt-2 mt-2 border-t border-slate-200">
+                                        <button onclick="printServiceOrder('${v.id}')" class="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-black uppercase shadow-xs flex items-center justify-center gap-1.5">
+                                            <span>🖨️</span><span>IMPRIMIR ORDEN</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Formulario de Cierre Técnico Móvil -->
+                                <div class="bg-blue-50/40 p-3.5 rounded-xl border border-blue-200 space-y-3">
+                                    <p class="text-[10px] font-black text-blue-900 uppercase italic tracking-wider flex items-center gap-1.5">
+                                        <span>🛠️</span><span>Formulario de Cierre Técnico</span>
+                                    </p>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div>
+                                            <label class="block text-[9px] font-black uppercase text-slate-600 mb-1">Estado de Cierre:</label>
+                                            <select id="card_status_${v.id}" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black uppercase text-slate-800 outline-none">
+                                                <option value="PENDIENTE">--- ESTADO CIERRE ---</option>
+                                                <option value="Atendido" ${v.estado === 'Atendido' ? 'selected' : ''}>✅ ATENDIDO / FINALIZADO</option>
+                                                <option value="A Taller" ${v.estado === 'A Taller' ? 'selected' : ''}>🏢 A TALLER (REPARACIÓN)</option>
+                                                <option value="Garantia en Tramite" ${v.estado === 'Garantia en Tramite' ? 'selected' : ''}>🛡️ GARANTÍA EN TRÁMITE</option>
+                                                <option value="No Atendido" ${v.estado === 'No Atendido' ? 'selected' : ''}>❌ NO ATENDIDO (FALLIDO)</option>
+                                                <option value="Pendiente (Tramite)" ${v.estado === 'Pendiente (Tramite)' ? 'selected' : ''}>⏳ PENDIENTE (REPUESTO)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[9px] font-black uppercase text-slate-600 mb-1">Tipo de Servicio:</label>
+                                            <select id="card_type_${v.id}" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black uppercase text-slate-800 outline-none">
+                                                ${TIPOS_SERVICIO.map(t => `<option value="${t}" ${v.tipoAtencion === t ? 'selected' : ''}>${t}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    ${!v.esMantenimiento ? `
+                                    <div>
+                                        <label class="block text-[9px] font-black uppercase text-slate-600 mb-1">Forma de Pago:</label>
+                                        <select id="card_payment_${v.id}" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black uppercase text-slate-800 outline-none">
+                                            <option value="EFECTIVO" ${v.financiera && v.financiera.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option>
+                                            <option value="TRANSFERENCIA" ${v.financiera && v.financiera.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option>
+                                        </select>
+                                    </div>` : `<input type="hidden" id="card_payment_${v.id}" value="EFECTIVO">`}
+
+                                    <!-- Fotos y Comentario -->
+                                    <div class="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                                        <label class="block text-[9px] font-black uppercase text-slate-700">📸 Fotos de Evidencia (Máx 3):</label>
+                                        <input type="file" accept="image/*" multiple onchange="handleImageSelect(event, '${v.id}')" class="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                        <div id="card_photo_previews_${v.id}" class="flex gap-2 flex-wrap"></div>
+                                        <label class="block text-[9px] font-black uppercase text-slate-700 mt-2">Testimonio o Novedad:</label>
+                                        <textarea id="card_client_comment_${v.id}" placeholder="TESTIMONIO O NOVEDAD FINAL..." class="w-full p-2.5 text-xs font-bold uppercase bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800"></textarea>
+                                    </div>
+
+                                    <!-- Accesorios Vendidos -->
+                                    ${!v.esMantenimiento ? `
+                                    <div class="bg-white p-3 rounded-xl border border-slate-200">
+                                        <label class="block text-[9px] font-black uppercase text-slate-700 mb-2">🔩 Accesorios / Materiales:</label>
+                                        <div class="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                                            ${Object.entries(ACCESORIOS_DEFAULT).map(function(item) {
+                                                const n = item[0]; const p = item[1];
+                                                const existing = (v.accesoriosVendidos || []).find(a => a.nombre === n);
+                                                return `
+                                                <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                                    <span class="text-[10px] font-bold uppercase text-slate-700">${n} ($${p.toFixed(2)})</span>
+                                                    <input type="number" min="0" value="${existing ? existing.cantidad : 0}" data-name="${n}" data-price="${p}" class="card-acc-${v.id} w-14 text-center text-xs font-black text-blue-900 bg-white border border-slate-300 rounded-md p-1 outline-none">
+                                                </div>`;
+                                            }).join('')}
+                                        </div>
+                                        <div class="mt-2 pt-2 border-t border-slate-200 flex gap-1.5">
+                                            <input type="text" id="card_manual_acc_desc_${v.id}" placeholder="OTRO ACCESORIO..." class="flex-1 p-2 text-[10px] font-bold uppercase bg-slate-50 border border-slate-300 rounded-lg outline-none">
+                                            <input type="number" step="0.01" id="card_manual_acc_price_${v.id}" placeholder="$0.00" class="w-16 p-2 text-[10px] font-bold text-center bg-slate-50 border border-slate-300 rounded-lg outline-none">
+                                        </div>
+                                    </div>` : ''}
+
+                                    <!-- Nota Interna Técnica -->
+                                    <div>
+                                        <label class="block text-[9px] font-black uppercase text-slate-700 mb-1">Nota Interna Técnica:</label>
+                                        <textarea id="card_reason_${v.id}" placeholder="NOTA INTERNA TÉCNICA..." class="w-full p-2.5 text-xs font-bold uppercase italic bg-white border border-slate-300 rounded-xl outline-none text-slate-800"></textarea>
+                                    </div>
+
+                                    <!-- Botón Guardar Cierre -->
+                                    <button onclick="closeVisitByTech('${v.id}')" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black uppercase shadow-md transition-all flex items-center justify-center gap-2">
+                                        <span>💾</span><span>GUARDAR CIERRE TÉCNICO</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
         }
 
         window.reScheduleVisit = function(id) {
@@ -5345,17 +5649,17 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
     <div class="max-w-[2800px] mx-auto pb-32 md:pb-10 relative">
         
         <header class="mb-6 p-6 md:p-8 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shadow-xl no-print relative z-10 border border-slate-700/50">
-            <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6 w-full">
-                <div class="relative shrink-0 group">
+            <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6 w-full header-main-row">
+                <div class="relative shrink-0 group header-logo">
                     <img src="FIX%20LOGO.jpg" alt="Logo Oficial FIX" class="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl object-cover shadow-2xl border-2 border-blue-400/60 bg-slate-900 transition-transform group-hover:scale-105">
                 </div>
-                <div class="flex-1 text-center sm:text-left">
-                    <div class="flex items-center justify-center sm:justify-start gap-2 mb-1.5">
+                <div class="flex-1 text-center sm:text-left min-w-0">
+                    <div class="flex items-center justify-center sm:justify-start gap-2 mb-1.5 header-version-pill">
                         <span class="version-badge shadow-sm">FIX GESTIÓN PRO</span>
                     </div>
                     <h1 class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">Gestión Integral de Visitas y Servicios</h1>
-                    <p class="text-sm md:text-base text-slate-300 mt-1.5 font-medium tracking-wide">Plataforma de Control Operativo, Rutas Diarias, Liquidaciones y Resultados</p>
-                    <div class="flex items-center justify-center sm:justify-start gap-3 text-xs text-slate-300 mt-3 flex-wrap">
+                    <p class="text-sm md:text-base text-slate-300 mt-1.5 font-medium tracking-wide header-desc">Plataforma de Control Operativo, Rutas Diarias, Liquidaciones y Resultados</p>
+                    <div class="flex items-center justify-center sm:justify-start gap-3 text-xs text-slate-300 mt-3 flex-wrap header-meta-row">
                         <span id="userDisplayLabel" class="font-semibold text-slate-200 uppercase font-mono bg-blue-900/50 px-2.5 py-0.5 rounded-md border border-blue-700/40">Admin</span>
                         <span>•</span>
                         <span class="text-emerald-400 font-semibold flex items-center gap-1.5">
@@ -5906,7 +6210,11 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <button onclick="printDailyRoute()" class="glass-card bg-slate-800 hover:bg-slate-900 border-slate-700 text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase shadow-md flex items-center gap-1.5 transition-all active:scale-95 hover:scale-105" title="Imprimir hoja de ruta del día">🖨️ IMPRIMIR RUTA</button>
                     </div>
                 </div>
-                <div class="overflow-x-auto w-full rounded-[1.5rem] shadow-md border border-white/80 font-black uppercase bg-white/40 backdrop-blur-md">
+                <!-- Contenedor de Tarjetas Móviles / Técnicos (Cards una por una) -->
+                <div id="ruteroCardsContainer" class="block md:hidden space-y-4"></div>
+
+                <!-- Contenedor de Tabla Rutero (Vista Escritorio / Administración) -->
+                <div id="ruteroTableContainer" class="hidden md:block overflow-x-auto w-full rounded-[1.5rem] shadow-md border border-white/80 font-black uppercase bg-white/40 backdrop-blur-md">
                     <table class="w-full border-collapse rutero-table">
                         <thead><tr><th class="w-12">Hora</th><th class="text-left w-32">Cliente</th><th class="text-left w-40">Calle Principal</th><th class="w-20">Servicio</th><th class="w-10">Téc</th><th class="w-16">Estado</th><th class="w-24">Mapa</th><th class="w-32">Contacto</th><th class="w-10 admin-only">Edit</th></tr></thead>
                         <tbody id="ruteroListBody" class="uppercase italic font-black text-stone-800"></tbody>
