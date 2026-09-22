@@ -6187,6 +6187,346 @@
             return moParaCaja + accTotal;
         }
 
+        function getAllFinancialMovements() {
+            let todos = [];
+            const pad = (n) => String(n).padStart(2, '0');
+            
+            visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Mantenimiento' && v.estado === 'Atendido' && v.financiera).forEach(v => {
+                let monto = getVisitCajaAmount(v);
+                let concepto = "VISITA: " + (v.nombreCliente || 'CLIENTE');
+                
+                todos.push({ 
+                    id: v.id, 
+                    monto: monto || 0, 
+                    type: 'INGRESO', 
+                    concepto: concepto, 
+                    fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : (v.createdAt || Date.now()), 
+                    dateStr: v.fechaInstalacion || '', 
+                    source: 'VISITA', 
+                    tecnico: v.tecnico || '---', 
+                    formaPago: String((v.financiera && v.financiera.formaPago) ? v.financiera.formaPago : 'EFECTIVO').trim().toUpperCase() 
+                });
+            });
+            
+            movementsArray.forEach(m => {
+                const mDate = new Date(m.fecha);
+                const dStr = isNaN(mDate.getTime()) ? '' : `${mDate.getFullYear()}-${pad(mDate.getMonth() + 1)}-${pad(mDate.getDate())}`;
+                todos.push({ 
+                    id: m.id, 
+                    monto: m.monto || 0, 
+                    type: String(m.type || 'EGRESO').trim().toUpperCase(), 
+                    concepto: "MANUAL: " + (m.concepto || ''), 
+                    fecha: m.fecha || Date.now(), 
+                    dateStr: dStr, 
+                    source: 'MANUAL', 
+                    tecnico: m.tecnico || '---', 
+                    formaPago: String(m.formaPago || 'EFECTIVO').trim().toUpperCase() 
+                });
+            });
+
+            return todos;
+        }
+
+        window.cuadroSemanalCurrentDate = new Date();
+        window.cajaActiveTab = 'diaria';
+
+        window.switchCajaTab = function(tabName) {
+            window.cajaActiveTab = tabName;
+            const diariaSec = document.getElementById('cajaDiariaSection');
+            const semanalSec = document.getElementById('cajaSemanalSection');
+            const btnDiaria = document.getElementById('tabCajaDiariaBtn');
+            const btnSemanal = document.getElementById('tabCajaSemanalBtn');
+            
+            if (tabName === 'semanal') {
+                if (diariaSec) diariaSec.classList.add('hidden');
+                if (semanalSec) semanalSec.classList.remove('hidden');
+                if (btnDiaria) {
+                    btnDiaria.className = "px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-tight transition-all bg-stone-200/80 text-stone-700 hover:bg-stone-300";
+                }
+                if (btnSemanal) {
+                    btnSemanal.className = "px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-tight transition-all bg-fix-main text-white shadow-md";
+                }
+                window.renderCuadroSemanalCaja();
+            } else {
+                if (diariaSec) diariaSec.classList.remove('hidden');
+                if (semanalSec) semanalSec.classList.add('hidden');
+                if (btnDiaria) {
+                    btnDiaria.className = "px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-tight transition-all bg-fix-main text-white shadow-md";
+                }
+                if (btnSemanal) {
+                    btnSemanal.className = "px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-tight transition-all bg-stone-200/80 text-stone-700 hover:bg-stone-300";
+                }
+                processFinancialBalance();
+            }
+        };
+
+        window.setCajaQuickDate = function(mode) {
+            const pad = n => String(n).padStart(2, '0');
+            const now = new Date();
+            const hoyStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+            const startInput = document.getElementById('cajaDateStart');
+            const endInput = document.getElementById('cajaDateEnd');
+            if (!startInput || !endInput) return;
+
+            if (mode === 'hoy') {
+                startInput.value = hoyStr;
+                endInput.value = hoyStr;
+            } else if (mode === 'ayer') {
+                const ayer = new Date(now);
+                ayer.setDate(now.getDate() - 1);
+                const ayerStr = `${ayer.getFullYear()}-${pad(ayer.getMonth() + 1)}-${pad(ayer.getDate())}`;
+                startInput.value = ayerStr;
+                endInput.value = ayerStr;
+            } else if (mode === 'semana') {
+                const day = now.getDay();
+                const diff = (day === 0) ? -6 : (1 - day);
+                const mon = new Date(now);
+                mon.setDate(now.getDate() + diff);
+                const monStr = `${mon.getFullYear()}-${pad(mon.getMonth() + 1)}-${pad(mon.getDate())}`;
+                startInput.value = monStr;
+                endInput.value = hoyStr;
+            } else if (mode === 'mes') {
+                const firstDayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+                startInput.value = firstDayStr;
+                endInput.value = hoyStr;
+            } else if (mode === 'todo') {
+                startInput.value = '';
+                endInput.value = '';
+            }
+            processFinancialBalance();
+        };
+
+        window.verDetalleDiaCaja = function(dateStr) {
+            const startInput = document.getElementById('cajaDateStart');
+            const endInput = document.getElementById('cajaDateEnd');
+            if (startInput) startInput.value = dateStr;
+            if (endInput) endInput.value = dateStr;
+            window.switchCajaTab('diaria');
+        };
+
+        window.navSemanaCaja = function(delta) {
+            if (!window.cuadroSemanalCurrentDate) window.cuadroSemanalCurrentDate = new Date();
+            window.cuadroSemanalCurrentDate.setDate(window.cuadroSemanalCurrentDate.getDate() + (delta * 7));
+            window.renderCuadroSemanalCaja();
+        };
+
+        window.navSemanaHoy = function() {
+            window.cuadroSemanalCurrentDate = new Date();
+            window.renderCuadroSemanalCaja();
+        };
+
+        window.onSemanaDatePick = function(dateVal) {
+            if (!dateVal) return;
+            const parts = dateVal.split('-');
+            if (parts.length === 3) {
+                window.cuadroSemanalCurrentDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+                window.renderCuadroSemanalCaja();
+            }
+        };
+
+        window.renderCuadroSemanalCaja = function() {
+            const container = document.getElementById('cuadroSemanalTableBody');
+            if (!container) return;
+
+            if (!window.cuadroSemanalCurrentDate) window.cuadroSemanalCurrentDate = new Date();
+            const cur = new Date(window.cuadroSemanalCurrentDate);
+            const dayOfWeek = cur.getDay(); // 0: Dom, 1: Lun ... 6: Sab
+            const diffToMonday = (dayOfWeek === 0) ? -6 : (1 - dayOfWeek);
+            const monday = new Date(cur);
+            monday.setDate(cur.getDate() + diffToMonday);
+            monday.setHours(0, 0, 0, 0);
+
+            const pad = n => String(n).padStart(2, '0');
+            const formatDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+            const incSabado = document.getElementById('cuadroSemanalIncSabado') ? document.getElementById('cuadroSemanalIncSabado').checked : true;
+            const daysCount = incSabado ? 6 : 5; // Lun-Vie (5) o Lun-Sab (6)
+
+            const techFilter = document.getElementById('cajaTechFilter') ? document.getElementById('cajaTechFilter').value : "";
+            const todos = getAllFinancialMovements();
+
+            const weekDays = [];
+            const dayNames = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO', 'DOMINGO'];
+
+            for (let i = 0; i < daysCount; i++) {
+                const d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                weekDays.push({
+                    dateObj: d,
+                    dateStr: formatDate(d),
+                    dayName: dayNames[i],
+                    displayShort: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`
+                });
+            }
+
+            const mondayStr = weekDays[0].dateStr;
+            const lastDayStr = weekDays[weekDays.length - 1].dateStr;
+
+            const labelRango = document.getElementById('cuadroSemanalRangoLabel');
+            if (labelRango) {
+                labelRango.textContent = `SEMANA: ${weekDays[0].dayName.slice(0,3)} ${weekDays[0].displayShort} AL ${weekDays[weekDays.length - 1].dayName.slice(0,3)} ${weekDays[weekDays.length - 1].displayShort}/${weekDays[0].dateObj.getFullYear()}`;
+            }
+            const dateJump = document.getElementById('cuadroSemanalDateJump');
+            if (dateJump) dateJump.value = mondayStr;
+
+            // 1. Apertura inicial del Lunes (todo lo anterior en efectivo antes del Lunes)
+            let aperturaAcumulada = 0;
+            todos.forEach(m => {
+                if (techFilter && m.tecnico !== techFilter) return;
+                if (m.dateStr && m.dateStr < mondayStr) {
+                    if (m.formaPago === 'EFECTIVO') {
+                        if (m.type === 'INGRESO') aperturaAcumulada += (m.monto || 0);
+                        else aperturaAcumulada -= (m.monto || 0);
+                    }
+                }
+            });
+
+            const aperturaSemanalInicial = aperturaAcumulada;
+            let totalIngresosSemana = 0;
+            let totalEgresosSemana = 0;
+            let totalTransferSemana = 0;
+
+            const todayStr = formatDate(new Date());
+
+            let runningApertura = aperturaAcumulada;
+            let rowsHtml = '';
+
+            weekDays.forEach(wd => {
+                const dayMovs = todos.filter(m => {
+                    if (techFilter && m.tecnico !== techFilter) return false;
+                    return m.dateStr === wd.dateStr;
+                });
+
+                let ingEfectivo = 0;
+                let egrEfectivo = 0;
+                let trans = 0;
+                let countMovs = dayMovs.length;
+
+                dayMovs.forEach(m => {
+                    if (m.type === 'INGRESO') {
+                        if (m.formaPago === 'EFECTIVO') ingEfectivo += (m.monto || 0);
+                        else trans += (m.monto || 0);
+                    } else {
+                        if (m.formaPago === 'EFECTIVO') egrEfectivo += (m.monto || 0);
+                    }
+                });
+
+                const aperturaDia = runningApertura;
+                const cierreDia = aperturaDia + ingEfectivo - egrEfectivo;
+                runningApertura = cierreDia; // El saldo final pasa como apertura al día siguiente
+
+                totalIngresosSemana += ingEfectivo;
+                totalEgresosSemana += egrEfectivo;
+                totalTransferSemana += trans;
+
+                const isToday = (wd.dateStr === todayStr);
+                const rowBg = isToday ? 'bg-indigo-50/70 border-l-4 border-indigo-600 font-black' : 'border-b border-stone-200/70 hover:bg-white/60';
+
+                rowsHtml += `
+                    <tr class="${rowBg} transition-colors uppercase font-mono">
+                        <td class="p-3.5 text-xs font-black text-stone-800">
+                            <div class="flex items-center gap-1.5">
+                                <span>${wd.dayName}</span>
+                                <span class="text-[10px] text-stone-500 font-bold">(${wd.displayShort})</span>
+                                ${isToday ? '<span class="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[7px] font-black tracking-widest ml-1">HOY</span>' : ''}
+                            </div>
+                        </td>
+                        <td class="p-3.5 text-right font-black text-xs ${aperturaDia < 0 ? 'text-rose-700' : 'text-amber-800'}">
+                            $${aperturaDia.toFixed(2)}
+                        </td>
+                        <td class="p-3.5 text-right font-black text-xs text-emerald-700">
+                            ${ingEfectivo > 0 ? '+$' + ingEfectivo.toFixed(2) : '<span class="text-stone-400">$0.00</span>'}
+                        </td>
+                        <td class="p-3.5 text-right font-black text-xs text-rose-700">
+                            ${egrEfectivo > 0 ? '-$' + egrEfectivo.toFixed(2) : '<span class="text-stone-400">$0.00</span>'}
+                        </td>
+                        <td class="p-3.5 text-right font-black text-sm ${cierreDia < 0 ? 'text-rose-700 bg-rose-50/50' : 'text-slate-900 bg-emerald-50/30'}">
+                            $${cierreDia.toFixed(2)}
+                        </td>
+                        <td class="p-3.5 text-right font-black text-xs text-blue-700">
+                            ${trans > 0 ? '$' + trans.toFixed(2) : '<span class="text-stone-400">$0.00</span>'}
+                        </td>
+                        <td class="p-3 text-center">
+                            <button type="button" onclick="verDetalleDiaCaja('${wd.dateStr}')" class="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-800 border border-stone-300 text-[9px] font-black uppercase shadow-xs active:scale-95 transition-all inline-flex items-center gap-1" title="Ver movimientos de este día">
+                                👁️ <span>${countMovs} movs</span>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            const cierreSemanaFinal = runningApertura;
+
+            // Fila de totales de la semana
+            rowsHtml += `
+                <tr class="bg-stone-900 text-white font-black text-xs uppercase font-mono border-t-2 border-stone-800 shadow-md">
+                    <td class="p-4 tracking-tight">
+                        <span class="text-indigo-300 font-sans">TOTALES SEMANA</span>
+                    </td>
+                    <td class="p-4 text-right text-amber-300">
+                        <span class="text-[8px] text-stone-400 block font-normal">APERTURA LUN:</span>
+                        $${aperturaSemanalInicial.toFixed(2)}
+                    </td>
+                    <td class="p-4 text-right text-emerald-400">
+                        <span class="text-[8px] text-stone-400 block font-normal">INGRESOS:</span>
+                        +$${totalIngresosSemana.toFixed(2)}
+                    </td>
+                    <td class="p-4 text-right text-rose-400">
+                        <span class="text-[8px] text-stone-400 block font-normal">EGRESOS:</span>
+                        -$${totalEgresosSemana.toFixed(2)}
+                    </td>
+                    <td class="p-4 text-right text-base text-white font-black bg-stone-950">
+                        <span class="text-[8px] text-stone-400 block font-normal">CIERRE FINAL:</span>
+                        $${cierreSemanaFinal.toFixed(2)}
+                    </td>
+                    <td class="p-4 text-right text-blue-300">
+                        <span class="text-[8px] text-stone-400 block font-normal">BANCOS:</span>
+                        $${totalTransferSemana.toFixed(2)}
+                    </td>
+                    <td class="p-4 text-center text-[9px] text-stone-400">
+                        LUN - ${incSabado ? 'SÁB' : 'VIE'}
+                    </td>
+                </tr>
+            `;
+
+            container.innerHTML = rowsHtml;
+
+            // Actualizar tarjetas de resumen semanal
+            if (document.getElementById('semAperturaDisplay')) document.getElementById('semAperturaDisplay').textContent = '$' + aperturaSemanalInicial.toFixed(2);
+            if (document.getElementById('semIngresosDisplay')) document.getElementById('semIngresosDisplay').textContent = '$' + totalIngresosSemana.toFixed(2);
+            if (document.getElementById('semEgresosDisplay')) document.getElementById('semEgresosDisplay').textContent = '$' + totalEgresosSemana.toFixed(2);
+            if (document.getElementById('semCierreDisplay')) document.getElementById('semCierreDisplay').textContent = '$' + cierreSemanaFinal.toFixed(2);
+            if (document.getElementById('semTransferDisplay')) document.getElementById('semTransferDisplay').textContent = '$' + totalTransferSemana.toFixed(2);
+        };
+
+        window.downloadArqueoSemanalCSV = function() {
+            let csv = "DIA,FECHA,APERTURA INICIAL,INGRESOS EFECTIVO,EGRESOS EFECTIVO,CIERRE DE CAJA,TRANSFERENCIAS\n";
+            document.querySelectorAll('#cuadroSemanalTableBody tr').forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if (cols.length >= 6) {
+                    const rowData = [
+                        cols[0].innerText.replace(/\n/g, ' ').trim(),
+                        cols[1].innerText.replace(/\n/g, ' ').replace('$', '').replace('+', '').replace('-', '').trim(),
+                        cols[2].innerText.replace(/\n/g, ' ').replace('$', '').replace('+', '').replace('-', '').trim(),
+                        cols[3].innerText.replace(/\n/g, ' ').replace('$', '').replace('+', '').replace('-', '').trim(),
+                        cols[4].innerText.replace(/\n/g, ' ').replace('$', '').replace('+', '').replace('-', '').trim(),
+                        cols[5].innerText.replace(/\n/g, ' ').replace('$', '').replace('+', '').replace('-', '').trim()
+                    ];
+                    csv += rowData.map(d => `"${d}"`).join(",") + "\n";
+                }
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const label = (document.getElementById('cuadroSemanalRangoLabel') ? document.getElementById('cuadroSemanalRangoLabel').innerText : 'SEMANA').replace(/[^a-zA-Z0-9_-]/g, '_');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", "ARQUEO_SEMANAL_" + label + ".csv");
+            link.click();
+        };
+
+        window.printArqueoSemanal = function() {
+            window.print();
+        };
+
         function processFinancialBalance() {
             const startInput = document.getElementById('cajaDateStart');
             const endInput = document.getElementById('cajaDateEnd');
@@ -6194,34 +6534,29 @@
             const end = endInput ? endInput.value : "";
             const techFilter = document.getElementById('cajaTechFilter') ? document.getElementById('cajaTechFilter').value : "";
             
-            let todos = [];
-            
-            visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Mantenimiento' && v.estado === 'Atendido' && v.financiera).forEach(v => {
-                let monto = getVisitCajaAmount(v);
-                let concepto = "VISITA: " + v.nombreCliente;
-                
-                todos.push({ 
-                    id: v.id, 
-                    monto, 
-                    type: 'INGRESO', 
-                    concepto: concepto, 
-                    fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : v.createdAt, 
-                    dateStr: v.fechaInstalacion, 
-                    source: 'VISITA', 
-                    tecnico: v.tecnico || '---', 
-                    formaPago: v.financiera.formaPago || 'EFECTIVO' 
-                });
-            });
-            
-            movementsArray.forEach(m => {
-                const mDate = new Date(m.fecha);
-                const dStr = mDate.toISOString().split('T')[0];
-                todos.push({ id: m.id, monto: m.monto, type: m.type, concepto: "MANUAL: " + m.concepto, fecha: m.fecha, dateStr: dStr, source: 'MANUAL', tecnico: m.tecnico || '---', formaPago: m.formaPago || 'EFECTIVO' });
-            });
+            const todos = getAllFinancialMovements();
 
-            let filteredTodos = [...todos];
-            if(start && end) filteredTodos = filteredTodos.filter(m => m.dateStr >= start && m.dateStr <= end);
-            if(techFilter) filteredTodos = filteredTodos.filter(m => m.tecnico === techFilter);
+            // 1. Apertura / Saldo Anterior acumulado en efectivo
+            let aperturaEfectivo = 0;
+            if (start) {
+                todos.forEach(m => {
+                    if (techFilter && m.tecnico !== techFilter) return;
+                    if (m.dateStr && m.dateStr < start) {
+                        if (m.formaPago === 'EFECTIVO') {
+                            if (m.type === 'INGRESO') aperturaEfectivo += (m.monto || 0);
+                            else aperturaEfectivo -= (m.monto || 0);
+                        }
+                    }
+                });
+            }
+
+            // 2. Movimientos filtrados para el rango
+            let filteredTodos = todos.filter(m => {
+                if (techFilter && m.tecnico !== techFilter) return false;
+                if (start && (!m.dateStr || m.dateStr < start)) return false;
+                if (end && (!m.dateStr || m.dateStr > end)) return false;
+                return true;
+            });
             
             filteredTodos.sort((a,b) => b.fecha - a.fecha);
 
@@ -6231,23 +6566,103 @@
                 return isNaN(d.getTime()) ? '---' : d.toLocaleDateString();
             };
             
-            const tb = document.getElementById('contabilidadTableBody');
-            if(tb) tb.innerHTML = filteredTodos.map(m => `<tr class="border-b border-white/50 row-hover uppercase font-black"><td class="p-4 text-[9px] font-mono font-black italic text-stone-700">${parseDateString(m.fecha)}<br><span class="text-[7px] text-stone-500 font-bold mt-1">${m.tecnico}</span></td><td class="p-4 text-[9px] font-bold tracking-tight"><span class="${m.type === 'INGRESO' ? 'text-emerald-700' : 'text-rose-700'}">${m.type}</span><br><span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-600' : 'text-stone-600'} mt-1">${m.formaPago}</span></td><td class="p-4 text-xs font-black uppercase tracking-tighter text-stone-800">${m.concepto}</td><td class="p-4 text-right text-[12px] font-mono font-black text-stone-900">$${(m.monto || 0).toFixed(2)}</td><td class="text-center p-4"><div class="flex gap-2 justify-center">${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-main text-base font-black glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm" title="Ver Desglose">👁️</button>` : ''}<button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-accent text-base font-black glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">✏️</button>${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-base glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button>` : ''}</div></td></tr>`).join('');
-            
             let tCashIn = 0, tOut = 0, tTransIn = 0;
             filteredTodos.forEach(m => { 
                 if(m.type === 'INGRESO') { 
-                    if(m.formaPago === 'EFECTIVO') tCashIn += m.monto; 
-                    else tTransIn += m.monto; 
+                    if(m.formaPago === 'EFECTIVO') tCashIn += (m.monto || 0); 
+                    else tTransIn += (m.monto || 0); 
                 } else { 
-                    if(m.formaPago === 'EFECTIVO') tOut += m.monto; 
+                    if(m.formaPago === 'EFECTIVO') tOut += (m.monto || 0); 
                 } 
             });
+
+            const saldoFinalCaja = aperturaEfectivo + tCashIn - tOut;
+            const flujoPeriodo = tCashIn - tOut;
+
+            // Renderizar tabla diaria con fila de apertura si aplica
+            const tb = document.getElementById('contabilidadTableBody');
+            if(tb) {
+                let rowsHtml = '';
+                
+                if (start) {
+                    rowsHtml += `
+                        <tr class="bg-amber-50/80 border-b-2 border-amber-300 uppercase font-black">
+                            <td class="p-4 text-[9px] font-mono font-black italic text-amber-900">
+                                ${start}<br><span class="text-[7px] text-amber-700 font-bold tracking-wider">APERTURA CAJA</span>
+                            </td>
+                            <td class="p-4 text-[9px] font-bold tracking-tight">
+                                <span class="text-amber-800">APERTURA</span><br>
+                                <span class="text-[7px] text-stone-600">SALDO ANTERIOR</span>
+                            </td>
+                            <td class="p-4 text-xs font-black uppercase tracking-tighter text-amber-950">
+                                SALDO ACUMULADO AL CIERRE DEL DÍA ANTERIOR (EN EFECTIVO)
+                            </td>
+                            <td class="p-4 text-right text-[13px] font-mono font-black ${aperturaEfectivo < 0 ? 'text-rose-700' : 'text-amber-900'}">
+                                $${aperturaEfectivo.toFixed(2)}
+                            </td>
+                            <td class="text-center p-4 text-sm font-bold text-amber-600" title="Saldo anterior no editable">
+                                💼
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                rowsHtml += filteredTodos.map(m => `
+                    <tr class="border-b border-white/50 row-hover uppercase font-black">
+                        <td class="p-4 text-[9px] font-mono font-black italic text-stone-700">
+                            ${parseDateString(m.fecha)}<br><span class="text-[7px] text-stone-500 font-bold mt-1">${m.tecnico}</span>
+                        </td>
+                        <td class="p-4 text-[9px] font-bold tracking-tight">
+                            <span class="${m.type === 'INGRESO' ? 'text-emerald-700' : 'text-rose-700'}">${m.type}</span><br>
+                            <span class="text-[7px] ${m.formaPago === 'TRANSFERENCIA' ? 'text-blue-600' : 'text-stone-600'} mt-1">${m.formaPago}</span>
+                        </td>
+                        <td class="p-4 text-xs font-black uppercase tracking-tighter text-stone-800">${m.concepto}</td>
+                        <td class="p-4 text-right text-[12px] font-mono font-black text-stone-900">$${(m.monto || 0).toFixed(2)}</td>
+                        <td class="text-center p-4">
+                            <div class="flex gap-2 justify-center">
+                                ${m.source === 'VISITA' ? `<button onclick="showDesgloseVisita('${m.id}')" class="text-fix-main text-base font-black glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm" title="Ver Desglose">👁️</button>` : ''}
+                                <button onclick="openEditFinanceModal('${m.id}', '${m.source}', ${m.monto}, '${m.concepto}')" class="text-fix-accent text-base font-black glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">✏️</button>
+                                ${m.source === 'MANUAL' ? `<button onclick="database.ref('movements').child('${m.id}').remove()" class="text-fix-error text-base glass-input bg-white/80 w-10 h-10 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-sm">🗑️</button>` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+
+                tb.innerHTML = rowsHtml;
+            }
             
+            // Actualizar tarjetas de resumen diario
+            if(document.getElementById('cajaAperturaDisplay')) {
+                document.getElementById('cajaAperturaDisplay').textContent = "$" + aperturaEfectivo.toFixed(2);
+            }
+            if(document.getElementById('cajaAperturaSubtext')) {
+                document.getElementById('cajaAperturaSubtext').textContent = start ? `Acumulado antes de ${start}` : 'Desde el inicio';
+            }
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
             if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tOut.toFixed(2);
             if(document.getElementById('totalTransferDisplay')) document.getElementById('totalTransferDisplay').textContent = "$" + tTransIn.toFixed(2);
-            if(document.getElementById('balanceNetoDisplay')) document.getElementById('balanceNetoDisplay').textContent = "$" + (tCashIn - tOut).toFixed(2);
+            if(document.getElementById('balanceNetoDisplay')) {
+                document.getElementById('balanceNetoDisplay').textContent = "$" + saldoFinalCaja.toFixed(2);
+                if (saldoFinalCaja < 0) {
+                    document.getElementById('balanceNetoDisplay').className = "text-3xl lg:text-4xl font-black text-rose-400 mt-1.5 font-mono tracking-tighter drop-shadow-lg";
+                } else {
+                    document.getElementById('balanceNetoDisplay').className = "text-3xl lg:text-4xl font-black text-white mt-1.5 font-mono tracking-tighter drop-shadow-lg";
+                }
+            }
+            if(document.getElementById('cajaFlujoPeriodoBadge')) {
+                const signo = flujoPeriodo >= 0 ? '+' : '';
+                document.getElementById('cajaFlujoPeriodoBadge').textContent = `Flujo: ${signo}$${flujoPeriodo.toFixed(2)}`;
+                if (flujoPeriodo < 0) {
+                    document.getElementById('cajaFlujoPeriodoBadge').className = "ml-1 px-1.5 py-0.5 rounded bg-rose-950 text-[8px] font-mono text-rose-300 font-bold";
+                } else {
+                    document.getElementById('cajaFlujoPeriodoBadge').className = "ml-1 px-1.5 py-0.5 rounded bg-emerald-950 text-[8px] font-mono text-emerald-300 font-bold";
+                }
+            }
+
+            // Mantener sincronizado el cuadro semanal
+            if(window.renderCuadroSemanalCaja) {
+                window.renderCuadroSemanalCaja();
+            }
         }
 
         window.openEditModal = function(id) {
@@ -8546,47 +8961,289 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
 
             <div id="contabilidadView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="glass-card p-6 md:p-8 rounded-2xl font-black uppercase">
-                    <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
+                    
+                    <!-- Header y selector de pestañas Diaria vs Semanal -->
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-stone-200/80 pb-5">
                         <div>
-                            <h2 class="text-xl font-black uppercase underline font-sans italic text-stone-800 tracking-tighter border-b border-white/50 pb-2">CONTABILIDAD Y CAJA</h2>
-                            <div class="flex flex-wrap gap-3 mt-5 font-black items-center">
-                                <input type="date" id="cajaDateStart" class="glass-input p-3 rounded-xl text-[10px] text-stone-800 shadow-sm outline-none">
-                                <input type="date" id="cajaDateEnd" class="glass-input p-3 rounded-xl text-[10px] text-stone-800 shadow-sm outline-none">
-                                <select id="cajaTechFilter" onchange="processFinancialBalance()" class="glass-input p-3 rounded-xl text-[10px] outline-none text-stone-800 shadow-sm"></select>
-                                <button onclick="downloadCajaCSV()" class="glass-card bg-emerald-700/90 border-white/60 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase shadow-md italic ml-2 hover:scale-105 transition-transform">📊 EXPORTAR CAJA</button>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-indigo-900 text-white text-[10px] px-2.5 py-1 rounded-lg font-black tracking-wider">GESTIÓN FINANCIERA</span>
+                                <span class="text-xs text-stone-500 font-bold">ARQUEO DE CAJA CHICA Y CONTROL DIARIO/SEMANAL</span>
+                            </div>
+                            <h2 class="text-xl md:text-2xl font-black uppercase italic text-stone-900 mt-1 tracking-tight flex items-center gap-2">
+                                💰 Contabilidad y Control de Caja
+                            </h2>
+                        </div>
+
+                        <!-- Selector de Pestañas y Filtro Técnico -->
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="flex items-center gap-1.5 p-1 bg-stone-100 rounded-2xl border border-stone-200 shadow-inner">
+                                <button type="button" id="tabCajaDiariaBtn" onclick="switchCajaTab('diaria')" class="px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-tight transition-all bg-fix-main text-white shadow-md">
+                                    📋 Movimientos Diarios / Rango
+                                </button>
+                                <button type="button" id="tabCajaSemanalBtn" onclick="switchCajaTab('semanal')" class="px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-tight transition-all bg-stone-200/80 text-stone-700 hover:bg-stone-300">
+                                    🗓️ Cuadro Semanal (Lun - Vie)
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <select id="cajaTechFilter" onchange="processFinancialBalance()" class="glass-input p-2.5 rounded-xl text-[10px] outline-none text-stone-800 shadow-sm font-black border border-stone-300"></select>
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8 text-center italic font-black">
-                        <div class="p-5 glass-panel bg-emerald-50/60 border-white/80 shadow-md flex flex-col justify-center">
-                            <span class="text-[9px] uppercase text-stone-600 tracking-tight">INGRESOS EFECTIVO</span>
-                            <div id="totalEfectivoDisplay" class="text-3xl font-black text-emerald-700 mt-2 font-mono drop-shadow-sm">$0.00</div>
+
+                    <!-- ========================================================= -->
+                    <!-- SECCION 1: VISTA DIARIA / RANGO DE FECHAS                -->
+                    <!-- ========================================================= -->
+                    <div id="cajaDiariaSection" class="space-y-6">
+                        
+                        <!-- Barra de Filtros de Fecha con accesos rápidos -->
+                        <div class="flex flex-wrap items-center justify-between gap-3 bg-stone-50/70 p-4 rounded-2xl border border-stone-200">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-[10px] font-black text-stone-600 uppercase">Desde:</span>
+                                <input type="date" id="cajaDateStart" onchange="processFinancialBalance()" class="glass-input p-2.5 rounded-xl text-[10px] text-stone-800 shadow-sm outline-none font-mono font-bold bg-white">
+                                <span class="text-[10px] font-black text-stone-600 uppercase">Hasta:</span>
+                                <input type="date" id="cajaDateEnd" onchange="processFinancialBalance()" class="glass-input p-2.5 rounded-xl text-[10px] text-stone-800 shadow-sm outline-none font-mono font-bold bg-white">
+                                
+                                <div class="flex items-center gap-1 ml-1 flex-wrap">
+                                    <button type="button" onclick="setCajaQuickDate('hoy')" class="px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase bg-white hover:bg-stone-100 text-stone-800 border border-stone-300 shadow-xs active:scale-95 transition-all">⚡ Hoy</button>
+                                    <button type="button" onclick="setCajaQuickDate('ayer')" class="px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase bg-white hover:bg-stone-100 text-stone-800 border border-stone-300 shadow-xs active:scale-95 transition-all">⏮️ Ayer</button>
+                                    <button type="button" onclick="setCajaQuickDate('semana')" class="px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase bg-white hover:bg-stone-100 text-stone-800 border border-stone-300 shadow-xs active:scale-95 transition-all">🗓️ Esta Semana</button>
+                                    <button type="button" onclick="setCajaQuickDate('mes')" class="px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase bg-white hover:bg-stone-100 text-stone-800 border border-stone-300 shadow-xs active:scale-95 transition-all">📅 Este Mes</button>
+                                    <button type="button" onclick="setCajaQuickDate('todo')" class="px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase bg-white hover:bg-stone-100 text-stone-500 border border-stone-300 shadow-xs active:scale-95 transition-all">Todo</button>
+                                </div>
+                            </div>
+                            
+                            <button type="button" onclick="downloadCajaCSV()" class="glass-card bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase shadow-md active:scale-95 transition-all flex items-center gap-1.5">
+                                <span>📊</span> <span>EXPORTAR MOVIMIENTOS</span>
+                            </button>
                         </div>
-                        <div class="p-5 glass-panel bg-rose-50/60 border-white/80 shadow-md flex flex-col justify-center">
-                            <span class="text-[9px] uppercase text-stone-600 tracking-tight">EGRESOS EFECTIVO</span>
-                            <div id="totalEgresosDisplay" class="text-3xl font-black text-rose-700 mt-2 font-mono drop-shadow-sm">$0.00</div>
+                        
+                        <!-- 5 Tarjetas de Resumen KPI con Apertura de Caja Integrada -->
+                        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 text-center italic font-black">
+                            <!-- 1. Apertura / Saldo Anterior -->
+                            <div class="p-4 glass-panel bg-amber-50/80 border-amber-300 shadow-md flex flex-col justify-between rounded-2xl">
+                                <div>
+                                    <span class="text-[9px] uppercase text-amber-900 tracking-tight font-black flex items-center justify-center gap-1">
+                                        <span>🏦</span> <span>APERTURA (SALDO ANTERIOR)</span>
+                                    </span>
+                                    <div id="cajaAperturaDisplay" class="text-2xl lg:text-3xl font-black text-amber-800 mt-2 font-mono drop-shadow-sm">$0.00</div>
+                                </div>
+                                <span id="cajaAperturaSubtext" class="text-[8px] text-amber-700 font-bold mt-1 block">Acumulado previo</span>
+                            </div>
+
+                            <!-- 2. Ingresos Efectivo -->
+                            <div class="p-4 glass-panel bg-emerald-50/70 border-emerald-300 shadow-md flex flex-col justify-between rounded-2xl">
+                                <div>
+                                    <span class="text-[9px] uppercase text-emerald-900 tracking-tight font-black flex items-center justify-center gap-1">
+                                        <span>🟢</span> <span>(+) INGRESOS EFECTIVO</span>
+                                    </span>
+                                    <div id="totalEfectivoDisplay" class="text-2xl lg:text-3xl font-black text-emerald-700 mt-2 font-mono drop-shadow-sm">$0.00</div>
+                                </div>
+                                <span class="text-[8px] text-emerald-700 font-bold mt-1 block">Cobros del periodo</span>
+                            </div>
+
+                            <!-- 3. Egresos Efectivo -->
+                            <div class="p-4 glass-panel bg-rose-50/70 border-rose-300 shadow-md flex flex-col justify-between rounded-2xl">
+                                <div>
+                                    <span class="text-[9px] uppercase text-rose-900 tracking-tight font-black flex items-center justify-center gap-1">
+                                        <span>🔴</span> <span>(-) EGRESOS / RETIROS</span>
+                                    </span>
+                                    <div id="totalEgresosDisplay" class="text-2xl lg:text-3xl font-black text-rose-700 mt-2 font-mono drop-shadow-sm">$0.00</div>
+                                </div>
+                                <span class="text-[8px] text-rose-700 font-bold mt-1 block">Salidas en efectivo</span>
+                            </div>
+
+                            <!-- 4. Saldo Físico Disponible en Caja -->
+                            <div class="p-4 glass-card bg-stone-900 text-white rounded-2xl flex flex-col justify-between border-fix-accent/60 shadow-xl col-span-2 sm:col-span-1">
+                                <div>
+                                    <span class="text-[9px] uppercase text-emerald-400 tracking-tight font-black flex items-center justify-center gap-1">
+                                        <span>⚖️</span> <span>SALDO TOTAL EN CAJA</span>
+                                    </span>
+                                    <div id="balanceNetoDisplay" class="text-3xl lg:text-4xl font-black text-white mt-1.5 font-mono tracking-tighter drop-shadow-lg">$0.00</div>
+                                </div>
+                                <div class="text-[8px] text-stone-300 font-bold mt-1 flex justify-center gap-1 items-center flex-wrap">
+                                    <span>Apertura + Ingr - Egr</span>
+                                    <span id="cajaFlujoPeriodoBadge" class="ml-1 px-1.5 py-0.5 rounded bg-stone-800 text-[8px] font-mono text-emerald-300 font-bold"></span>
+                                </div>
+                            </div>
+
+                            <!-- 5. Transferencias Bancarias -->
+                            <div class="p-4 glass-panel bg-blue-50/70 border-blue-300 shadow-md flex flex-col justify-between rounded-2xl col-span-2 sm:col-span-1">
+                                <div>
+                                    <span class="text-[9px] uppercase text-blue-900 tracking-tight font-black flex items-center justify-center gap-1">
+                                        <span>💳</span> <span>TRANSFERENCIAS</span>
+                                    </span>
+                                    <div id="totalTransferDisplay" class="text-2xl lg:text-3xl font-black text-blue-700 mt-2 font-mono drop-shadow-sm">$0.00</div>
+                                </div>
+                                <span class="text-[8px] text-blue-700 font-bold mt-1 block">Bancos (No en caja física)</span>
+                            </div>
                         </div>
-                        <div class="p-5 glass-panel bg-stone-100/60 border-white/80 shadow-md flex flex-col justify-center">
-                            <span class="text-[9px] uppercase text-stone-600 tracking-tight">TRANSFERENCIAS</span>
-                            <div id="totalTransferDisplay" class="text-3xl font-black text-blue-700 mt-2 font-mono drop-shadow-sm">$0.00</div>
+
+                        <!-- Formulario de Registro Manual de Movimiento -->
+                        <div class="glass-panel p-6 grid grid-cols-1 md:grid-cols-6 gap-4 items-end italic font-black bg-white/60 border-white/80 shadow-md rounded-2xl">
+                            <div class="md:col-span-1">
+                                <label class="text-[8px] ml-1 text-stone-600 block mb-1">FECHA</label>
+                                <input type="date" id="movFecha" class="w-full p-3.5 rounded-xl glass-input text-[10px] font-mono text-stone-800 shadow-inner outline-none bg-white">
+                            </div>
+                            <div class="md:col-span-1">
+                                <label class="text-[8px] ml-1 text-stone-600 block mb-1">CONCEPTO / MOTIVO</label>
+                                <input type="text" id="movConcepto" placeholder="DESCRIPCIÓN O RETIRO..." class="w-full p-3.5 rounded-xl glass-input text-[10px] uppercase text-stone-800 outline-none shadow-inner bg-white">
+                            </div>
+                            <div>
+                                <label class="text-[8px] ml-1 text-stone-600 block mb-1">MONTO $</label>
+                                <input type="number" id="movMonto" placeholder="$0.00" step="0.01" class="w-full p-3.5 rounded-xl glass-input text-right text-base font-mono text-fix-main outline-none shadow-inner bg-white font-black">
+                            </div>
+                            <div>
+                                <label class="text-[8px] ml-1 text-stone-600 block mb-1">TIPO DE MOVIMIENTO</label>
+                                <select id="movType" class="w-full p-3.5 rounded-xl glass-input text-[10px] outline-none text-stone-800 shadow-inner bg-white font-bold">
+                                    <option value="EGRESO">➖ EGRESO / RETIRO</option>
+                                    <option value="INGRESO">➕ INGRESO EXTRA</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[8px] ml-1 text-stone-600 block mb-1">MÉTODO / TÉCNICO</label>
+                                <div class="flex gap-2">
+                                    <select id="movPago" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner bg-white font-bold">
+                                        <option value="EFECTIVO">EFEC</option>
+                                        <option value="TRANSFERENCIA">TRANS</option>
+                                    </select>
+                                    <select id="movTecnico" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner bg-white font-bold"></select>
+                                </div>
+                            </div>
+                            <button onclick="saveManualMovement()" class="glass-card bg-fix-main hover:bg-blue-900 text-white py-4 rounded-xl font-black text-[10px] active:scale-95 transition-all uppercase italic text-center shadow-lg">
+                                💾 Registrar Movimiento
+                            </button>
                         </div>
-                        <div class="p-5 glass-card bg-stone-900/90 text-white rounded-[1.5rem] flex flex-col justify-center border-fix-accent/60 shadow-xl">
-                            <span class="text-[9px] uppercase text-fix-accent tracking-tighter">⚖️ RESTA CAJA EFECTIVO</span>
-                            <div id="balanceNetoDisplay" class="text-4xl font-black text-white mt-2 font-mono tracking-tighter drop-shadow-lg">$0.00</div>
+
+                        <!-- Tabla Detallada de Movimientos Diarios -->
+                        <div class="overflow-x-auto rounded-2xl border border-stone-200 shadow-sm bg-white/70 backdrop-blur-md">
+                            <table class="w-full text-left admin-table font-mono">
+                                <thead>
+                                    <tr class="bg-stone-900 text-white text-[9px] uppercase tracking-wider">
+                                        <th class="p-3.5">FECHA / TÉCNICO</th>
+                                        <th class="p-3.5">TIPO / PAGO</th>
+                                        <th class="p-3.5">DETALLE DE MOVIMIENTO</th>
+                                        <th class="p-3.5 text-right">MONTO</th>
+                                        <th class="p-3.5 text-center">ACCIONES</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="contabilidadTableBody" class="text-stone-800 divide-y divide-stone-200"></tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div class="glass-panel p-6 mb-8 grid grid-cols-1 md:grid-cols-6 gap-4 items-end italic font-black bg-white/50 border-white/80 shadow-md">
-                        <div class="md:col-span-1"><label class="text-[8px] ml-1 text-stone-600 block mb-1">FECHA</label><input type="date" id="movFecha" class="w-full p-3.5 rounded-xl glass-input text-[10px] font-mono text-stone-800 shadow-inner outline-none"></div>
-                        <div class="md:col-span-1"><label class="text-[8px] ml-1 text-stone-600 block mb-1">CONCEPTO</label><input type="text" id="movConcepto" placeholder="DESCRIPCIÓN..." class="w-full p-3.5 rounded-xl glass-input text-[10px] uppercase text-stone-800 outline-none shadow-inner"></div>
-                        <div><label class="text-[8px] ml-1 text-stone-600 block mb-1">MONTO $</label><input type="number" id="movMonto" placeholder="$0" class="w-full p-3.5 rounded-xl glass-input text-right text-base font-mono text-fix-main outline-none shadow-inner bg-white/80"></div>
-                        <div><label class="text-[8px] ml-1 text-stone-600 block mb-1">TIPO</label><select id="movType" class="w-full p-3.5 rounded-xl glass-input text-[10px] outline-none text-stone-800 shadow-inner"><option value="EGRESO">➖ EGRESO</option><option value="INGRESO">➕ INGRESO</option></select></div>
-                        <div><label class="text-[8px] ml-1 text-stone-600 block mb-1">MÉTODO / TÉCNICO</label><div class="flex gap-2"><select id="movPago" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner"><option value="EFECTIVO">EFEC</option><option value="TRANSFERENCIA">TRANS</option></select><select id="movTecnico" class="w-1/2 p-3.5 rounded-xl glass-input text-[9px] outline-none text-stone-800 shadow-inner"></select></div></div>
-                        <button onclick="saveManualMovement()" class="glass-card bg-fix-main/90 border-white/60 text-white py-4 rounded-xl font-black text-[10px] active:scale-95 transition-all uppercase italic text-center shadow-lg hover:shadow-stone-900/20">Registrar</button>
+                    <!-- ========================================================= -->
+                    <!-- SECCION 2: CUADRO SEMANAL DE CAJA (LUNES A VIERNES/SAB)   -->
+                    <!-- ========================================================= -->
+                    <div id="cajaSemanalSection" class="hidden space-y-6">
+                        
+                        <!-- Barra de Navegación de la Semana -->
+                        <div class="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 text-white shadow-md">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <button type="button" onclick="navSemanaCaja(-1)" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-black uppercase transition-all flex items-center gap-1 active:scale-95 shadow-sm">
+                                    ◀ Anterior
+                                </button>
+                                <button type="button" onclick="navSemanaHoy()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase transition-all shadow-sm active:scale-95">
+                                    ⚡ Esta Semana
+                                </button>
+                                <button type="button" onclick="navSemanaCaja(1)" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-black uppercase transition-all flex items-center gap-1 active:scale-95 shadow-sm">
+                                    Siguiente ▶
+                                </button>
+                                <div class="ml-2 pl-3 border-l border-slate-700">
+                                    <span id="cuadroSemanalRangoLabel" class="text-xs sm:text-sm font-black text-indigo-300 font-mono tracking-tight uppercase">
+                                        SEMANA ACTUAL
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <label class="flex items-center gap-1.5 text-xs font-black text-slate-300 cursor-pointer select-none">
+                                    <input type="checkbox" id="cuadroSemanalIncSabado" onchange="renderCuadroSemanalCaja()" checked class="rounded accent-indigo-600 w-4 h-4 cursor-pointer">
+                                    <span>Incluir Sábado</span>
+                                </label>
+                                <input type="date" id="cuadroSemanalDateJump" onchange="onSemanaDatePick(this.value)" title="Ir a cualquier semana por fecha" class="p-2 rounded-xl bg-slate-800 text-white text-[10px] font-mono border border-slate-700 outline-none">
+                                <button type="button" onclick="downloadArqueoSemanalCSV()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase transition-all shadow-sm flex items-center gap-1 active:scale-95">
+                                    <span>📊</span> <span>Exportar CSV</span>
+                                </button>
+                                <button type="button" onclick="printArqueoSemanal()" class="px-3.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-black uppercase transition-all shadow-sm flex items-center gap-1 active:scale-95">
+                                    <span>🖨️</span> <span>Imprimir</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 5 Tarjetas Resumen Semanal -->
+                        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 text-center italic font-black">
+                            <div class="p-4 glass-panel bg-amber-50/80 border-amber-300 shadow-md rounded-2xl flex flex-col justify-between">
+                                <span class="text-[9px] uppercase text-amber-900 tracking-tight font-black flex items-center justify-center gap-1">
+                                    <span>🏦</span> <span>APERTURA LUNES (INICIO)</span>
+                                </span>
+                                <div id="semAperturaDisplay" class="text-2xl font-black text-amber-800 mt-2 font-mono">$0.00</div>
+                                <span class="text-[8px] text-amber-700 font-bold mt-1">Saldo inicial semana</span>
+                            </div>
+
+                            <div class="p-4 glass-panel bg-emerald-50/70 border-emerald-300 shadow-md rounded-2xl flex flex-col justify-between">
+                                <span class="text-[9px] uppercase text-emerald-900 tracking-tight font-black flex items-center justify-center gap-1">
+                                    <span>🟢</span> <span>(+) INGRESOS EFECTIVO</span>
+                                </span>
+                                <div id="semIngresosDisplay" class="text-2xl font-black text-emerald-700 mt-2 font-mono">$0.00</div>
+                                <span class="text-[8px] text-emerald-700 font-bold mt-1">Cobros de la semana</span>
+                            </div>
+
+                            <div class="p-4 glass-panel bg-rose-50/70 border-rose-300 shadow-md rounded-2xl flex flex-col justify-between">
+                                <span class="text-[9px] uppercase text-rose-900 tracking-tight font-black flex items-center justify-center gap-1">
+                                    <span>🔴</span> <span>(-) EGRESOS EFECTIVO</span>
+                                </span>
+                                <div id="semEgresosDisplay" class="text-2xl font-black text-rose-700 mt-2 font-mono">$0.00</div>
+                                <span class="text-[8px] text-rose-700 font-bold mt-1">Salidas y retiros</span>
+                            </div>
+
+                            <div class="p-4 glass-card bg-stone-900 text-white rounded-2xl flex flex-col justify-between border-fix-accent/60 shadow-xl col-span-2 sm:col-span-1">
+                                <span class="text-[9px] uppercase text-emerald-400 tracking-tight font-black flex items-center justify-center gap-1">
+                                    <span>⚖️</span> <span>SALDO FINAL DE LA SEMANA</span>
+                                </span>
+                                <div id="semCierreDisplay" class="text-3xl font-black text-white mt-1.5 font-mono tracking-tighter">$0.00</div>
+                                <span class="text-[8px] text-stone-300 font-bold mt-1">Cierre en caja al finalizar semana</span>
+                            </div>
+
+                            <div class="p-4 glass-panel bg-blue-50/70 border-blue-300 shadow-md rounded-2xl flex flex-col justify-between col-span-2 sm:col-span-1">
+                                <span class="text-[9px] uppercase text-blue-900 tracking-tight font-black flex items-center justify-center gap-1">
+                                    <span>💳</span> <span>TRANSFERENCIAS</span>
+                                </span>
+                                <div id="semTransferDisplay" class="text-2xl font-black text-blue-700 mt-2 font-mono">$0.00</div>
+                                <span class="text-[8px] text-blue-700 font-bold mt-1">Bancos (Informativo)</span>
+                            </div>
+                        </div>
+
+                        <!-- Matriz Tabular Día a Día (Lunes a Viernes / Sábado) -->
+                        <div class="overflow-x-auto rounded-2xl border border-stone-300 shadow-sm bg-white/90">
+                            <table class="w-full text-left font-mono">
+                                <thead>
+                                    <tr class="bg-stone-900 text-white text-[9px] uppercase tracking-wider">
+                                        <th class="p-3.5">DÍA / FECHA</th>
+                                        <th class="p-3.5 text-right text-amber-300">🏦 APERTURA (INICIAL)</th>
+                                        <th class="p-3.5 text-right text-emerald-300">🟢 (+) INGRESOS EFEC</th>
+                                        <th class="p-3.5 text-right text-rose-300">🔴 (-) EGRESOS EFEC</th>
+                                        <th class="p-3.5 text-right text-white">⚖️ (=) CIERRE DE CAJA</th>
+                                        <th class="p-3.5 text-right text-blue-300">💳 BANCOS</th>
+                                        <th class="p-3.5 text-center">DETALLE</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cuadroSemanalTableBody" class="divide-y divide-stone-200"></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Nota explicativa al pie -->
+                        <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+                            <span class="text-base shrink-0">💡</span>
+                            <div>
+                                <span class="font-black uppercase">Regla Contable de Arrastre de Saldo:</span>
+                                <p class="text-[11px] font-normal text-amber-950 mt-0.5">
+                                    El <strong>Cierre de Caja</strong> de cada día pasa automáticamente como la <strong>Apertura</strong> del día siguiente. Si el Lunes termina con \$40.00, el Martes amanecerá con \$40.00 de saldo inicial, asegurando que los retiros o gastos se descuenten del dinero real y nunca quede en saldo negativo falso.
+                                </p>
+                            </div>
+                        </div>
+
                     </div>
 
-                    <div class="overflow-x-auto rounded-[1.5rem] border border-white/80 shadow-sm bg-white/40 backdrop-blur-md"><table class="w-full text-left admin-table font-mono"><thead><tr><th>FECHA / TÉCNICO</th><th>TIPO / PAGO</th><th>DETALLE DE MOVIMIENTO</th><th class="text-right">MONTO</th><th class="text-center">X</th></tr></thead><tbody id="contabilidadTableBody" class="text-stone-800"></tbody></table></div>
                 </div>
             </div>
         </div>
