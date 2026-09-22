@@ -6290,8 +6290,8 @@
                 startInput.value = firstDayStr;
                 endInput.value = hoyStr;
             } else if (mode === 'todo') {
-                startInput.value = '';
-                endInput.value = '';
+                startInput.value = '2026-09-21';
+                endInput.value = hoyStr;
             }
             processFinancialBalance();
         };
@@ -6369,11 +6369,12 @@
             const dateJump = document.getElementById('cuadroSemanalDateJump');
             if (dateJump) dateJump.value = mondayStr;
 
-            // 1. Apertura inicial del Lunes (todo lo anterior en efectivo antes del Lunes)
+            // 1. Apertura inicial del Lunes (acumulado en efectivo desde la fecha base 2026-09-21)
+            const CAJA_BASELINE_DATE = '2026-09-21';
             let aperturaAcumulada = 0;
             todos.forEach(m => {
                 if (techFilter && m.tecnico !== techFilter) return;
-                if (m.dateStr && m.dateStr < mondayStr) {
+                if (m.dateStr && m.dateStr >= CAJA_BASELINE_DATE && m.dateStr < mondayStr) {
                     if (m.formaPago === 'EFECTIVO') {
                         if (m.type === 'INGRESO') aperturaAcumulada += (m.monto || 0);
                         else aperturaAcumulada -= (m.monto || 0);
@@ -6536,12 +6537,14 @@
             
             const todos = getAllFinancialMovements();
 
-            // 1. Apertura / Saldo Anterior acumulado en efectivo
+            // 1. Apertura / Saldo Anterior acumulado en efectivo desde la fecha base (2026-09-21)
+            // Todo lo anterior a 2026-09-21 cuadra formalmente en 0.00
+            const CAJA_BASELINE_DATE = '2026-09-21';
             let aperturaEfectivo = 0;
             if (start) {
                 todos.forEach(m => {
                     if (techFilter && m.tecnico !== techFilter) return;
-                    if (m.dateStr && m.dateStr < start) {
+                    if (m.dateStr && m.dateStr >= CAJA_BASELINE_DATE && m.dateStr < start) {
                         if (m.formaPago === 'EFECTIVO') {
                             if (m.type === 'INGRESO') aperturaEfectivo += (m.monto || 0);
                             else aperturaEfectivo -= (m.monto || 0);
@@ -6585,26 +6588,49 @@
                 let rowsHtml = '';
                 
                 if (start) {
-                    rowsHtml += `
-                        <tr class="bg-amber-50/80 border-b-2 border-amber-300 uppercase font-black">
-                            <td class="p-4 text-[9px] font-mono font-black italic text-amber-900">
-                                ${start}<br><span class="text-[7px] text-amber-700 font-bold tracking-wider">APERTURA CAJA</span>
-                            </td>
-                            <td class="p-4 text-[9px] font-bold tracking-tight">
-                                <span class="text-amber-800">APERTURA</span><br>
-                                <span class="text-[7px] text-stone-600">SALDO ANTERIOR</span>
-                            </td>
-                            <td class="p-4 text-xs font-black uppercase tracking-tighter text-amber-950">
-                                SALDO ACUMULADO AL CIERRE DEL DÍA ANTERIOR (EN EFECTIVO)
-                            </td>
-                            <td class="p-4 text-right text-[13px] font-mono font-black ${aperturaEfectivo < 0 ? 'text-rose-700' : 'text-amber-900'}">
-                                $${aperturaEfectivo.toFixed(2)}
-                            </td>
-                            <td class="text-center p-4 text-sm font-bold text-amber-600" title="Saldo anterior no editable">
-                                💼
-                            </td>
-                        </tr>
-                    `;
+                    if (start > CAJA_BASELINE_DATE) {
+                        rowsHtml += `
+                            <tr class="bg-amber-50/80 border-b-2 border-amber-300 uppercase font-black">
+                                <td class="p-4 text-[9px] font-mono font-black italic text-amber-900">
+                                    ${start}<br><span class="text-[7px] text-amber-700 font-bold tracking-wider">APERTURA CAJA</span>
+                                </td>
+                                <td class="p-4 text-[9px] font-bold tracking-tight">
+                                    <span class="text-amber-800">APERTURA</span><br>
+                                    <span class="text-[7px] text-stone-600">SALDO ANTERIOR</span>
+                                </td>
+                                <td class="p-4 text-xs font-black uppercase tracking-tighter text-amber-950">
+                                    SALDO DISPONIBLE EN CAJA AL CIERRE DEL DÍA ANTERIOR (EN EFECTIVO)
+                                </td>
+                                <td class="p-4 text-right text-[13px] font-mono font-black ${aperturaEfectivo < 0 ? 'text-rose-700' : 'text-amber-900'}">
+                                    $${aperturaEfectivo.toFixed(2)}
+                                </td>
+                                <td class="text-center p-4 text-sm font-bold text-amber-600" title="Saldo anterior acumulado">
+                                    💼
+                                </td>
+                            </tr>
+                        `;
+                    } else if (start === CAJA_BASELINE_DATE) {
+                        rowsHtml += `
+                            <tr class="bg-indigo-50/80 border-b-2 border-indigo-200 uppercase font-black">
+                                <td class="p-4 text-[9px] font-mono font-black italic text-indigo-900">
+                                    ${start}<br><span class="text-[7px] text-indigo-700 font-bold tracking-wider">LÍNEA BASE</span>
+                                </td>
+                                <td class="p-4 text-[9px] font-bold tracking-tight">
+                                    <span class="text-indigo-800">APERTURA</span><br>
+                                    <span class="text-[7px] text-stone-600">INICIO ARQUEO</span>
+                                </td>
+                                <td class="p-4 text-xs font-black uppercase tracking-tighter text-indigo-950">
+                                    INICIO DE ARQUEO OFICIAL (TODO EL HISTORIAL ANTERIOR CUADRADO EN $0.00)
+                                </td>
+                                <td class="p-4 text-right text-[13px] font-mono font-black text-indigo-900">
+                                    $0.00
+                                </td>
+                                <td class="text-center p-4 text-sm font-bold text-indigo-600" title="Arranque oficial de caja">
+                                    🚀
+                                </td>
+                            </tr>
+                        `;
+                    }
                 }
 
                 rowsHtml += filteredTodos.map(m => `
@@ -6636,7 +6662,11 @@
                 document.getElementById('cajaAperturaDisplay').textContent = "$" + aperturaEfectivo.toFixed(2);
             }
             if(document.getElementById('cajaAperturaSubtext')) {
-                document.getElementById('cajaAperturaSubtext').textContent = start ? `Acumulado antes de ${start}` : 'Desde el inicio';
+                if (!start || start === CAJA_BASELINE_DATE) {
+                    document.getElementById('cajaAperturaSubtext').textContent = 'Inicio arqueo oficial ($0.00)';
+                } else {
+                    document.getElementById('cajaAperturaSubtext').textContent = `Acumulado desde 21/Sep previo a ${start}`;
+                }
             }
             if(document.getElementById('totalEfectivoDisplay')) document.getElementById('totalEfectivoDisplay').textContent = "$" + tCashIn.toFixed(2);
             if(document.getElementById('totalEgresosDisplay')) document.getElementById('totalEgresosDisplay').textContent = "$" + tOut.toFixed(2);
@@ -8990,6 +9020,17 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         </div>
                     </div>
 
+                    <!-- Banner de Inicio Oficial de Arqueo -->
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200 mb-6 text-xs text-indigo-950 font-bold shadow-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">🛡️</span>
+                            <span><strong>LÍNEA BASE OFICIAL:</strong> Arqueo de caja iniciado el <strong>Lunes 21 de Septiembre de 2026</strong>. Todo el historial anterior queda cerrado y cuadrado en <strong>$0.00</strong>.</span>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-lg bg-indigo-700 text-white text-[9px] font-black uppercase font-mono tracking-wider shrink-0">
+                            BASELINE: 21/SEP/2026
+                        </span>
+                    </div>
+
                     <!-- ========================================================= -->
                     <!-- SECCION 1: VISTA DIARIA / RANGO DE FECHAS                -->
                     <!-- ========================================================= -->
@@ -9235,9 +9276,9 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
                             <span class="text-base shrink-0">💡</span>
                             <div>
-                                <span class="font-black uppercase">Regla Contable de Arrastre de Saldo:</span>
+                                <span class="font-black uppercase">Regla Contable de Arrastre de Saldo (Línea Base: 21 de Septiembre 2026):</span>
                                 <p class="text-[11px] font-normal text-amber-950 mt-0.5">
-                                    El <strong>Cierre de Caja</strong> de cada día pasa automáticamente como la <strong>Apertura</strong> del día siguiente. Si el Lunes termina con \$40.00, el Martes amanecerá con \$40.00 de saldo inicial, asegurando que los retiros o gastos se descuenten del dinero real y nunca quede en saldo negativo falso.
+                                    El arqueo arranca formalmente el <strong>Lunes 21 de Septiembre con apertura de \$0.00</strong> (cerrando en \$0.00 todo el historial anterior). El Lunes 21 cerró con <strong>\$2.00</strong> (\$50 cobrados en efectivo − \$48 egresos), por lo que el Martes 22 abre con <strong>\$2.00</strong> en caja física. El cierre de cada día pasa automáticamente como la apertura del día siguiente.
                                 </p>
                             </div>
                         </div>
