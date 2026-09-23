@@ -1310,6 +1310,13 @@
         body.theme-light #widgetQuickTasksList .text-slate-100 {
             color: #0f172a !important;
         }
+        body.theme-light #widgetTab_hoy:not(.bg-amber-500),
+        body.theme-light #widgetTab_manana:not(.bg-amber-500),
+        body.theme-light #widgetTab_futuras:not(.bg-amber-500) {
+            background-color: #f1f5f9 !important;
+            color: #475569 !important;
+            border: 1px solid #cbd5e1 !important;
+        }
         body.theme-light #metroLiveClock {
             background-color: #f1f5f9 !important;
             color: #475569 !important;
@@ -2578,7 +2585,7 @@
             // 7. NOTAS RÁPIDAS:
             const notas = window.notasList || [];
             const pendNotas = notas.filter(t => t.status !== 'EJECUTADA');
-            const hoyNotas = pendNotas.filter(t => t.date === hoy);
+            const hoyNotas = pendNotas.filter(t => !t.date || t.date <= hoy);
             const bNot = document.getElementById('metroTileBadge_notas');
             const iNot = document.getElementById('metroTileInfo_notas');
             if (bNot) bNot.textContent = `${pendNotas.length} Pendientes`;
@@ -3403,32 +3410,105 @@
             }
         };
 
+        window.widgetTaskFilter = 'hoy';
+
+        window.setWidgetTasksFilter = function(filter) {
+            window.widgetTaskFilter = filter;
+            window.renderWidgetTasks();
+        };
+
         window.renderWidgetTasks = function() {
             const listEl = document.getElementById('widgetQuickTasksList');
             const badgeEl = document.getElementById('widgetNotasCountBadge');
             if (!listEl) return;
 
             const list = window.notasList || [];
+            const pad = (n) => String(n).padStart(2, '0');
+            const d = new Date();
+            const todayStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            const dTom = new Date();
+            dTom.setDate(dTom.getDate() + 1);
+            const tomorrowStr = `${dTom.getFullYear()}-${pad(dTom.getMonth() + 1)}-${pad(dTom.getDate())}`;
+
+            // Calcular contadores por clasificación temporal
             const pendientes = list.filter(t => t.status !== 'EJECUTADA');
-            
+            const countHoy = pendientes.filter(t => !t.date || t.date <= todayStr).length;
+            const countManana = pendientes.filter(t => t.date === tomorrowStr).length;
+            const countFuturas = pendientes.filter(t => t.date && t.date > tomorrowStr).length;
+
+            const elCountHoy = document.getElementById('widgetCount_hoy');
+            const elCountManana = document.getElementById('widgetCount_manana');
+            const elCountFuturas = document.getElementById('widgetCount_futuras');
+            if (elCountHoy) elCountHoy.textContent = countHoy;
+            if (elCountManana) elCountManana.textContent = countManana;
+            if (elCountFuturas) elCountFuturas.textContent = countFuturas;
+
+            const currentFilter = window.widgetTaskFilter || 'hoy';
+
+            // Actualizar apariencia de las pestañas
+            ['hoy', 'manana', 'futuras'].forEach(tab => {
+                const btn = document.getElementById('widgetTab_' + tab);
+                if (btn) {
+                    if (tab === currentFilter) {
+                        btn.className = 'px-2 py-0.5 rounded-lg bg-amber-500 text-white font-bold shadow-xs cursor-pointer transition-all';
+                    } else {
+                        btn.className = 'px-2 py-0.5 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white cursor-pointer transition-all';
+                    }
+                }
+            });
+
             if (badgeEl) {
-                badgeEl.textContent = `${pendientes.length} Pendiente${pendientes.length === 1 ? '' : 's'}`;
+                let badgeText = `${countHoy} para Hoy`;
+                if (currentFilter === 'manana') badgeText = `${countManana} para Mañana`;
+                if (currentFilter === 'futuras') badgeText = `${countFuturas} Futuras`;
+                badgeEl.textContent = badgeText;
             }
 
-            if (list.length === 0) {
-                listEl.innerHTML = '<div class="text-center py-4 text-xs text-slate-400 italic">No hay notas registradas. ¡Escribe una arriba!</div>';
+            // Filtrar lista según pestaña activa
+            const filteredList = list.filter(t => {
+                if (currentFilter === 'hoy') {
+                    return !t.date || t.date <= todayStr;
+                } else if (currentFilter === 'manana') {
+                    return t.date === tomorrowStr;
+                } else if (currentFilter === 'futuras') {
+                    return t.date && t.date > tomorrowStr;
+                }
+                return true;
+            });
+
+            if (filteredList.length === 0) {
+                let emptyMsg = 'No hay pendientes para Hoy';
+                if (currentFilter === 'manana') emptyMsg = 'No hay pendientes para Mañana';
+                if (currentFilter === 'futuras') emptyMsg = 'No hay tareas futuras agendadas';
+                listEl.innerHTML = `<div class="text-center py-4 text-xs text-slate-400 italic">${emptyMsg}</div>`;
                 return;
             }
 
-            const displayList = [...list].sort((a, b) => {
+            const displayList = [...filteredList].sort((a, b) => {
                 if (a.status === 'EJECUTADA' && b.status !== 'EJECUTADA') return 1;
                 if (a.status !== 'EJECUTADA' && b.status === 'EJECUTADA') return -1;
+                if (currentFilter === 'futuras' && a.date && b.date) {
+                    return a.date.localeCompare(b.date);
+                }
                 return (b.createdAt || 0) - (a.createdAt || 0);
             }).slice(0, 6);
 
             let html = '';
             displayList.forEach(task => {
                 const isDone = task.status === 'EJECUTADA';
+                let dateBadge = '';
+                if (task.date) {
+                    const parts = task.date.split('-');
+                    const formatted = parts.length === 3 ? `${parts[2]}/${parts[1]}` : task.date;
+                    if (task.date < todayStr && !isDone) {
+                        dateBadge = `<span class="shrink-0 text-[9px] px-1 py-0.2 rounded bg-rose-900/60 text-rose-300 border border-rose-500/30 font-bold">Atrasada</span>`;
+                    } else if (task.date > tomorrowStr) {
+                        dateBadge = `<span class="shrink-0 text-[9px] px-1 py-0.2 rounded bg-indigo-900/60 text-indigo-300 border border-indigo-500/30 font-bold">${formatted}</span>`;
+                    } else if (task.date === tomorrowStr) {
+                        dateBadge = `<span class="shrink-0 text-[9px] px-1 py-0.2 rounded bg-blue-900/60 text-blue-300 border border-blue-500/30 font-bold">Mañana</span>`;
+                    }
+                }
+
                 html += `
                 <div class="flex items-center justify-between gap-2 p-1.5 px-2 rounded-xl ${isDone ? 'bg-slate-800/40 opacity-60' : 'bg-slate-800/80 hover:bg-slate-700/80'} border border-white/5 transition-all text-xs">
                     <button type="button" onclick="window.toggleWidgetTaskStatus('${task.id}')" class="shrink-0 p-0.5 rounded text-amber-400 hover:text-amber-300 cursor-pointer" title="${isDone ? 'Marcar como pendiente' : 'Marcar como realizada'}">
@@ -3437,6 +3517,7 @@
                             : '<svg class="sf-symbol sf-symbol-xs text-slate-400 hover:text-amber-300" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="4"/></svg>'}
                     </button>
                     <span class="flex-1 truncate ${isDone ? 'line-through text-slate-400' : 'text-slate-100 font-medium'}">${task.text || 'Sin texto'}</span>
+                    ${dateBadge}
                     <button type="button" onclick="window.deleteWidgetTask('${task.id}')" class="shrink-0 text-slate-400 hover:text-rose-400 p-0.5 transition-colors cursor-pointer" title="Eliminar">
                         ✕
                     </button>
@@ -3482,12 +3563,21 @@
             const pad = (n) => String(n).padStart(2, '0');
             const d = new Date();
             const todayStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            const dTom = new Date();
+            dTom.setDate(dTom.getDate() + 1);
+            const tomorrowStr = `${dTom.getFullYear()}-${pad(dTom.getMonth() + 1)}-${pad(dTom.getDate())}`;
+
+            // Si el widget está en la pestaña "Mañana", agendar para mañana
+            let assignedDate = todayStr;
+            if (window.widgetTaskFilter === 'manana') {
+                assignedDate = tomorrowStr;
+            }
 
             const newId = 'nota_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
             const newTask = {
                 id: newId,
                 text: text,
-                date: todayStr,
+                date: assignedDate,
                 priority: 'NORMAL',
                 status: 'PENDIENTE',
                 createdAt: Date.now(),
@@ -3504,7 +3594,8 @@
             input.value = '';
             window.renderWidgetTasks();
             if (window.renderNotasRapidasView) window.renderNotasRapidasView();
-            if (window.showMessage) window.showMessage('📝 Pendiente añadido', 'fix-report');
+            const msg = assignedDate === tomorrowStr ? '📝 Tarea añadida para Mañana' : '📝 Pendiente añadido para Hoy';
+            if (window.showMessage) window.showMessage(msg, 'fix-report');
 
             if (typeof database !== 'undefined' && database.ref) {
                 try {
@@ -11063,8 +11154,15 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                     </button>
                                 </div>
 
+                                <!-- Pestañas de Filtrado Temporal: Hoy / Mañana / Futuras -->
+                                <div class="mt-2.5 flex items-center gap-1.5 text-[10px] font-bold">
+                                    <button id="widgetTab_hoy" type="button" onclick="setWidgetTasksFilter('hoy')" class="px-2.5 py-0.5 rounded-lg bg-amber-500 text-white shadow-xs cursor-pointer transition-all">Hoy (<span id="widgetCount_hoy">0</span>)</button>
+                                    <button id="widgetTab_manana" type="button" onclick="setWidgetTasksFilter('manana')" class="px-2.5 py-0.5 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white cursor-pointer transition-all">Mañana (<span id="widgetCount_manana">0</span>)</button>
+                                    <button id="widgetTab_futuras" type="button" onclick="setWidgetTasksFilter('futuras')" class="px-2.5 py-0.5 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white cursor-pointer transition-all">Futuras (<span id="widgetCount_futuras">0</span>)</button>
+                                </div>
+
                                 <!-- Lista interactiva de tareas -->
-                                <div id="widgetQuickTasksList" class="mt-2.5 space-y-1.5 max-h-[140px] overflow-y-auto pr-1 no-scrollbar">
+                                <div id="widgetQuickTasksList" class="mt-2 space-y-1.5 max-h-[140px] overflow-y-auto pr-1 no-scrollbar">
                                     <div class="text-center py-4 text-xs text-slate-400 italic">No hay pendientes anotados</div>
                                 </div>
                             </div>
@@ -12746,15 +12844,8 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         </form>
                     </div>
 
-                    <!-- 5 TARJETAS KPI -->
-                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-                        <div onclick="setNotasFilter('pendientes')" class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 cursor-pointer hover:shadow-xs transition-all">
-                            <div class="text-[10px] font-black uppercase text-amber-800 flex items-center justify-between">
-                                <span>⏳ Pendientes</span>
-                            </div>
-                            <div id="kpiNotasPendientes" class="text-2xl font-black text-amber-900 mt-1">0</div>
-                            <div class="text-[9px] text-amber-700 font-bold mt-0.5">Por ejecutar</div>
-                        </div>
+                    <!-- 6 TARJETAS KPI -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
                         <div onclick="setNotasFilter('hoy')" class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 cursor-pointer hover:shadow-xs transition-all">
                             <div class="text-[10px] font-black uppercase text-emerald-800 flex items-center justify-between">
                                 <span>🟢 Para Hoy</span>
@@ -12762,12 +12853,26 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <div id="kpiNotasHoy" class="text-2xl font-black text-emerald-900 mt-1">0</div>
                             <div class="text-[9px] text-emerald-700 font-bold mt-0.5">Prioridad diaria</div>
                         </div>
-                        <div onclick="setNotasFilter('futuras')" class="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 cursor-pointer hover:shadow-xs transition-all">
+                        <div onclick="setNotasFilter('manana')" class="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 cursor-pointer hover:shadow-xs transition-all">
                             <div class="text-[10px] font-black uppercase text-blue-800 flex items-center justify-between">
+                                <span>🔵 Mañana</span>
+                            </div>
+                            <div id="kpiNotasManana" class="text-2xl font-black text-blue-900 mt-1">0</div>
+                            <div class="text-[9px] text-blue-700 font-bold mt-0.5">Siguiente día</div>
+                        </div>
+                        <div onclick="setNotasFilter('futuras')" class="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 cursor-pointer hover:shadow-xs transition-all">
+                            <div class="text-[10px] font-black uppercase text-indigo-800 flex items-center justify-between">
                                 <span>📅 Futuras</span>
                             </div>
-                            <div id="kpiNotasFuturas" class="text-2xl font-black text-blue-900 mt-1">0</div>
-                            <div class="text-[9px] text-blue-700 font-bold mt-0.5">Próximos días</div>
+                            <div id="kpiNotasFuturas" class="text-2xl font-black text-indigo-900 mt-1">0</div>
+                            <div class="text-[9px] text-indigo-700 font-bold mt-0.5">Próximas fechas</div>
+                        </div>
+                        <div onclick="setNotasFilter('pendientes')" class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 cursor-pointer hover:shadow-xs transition-all">
+                            <div class="text-[10px] font-black uppercase text-amber-800 flex items-center justify-between">
+                                <span>⏳ Pendientes</span>
+                            </div>
+                            <div id="kpiNotasPendientes" class="text-2xl font-black text-amber-900 mt-1">0</div>
+                            <div class="text-[9px] text-amber-700 font-bold mt-0.5">Por ejecutar</div>
                         </div>
                         <div onclick="setNotasFilter('ejecutadas')" class="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 cursor-pointer hover:shadow-xs transition-all">
                             <div class="text-[10px] font-black uppercase text-slate-600 flex items-center justify-between">
@@ -12776,7 +12881,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <div id="kpiNotasEjecutadas" class="text-2xl font-black text-slate-700 mt-1">0</div>
                             <div class="text-[9px] text-slate-500 font-bold mt-0.5">Completadas</div>
                         </div>
-                        <div onclick="setNotasFilter('todas')" class="p-3.5 rounded-2xl bg-purple-50 border border-purple-200 cursor-pointer hover:shadow-xs transition-all col-span-2 sm:col-span-1">
+                        <div onclick="setNotasFilter('todas')" class="p-3.5 rounded-2xl bg-purple-50 border border-purple-200 cursor-pointer hover:shadow-xs transition-all">
                             <div class="text-[10px] font-black uppercase text-purple-800 flex items-center justify-between">
                                 <span>📋 Total</span>
                             </div>
@@ -12788,17 +12893,21 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                     <!-- BARRA DE FILTROS Y BÚSQUEDA -->
                     <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
                         <div class="flex items-center gap-1.5 flex-wrap">
-                            <button id="notasFilterBtn_pendientes" type="button" onclick="setNotasFilter('pendientes')" class="px-3.5 py-2 rounded-xl text-xs font-black uppercase transition-all shadow-sm bg-indigo-600 text-white flex items-center gap-1.5 cursor-pointer">
-                                <span>⏳ Pendientes</span>
-                                <span id="filterBadge_pendientes" class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">0</span>
-                            </button>
-                            <button id="notasFilterBtn_hoy" type="button" onclick="setNotasFilter('hoy')" class="px-3.5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 cursor-pointer">
+                            <button id="notasFilterBtn_hoy" type="button" onclick="setNotasFilter('hoy')" class="px-3.5 py-2 rounded-xl text-xs font-black uppercase transition-all shadow-sm bg-indigo-600 text-white flex items-center gap-1.5 cursor-pointer">
                                 <span>🟢 Hoy</span>
-                                <span id="filterBadge_hoy" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200">0</span>
+                                <span id="filterBadge_hoy" class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">0</span>
+                            </button>
+                            <button id="notasFilterBtn_manana" type="button" onclick="setNotasFilter('manana')" class="px-3.5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 cursor-pointer">
+                                <span>🔵 Mañana</span>
+                                <span id="filterBadge_manana" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200">0</span>
                             </button>
                             <button id="notasFilterBtn_futuras" type="button" onclick="setNotasFilter('futuras')" class="px-3.5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 cursor-pointer">
                                 <span>📅 Futuras</span>
                                 <span id="filterBadge_futuras" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200">0</span>
+                            </button>
+                            <button id="notasFilterBtn_pendientes" type="button" onclick="setNotasFilter('pendientes')" class="px-3.5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 cursor-pointer">
+                                <span>⏳ Pendientes</span>
+                                <span id="filterBadge_pendientes" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200">0</span>
                             </button>
                             <button id="notasFilterBtn_ejecutadas" type="button" onclick="setNotasFilter('ejecutadas')" class="px-3.5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 cursor-pointer">
                                 <span>✔️ Tachadas</span>

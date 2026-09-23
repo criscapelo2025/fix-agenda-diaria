@@ -6,7 +6,7 @@
  */
 
 window.notasList = [];
-window.currentNotasFilter = 'pendientes'; // 'pendientes', 'hoy', 'futuras', 'ejecutadas', 'todas'
+window.currentNotasFilter = 'hoy'; // 'hoy' (predeterminado), 'manana', 'futuras', 'pendientes', 'ejecutadas', 'todas'
 window.notasSearchQuery = '';
 
 // Helper para fecha de hoy en formato YYYY-MM-DD local
@@ -18,13 +18,28 @@ function getTodayDateString() {
     return `${year}-${month}-${day}`;
 }
 
+// Helper para fecha de mañana en formato YYYY-MM-DD local
+function getTomorrowDateString() {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 // Helper para formatear fecha amigable (Hoy, Mañana, Ayer o DD/MM)
 function formatFriendlyDate(dateStr) {
-    if (!dateStr) return { label: 'Sin Fecha', color: 'bg-slate-100 text-slate-600 border-slate-200', isOverdue: false, isToday: false };
+    if (!dateStr) return { label: 'Sin Fecha', color: 'bg-slate-100 text-slate-600 border-slate-200', isOverdue: false, isToday: false, isTomorrow: false, isFuture: false };
     
     const today = getTodayDateString();
+    const tomorrow = getTomorrowDateString();
+
     if (dateStr === today) {
-        return { label: '🟢 Hoy', color: 'bg-emerald-100 text-emerald-900 border-emerald-300 font-bold', isOverdue: false, isToday: true };
+        return { label: '🟢 Hoy', color: 'bg-emerald-100 text-emerald-900 border-emerald-300 font-bold', isOverdue: false, isToday: true, isTomorrow: false, isFuture: false };
+    }
+    if (dateStr === tomorrow) {
+        return { label: '🔵 Mañana', color: 'bg-blue-100 text-blue-900 border-blue-300 font-bold', isOverdue: false, isToday: false, isTomorrow: true, isFuture: false };
     }
     
     // Calcular diferencia en días
@@ -33,16 +48,14 @@ function formatFriendlyDate(dateStr) {
     const diffTime = dDate - dToday;
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     
-    if (diffDays === 1) {
-        return { label: '🔵 Mañana', color: 'bg-blue-100 text-blue-900 border-blue-300', isOverdue: false, isToday: false };
-    } else if (diffDays === -1) {
-        return { label: '🔴 Ayer (Atrasada)', color: 'bg-rose-100 text-rose-900 border-rose-300 font-black', isOverdue: true, isToday: false };
+    if (diffDays === -1) {
+        return { label: '🔴 Ayer (Atrasada)', color: 'bg-rose-100 text-rose-900 border-rose-300 font-black', isOverdue: true, isToday: false, isTomorrow: false, isFuture: false };
     } else if (diffDays < -1) {
-        return { label: `🔴 Atrasada (${Math.abs(diffDays)}d)`, color: 'bg-rose-100 text-rose-900 border-rose-300 font-black', isOverdue: true, isToday: false };
+        return { label: `🔴 Atrasada (${Math.abs(diffDays)}d)`, color: 'bg-rose-100 text-rose-900 border-rose-300 font-black', isOverdue: true, isToday: false, isTomorrow: false, isFuture: false };
     } else {
         const parts = dateStr.split('-');
         const formatted = parts.length === 3 ? `${parts[2]}/${parts[1]}` : dateStr;
-        return { label: `📅 ${formatted}`, color: 'bg-indigo-50 text-indigo-900 border-indigo-200', isOverdue: false, isToday: false };
+        return { label: `📅 ${formatted} (en ${diffDays}d)`, color: 'bg-indigo-50 text-indigo-900 border-indigo-200 font-bold', isOverdue: false, isToday: false, isTomorrow: false, isFuture: true };
     }
 }
 
@@ -134,7 +147,17 @@ window.addQuickTask = async function(e) {
     }
 
     if (window.showMessage) {
-        window.showMessage('✅ Tarea anotada', 'fix-report');
+        const tomorrow = getTomorrowDateString();
+        const today = getTodayDateString();
+        if (date && date > tomorrow) {
+            const parts = date.split('-');
+            const formatted = parts.length === 3 ? `${parts[2]}/${parts[1]}` : date;
+            window.showMessage(`📅 Tarea agendada para el ${formatted} (estará en "Futuras" hasta esa fecha)`, 'fix-report');
+        } else if (date === tomorrow) {
+            window.showMessage('🔵 Tarea agendada para Mañana', 'fix-report');
+        } else {
+            window.showMessage('✅ Tarea anotada para Hoy', 'fix-report');
+        }
     }
 
     // Guardar en Firebase
@@ -155,12 +178,7 @@ window.setQuickInputDateShortcut = function(shortcut) {
     if (shortcut === 'hoy') {
         dateInput.value = getTodayDateString();
     } else if (shortcut === 'manana') {
-        const d = new Date();
-        d.setDate(d.getDate() + 1);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const dia = String(d.getDate()).padStart(2, '0');
-        dateInput.value = `${y}-${m}-${dia}`;
+        dateInput.value = getTomorrowDateString();
     } else if (shortcut === 'sin_fecha') {
         dateInput.value = '';
     }
@@ -313,43 +331,55 @@ window.renderNotasRapidasView = function() {
     if (!container) return;
 
     const list = window.notasList || [];
-    const today = getTodayDateString();
 
-    // 1. Calcular KPIs
+    // 1. Calcular KPIs por Fechas
+    const today = getTodayDateString();
+    const tomorrow = getTomorrowDateString();
+
     const totalCount = list.length;
-    const pendientesCount = list.filter(t => t.status !== 'EJECUTADA').length;
     const ejecutadasCount = list.filter(t => t.status === 'EJECUTADA').length;
-    const hoyCount = list.filter(t => t.status !== 'EJECUTADA' && t.date === today).length;
-    const futurasCount = list.filter(t => t.status !== 'EJECUTADA' && t.date && t.date > today).length;
+    const pendientesList = list.filter(t => t.status !== 'EJECUTADA');
+
+    // HOY: Tareas agendadas para hoy, sin fecha o atrasadas pendientes
+    const hoyCount = pendientesList.filter(t => !t.date || t.date <= today).length;
+    // MAÑANA: Tareas exclusivamente para mañana
+    const mananaCount = pendientesList.filter(t => t.date === tomorrow).length;
+    // FUTURAS: Tareas para fechas estrictamente posteriores a mañana (ej: 3 de Octubre)
+    const futurasCount = pendientesList.filter(t => t.date && t.date > tomorrow).length;
+    const pendientesCount = pendientesList.length;
 
     // Actualizar elementos en pantalla
     const elKpiTotal = document.getElementById('kpiNotasTotal');
     const elKpiPend = document.getElementById('kpiNotasPendientes');
     const elKpiHoy = document.getElementById('kpiNotasHoy');
+    const elKpiManana = document.getElementById('kpiNotasManana');
     const elKpiFuturas = document.getElementById('kpiNotasFuturas');
     const elKpiEjec = document.getElementById('kpiNotasEjecutadas');
 
     if (elKpiTotal) elKpiTotal.textContent = totalCount;
     if (elKpiPend) elKpiPend.textContent = pendientesCount;
     if (elKpiHoy) elKpiHoy.textContent = hoyCount;
+    if (elKpiManana) elKpiManana.textContent = mananaCount;
     if (elKpiFuturas) elKpiFuturas.textContent = futurasCount;
     if (elKpiEjec) elKpiEjec.textContent = ejecutadasCount;
 
     // Actualizar badges en botones de filtro
     const badgePend = document.getElementById('filterBadge_pendientes');
     const badgeHoy = document.getElementById('filterBadge_hoy');
+    const badgeManana = document.getElementById('filterBadge_manana');
     const badgeFut = document.getElementById('filterBadge_futuras');
     const badgeEjec = document.getElementById('filterBadge_ejecutadas');
     const badgeAll = document.getElementById('filterBadge_todas');
 
     if (badgePend) badgePend.textContent = pendientesCount;
     if (badgeHoy) badgeHoy.textContent = hoyCount;
+    if (badgeManana) badgeManana.textContent = mananaCount;
     if (badgeFut) badgeFut.textContent = futurasCount;
     if (badgeEjec) badgeEjec.textContent = ejecutadasCount;
     if (badgeAll) badgeAll.textContent = totalCount;
 
     // Actualizar estilo activo de botones de filtro
-    ['pendientes', 'hoy', 'futuras', 'ejecutadas', 'todas'].forEach(f => {
+    ['hoy', 'manana', 'futuras', 'pendientes', 'ejecutadas', 'todas'].forEach(f => {
         const btn = document.getElementById('notasFilterBtn_' + f);
         if (btn) {
             if (f === window.currentNotasFilter) {
@@ -369,12 +399,14 @@ window.renderNotasRapidasView = function() {
         }
 
         // Filtro de pestañas
-        if (window.currentNotasFilter === 'pendientes') {
-            return t.status !== 'EJECUTADA';
-        } else if (window.currentNotasFilter === 'hoy') {
-            return t.status !== 'EJECUTADA' && t.date === today;
+        if (window.currentNotasFilter === 'hoy') {
+            return t.status !== 'EJECUTADA' && (!t.date || t.date <= today);
+        } else if (window.currentNotasFilter === 'manana') {
+            return t.status !== 'EJECUTADA' && t.date === tomorrow;
         } else if (window.currentNotasFilter === 'futuras') {
-            return t.status !== 'EJECUTADA' && t.date && t.date > today;
+            return t.status !== 'EJECUTADA' && t.date && t.date > tomorrow;
+        } else if (window.currentNotasFilter === 'pendientes') {
+            return t.status !== 'EJECUTADA';
         } else if (window.currentNotasFilter === 'ejecutadas') {
             return t.status === 'EJECUTADA';
         }
@@ -398,10 +430,16 @@ window.renderNotasRapidasView = function() {
 
     // 4. Renderizado
     if (filtered.length === 0) {
+        let emptyMsg = 'No hay tareas en esta vista';
+        if (window.currentNotasFilter === 'hoy') emptyMsg = '🎉 ¡Excelente! No tienes tareas pendientes para Hoy';
+        else if (window.currentNotasFilter === 'manana') emptyMsg = 'No tienes tareas programadas para Mañana';
+        else if (window.currentNotasFilter === 'futuras') emptyMsg = 'No tienes tareas futuras agendadas';
+        else if (window.currentNotasFilter === 'ejecutadas') emptyMsg = 'No hay tareas tachadas';
+
         container.innerHTML = `
-            <div class="p-12 text-center text-slate-400 font-bold bg-white/60 rounded-2xl border-2 border-dashed border-slate-200">
+            <div class="p-10 text-center text-slate-400 font-bold bg-white/60 rounded-2xl border-2 border-dashed border-slate-200">
                 <span class="text-4xl block mb-2">📌</span>
-                <p class="text-xs uppercase font-black text-slate-600">No hay tareas ${window.currentNotasFilter === 'ejecutadas' ? 'tachadas' : 'pendientes'} en esta vista</p>
+                <p class="text-xs uppercase font-black text-slate-600">${emptyMsg}</p>
                 <p class="text-[11px] text-slate-400 mt-1 font-normal">Escribe una tarea arriba y presiona Enter para registrarla en 1 segundo.</p>
             </div>
         `;
@@ -432,7 +470,9 @@ window.renderNotasRapidasView = function() {
                         ? 'bg-rose-50/40 border-rose-200 hover:border-rose-300 hover:shadow-xs'
                         : friendlyDate.isToday
                             ? 'bg-emerald-50/40 border-emerald-200 hover:border-emerald-300 hover:shadow-xs'
-                            : 'bg-white border-slate-200 hover:border-indigo-200 hover:shadow-xs'
+                            : friendlyDate.isTomorrow
+                                ? 'bg-blue-50/40 border-blue-200 hover:border-blue-300 hover:shadow-xs'
+                                : 'bg-white border-slate-200 hover:border-indigo-200 hover:shadow-xs'
             }">
                 <!-- Checkbox y Contenido -->
                 <div class="flex items-start gap-3 min-w-0 flex-1">
