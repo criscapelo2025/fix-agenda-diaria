@@ -320,6 +320,217 @@
         
         .dash-tab-content { display: none; }
         .dash-tab-content.active { display: block; }
+
+        /* ========================================================
+           SIDEBAR & ULTRA-COMPACT HEADER & PANTALLA DIVIDIDA
+           ======================================================== */
+        .sidebar-main {
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-collapsed {
+            width: 5rem !important; /* 80px */
+        }
+        .sidebar-collapsed .sidebar-label,
+        .sidebar-collapsed .sidebar-subtext,
+        .sidebar-collapsed .sidebar-section-title,
+        .sidebar-collapsed .sidebar-badge,
+        .sidebar-collapsed .sidebar-footer-text {
+            display: none !important;
+        }
+        .sidebar-collapsed .sidebar-priority-btn,
+        .sidebar-collapsed .sidebar-secondary-btn {
+            justify-content: center !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        .sidebar-collapsed .sidebar-brand-title {
+            display: none !important;
+        }
+        .sidebar-collapsed .sidebar-brand-container {
+            justify-content: center !important;
+        }
+
+        /* Botones Destacados (Top 5 más utilizados) */
+        .sidebar-priority-btn {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.65rem 0.85rem;
+            border-radius: 0.875rem;
+            font-weight: 700;
+            font-size: 0.85rem;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+        .sidebar-priority-btn:hover {
+            transform: translateX(3px);
+        }
+        .sidebar-priority-btn.active {
+            box-shadow: 0 4px 14px -1px rgba(0, 0, 0, 0.3);
+        }
+        .sidebar-priority-btn.active::before {
+            content: "";
+            position: absolute;
+            left: -4px;
+            top: 15%;
+            bottom: 15%;
+            width: 4px;
+            border-radius: 4px;
+            background: #ffffff;
+        }
+
+        /* 1. Registro (Azul) */
+        .sidebar-btn-registro {
+            background: rgba(30, 58, 138, 0.28);
+            color: #bfdbfe;
+            border-color: rgba(59, 130, 246, 0.35);
+        }
+        .sidebar-btn-registro:hover {
+            background: rgba(37, 99, 235, 0.4);
+            color: #ffffff;
+            border-color: rgba(96, 165, 250, 0.6);
+        }
+        .sidebar-btn-registro.active {
+            background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%) !important;
+            color: #ffffff !important;
+            border-color: #60a5fa !important;
+        }
+
+        /* 2. Logística (Verde Esmeralda) */
+        .sidebar-btn-rutero {
+            background: rgba(6, 78, 59, 0.28);
+            color: #a7f3d0;
+            border-color: rgba(16, 185, 129, 0.35);
+        }
+        .sidebar-btn-rutero:hover {
+            background: rgba(5, 150, 105, 0.4);
+            color: #ffffff;
+            border-color: rgba(52, 211, 153, 0.6);
+        }
+        .sidebar-btn-rutero.active {
+            background: linear-gradient(135deg, #047857 0%, #059669 100%) !important;
+            color: #ffffff !important;
+            border-color: #34d399 !important;
+        }
+
+        /* 3. Buscador (Púrpura / Violeta) */
+        .sidebar-btn-buscador {
+            background: rgba(88, 28, 135, 0.28);
+            color: #e9d5ff;
+            border-color: rgba(147, 51, 234, 0.35);
+        }
+        .sidebar-btn-buscador:hover {
+            background: rgba(126, 34, 206, 0.4);
+            color: #ffffff;
+            border-color: rgba(192, 132, 252, 0.6);
+        }
+        .sidebar-btn-buscador.active {
+            background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%) !important;
+            color: #ffffff !important;
+            border-color: #c084fc !important;
+        }
+
+        /* 4. Caja (Ámbar / Oro) */
+        .sidebar-btn-contabilidad {
+            background: rgba(120, 53, 15, 0.28);
+            color: #fde68a;
+            border-color: rgba(217, 119, 6, 0.35);
+        }
+        .sidebar-btn-contabilidad:hover {
+            background: rgba(180, 83, 9, 0.4);
+            color: #ffffff;
+            border-color: rgba(251, 191, 36, 0.6);
+        }
+        .sidebar-btn-contabilidad.active {
+            background: linear-gradient(135deg, #b45309 0%, #d97706 100%) !important;
+            color: #ffffff !important;
+            border-color: #fbbf24 !important;
+        }
+
+        /* 5. Catálogo (Rosa / Rubí) */
+        .sidebar-btn-catalogo {
+            background: rgba(136, 19, 55, 0.28);
+            color: #fecdd3;
+            border-color: rgba(225, 29, 72, 0.35);
+        }
+        .sidebar-btn-catalogo:hover {
+            background: rgba(190, 18, 60, 0.4);
+            color: #ffffff;
+            border-color: rgba(251, 113, 133, 0.6);
+        }
+        .sidebar-btn-catalogo.active {
+            background: linear-gradient(135deg, #be123c 0%, #e11d48 100%) !important;
+            color: #ffffff !important;
+            border-color: #fb7185 !important;
+        }
+
+        /* Módulos Secundarios */
+        .sidebar-secondary-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.45rem 0.75rem;
+            border-radius: 0.65rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #94a3b8;
+            transition: all 0.15s ease;
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+        .sidebar-secondary-btn:hover {
+            background: rgba(51, 65, 85, 0.6);
+            color: #ffffff;
+        }
+        .sidebar-secondary-btn.active {
+            background: #1e293b;
+            color: #38bdf8;
+            border-color: rgba(56, 189, 248, 0.5);
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Reglas de Pantalla Dividida (Split Screen) */
+        #mainViewsGrid.split-mode-active {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+            gap: 1.25rem !important;
+            align-items: start !important;
+        }
+        @media (max-width: 1023px) {
+            #mainViewsGrid.split-mode-active {
+                grid-template-columns: minmax(0, 1fr) !important;
+            }
+        }
+        #mainViewsGrid.split-mode-active > div {
+            grid-column: span 1 / span 1 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+        }
+        #mainViewsGrid.split-mode-active #reporte_adminView {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 1rem !important;
+        }
+        #mainViewsGrid.split-mode-active #reporte_adminView > div {
+            grid-column: span 1 / span 1 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        /* Technician Mode overrides */
+        body.technician-mode #mainSidebar { display: none !important; }
+        body.technician-mode #mainContentWrapper { margin-left: 0 !important; padding: 0.5rem !important; }
+        body.technician-mode #btnToggleSplitScreen { display: none !important; }
+        body.technician-mode #splitScreenBar { display: none !important; }
+
+        @media print {
+            #mainSidebar, #slimTopHeader, #splitScreenBar, #mobileAdminNav { display: none !important; }
+            #mainContentWrapper { margin-left: 0 !important; padding: 0 !important; }
+        }
     </style>
     
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
@@ -1357,51 +1568,294 @@
             if(currentView === 'garantias') renderMaestroGarantias();
         };
 
+        const VIEW_INFO = {
+            'reporte_admin': { icon: '📝', title: 'Registro y Agenda' },
+            'rutero': { icon: '🚚', title: 'Logística y Rutero' },
+            'buscador': { icon: '🔍', title: 'Buscador Global' },
+            'contabilidad': { icon: '💰', title: 'Caja y Liquidaciones' },
+            'catalogo': { icon: '📚', title: 'Catálogo TEKA 2026' },
+            'garantias': { icon: '🛡️', title: 'Garantías y Repuestos' },
+            'dashboard': { icon: '📊', title: 'Resultados Totales' },
+            'reporte_teka': { icon: '📋', title: 'Reporte Oficial TEKA' },
+            'reporte_diario': { icon: '📅', title: 'Reporte Diario' },
+            'pendientes': { icon: '⏳', title: 'Seguimiento Pendientes' },
+            'mantenimiento': { icon: '⚙️', title: 'Mantenimientos' },
+            'taller': { icon: '🏢', title: 'Taller Físico' },
+            'inventory': { icon: '📦', title: 'Inventario' },
+            'clientes': { icon: '👥', title: 'Directorio Clientes' }
+        };
+
+        window.updateHeaderViewIndicator = function(view) {
+            const el = document.getElementById('headerActiveViewIndicator');
+            if (!el) return;
+            const info = VIEW_INFO[view] || { icon: '📌', title: (view || '').toUpperCase() };
+            el.innerHTML = `<span class="text-sm">${info.icon}</span> <span class="font-bold uppercase tracking-tight text-white">${info.title}</span>`;
+        };
+
+        window.toggleSidebarCollapse = function() {
+            const sb = document.getElementById('mainSidebar');
+            const wrap = document.getElementById('mainContentWrapper');
+            const icon = document.getElementById('sidebarCollapseIcon');
+            if (!sb) return;
+            const isCollapsed = sb.classList.contains('sidebar-collapsed');
+            if (isCollapsed) {
+                sb.classList.remove('sidebar-collapsed');
+                sb.classList.remove('w-20');
+                sb.classList.add('w-64');
+                if (wrap) {
+                    wrap.classList.remove('lg:ml-20');
+                    wrap.classList.add('lg:ml-64');
+                }
+                if (icon) icon.textContent = '«';
+                try { localStorage.setItem('fix_sidebar_collapsed', 'false'); } catch(e){}
+            } else {
+                sb.classList.add('sidebar-collapsed');
+                sb.classList.remove('w-64');
+                sb.classList.add('w-20');
+                if (wrap) {
+                    wrap.classList.remove('lg:ml-64');
+                    wrap.classList.add('lg:ml-20');
+                }
+                if (icon) icon.textContent = '»';
+                try { localStorage.setItem('fix_sidebar_collapsed', 'true'); } catch(e){}
+            }
+        };
+
+        window.toggleMobileSidebar = function(forceState) {
+            const sb = document.getElementById('mainSidebar');
+            const backdrop = document.getElementById('sidebarBackdrop');
+            if (!sb) return;
+            const isClosed = sb.classList.contains('-translate-x-full');
+            const shouldOpen = (forceState !== undefined) ? forceState : isClosed;
+            if (shouldOpen) {
+                sb.classList.remove('-translate-x-full');
+                if (backdrop) backdrop.classList.remove('hidden');
+            } else {
+                sb.classList.add('-translate-x-full');
+                if (backdrop) backdrop.classList.add('hidden');
+            }
+        };
+
+        window.isSplitScreenActive = false;
+        window.splitLeftView = 'reporte_admin';
+        window.splitRightView = 'rutero';
+        window.splitActivePanel = 'left';
+
+        window.toggleSplitScreen = function(force) {
+            const activate = (force !== undefined) ? force : !window.isSplitScreenActive;
+            if (activate) {
+                window.openSplitScreen();
+            } else {
+                window.closeSplitScreen();
+            }
+        };
+
+        window.openSplitScreen = function() {
+            window.isSplitScreenActive = true;
+            const grid = document.getElementById('mainViewsGrid');
+            const bar = document.getElementById('splitScreenBar');
+            const btn = document.getElementById('btnToggleSplitScreen');
+            
+            if (grid) grid.classList.add('split-mode-active');
+            if (bar) bar.classList.remove('hidden');
+            if (btn) {
+                btn.classList.add('bg-emerald-600', 'border-emerald-400');
+                btn.classList.remove('from-blue-600', 'to-indigo-600');
+                btn.innerHTML = '<span class="text-sm">◫</span> <span class="hidden sm:inline">Dividida (Activa)</span>';
+            }
+            
+            if (currentView && currentView !== 'solicitudes_garantia') {
+                window.splitLeftView = currentView;
+            }
+            if (window.splitLeftView === window.splitRightView) {
+                window.splitRightView = (window.splitLeftView === 'rutero') ? 'reporte_admin' : 'rutero';
+            }
+            
+            window.renderSplitViews();
+            showMessage("◫ PANTALLA DIVIDIDA ACTIVADA", "fix-main");
+        };
+
+        window.closeSplitScreen = function() {
+            window.isSplitScreenActive = false;
+            const grid = document.getElementById('mainViewsGrid');
+            const bar = document.getElementById('splitScreenBar');
+            const btn = document.getElementById('btnToggleSplitScreen');
+            
+            if (grid) grid.classList.remove('split-mode-active');
+            if (bar) bar.classList.add('hidden');
+            if (btn) {
+                btn.classList.remove('bg-emerald-600', 'border-emerald-400');
+                btn.classList.add('from-blue-600', 'to-indigo-600');
+                btn.innerHTML = '<span class="text-sm">◫</span> <span class="hidden sm:inline">Pantalla Dividida</span>';
+            }
+            
+            changeMasterView(window.splitLeftView || currentView || 'reporte_admin');
+            showMessage("🖥️ PANTALLA COMPLETA RESTAURADA", "fix-main");
+        };
+
+        window.setSplitActivePanel = function(panel) {
+            window.splitActivePanel = panel;
+            const p1Btn = document.getElementById('splitPanel1FocusBtn');
+            const p2Btn = document.getElementById('splitPanel2FocusBtn');
+            if (panel === 'left') {
+                if (p1Btn) { p1Btn.classList.add('bg-blue-600', 'text-white'); p1Btn.classList.remove('bg-slate-700', 'text-slate-300'); }
+                if (p2Btn) { p2Btn.classList.remove('bg-blue-600', 'text-white'); p2Btn.classList.add('bg-slate-700', 'text-slate-300'); }
+            } else {
+                if (p2Btn) { p2Btn.classList.add('bg-blue-600', 'text-white'); p2Btn.classList.remove('bg-slate-700', 'text-slate-300'); }
+                if (p1Btn) { p1Btn.classList.remove('bg-blue-600', 'text-white'); p1Btn.classList.add('bg-slate-700', 'text-slate-300'); }
+            }
+        };
+
+        window.setSplitLeftView = function(view) {
+            if (!view) return;
+            window.splitLeftView = view;
+            if (window.splitLeftView === window.splitRightView) {
+                window.splitRightView = (view === 'rutero') ? 'reporte_admin' : 'rutero';
+            }
+            window.renderSplitViews();
+        };
+
+        window.setSplitRightView = function(view) {
+            if (!view) return;
+            window.splitRightView = view;
+            if (window.splitRightView === window.splitLeftView) {
+                window.splitLeftView = (view === 'reporte_admin') ? 'rutero' : 'reporte_admin';
+            }
+            window.renderSplitViews();
+        };
+
+        window.swapSplitViews = function() {
+            const temp = window.splitLeftView;
+            window.splitLeftView = window.splitRightView;
+            window.splitRightView = temp;
+            window.renderSplitViews();
+            showMessage("⇄ PANELES INTERCAMBIADOS", "fix-main");
+        };
+
+        window.setSplitPreset = function(left, right) {
+            window.splitLeftView = left;
+            window.splitRightView = right;
+            if (!window.isSplitScreenActive) {
+                window.openSplitScreen();
+            } else {
+                window.renderSplitViews();
+            }
+        };
+
+        window.activateSingleView = function(v) {
+            if(v === 'reporte_admin') {
+                const rv = document.getElementById('reporte_adminView'); if(rv) rv.classList.remove('hidden');
+                const fc = document.getElementById('formContainer'); if(fc) fc.classList.remove('hidden');
+                const ac = document.getElementById('agendaContainer'); if(ac) ac.classList.remove('hidden');
+            } else if(v === 'dashboard') {
+                const dv = document.getElementById('dashboardView'); if(dv) dv.classList.remove('hidden');
+                if(window.renderDashboardTotales) renderDashboardTotales();
+            } else if(v === 'reporte_teka') {
+                const rtv = document.getElementById('reporteTekaView'); if(rtv) rtv.classList.remove('hidden');
+                if(window.renderReporteTeka) renderReporteTeka();
+            } else if(v === 'reporte_diario') {
+                const rdv = document.getElementById('reporteDiarioView'); if(rdv) rdv.classList.remove('hidden');
+                if(window.renderReporteDiarioView) renderReporteDiarioView();
+            } else if(v === 'mantenimiento') {
+                const mv = document.getElementById('mantenimientoView'); if(mv) mv.classList.remove('hidden');
+            } else if(v === 'pendientes') {
+                const pv = document.getElementById('pendientesView'); if(pv) pv.classList.remove('hidden');
+                if(window.renderPendientes) renderPendientes();
+            } else if(v === 'garantias') {
+                const gv = document.getElementById('garantiasView'); if(gv) gv.classList.remove('hidden');
+                if(window.switchGarantiaInnerTab) {
+                    window.switchGarantiaInnerTab(window.garantiaActiveInnerTab || 'solicitudes');
+                } else {
+                    if(window.renderSolicitudesGarantiaView) renderSolicitudesGarantiaView();
+                    if(window.renderGarantias) renderGarantias();
+                    if(window.renderMaestroGarantias) renderMaestroGarantias();
+                }
+                if(window.updateGarantiaTabBadges) window.updateGarantiaTabBadges();
+            } else if(v === 'taller') {
+                const tv = document.getElementById('tallerView'); if(tv) tv.classList.remove('hidden');
+                if(window.renderTaller) renderTaller();
+            } else if(v === 'buscador') {
+                const bv = document.getElementById('buscadorView'); if(bv) bv.classList.remove('hidden');
+                if(window.renderBuscador) renderBuscador();
+            } else if(v === 'catalogo') {
+                const cv = document.getElementById('catalogoView'); if(cv) cv.classList.remove('hidden');
+                if(window.renderCatalogoView) renderCatalogoView();
+            } else {
+                const el = document.getElementById(v + 'View'); if(el) el.classList.remove('hidden');
+            }
+            if(v === 'rutero' && window.renderRutero) renderRutero();
+            if(v === 'contabilidad' && window.processFinancialBalance) processFinancialBalance();
+            if(v === 'inventory' && window.renderInventoryView) renderInventoryView();
+            if(v === 'clientes' && window.renderClientes) renderClientes();
+        };
+
+        window.renderSplitViews = function() {
+            const left = window.splitLeftView || 'reporte_admin';
+            const right = window.splitRightView || 'rutero';
+
+            const allSections = ['reporte_adminView', 'formContainer', 'contabilidadView', 'reporteTekaView', 'reporteDiarioView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'solicitudesGarantiaView', 'clientesView', 'dashboardView', 'catalogoView'];
+            allSections.forEach(function(id) { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
+
+            window.activateSingleView(left);
+            if (left !== right) {
+                window.activateSingleView(right);
+            }
+
+            const leftSel = document.getElementById('splitLeftSelect');
+            if(leftSel) leftSel.value = left;
+            const rightSel = document.getElementById('splitRightSelect');
+            if(rightSel) rightSel.value = right;
+
+            window.updateSidebarSplitIndicators(left, right);
+        };
+
+        window.updateSidebarSplitIndicators = function(left, right) {
+            document.querySelectorAll('.sidebar-nav-btn').forEach(function(btn) {
+                btn.classList.remove('active');
+            });
+            const leftBtn = document.querySelector(`.sidebar-nav-btn[data-view="${left}"]`);
+            if(leftBtn) leftBtn.classList.add('active');
+            const rightBtn = document.querySelector(`.sidebar-nav-btn[data-view="${right}"]`);
+            if(rightBtn) rightBtn.classList.add('active');
+
+            const el = document.getElementById('headerActiveViewIndicator');
+            if (el) {
+                const leftInfo = VIEW_INFO[left] || { icon: '1️⃣', title: left };
+                const rightInfo = VIEW_INFO[right] || { icon: '2️⃣', title: right };
+                el.innerHTML = `<span class="text-xs bg-blue-950 px-2 py-0.5 rounded border border-blue-600">${leftInfo.icon} ${leftInfo.title}</span> <span class="text-slate-400 font-bold">|</span> <span class="text-xs bg-indigo-950 px-2 py-0.5 rounded border border-indigo-600">${rightInfo.icon} ${rightInfo.title}</span>`;
+            }
+        };
+
         window.changeMasterView = function(view) {
             if (currentTechUser && view !== 'rutero') {
                 showMessage("🔒 ACCESO SOLO TÉCNICOS", "fix-error");
                 return;
             }
             currentView = (view === 'solicitudes_garantia') ? 'garantias' : view;
-            const sections = ['formContainer', 'contabilidadView', 'reporteTekaView', 'reporteDiarioView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'solicitudesGarantiaView', 'clientesView', 'dashboardView', 'catalogoView'];
+            
+            // If split screen is active, update the focused split panel
+            if (window.isSplitScreenActive) {
+                if (window.splitActivePanel === 'right') {
+                    window.setSplitRightView(currentView);
+                } else {
+                    window.setSplitLeftView(currentView);
+                }
+                return;
+            }
+
+            const sections = ['reporte_adminView', 'formContainer', 'contabilidadView', 'reporteTekaView', 'reporteDiarioView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'solicitudesGarantiaView', 'clientesView', 'dashboardView', 'catalogoView'];
             sections.forEach(function(id) { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
 
-            if(currentView === 'reporte_admin') { 
-                const fc = document.getElementById('formContainer'); if(fc) fc.classList.remove('hidden'); 
-                const ac = document.getElementById('agendaContainer'); if(ac) ac.classList.remove('hidden'); 
-            }
-            else if(currentView === 'dashboard') {
-                const dv = document.getElementById('dashboardView');
-                if(dv) dv.classList.remove('hidden');
-                renderDashboardTotales();
-            }
-            else if(currentView === 'reporte_teka') { const rtv = document.getElementById('reporteTekaView'); if(rtv) rtv.classList.remove('hidden'); renderReporteTeka(); }
-            else if(currentView === 'reporte_diario') { const rdv = document.getElementById('reporteDiarioView'); if(rdv) rdv.classList.remove('hidden'); if(window.renderReporteDiarioView) renderReporteDiarioView(); }
-            else if(currentView === 'mantenimiento') { const mv = document.getElementById('mantenimientoView'); if(mv) mv.classList.remove('hidden'); }
-            else if(currentView === 'pendientes') { const pv = document.getElementById('pendientesView'); if(pv) pv.classList.remove('hidden'); renderPendientes(); }
-            else if(currentView === 'garantias') { 
-                const gv = document.getElementById('garantiasView'); 
-                if(gv) gv.classList.remove('hidden'); 
-                if(window.switchGarantiaInnerTab) {
-                    window.switchGarantiaInnerTab(window.garantiaActiveInnerTab || 'solicitudes');
-                } else {
-                    if(window.renderSolicitudesGarantiaView) renderSolicitudesGarantiaView(); 
-                    renderGarantias(); 
-                    renderMaestroGarantias(); 
-                }
-                if(window.updateGarantiaTabBadges) window.updateGarantiaTabBadges();
-            }
-            else if(currentView === 'taller') { const tv = document.getElementById('tallerView'); if(tv) tv.classList.remove('hidden'); renderTaller(); }
-            else if(currentView === 'buscador') { const bv = document.getElementById('buscadorView'); if(bv) bv.classList.remove('hidden'); renderBuscador(); }
-            else if(currentView === 'catalogo') { const cv = document.getElementById('catalogoView'); if(cv) cv.classList.remove('hidden'); renderCatalogoView(); }
-            else { const el = document.getElementById(currentView + 'View'); if(el) el.classList.remove('hidden'); }
+            window.activateSingleView(currentView);
             
-            if(currentView === 'rutero') renderRutero();
-            if(currentView === 'contabilidad') processFinancialBalance();
-            if(currentView === 'inventory') renderInventoryView();
-            if(currentView === 'clientes') renderClientes();
-            
-            // Desktop Nav
+            // Sidebar Nav Active State
+            document.querySelectorAll('.sidebar-nav-btn').forEach(function(btn) {
+                btn.classList.remove('active');
+            });
+            const sidebarTarget = document.querySelector(`.sidebar-nav-btn[data-view="${currentView}"]`);
+            if(sidebarTarget) sidebarTarget.classList.add('active');
+
+            // Legacy Desktop Nav
             document.querySelectorAll('.view-btn').forEach(function(btn) { 
                 btn.classList.remove('bg-fix-main', 'text-white', 'shadow-sm'); 
                 btn.classList.add('bg-slate-100', 'text-slate-700'); 
@@ -1424,6 +1878,12 @@
                 targetMobileBtn.classList.add('text-fix-main', 'scale-105', 'bg-blue-50', 'rounded-xl', 'shadow-sm', 'border', 'border-blue-100');
                 targetMobileBtn.classList.remove('text-stone-400');
             }
+
+            if (window.innerWidth < 1024) {
+                window.toggleMobileSidebar(false);
+            }
+
+            window.updateHeaderViewIndicator(currentView);
         };
 
         window.garantiaActiveInnerTab = 'solicitudes';
@@ -1481,8 +1941,9 @@
             currentTechUser = null;
             document.body.classList.remove('technician-mode');
             document.getElementById('userDisplayLabel').textContent = "Admin";
-            document.getElementById('adminNav').classList.remove('hidden');
-            document.getElementById('mobileAdminNav').classList.remove('hidden');
+            if (document.getElementById('adminNav')) document.getElementById('adminNav').classList.remove('hidden');
+            if (document.getElementById('mobileAdminNav')) document.getElementById('mobileAdminNav').classList.remove('hidden');
+            if (document.getElementById('mainSidebar')) document.getElementById('mainSidebar').classList.remove('hidden');
             document.getElementById('exitTechModeBtn').classList.add('hidden');
             
             const url = new URL(window.location);
@@ -8004,8 +8465,9 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                 currentTechUser = t; 
                 document.body.classList.add('technician-mode'); 
                 document.getElementById('userDisplayLabel').textContent = "RUTA: " + t.toUpperCase(); 
-                document.getElementById('adminNav').classList.add('hidden'); 
-                document.getElementById('mobileAdminNav').classList.add('hidden'); 
+                if (document.getElementById('adminNav')) document.getElementById('adminNav').classList.add('hidden'); 
+                if (document.getElementById('mobileAdminNav')) document.getElementById('mobileAdminNav').classList.add('hidden'); 
+                if (document.getElementById('mainSidebar')) document.getElementById('mainSidebar').classList.add('hidden');
                 document.getElementById('exitTechModeBtn').classList.remove('hidden');
                 changeMasterView('rutero'); 
             } 
@@ -8050,6 +8512,26 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
             renderInsumosAdmin(); window.expandEquipmentUI();
             initInvoiceDropZone();
 
+            // Restaurar estado de barra lateral (colapsada o expandida)
+            if (localStorage.getItem('fix_sidebar_collapsed') === 'true') {
+                const sb = document.getElementById('mainSidebar');
+                const wrap = document.getElementById('mainContentWrapper');
+                const icon = document.getElementById('sidebarCollapseIcon');
+                if (sb) {
+                    sb.classList.add('sidebar-collapsed');
+                    sb.classList.remove('w-64');
+                    sb.classList.add('w-20');
+                }
+                if (wrap) {
+                    wrap.classList.remove('lg:ml-64');
+                    wrap.classList.add('lg:ml-20');
+                }
+                if (icon) icon.textContent = '»';
+            }
+            if (window.updateHeaderViewIndicator) {
+                window.updateHeaderViewIndicator(currentView || 'reporte_admin');
+            }
+
             if (isFirebaseFallback) {
                 setTimeout(() => { showMessage("🔌 MODO SIN CONEXIÓN (MOCK DE RESERVA ACTIVO)", "fix-accent"); }, 1500);
             }
@@ -8057,90 +8539,316 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
     </script>
 </head>
 
-<body class="min-h-screen p-2 md:p-6 font-sans selection:bg-fix-main text-slate-800 bg-slate-50 overflow-x-hidden">
+<body class="min-h-screen font-sans selection:bg-fix-main text-slate-800 bg-slate-100 overflow-x-hidden p-0 m-0">
 
     <!-- BOTTOM TAB BAR MÓVIL (Estilo Dashboard TEKA) -->
-    <nav id="mobileAdminNav" class="admin-only md:hidden fixed bottom-0 left-0 w-full glass-nav-mobile flex justify-around p-2 z-[999] rounded-t-2xl shadow-lg">
-        <button onclick="changeMasterView('dashboard')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="dashboard">
+    <nav id="mobileAdminNav" class="admin-only md:hidden fixed bottom-0 left-0 w-full glass-nav-mobile flex justify-around p-2 z-[999] rounded-t-2xl shadow-lg overflow-x-auto no-scrollbar">
+        <button onclick="changeMasterView('dashboard')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="dashboard">
             <span class="text-xl leading-none">📊</span><span class="text-[9px] mt-1 font-bold">Totales</span>
         </button>
-        <button onclick="changeMasterView('reporte_admin')" class="mobile-nav-btn flex flex-col items-center p-2 text-fix-main scale-105 bg-blue-50 rounded-xl shadow-sm border border-blue-100 font-bold transition-all" data-view="reporte_admin">
+        <button onclick="changeMasterView('reporte_admin')" class="mobile-nav-btn flex flex-col items-center p-2 text-fix-main scale-105 bg-blue-50 rounded-xl shadow-sm border border-blue-100 font-bold transition-all shrink-0" data-view="reporte_admin">
             <span class="text-xl leading-none">📝</span><span class="text-[9px] mt-1 font-bold">Registro</span>
         </button>
-        <button onclick="changeMasterView('reporte_teka')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="reporte_teka">
-            <span class="text-xl leading-none">📋</span><span class="text-[9px] mt-1 font-bold">TEKA</span>
-        </button>
-        <button onclick="changeMasterView('reporte_diario')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="reporte_diario">
-            <span class="text-xl leading-none">📅</span><span class="text-[9px] mt-1 font-bold">Diario</span>
-        </button>
-        <button onclick="changeMasterView('mantenimiento')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="mantenimiento">
-            <span class="text-xl leading-none">⚙️</span><span class="text-[9px] mt-1 font-bold">Mant.</span>
-        </button>
-        <button onclick="changeMasterView('rutero')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="rutero">
+        <button onclick="changeMasterView('rutero')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="rutero">
             <span class="text-xl leading-none">🚚</span><span class="text-[9px] mt-1 font-bold">Logística</span>
         </button>
-        <button onclick="changeMasterView('contabilidad')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="contabilidad">
-            <span class="text-xl leading-none">💰</span><span class="text-[9px] mt-1 font-bold">Caja</span>
-        </button>
-        <button onclick="changeMasterView('buscador')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="buscador">
+        <button onclick="changeMasterView('buscador')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="buscador">
             <span class="text-xl leading-none">🔍</span><span class="text-[9px] mt-1 font-bold">Buscador</span>
         </button>
-        <button onclick="changeMasterView('clientes')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="clientes">
-            <span class="text-xl leading-none">👥</span><span class="text-[9px] mt-1 font-bold">Clientes</span>
+        <button onclick="changeMasterView('contabilidad')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="contabilidad">
+            <span class="text-xl leading-none">💰</span><span class="text-[9px] mt-1 font-bold">Caja</span>
         </button>
-        <button onclick="changeMasterView('garantias')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="garantias">
+        <button onclick="changeMasterView('catalogo')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="catalogo">
+            <span class="text-xl leading-none">📚</span><span class="text-[9px] mt-1 font-bold">Catálogo</span>
+        </button>
+        <button onclick="changeMasterView('garantias')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="garantias">
             <span class="text-xl leading-none">🛡️</span><span class="text-[9px] mt-1 font-bold">Garantías</span>
         </button>
-        <button onclick="changeMasterView('catalogo')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all" data-view="catalogo">
-            <span class="text-xl leading-none">📚</span><span class="text-[9px] mt-1 font-bold">Catálogo</span>
+        <button onclick="changeMasterView('reporte_teka')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="reporte_teka">
+            <span class="text-xl leading-none">📋</span><span class="text-[9px] mt-1 font-bold">TEKA</span>
+        </button>
+        <button onclick="changeMasterView('reporte_diario')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="reporte_diario">
+            <span class="text-xl leading-none">📅</span><span class="text-[9px] mt-1 font-bold">Diario</span>
+        </button>
+        <button onclick="changeMasterView('pendientes')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="pendientes">
+            <span class="text-xl leading-none">⏳</span><span class="text-[9px] mt-1 font-bold">Seguimiento</span>
         </button>
     </nav>
 
-    <div class="max-w-[2800px] mx-auto pb-32 md:pb-10 relative">
-        
-        <header class="mb-6 p-6 md:p-8 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shadow-xl no-print relative z-10 border border-slate-700/50">
-            <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6 w-full header-main-row">
-                <div class="relative shrink-0 group header-logo">
-                    <img src="FIX%20LOGO.jpg" alt="Logo Oficial FIX" class="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl object-cover shadow-2xl border-2 border-blue-400/60 bg-slate-900 transition-transform group-hover:scale-105">
+    <!-- BACKDROP PARA MENÚ LATERAL EN MÓVILES -->
+    <div id="sidebarBackdrop" onclick="toggleMobileSidebar(false)" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 hidden lg:hidden transition-opacity"></div>
+
+    <!-- SIDEBAR LATERAL FIX GESTIÓN -->
+    <aside id="mainSidebar" class="sidebar-main fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-slate-900 text-slate-200 border-r border-slate-800 shadow-2xl transition-all duration-300 w-64 -translate-x-full lg:translate-x-0 no-print">
+        <!-- Header del Sidebar con Logo y Nombre -->
+        <div class="p-3.5 border-b border-slate-800 flex items-center justify-between gap-2 shrink-0 bg-slate-950/80 sidebar-brand-container">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <img src="FIX%20LOGO.jpg" alt="Logo FIX" class="w-9 h-9 rounded-xl object-cover border border-blue-400/50 shadow-md shrink-0">
+                <div class="sidebar-brand-title min-w-0">
+                    <div class="font-extrabold text-xs tracking-tight text-white uppercase flex items-center gap-1.5">
+                        <span>FIX GESTIÓN</span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-600/30 text-blue-300 border border-blue-400/40 font-mono">PRO</span>
+                    </div>
+                    <div class="text-[10px] text-slate-400 font-medium truncate">Control Operativo</div>
                 </div>
-                <div class="flex-1 text-center sm:text-left min-w-0">
-                    <div class="flex items-center justify-center sm:justify-start gap-2 mb-1.5 header-version-pill">
-                        <span class="version-badge shadow-sm">FIX GESTIÓN PRO</span>
+            </div>
+            <!-- Botón cerrar móvil -->
+            <button type="button" onclick="toggleMobileSidebar(false)" class="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800" title="Cerrar">
+                ✕
+            </button>
+        </div>
+
+        <!-- Contenedor Nav con Scroll Interno -->
+        <nav id="adminNav" class="sidebar-nav-container flex-1 p-3 space-y-4 overflow-y-auto no-scrollbar admin-only">
+            <!-- SECCIÓN 1: LOS 5 MÓDULOS MÁS UTILIZADOS (DESTACADOS) -->
+            <div>
+                <div class="px-2 pb-2 flex items-center justify-between text-[10px] font-black tracking-wider uppercase text-blue-400 sidebar-section-title">
+                    <span class="flex items-center gap-1">★ Más Utilizados</span>
+                    <span class="text-[9px] font-mono text-blue-300 bg-blue-950/80 px-1.5 py-0.5 rounded border border-blue-800/40">Frecuentes</span>
+                </div>
+                <div class="space-y-1.5">
+                    <!-- 1. REGISTRO -->
+                    <button type="button" onclick="changeMasterView('reporte_admin')" class="sidebar-nav-btn view-btn sidebar-priority-btn sidebar-btn-registro w-full text-left active" data-view="reporte_admin" title="Registro: Agendar Visita e IA Facturas">
+                        <span class="w-9 h-9 rounded-xl bg-blue-600/30 flex items-center justify-center text-lg shrink-0 border border-blue-400/40 shadow-xs">📝</span>
+                        <div class="sidebar-label min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-black text-xs sm:text-sm text-white tracking-tight">Registro</span>
+                                <span class="sidebar-badge text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-200 border border-blue-400/30">Agendar</span>
+                            </div>
+                            <div class="sidebar-subtext text-[10px] text-blue-200/70 font-medium truncate">Formulario e IA Factura</div>
+                        </div>
+                    </button>
+
+                    <!-- 2. LOGÍSTICA (RUTERO) -->
+                    <button type="button" onclick="changeMasterView('rutero')" class="sidebar-nav-btn view-btn sidebar-priority-btn sidebar-btn-rutero w-full text-left" data-view="rutero" title="Logística: Rutero Diario de Técnicos">
+                        <span class="w-9 h-9 rounded-xl bg-emerald-600/30 flex items-center justify-center text-lg shrink-0 border border-emerald-400/40 shadow-xs">🚚</span>
+                        <div class="sidebar-label min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-black text-xs sm:text-sm text-white tracking-tight">Logística</span>
+                                <span class="sidebar-badge text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">Rutas</span>
+                            </div>
+                            <div class="sidebar-subtext text-[10px] text-emerald-200/70 font-medium truncate">Rutero Diario de Técnicos</div>
+                        </div>
+                    </button>
+
+                    <!-- 3. BUSCADOR -->
+                    <button type="button" onclick="changeMasterView('buscador')" class="sidebar-nav-btn view-btn sidebar-priority-btn sidebar-btn-buscador w-full text-left" data-view="buscador" title="Buscador: Historial y Clientes">
+                        <span class="w-9 h-9 rounded-xl bg-purple-600/30 flex items-center justify-center text-lg shrink-0 border border-purple-400/40 shadow-xs">🔍</span>
+                        <div class="sidebar-label min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-black text-xs sm:text-sm text-white tracking-tight">Buscador</span>
+                                <span class="sidebar-badge text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-400/30">Historial</span>
+                            </div>
+                            <div class="sidebar-subtext text-[10px] text-purple-200/70 font-medium truncate">Consultas y Cédulas</div>
+                        </div>
+                    </button>
+
+                    <!-- 4. CAJA -->
+                    <button type="button" onclick="changeMasterView('contabilidad')" class="sidebar-nav-btn view-btn sidebar-priority-btn sidebar-btn-contabilidad w-full text-left" data-view="contabilidad" title="Caja: Arqueo, Liquidaciones y Balance">
+                        <span class="w-9 h-9 rounded-xl bg-amber-600/30 flex items-center justify-center text-lg shrink-0 border border-amber-400/40 shadow-xs">💰</span>
+                        <div class="sidebar-label min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-black text-xs sm:text-sm text-white tracking-tight">Caja Chica</span>
+                                <span class="sidebar-badge text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-400/30">Finanzas</span>
+                            </div>
+                            <div class="sidebar-subtext text-[10px] text-amber-200/70 font-medium truncate">Arqueo y Liquidaciones</div>
+                        </div>
+                    </button>
+
+                    <!-- 5. CATÁLOGO -->
+                    <button type="button" onclick="changeMasterView('catalogo')" class="sidebar-nav-btn view-btn sidebar-priority-btn sidebar-btn-catalogo w-full text-left" data-view="catalogo" title="Catálogo TEKA: Productos y Repuestos 2026">
+                        <span class="w-9 h-9 rounded-xl bg-rose-600/30 flex items-center justify-center text-lg shrink-0 border border-rose-400/40 shadow-xs">📚</span>
+                        <div class="sidebar-label min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-black text-xs sm:text-sm text-white tracking-tight">Catálogo</span>
+                                <span class="sidebar-badge text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-200 border border-rose-400/30">TEKA</span>
+                            </div>
+                            <div class="sidebar-subtext text-[10px] text-rose-200/70 font-medium truncate">Precios y Repuestos 2026</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SECCIÓN 2: OTROS MÓDULOS DE GESTIÓN -->
+            <div class="pt-2 border-t border-slate-800">
+                <div class="px-2 pb-2 flex items-center justify-between text-[10px] font-black tracking-wider uppercase text-slate-400 sidebar-section-title">
+                    <span>Otros Módulos</span>
+                    <span class="text-[9px] font-mono text-slate-500 bg-slate-800/80 px-1.5 py-0.5 rounded">9</span>
+                </div>
+                <div class="space-y-1">
+                    <button type="button" onclick="changeMasterView('dashboard')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="dashboard" title="Resultados Totales">
+                        <span class="text-base shrink-0">📊</span>
+                        <span class="sidebar-label min-w-0 flex-1 truncate">Resultados Totales</span>
+                    </button>
+                    <button type="button" onclick="changeMasterView('reporte_teka')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="reporte_teka" title="Reporte Mensual TEKA Oficial">
+                        <span class="text-base shrink-0">📋</span>
+                        <span class="sidebar-label min-w-0 flex-1 truncate">Reporte TEKA (Oficial)</span>
+                    </button>
+                    <button type="button" onclick="changeMasterView('reporte_diario')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="reporte_diario" title="Reporte Diario Excel">
+                        <span class="text-base shrink-0">📅</span>
+                        <span class="sidebar-label min-w-0 flex-1 truncate">Reporte Diario</span>
+                    </button>
+                    <button type="button" onclick="changeMasterView('garantias')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="garantias" title="Garantías y Solicitudes de Repuestos TEKA">
+                        <span class="text-base shrink-0">🛡️</span>
+                        <span class="sidebar-label min-w-0 flex-1 truncate">Garantías y Repuestos</span>
+                    </button>
+                    <button type="button" onclick="changeMasterView('pendientes')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="pendientes" title="Seguimiento de Servicios Pendientes">
+                        <span class="text-base shrink-0">⏳</span>
+                        <span class="sidebar-label min-w-0 flex-1 truncate">Seguimiento</span>
+                    </button>
+                    <button type="button" onclick="changeMasterView('mantenimiento')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="mantenimiento" title="Mantenimientos Preventivos">
+                        <span class="text-base shrink-0">⚙️</span>
+                        <span class="sidebar-label min-w-0 flex-1 truncate">Mantenimiento</span>
+                    </button>
+                    <button type="button" onclick="changeMasterView('taller')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="taller" title="Control de Taller Físico">
+                        <span class="text-base shrink-0">🏢</span>
+                        <span class="sidebar-label min-w-0 flex-1 truncate">Taller</span>
+                    </button>
+                    <button type="button" onclick="changeMasterView('inventory')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="inventory" title="Inventario de Repuestos">
+                        <span class="text-base shrink-0">📦</span>
+                        <span class="sidebar-label min-w-0 flex-1 truncate">Inventario</span>
+                    </button>
+                    <button type="button" onclick="changeMasterView('clientes')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="clientes" title="Directorio de Clientes">
+                        <span class="text-base shrink-0">👥</span>
+                        <span class="sidebar-label min-w-0 flex-1 truncate">Clientes</span>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Footer del Sidebar con Acceso Rápido a Pantalla Dividida -->
+        <div class="p-3 border-t border-slate-800 bg-slate-950/90 shrink-0 space-y-2">
+            <button type="button" onclick="toggleSplitScreen()" class="w-full p-2.5 rounded-xl bg-gradient-to-r from-blue-900/60 to-indigo-900/60 hover:from-blue-800 hover:to-indigo-800 border border-blue-500/40 text-blue-200 hover:text-white flex items-center gap-2.5 transition-all cursor-pointer shadow-sm active:scale-95" title="Dividir pantalla entre 2 pestañas">
+                <span class="text-base shrink-0">◫</span>
+                <div class="sidebar-label text-left min-w-0 flex-1">
+                    <div class="text-xs font-black uppercase text-white">Pantalla Dividida</div>
+                    <div class="text-[9px] text-blue-300 font-medium truncate">Abrir 2 pestañas a la vez</div>
+                </div>
+            </button>
+            <div class="sidebar-footer-text flex items-center justify-between text-[10px] text-slate-400 px-1 pt-0.5">
+                <span class="flex items-center gap-1 font-bold text-slate-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Sistema OK
+                </span>
+                <span class="font-mono text-[9px] text-slate-500">v2.4</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- WRAPPER PRINCIPAL DE CONTENIDO -->
+    <div id="mainContentWrapper" class="transition-all duration-300 lg:ml-64 p-2 sm:p-4 md:p-6 pb-28 md:pb-12 min-h-screen flex flex-col">
+        <!-- ENCABEZADO ULTRA-COMPACTO (Reemplazo del banner alto) -->
+        <header id="slimTopHeader" class="sticky top-2 z-30 mb-4 bg-slate-900/95 backdrop-blur-md rounded-2xl border border-slate-700/60 p-2 sm:px-4 flex items-center justify-between text-white shadow-lg no-print">
+            <!-- Left: Menu Drawer (Mobile) + Collapse (Desktop) + Brand Logo & Title -->
+            <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                <button type="button" onclick="toggleMobileSidebar(true)" class="lg:hidden p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-base shadow-xs cursor-pointer" title="Abrir Menú Lateral">
+                    ☰
+                </button>
+                <button type="button" onclick="toggleSidebarCollapse()" id="sidebarCollapseDesktopBtn" class="hidden lg:flex p-1.5 px-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all shadow-xs border border-slate-700/60 cursor-pointer" title="Expandir / Contraer Barra Lateral">
+                    <span id="sidebarCollapseIcon">«</span>
+                </button>
+                <img src="FIX%20LOGO.jpg" alt="Logo FIX" class="w-8 h-8 rounded-lg object-cover border border-blue-400/50 shadow-sm shrink-0">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-extrabold text-xs sm:text-sm tracking-tight text-white whitespace-nowrap">FIX GESTIÓN</span>
+                        <span id="userDisplayLabel" class="font-semibold text-[10px] text-blue-200 uppercase font-mono bg-blue-950/80 px-2 py-0.5 rounded border border-blue-700/50">Admin</span>
                     </div>
-                    <h1 class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">Gestión Integral de Visitas y Servicios</h1>
-                    <p class="text-sm md:text-base text-slate-300 mt-1.5 font-medium tracking-wide header-desc">Plataforma de Control Operativo, Rutas Diarias, Liquidaciones y Resultados</p>
-                    <div class="flex items-center justify-center sm:justify-start gap-3 text-xs text-slate-300 mt-3 flex-wrap header-meta-row">
-                        <span id="userDisplayLabel" class="font-semibold text-slate-200 uppercase font-mono bg-blue-900/50 px-2.5 py-0.5 rounded-md border border-blue-700/40">Admin</span>
-                        <span>•</span>
-                        <span class="text-emerald-400 font-semibold flex items-center gap-1.5">
-                            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Nube Activa
-                        </span>
-                        <button id="exitTechModeBtn" onclick="exitTechMode()" class="hidden bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3 py-1 rounded-lg transition-all shadow-sm">🔓 Salir de Ruta (Admin)</button>
-                    </div>
+                </div>
+                <button id="exitTechModeBtn" onclick="exitTechMode()" class="hidden bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black px-2.5 py-1 rounded-lg transition-all shadow-sm">🔓 Salir Ruta</button>
+            </div>
+
+            <!-- Center: Active View Breadcrumb / Status -->
+            <div id="headerActiveViewIndicator" class="hidden md:flex items-center gap-2 text-xs font-bold text-slate-200 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700/70 shadow-inner">
+                <span>📝</span> <span>Registro y Agenda</span>
+            </div>
+
+            <!-- Right: Split Screen Toggle + Cloud Status -->
+            <div class="flex items-center gap-2 shrink-0">
+                <button id="btnToggleSplitScreen" onclick="toggleSplitScreen()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black rounded-xl transition-all bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md border border-blue-400/40 cursor-pointer active:scale-95" title="Dividir pantalla entre dos pestañas">
+                    <span class="text-sm">◫</span>
+                    <span class="hidden sm:inline">Pantalla Dividida</span>
+                </button>
+                <div class="hidden sm:flex items-center gap-1.5 text-[11px] text-emerald-400 font-bold bg-slate-800/70 px-2.5 py-1.5 rounded-xl border border-slate-700/60">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="hidden lg:inline">Nube Activa</span>
                 </div>
             </div>
         </header>
 
-        <!-- NAV ESCRITORIO CON ICONOS (Estilo Tabs de Dashboard) -->
-        <nav id="adminNav" class="hidden md:flex flex-wrap justify-center bg-white border border-slate-200 p-2 rounded-xl gap-1.5 mb-6 shadow-sm admin-only">
-            <button onclick="changeMasterView('dashboard')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">📊</span> Resultados Totales</button>
-            <button onclick="changeMasterView('reporte_admin')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-fix-main text-white shadow-sm"><span class="text-base">📝</span> Registro</button>
-            <button onclick="changeMasterView('reporte_teka')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-black text-xs transition-all bg-blue-100 text-blue-900 hover:bg-blue-200 border border-blue-300 shadow-sm" title="Reporte Mensual Oficial TEKA (Corte al Día 19)"><span class="text-base">📋</span> Reporte TEKA (Oficial)</button>
-            <button onclick="changeMasterView('reporte_diario')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-black text-xs transition-all bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-300 shadow-sm" title="Generador de Reporte Diario Excel Oficial (Hoy + Siguiente Día)"><span class="text-base">📅</span> Reporte Diario</button>
-            <button onclick="changeMasterView('mantenimiento')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">⚙️</span> Mant.</button>
-            <button onclick="changeMasterView('pendientes')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">⏳</span> Segui.</button>
-            <button onclick="changeMasterView('garantias')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-black text-xs transition-all bg-indigo-50 text-indigo-900 hover:bg-indigo-100 border border-indigo-200 shadow-sm" title="Gestión Integral de Garantías y Solicitudes de Repuestos TEKA"><span class="text-base">🛡️</span> Garantías y Repuestos</button>
-            <button onclick="changeMasterView('taller')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">🏢</span> Taller</button>
-            <button onclick="changeMasterView('inventory')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">📦</span> Invent.</button>
-            <button onclick="changeMasterView('rutero')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">🚚</span> Logist.</button>
-            <button onclick="changeMasterView('contabilidad')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">💰</span> Caja</button>
-            <button onclick="changeMasterView('buscador')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">🔍</span> Buscador</button>
-            <button onclick="changeMasterView('clientes')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"><span class="text-base">👥</span> Clientes</button>
-            <button onclick="changeMasterView('catalogo')" class="view-btn flex items-center gap-1.5 py-2 px-4 rounded-lg font-semibold text-xs transition-all bg-slate-100 text-slate-700 hover:bg-slate-200" title="Catálogo de Productos y Repuestos"><span class="text-base">📚</span> Catálogo</button>
-        </nav>
-    </header>
+        <!-- BARRA DE CONTROL DE PANTALLA DIVIDIDA (Aparece al activar modo split) -->
+        <div id="splitScreenBar" class="hidden mb-4 p-3 bg-slate-900/95 backdrop-blur-md rounded-2xl border-2 border-indigo-500/50 shadow-xl text-white no-print">
+            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+                <!-- Panel 1 (Left) Selector & Focus -->
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <button id="splitPanel1FocusBtn" type="button" onclick="setSplitActivePanel('left')" class="px-2.5 py-1.5 rounded-lg text-xs font-black bg-blue-600 text-white shadow-sm transition-all whitespace-nowrap cursor-pointer" title="Enfocar Panel 1 (el menú cambiará este panel)">
+                        ◧ Panel 1
+                    </button>
+                    <select id="splitLeftSelect" onchange="setSplitLeftView(this.value)" class="w-full bg-slate-800 border border-slate-600 text-white text-xs font-bold rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-400">
+                        <option value="reporte_admin">📝 Registro y Agenda</option>
+                        <option value="rutero">🚚 Logística y Rutero</option>
+                        <option value="buscador">🔍 Buscador Global</option>
+                        <option value="contabilidad">💰 Caja Chica y Finanzas</option>
+                        <option value="catalogo">📚 Catálogo TEKA 2026</option>
+                        <option value="garantias">🛡️ Garantías y Repuestos</option>
+                        <option value="dashboard">📊 Resultados Totales</option>
+                        <option value="reporte_teka">📋 Reporte Oficial TEKA</option>
+                        <option value="reporte_diario">📅 Reporte Diario</option>
+                        <option value="pendientes">⏳ Seguimiento Pendientes</option>
+                        <option value="mantenimiento">⚙️ Mantenimiento</option>
+                        <option value="taller">🏢 Taller Físico</option>
+                        <option value="inventory">📦 Inventario</option>
+                        <option value="clientes">👥 Clientes</option>
+                    </select>
+                </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-8 relative z-10">
+                <!-- Center: Quick Presets & Swap -->
+                <div class="flex items-center justify-center gap-1.5 flex-wrap shrink-0">
+                    <button type="button" onclick="setSplitPreset('reporte_admin', 'rutero')" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-700 transition-all cursor-pointer" title="Registro a la izquierda, Logística a la derecha">
+                        📝+🚚
+                    </button>
+                    <button type="button" onclick="setSplitPreset('reporte_admin', 'catalogo')" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-700 transition-all cursor-pointer" title="Registro a la izquierda, Catálogo a la derecha">
+                        📝+📚
+                    </button>
+                    <button type="button" onclick="setSplitPreset('buscador', 'contabilidad')" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-700 transition-all cursor-pointer" title="Buscador a la izquierda, Caja a la derecha">
+                        🔍+💰
+                    </button>
+                    <button type="button" onclick="setSplitPreset('garantias', 'rutero')" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-700 transition-all cursor-pointer" title="Garantías a la izquierda, Rutas a la derecha">
+                        🛡️+🚚
+                    </button>
+                    <button type="button" onclick="swapSplitViews()" class="px-2.5 py-1 rounded-lg bg-indigo-900/60 hover:bg-indigo-800 text-xs font-black text-indigo-200 border border-indigo-500/40 transition-all cursor-pointer" title="Intercambiar orden de los paneles">
+                        ⇄ Cambiar
+                    </button>
+                </div>
+
+                <!-- Panel 2 (Right) Selector & Focus -->
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <button id="splitPanel2FocusBtn" type="button" onclick="setSplitActivePanel('right')" class="px-2.5 py-1.5 rounded-lg text-xs font-black bg-slate-700 text-slate-300 shadow-sm transition-all whitespace-nowrap cursor-pointer" title="Enfocar Panel 2 (el menú cambiará este panel)">
+                        ◨ Panel 2
+                    </button>
+                    <select id="splitRightSelect" onchange="setSplitRightView(this.value)" class="w-full bg-slate-800 border border-slate-600 text-white text-xs font-bold rounded-xl px-2.5 py-1.5 outline-none focus:border-blue-400">
+                        <option value="rutero">🚚 Logística y Rutero</option>
+                        <option value="reporte_admin">📝 Registro y Agenda</option>
+                        <option value="buscador">🔍 Buscador Global</option>
+                        <option value="contabilidad">💰 Caja Chica y Finanzas</option>
+                        <option value="catalogo">📚 Catálogo TEKA 2026</option>
+                        <option value="garantias">🛡️ Garantías y Repuestos</option>
+                        <option value="dashboard">📊 Resultados Totales</option>
+                        <option value="reporte_teka">📋 Reporte Oficial TEKA</option>
+                        <option value="reporte_diario">📅 Reporte Diario</option>
+                        <option value="pendientes">⏳ Seguimiento Pendientes</option>
+                        <option value="mantenimiento">⚙️ Mantenimiento</option>
+                        <option value="taller">🏢 Taller Físico</option>
+                        <option value="inventory">📦 Inventario</option>
+                        <option value="clientes">👥 Clientes</option>
+                    </select>
+
+                    <button type="button" onclick="closeSplitScreen()" class="px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black transition-all shadow-sm shrink-0 cursor-pointer" title="Volver a pantalla completa">
+                        ✕ Salir
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="mainViewsGrid" class="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 relative z-10">
             
             <!-- VISTA DASHBOARD: RESULTADOS TOTALES -->
             <div id="dashboardView" class="hidden lg:col-span-3 space-y-6 admin-only">
@@ -8445,7 +9153,8 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                 </div>
             </div>
 
-            <div id="formContainer" class="lg:col-span-2 space-y-5 admin-only no-print">
+            <div id="reporte_adminView" class="lg:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
+                <div id="formContainer" class="lg:col-span-2 space-y-5 admin-only no-print">
                 <div class="glass-card p-4 rounded-3xl"><input type="date" id="filterDateInput" onchange="syncDates('filterDateInput')" class="bg-transparent w-full text-center text-2xl font-black italic text-fix-main outline-none border-none font-mono drop-shadow-sm"></div>
                 <div class="glass-card p-6 md:p-8 rounded-2xl">
                     <form id="visitForm" onsubmit="event.preventDefault();">
@@ -8571,6 +9280,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                 </div>
                 <div id="visitsList" class="space-y-4 max-h-[700px] overflow-y-auto pr-2 pb-10"></div>
             </div>
+        </div>
 
             <div id="tallerView" class="hidden lg:col-span-3 space-y-6 admin-only">
                 <div class="glass-card p-6 md:p-8 rounded-2xl">
