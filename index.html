@@ -492,33 +492,91 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
-        /* Reglas de Pantalla Dividida (Split Screen) */
+        /* ========================================================
+           MODO PANTALLA DIVIDIDA (SPLIT SCREEN) - EXACTO 50% / 50%
+           ======================================================== */
         #mainViewsGrid.split-mode-active {
-            display: grid !important;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
             gap: 1.25rem !important;
-            align-items: start !important;
-        }
-        @media (max-width: 1023px) {
-            #mainViewsGrid.split-mode-active {
-                grid-template-columns: minmax(0, 1fr) !important;
-            }
-        }
-        #mainViewsGrid.split-mode-active > div {
-            grid-column: span 1 / span 1 !important;
             width: 100% !important;
             max-width: 100% !important;
             min-width: 0 !important;
+            box-sizing: border-box !important;
         }
+
+        /* Cada panel activo toma EXACTAMENTE la mitad del espacio */
+        #mainViewsGrid.split-mode-active > div:not(.hidden) {
+            flex: 0 0 calc(50% - 0.625rem) !important;
+            width: calc(50% - 0.625rem) !important;
+            max-width: calc(50% - 0.625rem) !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+            overflow-x: auto !important;
+            grid-column: auto !important;
+            margin: 0 !important;
+        }
+
+        /* Panel Izquierdo (Panel 1) siempre orden 1 */
+        #mainViewsGrid.split-mode-active > div.split-panel-left {
+            order: 1 !important;
+            flex: 0 0 calc(var(--split-left-ratio, 50%) - 0.625rem) !important;
+            width: calc(var(--split-left-ratio, 50%) - 0.625rem) !important;
+            max-width: calc(var(--split-left-ratio, 50%) - 0.625rem) !important;
+            border-top: 4px solid #2563eb !important;
+            box-shadow: 0 4px 20px -2px rgba(37, 99, 235, 0.15) !important;
+            border-radius: 1rem !important;
+        }
+
+        /* Panel Derecho (Panel 2) siempre orden 2 */
+        #mainViewsGrid.split-mode-active > div.split-panel-right {
+            order: 2 !important;
+            flex: 0 0 calc(var(--split-right-ratio, 50%) - 0.625rem) !important;
+            width: calc(var(--split-right-ratio, 50%) - 0.625rem) !important;
+            max-width: calc(var(--split-right-ratio, 50%) - 0.625rem) !important;
+            border-top: 4px solid #059669 !important;
+            box-shadow: 0 4px 20px -2px rgba(5, 150, 105, 0.15) !important;
+            border-radius: 1rem !important;
+        }
+
+        /* Estructura vertical limpia para Registro en modo dividido */
         #mainViewsGrid.split-mode-active #reporte_adminView {
             display: flex !important;
             flex-direction: column !important;
-            gap: 1rem !important;
+            gap: 1.25rem !important;
         }
-        #mainViewsGrid.split-mode-active #reporte_adminView > div {
-            grid-column: span 1 / span 1 !important;
+        #mainViewsGrid.split-mode-active #reporte_adminView > #formContainer,
+        #mainViewsGrid.split-mode-active #reporte_adminView > #agendaContainer {
             width: 100% !important;
             max-width: 100% !important;
+            min-width: 0 !important;
+            grid-column: auto !important;
+        }
+
+        /* Tablas y KPIs dentro de modo dividido se adaptan sin desbordar */
+        #mainViewsGrid.split-mode-active .kpis {
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+            gap: 0.75rem !important;
+        }
+        #mainViewsGrid.split-mode-active .glass-card {
+            padding: 1rem !important;
+        }
+
+        @media (max-width: 767px) {
+            #mainViewsGrid.split-mode-active {
+                flex-direction: column !important;
+                flex-wrap: wrap !important;
+            }
+            #mainViewsGrid.split-mode-active > div:not(.hidden),
+            #mainViewsGrid.split-mode-active > div.split-panel-left,
+            #mainViewsGrid.split-mode-active > div.split-panel-right {
+                flex: 0 0 100% !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
         }
 
         /* Technician Mode overrides */
@@ -1640,6 +1698,16 @@
         window.splitLeftView = 'reporte_admin';
         window.splitRightView = 'rutero';
         window.splitActivePanel = 'left';
+        window.currentSplitRatio = '50-50';
+
+        window.getViewElement = function(v) {
+            if (!v) return null;
+            if (v === 'reporte_admin') return document.getElementById('reporte_adminView');
+            if (v === 'reporte_teka') return document.getElementById('reporteTekaView');
+            if (v === 'reporte_diario') return document.getElementById('reporteDiarioView');
+            if (v === 'solicitudes_garantia') return document.getElementById('garantiasView');
+            return document.getElementById(v + 'View');
+        };
 
         window.toggleSplitScreen = function(force) {
             const activate = (force !== undefined) ? force : !window.isSplitScreenActive;
@@ -1663,6 +1731,13 @@
                 btn.classList.remove('from-blue-600', 'to-indigo-600');
                 btn.innerHTML = '<span class="text-sm">◫</span> <span class="hidden sm:inline">Dividida (Activa)</span>';
             }
+
+            // Auto-contraer barra lateral en laptops o pantallas medianas (<1440px) para máximo espacio
+            const sb = document.getElementById('mainSidebar');
+            if (window.innerWidth < 1440 && sb && !sb.classList.contains('sidebar-collapsed') && window.toggleSidebarCollapse) {
+                window._sidebarWasAutoCollapsed = true;
+                window.toggleSidebarCollapse();
+            }
             
             if (currentView && currentView !== 'solicitudes_garantia') {
                 window.splitLeftView = currentView;
@@ -1672,7 +1747,7 @@
             }
             
             window.renderSplitViews();
-            showMessage("◫ PANTALLA DIVIDIDA ACTIVADA", "fix-main");
+            showMessage("◫ PANTALLA DIVIDIDA ACTIVADA (50/50)", "fix-main");
         };
 
         window.closeSplitScreen = function() {
@@ -1681,16 +1756,73 @@
             const bar = document.getElementById('splitScreenBar');
             const btn = document.getElementById('btnToggleSplitScreen');
             
-            if (grid) grid.classList.remove('split-mode-active');
+            if (grid) {
+                grid.classList.remove('split-mode-active');
+                grid.style.removeProperty('--split-left-ratio');
+                grid.style.removeProperty('--split-right-ratio');
+            }
             if (bar) bar.classList.add('hidden');
             if (btn) {
                 btn.classList.remove('bg-emerald-600', 'border-emerald-400');
                 btn.classList.add('from-blue-600', 'to-indigo-600');
                 btn.innerHTML = '<span class="text-sm">◫</span> <span class="hidden sm:inline">Pantalla Dividida</span>';
             }
+
+            // Restaurar barra lateral si se había auto-contraído
+            const sb = document.getElementById('mainSidebar');
+            if (window._sidebarWasAutoCollapsed && sb && sb.classList.contains('sidebar-collapsed') && window.toggleSidebarCollapse) {
+                window.toggleSidebarCollapse();
+                window._sidebarWasAutoCollapsed = false;
+            }
+
+            // Limpiar clases y órdenes flex de todos los paneles
+            const allViews = ['dashboardView', 'clientesView', 'buscadorView', 'reporte_adminView', 'tallerView', 'garantiasView', 'pendientesView', 'mantenimientoView', 'inventoryView', 'ruteroView', 'reporteDiarioView', 'reporteTekaView', 'catalogoView', 'contabilidadView'];
+            allViews.forEach(function(id) {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.classList.remove('split-panel-left', 'split-panel-right');
+                    el.style.order = '';
+                }
+            });
             
             changeMasterView(window.splitLeftView || currentView || 'reporte_admin');
             showMessage("🖥️ PANTALLA COMPLETA RESTAURADA", "fix-main");
+        };
+
+        window.setSplitRatio = function(ratio) {
+            window.currentSplitRatio = ratio;
+            window.applySplitRatioStyles(ratio);
+            
+            ['50-50', '65-35', '35-65'].forEach(function(r) {
+                const b = document.getElementById('ratioBtn_' + r);
+                if (b) {
+                    if (r === ratio) {
+                        b.classList.add('bg-blue-600', 'text-white', 'shadow-xs');
+                        b.classList.remove('text-slate-300', 'hover:text-white', 'bg-slate-800');
+                    } else {
+                        b.classList.remove('bg-blue-600', 'text-white', 'shadow-xs');
+                        b.classList.add('text-slate-300', 'hover:text-white', 'bg-slate-800');
+                    }
+                }
+            });
+        };
+
+        window.applySplitRatioStyles = function(ratio) {
+            const grid = document.getElementById('mainViewsGrid');
+            if (!grid) return;
+            
+            let leftRatio = '50%';
+            let rightRatio = '50%';
+            if (ratio === '65-35') {
+                leftRatio = '65%';
+                rightRatio = '35%';
+            } else if (ratio === '35-65') {
+                leftRatio = '35%';
+                rightRatio = '65%';
+            }
+            
+            grid.style.setProperty('--split-left-ratio', leftRatio);
+            grid.style.setProperty('--split-right-ratio', rightRatio);
         };
 
         window.setSplitActivePanel = function(panel) {
@@ -1699,9 +1831,9 @@
             const p2Btn = document.getElementById('splitPanel2FocusBtn');
             if (panel === 'left') {
                 if (p1Btn) { p1Btn.classList.add('bg-blue-600', 'text-white'); p1Btn.classList.remove('bg-slate-700', 'text-slate-300'); }
-                if (p2Btn) { p2Btn.classList.remove('bg-blue-600', 'text-white'); p2Btn.classList.add('bg-slate-700', 'text-slate-300'); }
+                if (p2Btn) { p2Btn.classList.remove('bg-emerald-600', 'text-white'); p2Btn.classList.add('bg-slate-700', 'text-slate-300'); }
             } else {
-                if (p2Btn) { p2Btn.classList.add('bg-blue-600', 'text-white'); p2Btn.classList.remove('bg-slate-700', 'text-slate-300'); }
+                if (p2Btn) { p2Btn.classList.add('bg-emerald-600', 'text-white'); p2Btn.classList.remove('bg-slate-700', 'text-slate-300'); }
                 if (p1Btn) { p1Btn.classList.remove('bg-blue-600', 'text-white'); p1Btn.classList.add('bg-slate-700', 'text-slate-300'); }
             }
         };
@@ -1793,19 +1925,54 @@
             const left = window.splitLeftView || 'reporte_admin';
             const right = window.splitRightView || 'rutero';
 
-            const allSections = ['reporte_adminView', 'formContainer', 'contabilidadView', 'reporteTekaView', 'reporteDiarioView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'solicitudesGarantiaView', 'clientesView', 'dashboardView', 'catalogoView'];
-            allSections.forEach(function(id) { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
+            const allViews = [
+                'dashboardView', 'clientesView', 'buscadorView',
+                'reporte_adminView', 'tallerView', 'garantiasView',
+                'pendientesView', 'mantenimientoView', 'inventoryView',
+                'ruteroView', 'reporteDiarioView', 'reporteTekaView',
+                'catalogoView', 'contabilidadView'
+            ];
 
+            // 1. Ocultar y limpiar clases/orden de todos los paneles
+            allViews.forEach(function(id) {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.classList.add('hidden');
+                    el.classList.remove('split-panel-left', 'split-panel-right');
+                    el.style.order = '';
+                }
+            });
+
+            // 2. Activar Panel Izquierdo (Panel 1) siempre en order: 1
             window.activateSingleView(left);
-            if (left !== right) {
-                window.activateSingleView(right);
+            const leftEl = window.getViewElement(left);
+            if (leftEl) {
+                leftEl.classList.remove('hidden');
+                leftEl.classList.add('split-panel-left');
+                leftEl.style.order = '1';
             }
 
-            const leftSel = document.getElementById('splitLeftSelect');
-            if(leftSel) leftSel.value = left;
-            const rightSel = document.getElementById('splitRightSelect');
-            if(rightSel) rightSel.value = right;
+            // 3. Activar Panel Derecho (Panel 2) siempre en order: 2
+            if (left !== right) {
+                window.activateSingleView(right);
+                const rightEl = window.getViewElement(right);
+                if (rightEl) {
+                    rightEl.classList.remove('hidden');
+                    rightEl.classList.add('split-panel-right');
+                    rightEl.style.order = '2';
+                }
+            }
 
+            // 4. Actualizar Selectores
+            const leftSel = document.getElementById('splitLeftSelect');
+            if (leftSel) leftSel.value = left;
+            const rightSel = document.getElementById('splitRightSelect');
+            if (rightSel) rightSel.value = right;
+
+            // 5. Aplicar proporciones
+            window.applySplitRatioStyles(window.currentSplitRatio || '50-50');
+
+            // 6. Actualizar indicadores de la barra lateral y encabezado
             window.updateSidebarSplitIndicators(left, right);
         };
 
@@ -8817,6 +8984,11 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                     <button type="button" onclick="swapSplitViews()" class="px-2.5 py-1 rounded-lg bg-indigo-900/60 hover:bg-indigo-800 text-xs font-black text-indigo-200 border border-indigo-500/40 transition-all cursor-pointer" title="Intercambiar orden de los paneles">
                         ⇄ Cambiar
                     </button>
+                    <div class="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 shadow-inner">
+                        <button type="button" id="ratioBtn_50-50" onclick="setSplitRatio('50-50')" class="px-2 py-1 rounded-md text-[10px] font-black bg-blue-600 text-white transition-all cursor-pointer" title="Proporción 50% / 50% exacta">50:50</button>
+                        <button type="button" id="ratioBtn_65-35" onclick="setSplitRatio('65-35')" class="px-2 py-1 rounded-md text-[10px] font-bold text-slate-300 hover:text-white transition-all cursor-pointer" title="Panel 1 más ancho (65% / 35%)">65:35</button>
+                        <button type="button" id="ratioBtn_35-65" onclick="setSplitRatio('35-65')" class="px-2 py-1 rounded-md text-[10px] font-bold text-slate-300 hover:text-white transition-all cursor-pointer" title="Panel 2 más ancho (35% / 65%)">35:65</button>
+                    </div>
                 </div>
 
                 <!-- Panel 2 (Right) Selector & Focus -->
