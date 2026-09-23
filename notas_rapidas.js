@@ -306,6 +306,9 @@ window.setNotasFilter = function(filter) {
 
 // Renderizado principal del listado y contadores
 window.renderNotasRapidasView = function() {
+    if (typeof window.renderWidgetTasks === 'function') {
+        window.renderWidgetTasks();
+    }
     const container = document.getElementById('notasListContainer');
     if (!container) return;
 
