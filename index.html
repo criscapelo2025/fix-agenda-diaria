@@ -9495,8 +9495,11 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <h2 class="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">EXPEDIENTES, REPUESTOS Y GARANTÍAS EN RUTA</h2>
                             <p class="text-slate-500 text-xs mt-1">Gestión centralizada de pedidos a fábrica (Word/Excel), seguimiento de piezas recibidas y reprogramación de visitas en ruta.</p>
                         </div>
-                        <div class="flex items-center gap-3 flex-wrap">
-                            <button onclick="openNuevaSolicitudModal()" class="bg-indigo-700 hover:bg-indigo-800 active:scale-95 text-white font-black py-3 px-5 rounded-xl text-xs shadow-md flex items-center gap-2 transition-all">
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                            <button onclick="openConfigGoogleScriptModal()" class="bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 active:scale-95 font-black py-3 px-4 rounded-xl text-xs shadow-2xs flex items-center gap-2 transition-all cursor-pointer" title="Configurar Conector Gmail Automático con TEKA">
+                                <span>⚙️</span> <span class="hidden sm:inline">CONECTOR GMAIL</span>
+                            </button>
+                            <button onclick="openNuevaSolicitudModal()" class="bg-indigo-700 hover:bg-indigo-800 active:scale-95 text-white font-black py-3 px-5 rounded-xl text-xs shadow-md flex items-center gap-2 transition-all cursor-pointer">
                                 <span class="text-base">➕</span> NUEVA SOLICITUD DE REPUESTO
                             </button>
                         </div>
