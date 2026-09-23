@@ -508,11 +508,17 @@
             box-sizing: border-box !important;
         }
 
-        /* Cada panel activo toma EXACTAMENTE la mitad del espacio */
-        #mainViewsGrid.split-mode-active > div:not(.hidden) {
-            flex: 0 0 calc(50% - 0.625rem) !important;
-            width: calc(50% - 0.625rem) !important;
-            max-width: calc(50% - 0.625rem) !important;
+        /* Ocultar ABSOLUTAMENTE cualquier panel o vista no seleccionada en modo dividido */
+        #mainViewsGrid.split-mode-active > div:not(.split-panel-left):not(.split-panel-right),
+        #mainViewsGrid.split-mode-active > .hidden,
+        #mainViewsGrid.split-mode-active > div.hidden,
+        #mainViewsGrid.split-mode-active #reporte_adminView:not(.split-panel-left):not(.split-panel-right) {
+            display: none !important;
+        }
+
+        /* Cada panel activo toma EXACTAMENTE su espacio asignado */
+        #mainViewsGrid.split-mode-active > div.split-panel-left,
+        #mainViewsGrid.split-mode-active > div.split-panel-right {
             min-width: 0 !important;
             box-sizing: border-box !important;
             overflow-x: auto !important;
@@ -523,6 +529,7 @@
         /* Panel Izquierdo (Panel 1) siempre orden 1 */
         #mainViewsGrid.split-mode-active > div.split-panel-left {
             order: 1 !important;
+            display: block !important;
             flex: 0 0 calc(var(--split-left-ratio, 50%) - 0.625rem) !important;
             width: calc(var(--split-left-ratio, 50%) - 0.625rem) !important;
             max-width: calc(var(--split-left-ratio, 50%) - 0.625rem) !important;
@@ -534,6 +541,7 @@
         /* Panel Derecho (Panel 2) siempre orden 2 */
         #mainViewsGrid.split-mode-active > div.split-panel-right {
             order: 2 !important;
+            display: block !important;
             flex: 0 0 calc(var(--split-right-ratio, 50%) - 0.625rem) !important;
             width: calc(var(--split-right-ratio, 50%) - 0.625rem) !important;
             max-width: calc(var(--split-right-ratio, 50%) - 0.625rem) !important;
@@ -542,14 +550,17 @@
             border-radius: 1rem !important;
         }
 
-        /* Estructura vertical limpia para Registro en modo dividido */
-        #mainViewsGrid.split-mode-active #reporte_adminView {
+        /* Estructura vertical limpia para Registro en modo dividido ÚNICAMENTE si está seleccionado como panel activo */
+        #mainViewsGrid.split-mode-active #reporte_adminView.split-panel-left,
+        #mainViewsGrid.split-mode-active #reporte_adminView.split-panel-right {
             display: flex !important;
             flex-direction: column !important;
             gap: 1.25rem !important;
         }
-        #mainViewsGrid.split-mode-active #reporte_adminView > #formContainer,
-        #mainViewsGrid.split-mode-active #reporte_adminView > #agendaContainer {
+        #mainViewsGrid.split-mode-active #reporte_adminView.split-panel-left > #formContainer,
+        #mainViewsGrid.split-mode-active #reporte_adminView.split-panel-right > #formContainer,
+        #mainViewsGrid.split-mode-active #reporte_adminView.split-panel-left > #agendaContainer,
+        #mainViewsGrid.split-mode-active #reporte_adminView.split-panel-right > #agendaContainer {
             width: 100% !important;
             max-width: 100% !important;
             min-width: 0 !important;
@@ -1782,6 +1793,7 @@
                 if (el) {
                     el.classList.remove('split-panel-left', 'split-panel-right');
                     el.style.order = '';
+                    el.style.display = '';
                 }
             });
             
@@ -1940,6 +1952,7 @@
                     el.classList.add('hidden');
                     el.classList.remove('split-panel-left', 'split-panel-right');
                     el.style.order = '';
+                    el.style.display = 'none';
                 }
             });
 
@@ -1950,6 +1963,7 @@
                 leftEl.classList.remove('hidden');
                 leftEl.classList.add('split-panel-left');
                 leftEl.style.order = '1';
+                leftEl.style.display = '';
             }
 
             // 3. Activar Panel Derecho (Panel 2) siempre en order: 2
@@ -1960,6 +1974,7 @@
                     rightEl.classList.remove('hidden');
                     rightEl.classList.add('split-panel-right');
                     rightEl.style.order = '2';
+                    rightEl.style.display = '';
                 }
             }
 
