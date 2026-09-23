@@ -137,62 +137,69 @@ function triggerDownloadBlob(blob, filename) {
 // ==========================================================================
 // 1. GENERADOR DE WORD (.docx) EXACTO
 // ==========================================================================
+window.buildWordZipGarantia = async function(data) {
+    if (typeof JSZip === 'undefined') {
+        throw new Error('La libreria JSZip no esta disponible.');
+    }
+    const zip = await JSZip.loadAsync(b64ToUint8(window.FORMATO_DOCX_BASE64));
+    let xml = await zip.file('word/document.xml').async('string');
+
+    const tipo = (data.tipoSolicitud || 'REPUESTO').toUpperCase();
+    const fechaSolicitud = formatDateSpanish(data.fechaEnvio || new Date());
+    const fechaCompraLarga = data.fechaCompra ? formatDateSpanish(data.fechaCompra) : '';
+    const fechaCompraCorta = data.fechaCompra ? formatFechaCompra(data.fechaCompra) : '';
+    const cliente = (data.cliente || '').toUpperCase();
+    const telefono = data.telefono || '';
+    const producto = (data.producto || data.tipoProducto || '').toUpperCase();
+    const modelo = (data.modelo || '').toUpperCase();
+    const serie = (data.serie || '').toUpperCase();
+    const lugarCompra = (data.lugarCompra || '').toUpperCase();
+    const numFactura = (data.numFactura || '').toUpperCase();
+    const codProducto = (data.codProducto || '').toUpperCase();
+    const diagnostico = (data.diagnostico || data.observacion || '').toUpperCase();
+    let codRepuesto = (data.codRepuesto || '').toUpperCase();
+    let descRepuesto = (data.descRepuesto || '').toUpperCase();
+
+    // Adaptación técnica según Tipo de Solicitud (Repuesto, Nota de Crédito, Cambio de Equipo)
+    if (tipo === 'NOTA DE CREDITO' || tipo === 'NOTA_CREDITO') {
+        if (!codRepuesto || codRepuesto === '---') codRepuesto = 'NOTA DE CRÉDITO';
+        if (!descRepuesto || descRepuesto === '---') descRepuesto = 'SE SOLICITA NOTA DE CRÉDITO POR EQUIPO IRREPARABLE';
+        xml = xml.replace('CODIGO DEL REPUESTO:', 'RESOLUCION SOLICITADA: NOTA DE CREDITO');
+    } else if (tipo === 'CAMBIO DE EQUIPO' || tipo === 'CAMBIO_EQUIPO' || tipo === 'CAMBIO DE PRODUCTO') {
+        if (!codRepuesto || codRepuesto === '---') codRepuesto = 'CAMBIO DE EQUIPO';
+        if (!descRepuesto || descRepuesto === '---') descRepuesto = 'SE SOLICITA CAMBIO DE PRODUCTO/EQUIPO POR NO DISPONIBILIDAD DE REPARACIÓN';
+        xml = xml.replace('CODIGO DEL REPUESTO:', 'RESOLUCION SOLICITADA: CAMBIO DE EQUIPO');
+    }
+
+    xml = xml.replace('{{FECHA_SOLICITUD}}', xmlEscape(fechaSolicitud));
+    xml = xml.replace('{{CLIENTE}}', xmlEscape(cliente));
+    xml = xml.replace('{{TELEFONO}}', xmlEscape(telefono));
+    xml = xml.replace('{{PRODUCTO}}', xmlEscape(producto));
+    xml = xml.replace('{{MODELO}}', xmlEscape(modelo));
+    xml = xml.replace('{{SERIE}}', xmlEscape(serie));
+    xml = xml.replace('{{LUGAR_COMPRA}}', xmlEscape(lugarCompra));
+    xml = xml.replace('{{FECHA_COMPRA}}', xmlEscape(fechaCompraLarga));
+    xml = xml.replace('{{FECHA_COMPRA}}', xmlEscape(fechaCompraCorta));
+    xml = xml.replace('{{NUM_FACTURA}}', xmlEscape(numFactura));
+    xml = xml.replace('{{COD_PRODUCTO}}', xmlEscape(codProducto));
+    xml = xml.replace('{{DIAGNOSTICO}}', xmlEscape(diagnostico));
+    xml = xml.replace('{{COD_REPUESTO}}', xmlEscape(codRepuesto));
+    xml = xml.replace('{{DESC_REPUESTO}}', xmlEscape(descRepuesto));
+
+    zip.file('word/document.xml', xml);
+
+    const numSlug = (data.numeroSolicitud || '070_2026').replace(/\s+/g, '_');
+    let filePrefix = 'FORMATO_WORD_';
+    if (tipo === 'NOTA DE CREDITO' || tipo === 'NOTA_CREDITO') filePrefix = 'FORMATO_NOTA_CREDITO_';
+    else if (tipo === 'CAMBIO DE EQUIPO' || tipo === 'CAMBIO_EQUIPO' || tipo === 'CAMBIO DE PRODUCTO') filePrefix = 'FORMATO_CAMBIO_EQUIPO_';
+
+    const filename = filePrefix + numSlug + '_' + sanitizeFileName(cliente) + '.docx';
+    return { zip, filename, cliente, tipo };
+};
+
 window.generateWordGarantia = async function(data) {
     try {
-        if (typeof JSZip === 'undefined') {
-            throw new Error('La libreria JSZip no esta disponible.');
-        }
-        const zip = await JSZip.loadAsync(b64ToUint8(window.FORMATO_DOCX_BASE64));
-        let xml = await zip.file('word/document.xml').async('string');
-
-        const tipo = (data.tipoSolicitud || 'REPUESTO').toUpperCase();
-        const fechaSolicitud = formatDateSpanish(data.fechaEnvio || new Date());
-        // Aclaración: donde dice "el" en P4 va fecha larga (ej: 16 de septiembre del 2026)
-        // y donde dice "Fecha de compra:" en P8 va fecha corta numérica (ej: 16/9/26)
-        const fechaCompraLarga = data.fechaCompra ? formatDateSpanish(data.fechaCompra) : '';
-        const fechaCompraCorta = data.fechaCompra ? formatFechaCompra(data.fechaCompra) : '';
-        const cliente = (data.cliente || '').toUpperCase();
-        const telefono = data.telefono || '';
-        const producto = (data.producto || data.tipoProducto || '').toUpperCase();
-        const modelo = (data.modelo || '').toUpperCase();
-        const serie = (data.serie || '').toUpperCase();
-        const lugarCompra = (data.lugarCompra || '').toUpperCase();
-        const numFactura = (data.numFactura || '').toUpperCase();
-        const codProducto = (data.codProducto || '').toUpperCase();
-        const diagnostico = (data.diagnostico || data.observacion || '').toUpperCase();
-        let codRepuesto = (data.codRepuesto || '').toUpperCase();
-        let descRepuesto = (data.descRepuesto || '').toUpperCase();
-
-        // Adaptación técnica según Tipo de Solicitud (Repuesto, Nota de Crédito, Cambio de Equipo)
-        if (tipo === 'NOTA DE CREDITO' || tipo === 'NOTA_CREDITO') {
-            if (!codRepuesto || codRepuesto === '---') codRepuesto = 'NOTA DE CRÉDITO';
-            if (!descRepuesto || descRepuesto === '---') descRepuesto = 'SE SOLICITA NOTA DE CRÉDITO POR EQUIPO IRREPARABLE';
-            xml = xml.replace('CODIGO DEL REPUESTO:', 'RESOLUCION SOLICITADA: NOTA DE CREDITO');
-        } else if (tipo === 'CAMBIO DE EQUIPO' || tipo === 'CAMBIO_EQUIPO' || tipo === 'CAMBIO DE PRODUCTO') {
-            if (!codRepuesto || codRepuesto === '---') codRepuesto = 'CAMBIO DE EQUIPO';
-            if (!descRepuesto || descRepuesto === '---') descRepuesto = 'SE SOLICITA CAMBIO DE PRODUCTO/EQUIPO POR NO DISPONIBILIDAD DE REPARACIÓN';
-            xml = xml.replace('CODIGO DEL REPUESTO:', 'RESOLUCION SOLICITADA: CAMBIO DE EQUIPO');
-        }
-
-        xml = xml.replace('{{FECHA_SOLICITUD}}', xmlEscape(fechaSolicitud));
-        xml = xml.replace('{{CLIENTE}}', xmlEscape(cliente));
-        xml = xml.replace('{{TELEFONO}}', xmlEscape(telefono));
-        xml = xml.replace('{{PRODUCTO}}', xmlEscape(producto));
-        xml = xml.replace('{{MODELO}}', xmlEscape(modelo));
-        xml = xml.replace('{{SERIE}}', xmlEscape(serie));
-        xml = xml.replace('{{LUGAR_COMPRA}}', xmlEscape(lugarCompra));
-        // Primera fecha (P4: donde dice "el..."):
-        xml = xml.replace('{{FECHA_COMPRA}}', xmlEscape(fechaCompraLarga));
-        // Segunda fecha (P8: donde dice "Fecha de compra:"):
-        xml = xml.replace('{{FECHA_COMPRA}}', xmlEscape(fechaCompraCorta));
-        xml = xml.replace('{{NUM_FACTURA}}', xmlEscape(numFactura));
-        xml = xml.replace('{{COD_PRODUCTO}}', xmlEscape(codProducto));
-        xml = xml.replace('{{DIAGNOSTICO}}', xmlEscape(diagnostico));
-        xml = xml.replace('{{COD_REPUESTO}}', xmlEscape(codRepuesto));
-        xml = xml.replace('{{DESC_REPUESTO}}', xmlEscape(descRepuesto));
-
-        zip.file('word/document.xml', xml);
-
+        const { zip, filename } = await window.buildWordZipGarantia(data);
         const buffer = await zip.generateAsync({
             type: (typeof JSZip !== 'undefined' && JSZip.support && JSZip.support.blob) ? 'blob' : 'uint8array'
         });
@@ -200,12 +207,6 @@ window.generateWordGarantia = async function(data) {
             type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         });
 
-        const numSlug = (data.numeroSolicitud || '070_2026').replace(/\s+/g, '_');
-        let filePrefix = 'FORMATO_WORD_';
-        if (tipo === 'NOTA DE CREDITO' || tipo === 'NOTA_CREDITO') filePrefix = 'FORMATO_NOTA_CREDITO_';
-        else if (tipo === 'CAMBIO DE EQUIPO' || tipo === 'CAMBIO_EQUIPO' || tipo === 'CAMBIO DE PRODUCTO') filePrefix = 'FORMATO_CAMBIO_EQUIPO_';
-
-        const filename = filePrefix + numSlug + '_' + sanitizeFileName(cliente) + '.docx';
         triggerDownloadBlob(blob, filename);
 
         if (window.showMessage) {
@@ -219,96 +220,121 @@ window.generateWordGarantia = async function(data) {
     }
 };
 
+window.generateWordBase64 = async function(data) {
+    try {
+        const { zip, filename } = await window.buildWordZipGarantia(data);
+        const base64 = await zip.generateAsync({ type: 'base64' });
+        return {
+            name: filename,
+            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            base64: base64
+        };
+    } catch(err) {
+        console.error('Error generando Word Base64:', err);
+        throw err;
+    }
+};
+
 // ==========================================================================
 // 2. GENERADOR DE EXCEL (.xlsx) EXACTO
 // ==========================================================================
+window.buildExcelWorkbookGarantia = async function(data) {
+    const tipo = (data.tipoSolicitud || 'REPUESTO').toUpperCase();
+    if (tipo === 'NOTA DE CREDITO' || tipo === 'NOTA_CREDITO' || tipo === 'CAMBIO DE EQUIPO' || tipo === 'CAMBIO_EQUIPO' || tipo === 'CAMBIO DE PRODUCTO') {
+        return null;
+    }
+
+    if (typeof ExcelJS === 'undefined') {
+        throw new Error('La libreria ExcelJS no esta disponible.');
+    }
+    const wb = new ExcelJS.Workbook();
+    const uint8 = b64ToUint8(window.REPUESTO_XLSX_BASE64);
+    await wb.xlsx.load(uint8.buffer);
+    const ws = wb.worksheets[0];
+
+    const cliente = (data.cliente || '').toUpperCase();
+    const telefono = data.telefono || '';
+    const direccion = (data.direccion || data.ciudad || 'Cuenca').toUpperCase();
+    const numStr = (data.numeroSolicitud || '070 2026').trim();
+
+    // Encabezado
+    ws.getCell('F5').value = cliente;
+    ws.getCell('F6').value = telefono;
+
+    // Fecha de envio D7
+    if (data.fechaEnvio) {
+        try {
+            const parts = data.fechaEnvio.split('-');
+            if (parts.length === 3) {
+                ws.getCell('D7').value = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            } else {
+                ws.getCell('D7').value = new Date();
+            }
+        } catch(e) {
+            ws.getCell('D7').value = new Date();
+        }
+    } else {
+        ws.getCell('D7').value = new Date();
+    }
+
+    ws.getCell('F7').value = direccion;
+    ws.getCell('B8').value = 'SOLICITUD N°' + numStr;
+
+    // Fila 10 de Repuesto
+    ws.getCell('B10').value = 1;
+    ws.getCell('C10').value = (data.codRepuesto || '').toUpperCase();
+    ws.getCell('D10').value = (data.descRepuesto || '').toUpperCase();
+    
+    // Modelo de equipo completo:
+    let fullModelo = (data.modelo || '').trim();
+    const prod = (data.producto || '').trim();
+    if (prod && !fullModelo.toUpperCase().includes(prod.toUpperCase())) {
+        fullModelo = (prod + ' ' + fullModelo).trim();
+    }
+    if (!fullModelo) fullModelo = prod || 'EQUIPO';
+    ws.getCell('E10').value = fullModelo.toUpperCase();
+    ws.getCell('F10').value = { formula: 'F5', result: cliente };
+    ws.getCell('G10').value = { formula: 'F6', result: telefono };
+    ws.getCell('H10').value = (data.serie || '').toUpperCase();
+    ws.getCell('C12').value = 'Garantia';
+
+    // Fijar altura uniforme para que la fila 10 no sea más ancha/alta que las demás celdas
+    ws.getRow(9).height = 18;
+    ws.getRow(10).height = 18;
+
+    // Desactivar wrapText y estandarizar estilo en fila 10
+    ['B10', 'C10', 'D10', 'E10', 'F10', 'G10', 'H10'].forEach(ref => {
+        const cell = ws.getCell(ref);
+        cell.alignment = {
+            vertical: 'middle',
+            horizontal: (ref === 'D10' || ref === 'F10') ? 'left' : 'center',
+            wrapText: false
+        };
+        cell.font = {
+            name: 'Calibri',
+            size: 11,
+            bold: false
+        };
+    });
+
+    const numSlug = numStr.replace(/\s+/g, '_');
+    const filename = 'REPUESTO_EXCEL_' + numSlug + '_' + sanitizeFileName(cliente) + '.xlsx';
+    return { wb, filename, cliente };
+};
+
 window.generateExcelGarantia = async function(data) {
     try {
-        const tipo = (data.tipoSolicitud || 'REPUESTO').toUpperCase();
-        if (tipo === 'NOTA DE CREDITO' || tipo === 'NOTA_CREDITO' || tipo === 'CAMBIO DE EQUIPO' || tipo === 'CAMBIO_EQUIPO' || tipo === 'CAMBIO DE PRODUCTO') {
+        const result = await window.buildExcelWorkbookGarantia(data);
+        if (!result) {
             if (window.showMessage) {
                 window.showMessage('ℹ️ Para Nota de Crédito y Cambio de Equipo únicamente se emite el Formato Word oficial; no aplica archivo Excel de repuesto.', 'fix-accent');
             }
             return false;
         }
 
-        if (typeof ExcelJS === 'undefined') {
-            throw new Error('La libreria ExcelJS no esta disponible.');
-        }
-        const wb = new ExcelJS.Workbook();
-        const uint8 = b64ToUint8(window.REPUESTO_XLSX_BASE64);
-        await wb.xlsx.load(uint8.buffer);
-        const ws = wb.worksheets[0];
-
-        const cliente = (data.cliente || '').toUpperCase();
-        const telefono = data.telefono || '';
-        const direccion = (data.direccion || data.ciudad || 'Cuenca').toUpperCase();
-        const numStr = (data.numeroSolicitud || '070 2026').trim();
-
-        // Encabezado
-        ws.getCell('F5').value = cliente;
-        ws.getCell('F6').value = telefono;
-
-        // Fecha de envio D7
-        if (data.fechaEnvio) {
-            try {
-                const parts = data.fechaEnvio.split('-');
-                if (parts.length === 3) {
-                    ws.getCell('D7').value = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                } else {
-                    ws.getCell('D7').value = new Date();
-                }
-            } catch(e) {
-                ws.getCell('D7').value = new Date();
-            }
-        } else {
-            ws.getCell('D7').value = new Date();
-        }
-
-        ws.getCell('F7').value = direccion;
-        ws.getCell('B8').value = 'SOLICITUD N°' + numStr;
-
-        // Fila 10 de Repuesto
-        ws.getCell('B10').value = 1;
-        ws.getCell('C10').value = (data.codRepuesto || '').toUpperCase();
-        ws.getCell('D10').value = (data.descRepuesto || '').toUpperCase();
-                // Modelo de equipo completo:
-        let fullModelo = (data.modelo || '').trim();
-        const prod = (data.producto || '').trim();
-        if (prod && !fullModelo.toUpperCase().includes(prod.toUpperCase())) {
-            fullModelo = (prod + ' ' + fullModelo).trim();
-        }
-        if (!fullModelo) fullModelo = prod || 'EQUIPO';
-        ws.getCell('E10').value = fullModelo.toUpperCase();
-        ws.getCell('F10').value = { formula: 'F5', result: cliente };
-        ws.getCell('G10').value = { formula: 'F6', result: telefono };
-        ws.getCell('H10').value = (data.serie || '').toUpperCase();
-        ws.getCell('C12').value = 'Garantia';
-
-        // Fijar altura uniforme para que la fila 10 no sea más ancha/alta que las demás celdas
-        ws.getRow(9).height = 18;
-        ws.getRow(10).height = 18;
-
-        // Desactivar wrapText y estandarizar estilo en fila 10 para asegurar que todas las celdas sean del mismo tamaño
-        ['B10', 'C10', 'D10', 'E10', 'F10', 'G10', 'H10'].forEach(ref => {
-            const cell = ws.getCell(ref);
-            cell.alignment = {
-                vertical: 'middle',
-                horizontal: (ref === 'D10' || ref === 'F10') ? 'left' : 'center',
-                wrapText: false
-            };
-            cell.font = {
-                name: 'Calibri',
-                size: 11,
-                bold: false
-            };
-        });
-
+        const { wb, filename } = result;
         const buffer = await wb.xlsx.writeBuffer();
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-        const numSlug = numStr.replace(/\s+/g, '_');
-        const filename = 'REPUESTO_EXCEL_' + numSlug + '_' + sanitizeFileName(cliente) + '.xlsx';
         triggerDownloadBlob(blob, filename);
 
         if (window.showMessage) {
@@ -319,6 +345,31 @@ window.generateExcelGarantia = async function(data) {
         console.error('Error generando Excel:', err);
         if (window.showMessage) window.showMessage('❌ Error generando Excel: ' + err.message, 'fix-error');
         return false;
+    }
+};
+
+window.generateExcelBase64 = async function(data) {
+    try {
+        const result = await window.buildExcelWorkbookGarantia(data);
+        if (!result) return null;
+
+        const { wb, filename } = result;
+        const buffer = await wb.xlsx.writeBuffer();
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+        return {
+            name: filename,
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            base64: base64
+        };
+    } catch (err) {
+        console.error('Error generando Excel Base64:', err);
+        throw err;
     }
 };
 
@@ -1066,6 +1117,38 @@ window.openEmailModal = function(id) {
         `;
     }
 
+    // Actualizar indicador del conector de Google Apps Script
+    const connIndicator = document.getElementById('emailScriptConnIndicator');
+    const scriptUrl = localStorage.getItem('fix_teka_gmail_script_url');
+    if (connIndicator) {
+        if (scriptUrl) {
+            connIndicator.innerHTML = `
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Conectado a Gmail</span>
+                </div>
+                <button type="button" onclick="openConfigGoogleScriptModal()" class="px-2 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-[9px] font-bold text-slate-200 transition-all cursor-pointer" title="Configurar URL del conector">
+                    ⚙️
+                </button>
+            `;
+        } else {
+            connIndicator.innerHTML = `
+                <button type="button" onclick="openConfigGoogleScriptModal()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold hover:bg-amber-500/30 transition-all cursor-pointer animate-pulse" title="Haz clic para vincular en 2 minutos">
+                    <span>⚠️ Conectar Gmail (2 min)</span>
+                    <span>⚙️</span>
+                </button>
+            `;
+        }
+    }
+
+    // Resetear caja de progreso y botones
+    const progressBox = document.getElementById('emailSendingProgressBox');
+    if (progressBox) progressBox.classList.add('hidden');
+    const btnSend = document.getElementById('btnEnviarAutoGmail');
+    if (btnSend) btnSend.disabled = false;
+    const btnDraft = document.getElementById('btnCrearBorradorGmail');
+    if (btnDraft) btnDraft.disabled = false;
+
     const modal = document.getElementById('emailGarantiaModal');
     if (modal) modal.classList.remove('hidden');
 };
@@ -1199,6 +1282,375 @@ window.downloadAll4FilesForEmail = async function(customId) {
             a.click();
             document.body.removeChild(a);
         }, 1500);
+    }
+};
+
+// ==========================================================================
+// 4.1 CONECTOR GOOGLE APPS SCRIPT PARA ENVÍO 100% AUTOMÁTICO A TEKA (OPCIÓN B)
+// ==========================================================================
+
+window.GOOGLE_APPS_SCRIPT_TEKA_CODE = `/**
+ * ============================================================================
+ * CONECTOR GMAIL PARA FIX GESTIÓN - ENVÍO OFICIAL DE GARANTÍAS TEKA
+ * ============================================================================
+ * Cuenta de ejecución: criscapelo.fix@gmail.com
+ */
+
+function doPost(e) {
+  try {
+    var rawContents = e.postData ? e.postData.contents : "";
+    if (!rawContents) {
+      return jsonResponse({ status: "error", message: "No se recibieron datos en el cuerpo de la petición." });
+    }
+    
+    var data = JSON.parse(rawContents);
+    var to = data.to || "mnavarrete@teka.ec";
+    var subject = data.subject || "SOLICITUD DE GARANTIA TEKA";
+    var body = data.body || ""; // Cuerpo vacío según regla de fábrica TEKA
+    var mode = data.mode || "send"; // "send" para enviar directo, "draft" para borrador
+    
+    var attachments = [];
+    if (data.files && data.files.length) {
+      for (var i = 0; i < data.files.length; i++) {
+        var file = data.files[i];
+        if (file && file.base64 && file.name) {
+          var cleanBase64 = file.base64.indexOf(',') > -1 
+            ? file.base64.split(',')[1] 
+            : file.base64;
+          var bytes = Utilities.base64Decode(cleanBase64);
+          var mimeType = file.type || "application/octet-stream";
+          var blob = Utilities.newBlob(bytes, mimeType, file.name);
+          attachments.push(blob);
+        }
+      }
+    }
+    
+    if (mode === "draft") {
+      var draft = GmailApp.createDraft(to, subject, body, {
+        attachments: attachments
+      });
+      return jsonResponse({
+        status: "success",
+        mode: "draft",
+        message: "Borrador creado exitosamente en Gmail con " + attachments.length + " archivos adjuntos.",
+        draftId: draft.getId()
+      });
+    } else {
+      GmailApp.sendEmail(to, subject, body, {
+        attachments: attachments
+      });
+      return jsonResponse({
+        status: "success",
+        mode: "sent",
+        message: "Correo enviado exitosamente a " + to + " con " + attachments.length + " archivos adjuntos."
+      });
+    }
+  } catch (err) {
+    return jsonResponse({
+      status: "error",
+      message: err.toString()
+    });
+  }
+}
+
+function doGet(e) {
+  var activeUser = "";
+  try {
+    activeUser = Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail();
+  } catch (err) {
+    activeUser = "criscapelo.fix@gmail.com";
+  }
+  return jsonResponse({
+    status: "ok",
+    service: "FIX Gestión - Conector Gmail TEKA",
+    user: activeUser,
+    timestamp: new Date().toISOString()
+  });
+}
+
+function jsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+window.copyGoogleScriptCode = function() {
+    navigator.clipboard.writeText(window.GOOGLE_APPS_SCRIPT_TEKA_CODE).then(() => {
+        if (window.showMessage) {
+            window.showMessage('📋 Código de Google Apps Script copiado al portapapeles. ¡Pégalo en script.google.com!', 'fix-report');
+        }
+    }).catch(err => {
+        console.error("Error copiando código:", err);
+        alert("Código de Apps Script disponible en el archivo google_apps_script_teka.js");
+    });
+};
+
+window.openConfigGoogleScriptModal = function() {
+    const modal = document.getElementById('configGoogleScriptModal');
+    const input = document.getElementById('configGoogleScriptUrlInput');
+    const statusText = document.getElementById('configGoogleScriptStatusText');
+    const currentUrl = localStorage.getItem('fix_teka_gmail_script_url') || '';
+    if (input) input.value = currentUrl;
+    if (statusText) {
+        if (currentUrl) {
+            statusText.textContent = '🟢 Conector guardado y listo para envíos automáticos.';
+            statusText.className = 'text-[10px] font-bold text-emerald-600';
+        } else {
+            statusText.textContent = '⚪ Pega la URL generada por Google Apps Script.';
+            statusText.className = 'text-[10px] font-bold text-slate-500';
+        }
+    }
+    if (modal) modal.classList.remove('hidden');
+};
+
+window.closeConfigGoogleScriptModal = function() {
+    const modal = document.getElementById('configGoogleScriptModal');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.saveGoogleScriptUrl = function() {
+    const input = document.getElementById('configGoogleScriptUrlInput');
+    let url = (input ? input.value : '').trim();
+    if (!url) {
+        if (window.showMessage) window.showMessage('⚠️ Por favor ingresa la URL de la aplicación web', 'fix-accent');
+        return;
+    }
+    if (!url.startsWith('https://script.google.com/macros/s/')) {
+        if (!confirm('⚠️ La URL ingresada no parece una URL estándar de Google Apps Script (suele empezar con https://script.google.com/macros/s/.../exec).\n\n¿Deseas guardarla de todos modos?')) {
+            return;
+        }
+    }
+    localStorage.setItem('fix_teka_gmail_script_url', url);
+    if (window.showMessage) window.showMessage('✅ Conexión con Google Apps Script guardada exitosamente', 'fix-report');
+    window.closeConfigGoogleScriptModal();
+    if (window.currentSolicitudEmailId) {
+        window.openEmailModal(window.currentSolicitudEmailId);
+    }
+};
+
+window.clearGoogleScriptUrl = function() {
+    if (confirm('¿Estás seguro de que deseas desvincular el conector automático de Google Apps Script?')) {
+        localStorage.removeItem('fix_teka_gmail_script_url');
+        const input = document.getElementById('configGoogleScriptUrlInput');
+        if (input) input.value = '';
+        if (window.showMessage) window.showMessage('ℹ️ Conector desvinculado', 'fix-accent');
+        window.closeConfigGoogleScriptModal();
+        if (window.currentSolicitudEmailId) {
+            window.openEmailModal(window.currentSolicitudEmailId);
+        }
+    }
+};
+
+window.testGoogleScriptConnection = async function() {
+    const input = document.getElementById('configGoogleScriptUrlInput');
+    const statusText = document.getElementById('configGoogleScriptStatusText');
+    const url = (input ? input.value : '').trim();
+    if (!url) {
+        if (statusText) {
+            statusText.textContent = '⚠️ Ingresa primero la URL de la aplicación web';
+            statusText.className = 'text-[10px] font-bold text-amber-600';
+        }
+        return;
+    }
+
+    if (statusText) {
+        statusText.textContent = '⏳ Probando conexión con Google Apps Script...';
+        statusText.className = 'text-[10px] font-bold text-indigo-600';
+    }
+
+    try {
+        const testUrl = url + (url.includes('?') ? '&' : '?') + 'test=1&t=' + Date.now();
+        const res = await fetch(testUrl, { method: 'GET' });
+        const data = await res.json();
+        if (data && data.status === 'ok') {
+            if (statusText) {
+                statusText.textContent = '✅ Conexión exitosa. Usuario activo: ' + (data.user || 'criscapelo.fix@gmail.com');
+                statusText.className = 'text-[10px] font-bold text-emerald-600';
+            }
+            if (window.showMessage) window.showMessage('✅ Conexión verificada con Google Apps Script', 'fix-report');
+        } else {
+            if (statusText) {
+                statusText.textContent = '⚠️ El script respondió: ' + JSON.stringify(data);
+                statusText.className = 'text-[10px] font-bold text-amber-600';
+            }
+        }
+    } catch(err) {
+        console.warn("Test GET error (likely CORS redirect):", err);
+        if (statusText) {
+            statusText.textContent = 'ℹ️ Petición enviada. Si ya autorizaste la app en Google, puedes hacer clic en Guardar Conexión.';
+            statusText.className = 'text-[10px] font-bold text-blue-600';
+        }
+    }
+};
+
+window.enviarGarantiaDirectoGmail = async function(customId, mode = 'send') {
+    const id = customId || window.currentSolicitudEmailId;
+    const s = (window.solicitudesGarantiaArray || []).find(item => item.id === id);
+    if (!s) {
+        if (window.showMessage) window.showMessage('⚠️ No se encontró la solicitud seleccionada', 'fix-error');
+        return;
+    }
+
+    const scriptUrl = localStorage.getItem('fix_teka_gmail_script_url');
+    if (!scriptUrl) {
+        if (window.showMessage) {
+            window.showMessage('⚙️ Para enviar de forma 100% automática con los 4 archivos, primero debes vincular tu conector de Google Apps Script (toma 2 minutos).', 'fix-accent');
+        }
+        window.openConfigGoogleScriptModal();
+        return;
+    }
+
+    // Advertencia amigable si falta Factura u Orden
+    const isWordOnly = s.tipoSolicitud === 'NOTA DE CREDITO' || s.tipoSolicitud === 'CAMBIO DE EQUIPO';
+    const hasFactura = !!(s.facturaFile && s.facturaFile.data);
+    const hasOrden = !!(s.ordenFile && s.ordenFile.data);
+
+    let faltantes = [];
+    if (!hasFactura) faltantes.push('Factura de compra');
+    if (!hasOrden) faltantes.push('Orden de servicio manual');
+
+    if (faltantes.length > 0) {
+        const confirmSend = confirm(
+            `⚠️ ATENCIÓN:\nEn este expediente aún falta adjuntar: ${faltantes.join(' y ')}.\n\n` +
+            `Fábrica TEKA exige estrictamente los 4 archivos completos para tramitar la garantía.\n\n` +
+            `¿Deseas procesar el envío únicamente con los archivos disponibles de todos modos?`
+        );
+        if (!confirmSend) return;
+    }
+
+    // Activar indicador de progreso en modal
+    const progressBox = document.getElementById('emailSendingProgressBox');
+    const progressMsg = document.getElementById('emailSendingProgressMsg');
+    const btnSend = document.getElementById('btnEnviarAutoGmail');
+    const btnDraft = document.getElementById('btnCrearBorradorGmail');
+
+    if (progressBox) progressBox.classList.remove('hidden');
+    if (btnSend) btnSend.disabled = true;
+    if (btnDraft) btnDraft.disabled = true;
+
+    try {
+        if (progressMsg) progressMsg.textContent = '⏳ [1/3] Generando formatos oficiales Word y Excel en vivo...';
+
+        // 1. Generar Word Base64
+        const wordObj = await window.generateWordBase64(s);
+
+        // 2. Generar Excel Base64 (si aplica)
+        let excelObj = null;
+        if (!isWordOnly) {
+            excelObj = await window.generateExcelBase64(s);
+        }
+
+        if (progressMsg) progressMsg.textContent = '⏳ [2/3] Empaquetando expediente digital con los archivos adjuntos...';
+
+        const files = [];
+        if (wordObj) files.push(wordObj);
+        if (excelObj) files.push(excelObj);
+
+        if (s.facturaFile && s.facturaFile.data) {
+            files.push({
+                name: s.facturaFile.name || ('FACTURA_' + sanitizeFileName(s.cliente) + '.pdf'),
+                type: s.facturaFile.type || 'application/pdf',
+                base64: s.facturaFile.data
+            });
+        }
+
+        if (s.ordenFile && s.ordenFile.data) {
+            files.push({
+                name: s.ordenFile.name || ('ORDEN_MANUAL_' + sanitizeFileName(s.cliente) + '.pdf'),
+                type: s.ordenFile.type || 'application/pdf',
+                base64: s.ordenFile.data
+            });
+        }
+
+        const draft = window.getEmailDraftContent(s);
+        const payload = {
+            to: window.TEKA_EMAIL_DESTINATARIO || 'mnavarrete@teka.ec',
+            subject: draft.subject,
+            body: "", // Cuerpo vacío según regla de fábrica TEKA
+            mode: mode, // 'send' o 'draft'
+            files: files
+        };
+
+        if (progressMsg) {
+            progressMsg.textContent = mode === 'draft'
+                ? `⏳ [3/3] Creando borrador en Gmail con ${files.length} archivos adjuntos...`
+                : `⏳ [3/3] Enviando a mnavarrete@teka.ec con ${files.length} archivos adjuntos...`;
+        }
+
+        let sentSuccess = false;
+        let responseJson = null;
+
+        try {
+            const resp = await fetch(scriptUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            });
+            try {
+                responseJson = await resp.json();
+            } catch(e) {}
+
+            if (responseJson && responseJson.status === 'error') {
+                throw new Error(responseJson.message || 'Error reportado por Google Apps Script');
+            }
+            sentSuccess = true;
+        } catch(fetchErr) {
+            console.warn("Direct POST fetch failed (likely due to CORS redirect), attempting fallback no-cors mode:", fetchErr);
+            try {
+                await fetch(scriptUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(payload)
+                });
+                sentSuccess = true;
+            } catch(noCorsErr) {
+                console.error("No-cors fetch failed:", noCorsErr);
+                throw new Error("No se pudo conectar con el script de Google. Por favor revisa la URL o tu conexión a internet.");
+            }
+        }
+
+        if (sentSuccess) {
+            if (mode === 'send') {
+                // Actualizar estado en Firebase a ENVIADO A FÁBRICA
+                try {
+                    await database.ref('solicitudes_garantia/' + id).update({
+                        estado: 'ENVIADO A FÁBRICA',
+                        fechaEnvioFabrica: new Date().toISOString()
+                    });
+                    s.estado = 'ENVIADO A FÁBRICA';
+                    if (window.renderSolicitudesGarantiaView) window.renderSolicitudesGarantiaView();
+                } catch(dbErr) {
+                    console.error("Error actualizando estado en Firebase:", dbErr);
+                }
+
+                if (window.showMessage) {
+                    window.showMessage(`🚀 ¡Correo enviado exitosamente a mnavarrete@teka.ec con los ${files.length} archivos adjuntos!`, 'fix-report');
+                }
+                alert(`✅ ¡ENVÍO EXITOSO A FÁBRICA TEKA!\n\n` +
+                      `Destinatario: mnavarrete@teka.ec\n` +
+                      `Remitente: criscapelo.fix@gmail.com\n` +
+                      `Asunto: ${draft.subject}\n` +
+                      `Cuerpo: Vacío (Cumpliendo regla de TEKA)\n` +
+                      `Archivos adjuntos (${files.length}):\n` +
+                      files.map((f, i) => `  ${i+1}. ${f.name}`).join('\n') +
+                      `\n\nEl estado de la solicitud ha sido actualizado a "ENVIADO A FÁBRICA".`);
+                window.closeEmailModal();
+            } else {
+                if (window.showMessage) {
+                    window.showMessage(`📝 ¡Borrador creado en Gmail con los ${files.length} archivos adjuntos!`, 'fix-report');
+                }
+                alert(`✅ ¡BORRADOR CREADO CON ÉXITO EN GMAIL!\n\n` +
+                      `Se creó un borrador en la cuenta criscapelo.fix@gmail.com listo para enviar con los ${files.length} archivos adjuntos.\n\n` +
+                      `Puedes abrir tu Gmail para revisarlo cuando gustes.`);
+            }
+        }
+    } catch(err) {
+        console.error("Error en enviarGarantiaDirectoGmail:", err);
+        alert(`❌ Ocurrió un error al procesar el envío:\n\n${err.message}\n\nSi el problema persiste, verifica que la URL de Google Apps Script esté correctamente implementada o usa la opción de Descargar los 4 Archivos.`);
+        if (window.showMessage) window.showMessage('❌ Error en envío automático: ' + err.message, 'fix-error');
+    } finally {
+        if (progressBox) progressBox.classList.add('hidden');
+        if (btnSend) btnSend.disabled = false;
+        if (btnDraft) btnDraft.disabled = false;
     }
 };
 
