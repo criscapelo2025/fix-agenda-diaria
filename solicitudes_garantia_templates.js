@@ -939,31 +939,131 @@ window.downloadAttachmentFromList = function(id, type) {
     }
 };
 
+// ==========================================================================
+// CONFIGURACIÓN DE CORREO OFICIAL TEKA
+// ==========================================================================
+window.TEKA_EMAIL_DESTINATARIO = 'mnavarrete@teka.ec';
+window.TEKA_EMAIL_REMITENTE = 'criscapelo.fix@gmail.com';
+window.currentSolicitudEmailId = null;
+
 // Modal de correo electronico preparado
 window.openEmailModal = function(id) {
     const s = (window.solicitudesGarantiaArray || []).find(item => item.id === id);
     if (!s) return;
 
+    window.currentSolicitudEmailId = id;
     const draft = window.getEmailDraftContent(s);
-    document.getElementById('emailModalSubject').value = draft.subject;
-    document.getElementById('emailModalBody').value = draft.body;
-    document.getElementById('emailModalClientName').textContent = s.cliente;
-    document.getElementById('emailModalNum').textContent = s.numeroSolicitud;
+    const destino = window.TEKA_EMAIL_DESTINATARIO || 'mnavarrete@teka.ec';
+    const remitente = window.TEKA_EMAIL_REMITENTE || 'criscapelo.fix@gmail.com';
 
-    // Actualizar aviso de adjuntos según si es Repuesto o Nota de Crédito/Cambio
-    const noticeEl = document.getElementById('emailModalNotice');
-    if (noticeEl) {
-        if (s.tipoSolicitud === 'NOTA DE CREDITO' || s.tipoSolicitud === 'CAMBIO DE EQUIPO') {
-            noticeEl.innerHTML = `📎 Adjuntar <strong>3 documentos</strong>: Formato Word (.docx) oficial, Factura y Orden Manual. <span class="text-amber-300 font-bold">(No requiere archivo Excel)</span>`;
-        } else {
-            noticeEl.innerHTML = `📎 Recuerda adjuntar los <strong>4 documentos requeridos</strong>: Word oficial (.docx), Excel oficial (.xlsx), Factura y Orden de Servicio manual.`;
-        }
+    const subjEl = document.getElementById('emailModalSubject');
+    if (subjEl) subjEl.value = draft.subject;
+    const bodyEl = document.getElementById('emailModalBody');
+    if (bodyEl) bodyEl.value = draft.body;
+    const clientEl = document.getElementById('emailModalClientName');
+    if (clientEl) clientEl.textContent = s.cliente;
+    const numEl = document.getElementById('emailModalNum');
+    if (numEl) numEl.textContent = s.numeroSolicitud;
+
+    const destEl = document.getElementById('emailModalDestino');
+    if (destEl) destEl.textContent = destino;
+    const remEl = document.getElementById('emailModalRemitente');
+    if (remEl) remEl.textContent = remitente;
+
+    // Configurar enlace de Gmail Web directo con la cuenta criscapelo.fix@gmail.com
+    const gmailBtn = document.getElementById('emailModalGmailBtn');
+    if (gmailBtn) {
+        gmailBtn.href = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(destino)}&authuser=${encodeURIComponent(remitente)}&su=${encodeURIComponent(draft.subject)}`;
     }
 
-    // Mailto button
+    // Configurar enlace Mailto
     const mailtoBtn = document.getElementById('emailModalMailtoBtn');
     if (mailtoBtn) {
-        mailtoBtn.href = 'mailto:?subject=' + encodeURIComponent(draft.subject);
+        mailtoBtn.href = `mailto:${destino}?subject=${encodeURIComponent(draft.subject)}`;
+    }
+
+    // Renderizar Checklist visual de los 4 Documentos con estados y botones
+    const docsGrid = document.getElementById('emailModalDocsGrid');
+    if (docsGrid) {
+        const isWordOnly = s.tipoSolicitud === 'NOTA DE CREDITO' || s.tipoSolicitud === 'CAMBIO DE EQUIPO';
+        const hasFactura = !!(s.facturaFile && s.facturaFile.data);
+        const hasOrden = !!(s.ordenFile && s.ordenFile.data);
+
+        docsGrid.innerHTML = `
+            <!-- 1. Word Oficial -->
+            <div class="p-3 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 shadow-2xs">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span class="text-xl shrink-0">📄</span>
+                    <div class="truncate">
+                        <p class="text-[11px] font-black uppercase text-slate-800 truncate">1. Formato Word Oficial (.docx)</p>
+                        <p class="text-[9px] font-bold text-emerald-600">✅ Generación en vivo lista</p>
+                    </div>
+                </div>
+                <button type="button" onclick="downloadSolicitudWordFromList('${s.id}')" class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase shrink-0 transition-all active:scale-95 cursor-pointer" title="Descargar Word">
+                    ⬇️ Bajar
+                </button>
+            </div>
+
+            <!-- 2. Excel Oficial -->
+            <div class="p-3 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 shadow-2xs">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span class="text-xl shrink-0">📊</span>
+                    <div class="truncate">
+                        <p class="text-[11px] font-black uppercase text-slate-800 truncate">2. Formato Excel Oficial (.xlsx)</p>
+                        <p class="text-[9px] font-bold ${isWordOnly ? 'text-stone-400' : 'text-emerald-600'}">${isWordOnly ? '🚫 No aplica para este trámite' : '✅ Generación en vivo lista'}</p>
+                    </div>
+                </div>
+                ${isWordOnly ? `
+                    <span class="px-2.5 py-1.5 bg-stone-100 text-stone-400 rounded-lg text-[9px] font-bold uppercase shrink-0">No aplica</span>
+                ` : `
+                    <button type="button" onclick="downloadSolicitudExcelFromList('${s.id}')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase shrink-0 transition-all active:scale-95 cursor-pointer" title="Descargar Excel">
+                        ⬇️ Bajar
+                    </button>
+                `}
+            </div>
+
+            <!-- 3. Factura de Compra -->
+            <div class="p-3 rounded-xl bg-white border ${hasFactura ? 'border-slate-200' : 'border-amber-300 bg-amber-50/50'} flex items-center justify-between gap-2 shadow-2xs">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span class="text-xl shrink-0">🧾</span>
+                    <div class="truncate">
+                        <p class="text-[11px] font-black uppercase text-slate-800 truncate">3. Factura de Compra</p>
+                        <p class="text-[9px] font-bold ${hasFactura ? 'text-emerald-600 truncate' : 'text-amber-700'}">${hasFactura ? ('✅ ' + (s.facturaFile.name || 'Cargada')) : '⚠️ Falta adjuntar factura'}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    ${hasFactura ? `
+                        <button type="button" onclick="downloadAttachmentFromList('${s.id}', 'factura')" class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase transition-all active:scale-95 cursor-pointer" title="Ver / Descargar">
+                            Ver
+                        </button>
+                    ` : ''}
+                    <button type="button" onclick="uploadAttachmentFromEmailModal('factura')" class="px-2.5 py-1.5 ${hasFactura ? 'bg-slate-200 hover:bg-slate-300 text-slate-800' : 'bg-amber-600 hover:bg-amber-700 text-white'} rounded-lg text-[10px] font-black uppercase transition-all active:scale-95 cursor-pointer" title="Cargar factura">
+                        ${hasFactura ? 'Cambiar' : '➕ Cargar'}
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. Orden de Servicio Manual -->
+            <div class="p-3 rounded-xl bg-white border ${hasOrden ? 'border-slate-200' : 'border-amber-300 bg-amber-50/50'} flex items-center justify-between gap-2 shadow-2xs">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span class="text-xl shrink-0">📋</span>
+                    <div class="truncate">
+                        <p class="text-[11px] font-black uppercase text-slate-800 truncate">4. Orden de Servicio Manual</p>
+                        <p class="text-[9px] font-bold ${hasOrden ? 'text-emerald-600 truncate' : 'text-amber-700'}">${hasOrden ? ('✅ ' + (s.ordenFile.name || 'Cargada')) : '⚠️ Falta adjuntar orden'}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    ${hasOrden ? `
+                        <button type="button" onclick="downloadAttachmentFromList('${s.id}', 'orden')" class="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-black uppercase transition-all active:scale-95 cursor-pointer" title="Ver / Descargar">
+                            Ver
+                        </button>
+                    ` : ''}
+                    <button type="button" onclick="uploadAttachmentFromEmailModal('orden')" class="px-2.5 py-1.5 ${hasOrden ? 'bg-slate-200 hover:bg-slate-300 text-slate-800' : 'bg-amber-600 hover:bg-amber-700 text-white'} rounded-lg text-[10px] font-black uppercase transition-all active:scale-95 cursor-pointer" title="Cargar orden manual">
+                        ${hasOrden ? 'Cambiar' : '➕ Cargar'}
+                    </button>
+                </div>
+            </div>
+        `;
     }
 
     const modal = document.getElementById('emailGarantiaModal');
@@ -973,6 +1073,7 @@ window.openEmailModal = function(id) {
 window.closeEmailModal = function() {
     const modal = document.getElementById('emailGarantiaModal');
     if (modal) modal.classList.add('hidden');
+    window.currentSolicitudEmailId = null;
 };
 
 window.copyEmailSubject = function() {
@@ -985,8 +1086,120 @@ window.copyEmailSubject = function() {
     }
 };
 
+window.copyEmailRecipient = function() {
+    const email = window.TEKA_EMAIL_DESTINATARIO || 'mnavarrete@teka.ec';
+    navigator.clipboard.writeText(email).then(() => {
+        if (window.showMessage) window.showMessage('📋 Correo copiado: ' + email, 'fix-report');
+    });
+};
+
 window.copyEmailText = function() {
     window.copyEmailSubject();
+};
+
+window.uploadAttachmentFromEmailModal = function(type) {
+    const input = document.getElementById(type === 'factura' ? 'emailModalFacturaUploadInput' : 'emailModalOrdenUploadInput');
+    if (input) input.click();
+};
+
+window.handleEmailModalFileUpload = async function(event, type) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+        if (window.showMessage) window.showMessage('⚠️ El archivo no debe superar los 10MB', 'fix-accent');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const fileObj = {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            data: e.target.result,
+            uploadedAt: Date.now()
+        };
+
+        const id = window.currentSolicitudEmailId;
+        if (!id) return;
+
+        const updateObj = {};
+        if (type === 'factura') {
+            updateObj.facturaFile = fileObj;
+        } else {
+            updateObj.ordenFile = fileObj;
+        }
+
+        try {
+            await database.ref('solicitudes_garantia/' + id).update(updateObj);
+            const s = (window.solicitudesGarantiaArray || []).find(item => item.id === id);
+            if (s) {
+                if (type === 'factura') s.facturaFile = fileObj;
+                else s.ordenFile = fileObj;
+            }
+            if (window.showMessage) window.showMessage('✅ ' + (type === 'factura' ? 'Factura' : 'Orden manual') + ' cargada y guardada', 'fix-report');
+            window.openEmailModal(id);
+            if (window.renderSolicitudesGarantiaView) window.renderSolicitudesGarantiaView();
+        } catch(err) {
+            console.error(err);
+            if (window.showMessage) window.showMessage('❌ Error guardando archivo', 'fix-error');
+        }
+    };
+    reader.readAsDataURL(file);
+};
+
+window.downloadAll4FilesForEmail = async function(customId) {
+    const id = customId || window.currentSolicitudEmailId;
+    const s = (window.solicitudesGarantiaArray || []).find(item => item.id === id);
+    if (!s) return;
+
+    if (window.showMessage) {
+        window.showMessage("⏳ Descargando los 4 documentos del caso para adjuntar...", "fix-report");
+    }
+
+    // 1. Word oficial (.docx)
+    try {
+        await window.generateWordGarantia(s);
+    } catch(e) {
+        console.error("Error generando Word:", e);
+    }
+
+    // 2. Excel oficial (.xlsx) si aplica
+    const isWordOnly = s.tipoSolicitud === 'NOTA DE CREDITO' || s.tipoSolicitud === 'CAMBIO DE EQUIPO';
+    if (!isWordOnly) {
+        setTimeout(async () => {
+            try {
+                await window.generateExcelGarantia(s);
+            } catch(e) {
+                console.error("Error generando Excel:", e);
+            }
+        }, 500);
+    }
+
+    // 3. Factura (si está adjunta)
+    if (s.facturaFile && s.facturaFile.data) {
+        setTimeout(() => {
+            const a = document.createElement('a');
+            a.href = s.facturaFile.data;
+            a.download = s.facturaFile.name || ('FACTURA_' + sanitizeFileName(s.cliente) + '.pdf');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }, 1000);
+    }
+
+    // 4. Orden de servicio manual (si está adjunta)
+    if (s.ordenFile && s.ordenFile.data) {
+        setTimeout(() => {
+            const a = document.createElement('a');
+            a.href = s.ordenFile.data;
+            a.download = s.ordenFile.name || ('ORDEN_MANUAL_' + sanitizeFileName(s.cliente) + '.pdf');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }, 1500);
+    }
 };
 
 // ==========================================================================
@@ -1126,9 +1339,9 @@ window.renderSolicitudesGarantiaView = function() {
                                 📊 Excel
                             </button>
                         `}
-                        <!-- CORREO PREPARADO -->
-                        <button type="button" onclick="openEmailModal('${s.id}')" class="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase shadow-xs transition-all active:scale-95" title="Preparar Correo para Srta. Marcia">
-                            ✉️
+                        <!-- CORREO PREPARADO GMAIL -->
+                        <button type="button" onclick="openEmailModal('${s.id}')" class="p-2 bg-gradient-to-r from-red-600 to-indigo-600 hover:from-red-700 hover:to-indigo-700 text-white rounded-xl text-xs font-black uppercase shadow-xs transition-all active:scale-95 flex items-center gap-1 cursor-pointer" title="Enviar correo a mnavarrete@teka.ec desde criscapelo.fix@gmail.com con los 4 archivos">
+                            <span>✉️</span> <span class="hidden xl:inline text-[10px]">Gmail</span>
                         </button>
                         <!-- EDITAR -->
                         <button type="button" onclick="openEditSolicitudModal('${s.id}')" class="p-2 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded-xl text-xs font-black shadow-xs transition-all" title="Editar Expediente">
