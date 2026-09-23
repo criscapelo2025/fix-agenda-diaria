@@ -38,6 +38,7 @@
     <script src="teka_repuestos.js"></script>
     <script src="solicitudes_garantia_templates.js"></script>
     <script src="reporte_diario.js"></script>
+    <script src="notas_rapidas.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -464,6 +465,40 @@
             background: linear-gradient(135deg, #be123c 0%, #e11d48 100%) !important;
             color: #ffffff !important;
             border-color: #fb7185 !important;
+        }
+
+        /* 6. Garantías (Índigo / Azul Royal) */
+        .sidebar-btn-garantias {
+            background: rgba(49, 46, 129, 0.28);
+            color: #c7d2fe;
+            border-color: rgba(99, 102, 241, 0.35);
+        }
+        .sidebar-btn-garantias:hover {
+            background: rgba(67, 56, 202, 0.4);
+            color: #ffffff;
+            border-color: rgba(129, 140, 248, 0.6);
+        }
+        .sidebar-btn-garantias.active {
+            background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%) !important;
+            color: #ffffff !important;
+            border-color: #818cf8 !important;
+        }
+
+        /* 7. Notas Rápidas (Ámbar / Naranja Cálido) */
+        .sidebar-btn-notas {
+            background: rgba(124, 45, 18, 0.28);
+            color: #fed7aa;
+            border-color: rgba(249, 115, 22, 0.35);
+        }
+        .sidebar-btn-notas:hover {
+            background: rgba(194, 65, 12, 0.4);
+            color: #ffffff;
+            border-color: rgba(251, 146, 60, 0.6);
+        }
+        .sidebar-btn-notas.active {
+            background: linear-gradient(135deg, #c2410c 0%, #ea580c 100%) !important;
+            color: #ffffff !important;
+            border-color: #fb923c !important;
         }
 
         /* Módulos Secundarios */
@@ -1644,6 +1679,7 @@
             'contabilidad': { icon: '💰', title: 'Caja y Liquidaciones' },
             'catalogo': { icon: '📚', title: 'Catálogo TEKA 2026' },
             'garantias': { icon: '🛡️', title: 'Garantías y Repuestos' },
+            'notas': { icon: '📌', title: 'Notas y Tareas Rápidas' },
             'dashboard': { icon: '📊', title: 'Resultados Totales' },
             'reporte_teka': { icon: '📋', title: 'Reporte Oficial TEKA' },
             'reporte_diario': { icon: '📅', title: 'Reporte Diario' },
@@ -1717,6 +1753,7 @@
             if (v === 'reporte_teka') return document.getElementById('reporteTekaView');
             if (v === 'reporte_diario') return document.getElementById('reporteDiarioView');
             if (v === 'solicitudes_garantia') return document.getElementById('garantiasView');
+            if (v === 'notas') return document.getElementById('notasView');
             return document.getElementById(v + 'View');
         };
 
@@ -1787,7 +1824,7 @@
             }
 
             // Limpiar clases y órdenes flex de todos los paneles
-            const allViews = ['dashboardView', 'clientesView', 'buscadorView', 'reporte_adminView', 'tallerView', 'garantiasView', 'pendientesView', 'mantenimientoView', 'inventoryView', 'ruteroView', 'reporteDiarioView', 'reporteTekaView', 'catalogoView', 'contabilidadView'];
+            const allViews = ['dashboardView', 'clientesView', 'buscadorView', 'reporte_adminView', 'tallerView', 'garantiasView', 'pendientesView', 'mantenimientoView', 'inventoryView', 'ruteroView', 'reporteDiarioView', 'reporteTekaView', 'catalogoView', 'contabilidadView', 'notasView'];
             allViews.forEach(function(id) {
                 const el = document.getElementById(id);
                 if (el) {
@@ -1924,6 +1961,9 @@
             } else if(v === 'catalogo') {
                 const cv = document.getElementById('catalogoView'); if(cv) cv.classList.remove('hidden');
                 if(window.renderCatalogoView) renderCatalogoView();
+            } else if(v === 'notas') {
+                const nv = document.getElementById('notasView'); if(nv) nv.classList.remove('hidden');
+                if(window.renderNotasRapidasView) renderNotasRapidasView();
             } else {
                 const el = document.getElementById(v + 'View'); if(el) el.classList.remove('hidden');
             }
@@ -1942,7 +1982,7 @@
                 'reporte_adminView', 'tallerView', 'garantiasView',
                 'pendientesView', 'mantenimientoView', 'inventoryView',
                 'ruteroView', 'reporteDiarioView', 'reporteTekaView',
-                'catalogoView', 'contabilidadView'
+                'catalogoView', 'contabilidadView', 'notasView'
             ];
 
             // 1. Ocultar y limpiar clases/orden de todos los paneles
@@ -2025,7 +2065,7 @@
                 return;
             }
 
-            const sections = ['reporte_adminView', 'formContainer', 'contabilidadView', 'reporteTekaView', 'reporteDiarioView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'solicitudesGarantiaView', 'clientesView', 'dashboardView', 'catalogoView'];
+            const sections = ['reporte_adminView', 'formContainer', 'contabilidadView', 'reporteTekaView', 'reporteDiarioView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'solicitudesGarantiaView', 'clientesView', 'dashboardView', 'catalogoView', 'notasView'];
             sections.forEach(function(id) { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
 
             window.activateSingleView(currentView);
@@ -8714,6 +8754,10 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                 window.updateHeaderViewIndicator(currentView || 'reporte_admin');
             }
 
+            if (window.initNotasRapidas) {
+                window.initNotasRapidas();
+            }
+
             if (isFirebaseFallback) {
                 setTimeout(() => { showMessage("🔌 MODO SIN CONEXIÓN (MOCK DE RESERVA ACTIVO)", "fix-accent"); }, 1500);
             }
@@ -8745,6 +8789,9 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
         </button>
         <button onclick="changeMasterView('garantias')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="garantias">
             <span class="text-xl leading-none">🛡️</span><span class="text-[9px] mt-1 font-bold">Garantías</span>
+        </button>
+        <button onclick="changeMasterView('notas')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="notas">
+            <span class="text-xl leading-none">📌</span><span class="text-[9px] mt-1 font-bold">Notas</span>
         </button>
         <button onclick="changeMasterView('reporte_teka')" class="mobile-nav-btn flex flex-col items-center p-2 text-stone-400 transition-all shrink-0" data-view="reporte_teka">
             <span class="text-xl leading-none">📋</span><span class="text-[9px] mt-1 font-bold">TEKA</span>
@@ -8782,7 +8829,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
 
         <!-- Contenedor Nav con Scroll Interno -->
         <nav id="adminNav" class="sidebar-nav-container flex-1 p-3 space-y-4 overflow-y-auto no-scrollbar admin-only">
-            <!-- SECCIÓN 1: LOS 5 MÓDULOS MÁS UTILIZADOS (DESTACADOS) -->
+            <!-- SECCIÓN 1: MÓDULOS PRINCIPALES (DESTACADOS) -->
             <div>
                 <div class="px-2 pb-2 flex items-center justify-between text-[10px] font-black tracking-wider uppercase text-blue-400 sidebar-section-title">
                     <span class="flex items-center gap-1">★ Más Utilizados</span>
@@ -8848,6 +8895,30 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <div class="sidebar-subtext text-[10px] text-rose-200/70 font-medium truncate">Precios y Repuestos 2026</div>
                         </div>
                     </button>
+
+                    <!-- 6. GARANTÍAS -->
+                    <button type="button" onclick="changeMasterView('garantias')" class="sidebar-nav-btn view-btn sidebar-priority-btn sidebar-btn-garantias w-full text-left" data-view="garantias" title="Garantías y Solicitudes de Repuestos TEKA">
+                        <span class="w-9 h-9 rounded-xl bg-indigo-600/30 flex items-center justify-center text-lg shrink-0 border border-indigo-400/40 shadow-xs">🛡️</span>
+                        <div class="sidebar-label min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-black text-xs sm:text-sm text-white tracking-tight">Garantías</span>
+                                <span class="sidebar-badge text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200 border border-indigo-400/30">TEKA</span>
+                            </div>
+                            <div class="sidebar-subtext text-[10px] text-indigo-200/70 font-medium truncate">Solicitud y Repuestos</div>
+                        </div>
+                    </button>
+
+                    <!-- 7. NOTAS RÁPIDAS -->
+                    <button type="button" onclick="changeMasterView('notas')" class="sidebar-nav-btn view-btn sidebar-priority-btn sidebar-btn-notas w-full text-left" data-view="notas" title="Notas Rápidas: Tareas y Borrador Operativo">
+                        <span class="w-9 h-9 rounded-xl bg-amber-500/30 flex items-center justify-center text-lg shrink-0 border border-amber-400/40 shadow-xs">📌</span>
+                        <div class="sidebar-label min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-black text-xs sm:text-sm text-white tracking-tight">Notas Rápidas</span>
+                                <span class="sidebar-badge text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-400/30">Tareas</span>
+                            </div>
+                            <div class="sidebar-subtext text-[10px] text-amber-200/70 font-medium truncate">Borrador Operativo Ágil</div>
+                        </div>
+                    </button>
                 </div>
             </div>
 
@@ -8855,7 +8926,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
             <div class="pt-2 border-t border-slate-800">
                 <div class="px-2 pb-2 flex items-center justify-between text-[10px] font-black tracking-wider uppercase text-slate-400 sidebar-section-title">
                     <span>Otros Módulos</span>
-                    <span class="text-[9px] font-mono text-slate-500 bg-slate-800/80 px-1.5 py-0.5 rounded">9</span>
+                    <span class="text-[9px] font-mono text-slate-500 bg-slate-800/80 px-1.5 py-0.5 rounded">8</span>
                 </div>
                 <div class="space-y-1">
                     <button type="button" onclick="changeMasterView('dashboard')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="dashboard" title="Resultados Totales">
@@ -8869,10 +8940,6 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                     <button type="button" onclick="changeMasterView('reporte_diario')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="reporte_diario" title="Reporte Diario Excel">
                         <span class="text-base shrink-0">📅</span>
                         <span class="sidebar-label min-w-0 flex-1 truncate">Reporte Diario</span>
-                    </button>
-                    <button type="button" onclick="changeMasterView('garantias')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="garantias" title="Garantías y Solicitudes de Repuestos TEKA">
-                        <span class="text-base shrink-0">🛡️</span>
-                        <span class="sidebar-label min-w-0 flex-1 truncate">Garantías y Repuestos</span>
                     </button>
                     <button type="button" onclick="changeMasterView('pendientes')" class="sidebar-nav-btn view-btn sidebar-secondary-btn w-full text-left" data-view="pendientes" title="Seguimiento de Servicios Pendientes">
                         <span class="text-base shrink-0">⏳</span>
@@ -8971,6 +9038,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <option value="contabilidad">💰 Caja Chica y Finanzas</option>
                         <option value="catalogo">📚 Catálogo TEKA 2026</option>
                         <option value="garantias">🛡️ Garantías y Repuestos</option>
+                        <option value="notas">📌 Notas y Tareas Rápidas</option>
                         <option value="dashboard">📊 Resultados Totales</option>
                         <option value="reporte_teka">📋 Reporte Oficial TEKA</option>
                         <option value="reporte_diario">📅 Reporte Diario</option>
@@ -9018,6 +9086,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <option value="contabilidad">💰 Caja Chica y Finanzas</option>
                         <option value="catalogo">📚 Catálogo TEKA 2026</option>
                         <option value="garantias">🛡️ Garantías y Repuestos</option>
+                        <option value="notas">📌 Notas y Tareas Rápidas</option>
                         <option value="dashboard">📊 Resultados Totales</option>
                         <option value="reporte_teka">📋 Reporte Oficial TEKA</option>
                         <option value="reporte_diario">📅 Reporte Diario</option>
@@ -10629,6 +10698,146 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             </div>
                         </div>
 
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- VISTA NOTAS Y TAREAS RÁPIDAS (BORRADOR OPERATIVO ÁGIL) -->
+            <div id="notasView" class="hidden lg:col-span-3 space-y-6 admin-only">
+                <div class="glass-card p-4 sm:p-6 md:p-8 rounded-2xl">
+                    
+                    <!-- Encabezado de la vista -->
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-stone-200/80 pb-5">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-amber-500 text-white text-[10px] px-2.5 py-1 rounded-lg font-black tracking-wider uppercase">Borrador Operativo</span>
+                                <span class="text-xs text-slate-500 font-bold">⚡ Agilidad Total</span>
+                            </div>
+                            <h2 class="text-xl sm:text-2xl font-black text-slate-800 tracking-tight mt-1 flex items-center gap-2">
+                                <span>📌</span> Notas y Tareas Rápidas
+                            </h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Escribe varias tareas en borrador, tacha las ejecutadas y agenda fechas con un clic.</p>
+                        </div>
+                        
+                        <!-- Acciones Rápidas del encabezado -->
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button type="button" onclick="clearCompletedTasks()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 border border-slate-200 hover:border-rose-300 text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95" title="Eliminar todas las tareas tachadas">
+                                <span>🧹</span> <span>Limpiar Tachadas</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CAJA DE ENTRADA RÁPIDA (OPTIMIZADA PARA TECLADO / ENTER) -->
+                    <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 border-2 border-amber-400/40 shadow-sm mb-6">
+                        <form onsubmit="addQuickTask(event)" class="space-y-3">
+                            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <div class="relative flex-1">
+                                    <input type="text" id="quickTaskInput" placeholder="✍️ Escribe una tarea o pendiente y presiona ENTER..." autofocus autocomplete="off" class="w-full bg-white border-2 border-amber-300 focus:border-amber-500 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder-slate-400 outline-none shadow-xs transition-all">
+                                </div>
+                                <button type="submit" class="px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-wider shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer active:scale-95">
+                                    <span>➕</span> <span>Anotar (Enter)</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Controles auxiliares en una sola línea -->
+                            <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-[11px] font-bold text-slate-600">Fecha:</span>
+                                    <input type="date" id="quickTaskDate" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-700 outline-none focus:border-amber-500">
+                                    <button type="button" onclick="setQuickInputDateShortcut('hoy')" class="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-black transition-all cursor-pointer">Hoy</button>
+                                    <button type="button" onclick="setQuickInputDateShortcut('manana')" class="px-2 py-0.5 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-800 text-[10px] font-black transition-all cursor-pointer">Mañana</button>
+                                    <button type="button" onclick="setQuickInputDateShortcut('sin_fecha')" class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-black transition-all cursor-pointer">Sin Fecha</button>
+                                </div>
+                                
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-bold text-slate-600">Etiqueta:</span>
+                                    <select id="quickTaskPriority" class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-amber-500">
+                                        <option value="NORMAL">Normal</option>
+                                        <option value="URGENTE">🔴 Urgente</option>
+                                        <option value="REPUESTO">📦 Repuesto</option>
+                                        <option value="LLAMADA">📞 Llamada</option>
+                                        <option value="TALLER">🏢 Taller</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- 5 TARJETAS KPI -->
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+                        <div onclick="setNotasFilter('pendientes')" class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 cursor-pointer hover:shadow-xs transition-all">
+                            <div class="text-[10px] font-black uppercase text-amber-800 flex items-center justify-between">
+                                <span>⏳ Pendientes</span>
+                            </div>
+                            <div id="kpiNotasPendientes" class="text-2xl font-black text-amber-900 mt-1">0</div>
+                            <div class="text-[9px] text-amber-700 font-bold mt-0.5">Por ejecutar</div>
+                        </div>
+                        <div onclick="setNotasFilter('hoy')" class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 cursor-pointer hover:shadow-xs transition-all">
+                            <div class="text-[10px] font-black uppercase text-emerald-800 flex items-center justify-between">
+                                <span>🟢 Para Hoy</span>
+                            </div>
+                            <div id="kpiNotasHoy" class="text-2xl font-black text-emerald-900 mt-1">0</div>
+                            <div class="text-[9px] text-emerald-700 font-bold mt-0.5">Prioridad diaria</div>
+                        </div>
+                        <div onclick="setNotasFilter('futuras')" class="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 cursor-pointer hover:shadow-xs transition-all">
+                            <div class="text-[10px] font-black uppercase text-blue-800 flex items-center justify-between">
+                                <span>📅 Futuras</span>
+                            </div>
+                            <div id="kpiNotasFuturas" class="text-2xl font-black text-blue-900 mt-1">0</div>
+                            <div class="text-[9px] text-blue-700 font-bold mt-0.5">Próximos días</div>
+                        </div>
+                        <div onclick="setNotasFilter('ejecutadas')" class="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 cursor-pointer hover:shadow-xs transition-all">
+                            <div class="text-[10px] font-black uppercase text-slate-600 flex items-center justify-between">
+                                <span>✔️ Tachadas</span>
+                            </div>
+                            <div id="kpiNotasEjecutadas" class="text-2xl font-black text-slate-700 mt-1">0</div>
+                            <div class="text-[9px] text-slate-500 font-bold mt-0.5">Completadas</div>
+                        </div>
+                        <div onclick="setNotasFilter('todas')" class="p-3.5 rounded-2xl bg-purple-50 border border-purple-200 cursor-pointer hover:shadow-xs transition-all col-span-2 sm:col-span-1">
+                            <div class="text-[10px] font-black uppercase text-purple-800 flex items-center justify-between">
+                                <span>📋 Total</span>
+                            </div>
+                            <div id="kpiNotasTotal" class="text-2xl font-black text-purple-900 mt-1">0</div>
+                            <div class="text-[9px] text-purple-700 font-bold mt-0.5">Historial notas</div>
+                        </div>
+                    </div>
+
+                    <!-- BARRA DE FILTROS Y BÚSQUEDA -->
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <button id="notasFilterBtn_pendientes" type="button" onclick="setNotasFilter('pendientes')" class="px-3.5 py-2 rounded-xl text-xs font-black uppercase transition-all shadow-sm bg-indigo-600 text-white flex items-center gap-1.5 cursor-pointer">
+                                <span>⏳ Pendientes</span>
+                                <span id="filterBadge_pendientes" class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">0</span>
+                            </button>
+                            <button id="notasFilterBtn_hoy" type="button" onclick="setNotasFilter('hoy')" class="px-3.5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 cursor-pointer">
+                                <span>🟢 Hoy</span>
+                                <span id="filterBadge_hoy" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200">0</span>
+                            </button>
+                            <button id="notasFilterBtn_futuras" type="button" onclick="setNotasFilter('futuras')" class="px-3.5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 cursor-pointer">
+                                <span>📅 Futuras</span>
+                                <span id="filterBadge_futuras" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200">0</span>
+                            </button>
+                            <button id="notasFilterBtn_ejecutadas" type="button" onclick="setNotasFilter('ejecutadas')" class="px-3.5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 cursor-pointer">
+                                <span>✔️ Tachadas</span>
+                                <span id="filterBadge_ejecutadas" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200">0</span>
+                            </button>
+                            <button id="notasFilterBtn_todas" type="button" onclick="setNotasFilter('todas')" class="px-3.5 py-2 rounded-xl text-xs font-bold uppercase transition-all bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 cursor-pointer">
+                                <span>Todas</span>
+                                <span id="filterBadge_todas" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200">0</span>
+                            </button>
+                        </div>
+
+                        <!-- Buscador en tiempo real -->
+                        <div class="relative w-full sm:w-64">
+                            <input type="text" id="notasSearchInput" oninput="renderNotasRapidasView()" placeholder="🔍 Filtrar tareas..." class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 pl-8 text-xs font-medium text-slate-800 outline-none focus:border-indigo-500 shadow-2xs">
+                            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+                        </div>
+                    </div>
+
+                    <!-- LISTADO DE TAREAS -->
+                    <div id="notasListContainer" class="space-y-2.5">
+                        <!-- Se llena dinámicamente vía renderNotasRapidasView() -->
                     </div>
 
                 </div>
