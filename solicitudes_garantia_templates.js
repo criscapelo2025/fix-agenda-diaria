@@ -1635,12 +1635,25 @@ window.enviarGarantiaDirectoGmail = async function(customId, mode = 'send') {
                       `\n\nEl estado de la solicitud ha sido actualizado a "ENVIADO A FÁBRICA".`);
                 window.closeEmailModal();
             } else {
-                if (window.showMessage) {
-                    window.showMessage(`📝 ¡Borrador creado en Gmail con los ${files.length} archivos adjuntos!`, 'fix-report');
+                // Abrir automáticamente la pestaña de Gmail en Borradores para revisión inmediata
+                try {
+                    window.open('https://mail.google.com/mail/u/criscapelo.fix@gmail.com/#drafts', '_blank');
+                } catch(e) {
+                    console.warn("No se pudo abrir automáticamente la pestaña de Gmail:", e);
                 }
-                alert(`✅ ¡BORRADOR CREADO CON ÉXITO EN GMAIL!\n\n` +
-                      `Se creó un borrador en la cuenta criscapelo.fix@gmail.com listo para enviar con los ${files.length} archivos adjuntos.\n\n` +
-                      `Puedes abrir tu Gmail para revisarlo cuando gustes.`);
+
+                if (window.showMessage) {
+                    window.showMessage(`📝 ¡Correo preparado en Gmail con los ${files.length} archivos adjuntos! Revisa y presiona Enviar en Gmail.`, 'fix-report');
+                }
+                alert(`✅ ¡CORREO PREPARADO CON ÉXITO EN TU GMAIL!\n\n` +
+                      `Se armó el borrador en criscapelo.fix@gmail.com con:\n` +
+                      `• Destinatario: mnavarrete@teka.ec\n` +
+                      `• Asunto: ${draft.subject}\n` +
+                      `• Los ${files.length} archivos oficiales adjuntos:\n` +
+                      files.map((f, i) => `   ${i+1}. ${f.name}`).join('\n') +
+                      `\n\n👉 Se abrió la pestaña de Gmail para que puedas:\n` +
+                      `1. Verificar los 4 archivos adjuntos con tus propios ojos.\n` +
+                      `2. Hacer clic en el botón azul "Enviar" de Gmail cuando confirmes que todo está correcto.`);
             }
         }
     } catch(err) {
