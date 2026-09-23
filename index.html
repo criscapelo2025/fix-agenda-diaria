@@ -3188,6 +3188,43 @@
             }
         };
 
+        /* ========================================================
+           SISTEMA DE INSTALACIÓN PWA & ACCESOS DIRECTOS MÓVILES
+           ======================================================== */
+        window.deferredPwaPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            window.deferredPwaPrompt = e;
+            const b = document.getElementById('techInstallPwaBanner');
+            if (b) b.classList.remove('hidden');
+        });
+
+        window.triggerPwaInstall = function() {
+            if (window.deferredPwaPrompt) {
+                window.deferredPwaPrompt.prompt();
+                window.deferredPwaPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        if (window.showMessage) window.showMessage("🎉 ¡Acceso directo instalado en tu pantalla!", "fix-report");
+                        const b = document.getElementById('techInstallPwaBanner');
+                        if (b) b.classList.add('hidden');
+                    }
+                    window.deferredPwaPrompt = null;
+                });
+                return;
+            }
+            window.openInstallHelpModal();
+        };
+
+        window.openInstallHelpModal = function() {
+            const m = document.getElementById('pwaInstallHelpModal');
+            if (m) m.classList.remove('hidden');
+        };
+
+        window.closeInstallHelpModal = function() {
+            const m = document.getElementById('pwaInstallHelpModal');
+            if (m) m.classList.add('hidden');
+        };
+
         window.exitTechMode = function() {
             const pin = prompt("Introduce clave de administrador para salir del modo técnico:");
             if (pin !== "fix2026" && pin !== "admin") {
@@ -4362,7 +4399,24 @@
 
                 // 1. Barra flotante de pestañas para el técnico
                 const isCurrentDark = (localStorage.getItem('fix_theme_mode') || 'dark') === 'dark';
+                const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+                
+                const installBannerHtml = (!isStandalone && currentTechUser) ? `
+                <div id="techInstallPwaBanner" class="mb-2 p-2 px-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 text-white rounded-2xl shadow-md border border-emerald-400/40 flex items-center justify-between gap-2 no-print">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="text-xl shrink-0">📲</span>
+                        <div class="min-w-0">
+                            <div class="text-[11px] font-black uppercase tracking-tight truncate">Instalar Ruta en tu Teléfono</div>
+                            <div class="text-[9px] text-emerald-100 font-medium truncate">Crea el icono directo en tu pantalla</div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="triggerPwaInstall()" class="px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-950 font-black text-[10.5px] rounded-xl shadow-xs uppercase shrink-0 active:scale-95 transition-all cursor-pointer">
+                        Instalar
+                    </button>
+                </div>` : '';
+
                 const tabsHeaderHtml = `
+                ${installBannerHtml}
                 <div class="sticky top-2 z-20 bg-slate-900/95 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-slate-700/80 mb-3 flex items-center gap-1.5 text-xs font-black">
                     <button type="button" onclick="setTechRuteroTab('por_atender')" class="flex-1 py-2.5 px-2 text-center rounded-xl uppercase transition-all flex items-center justify-center gap-1.5 ${activeTab === 'por_atender' ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-400/50' : 'text-slate-300 hover:text-white hover:bg-slate-800/80'}">
                         <span>⏳ Por Atender</span>
@@ -13519,6 +13573,72 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
             <div class="flex-grow overflow-auto p-4 flex items-center justify-center">
                 <img id="previewModalImg" src="" alt="Vista previa" class="max-h-[75vh] w-auto object-contain rounded-xl shadow-lg border border-slate-800">
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE AYUDA DE INSTALACIÓN PWA -->
+    <div id="pwaInstallHelpModal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[100000] flex items-center justify-center p-3 sm:p-5 overflow-y-auto no-print">
+        <div class="glass-card bg-slate-900 text-white max-w-md w-full p-5 sm:p-6 rounded-3xl border border-white/15 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl">📲</span>
+                    <div>
+                        <h3 class="text-sm font-extrabold text-white uppercase tracking-tight">Cómo crear el Acceso Directo</h3>
+                        <p class="text-[10px] text-emerald-400 font-semibold">Sigue estos sencillos pasos según tu navegador</p>
+                    </div>
+                </div>
+                <button onclick="closeInstallHelpModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-sm font-bold cursor-pointer">✕</button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <!-- CASO 1: SI LO ABRIERON DESDE WHATSAPP -->
+                <div class="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 space-y-1">
+                    <div class="flex items-center gap-1.5 font-bold text-amber-300 text-[11px] uppercase">
+                        <span>⚠️</span> <span>¿Abriste el enlace directo en WhatsApp?</span>
+                    </div>
+                    <p class="text-slate-300 text-[11px] leading-relaxed">
+                        WhatsApp usa su propio visor interno. Toca los <strong>3 puntos (⋮)</strong> arriba a la derecha de la pantalla de WhatsApp y pulsa <strong>"Abrir en Chrome"</strong> o <strong>"Abrir en el navegador"</strong>.
+                    </p>
+                </div>
+
+                <!-- CASO 2: ANDROID (GOOGLE CHROME) -->
+                <div class="p-3 rounded-2xl bg-slate-800/80 border border-white/10 space-y-1.5">
+                    <div class="flex items-center gap-1.5 font-bold text-sky-300 text-[11px] uppercase">
+                        <span>🤖</span> <span>En Google Chrome (Android):</span>
+                    </div>
+                    <p class="text-slate-300 text-[11px] leading-relaxed">
+                        1. Si no ves la barra de arriba, <strong>desliza la pantalla un poco hacia abajo</strong> para que aparezca.<br>
+                        2. Toca los <strong>3 puntos verticales (⋮)</strong> arriba a la derecha.<br>
+                        3. Toca <strong>"Instalar aplicación"</strong> o <strong>"Agregar a la pantalla principal"</strong>.
+                    </p>
+                </div>
+
+                <!-- CASO 3: SAMSUNG INTERNET -->
+                <div class="p-3 rounded-2xl bg-slate-800/80 border border-white/10 space-y-1.5">
+                    <div class="flex items-center gap-1.5 font-bold text-indigo-300 text-[11px] uppercase">
+                        <span>📱</span> <span>En teléfonos Samsung (Samsung Internet):</span>
+                    </div>
+                    <p class="text-slate-300 text-[11px] leading-relaxed">
+                        1. Toca el botón con <strong>3 rayitas (≡) abajo a la derecha</strong>.<br>
+                        2. Toca <strong>"Agregar página a"</strong> y luego <strong>"Pantalla de inicio"</strong>.
+                    </p>
+                </div>
+
+                <!-- CASO 4: IPHONE (SAFARI) -->
+                <div class="p-3 rounded-2xl bg-slate-800/80 border border-white/10 space-y-1.5">
+                    <div class="flex items-center gap-1.5 font-bold text-emerald-300 text-[11px] uppercase">
+                        <span>🍏</span> <span>En iPhone (Apple Safari):</span>
+                    </div>
+                    <p class="text-slate-300 text-[11px] leading-relaxed">
+                        1. Toca el botón de <strong>Compartir</strong> (el cuadrado con la flecha hacia arriba ⬆️ en la barra inferior).<br>
+                        2. Desliza hacia abajo y toca <strong>"Agregar a inicio"</strong>.
+                    </p>
+                </div>
+            </div>
+
+            <button onclick="closeInstallHelpModal()" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wide transition-all shadow-md cursor-pointer active:scale-95">
+                ¡Entendido!
+            </button>
         </div>
     </div>
 
