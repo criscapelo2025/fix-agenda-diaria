@@ -47,6 +47,7 @@
     <script src="solicitudes_garantia_templates.js"></script>
     <script src="reporte_diario.js"></script>
     <script src="notas_rapidas.js"></script>
+    <script src="proformas.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -520,6 +521,23 @@
             border-color: #fb923c !important;
         }
 
+        /* 8. Proformas y Cotizaciones (Indigo / Azul Profesional) */
+        .sidebar-btn-proformas {
+            background: rgba(79, 70, 229, 0.25);
+            color: #c7d2fe;
+            border-color: rgba(99, 102, 241, 0.35);
+        }
+        .sidebar-btn-proformas:hover {
+            background: rgba(67, 56, 202, 0.45);
+            color: #ffffff;
+            border-color: rgba(129, 140, 248, 0.6);
+        }
+        .sidebar-btn-proformas.active {
+            background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%) !important;
+            color: #ffffff !important;
+            border-color: #818cf8 !important;
+        }
+
         /* 0. Inicio / Menú Metro (Azul Eléctrico / Cyan) */
         .sidebar-btn-inicio {
             background: rgba(14, 165, 233, 0.22);
@@ -723,6 +741,7 @@
         .metro-track-6 { animation: metroTileSlide 6.5s var(--apple-ease) infinite; animation-delay: 2.4s; }
         .metro-track-7 { animation: metroTileSlide 6.5s var(--apple-ease) infinite; animation-delay: 4.0s; }
         .metro-track-8 { animation: metroTileSlide 6.5s var(--apple-ease) infinite; animation-delay: 5.6s; }
+        .metro-track-9 { animation: metroTileSlide 6.5s var(--apple-ease) infinite; animation-delay: 2.0s; }
 
         .metro-tile-title {
             font-size: 0.85rem;
@@ -1440,9 +1459,72 @@
             transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
         }
 
+        /* Hoja de Proforma Oficial A4 con Membrete FIX */
+        .proforma-sheet-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 10px;
+            overflow-x: auto;
+        }
+        .proforma-sheet {
+            width: 210mm;
+            min-height: 297mm;
+            height: 297mm;
+            background-color: #ffffff;
+            background-image: url('hoja_membretada_fix.png');
+            background-size: 100% 100%;
+            background-position: top center;
+            background-repeat: no-repeat;
+            padding-top: 36mm;
+            padding-left: 22mm;
+            padding-right: 22mm;
+            padding-bottom: 25mm;
+            box-sizing: border-box;
+            box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.25), 0 4px 12px -2px rgba(0, 0, 0, 0.15);
+            border-radius: 4px;
+            color: #000000;
+            font-family: Arial, sans-serif;
+            position: relative;
+            transform-origin: top center;
+        }
+
         @media print {
-            #mainSidebar, #slimTopHeader, #splitScreenBar, #mobileAdminNav { display: none !important; }
+            #mainSidebar, #slimTopHeader, #splitScreenBar, #mobileAdminNav, .no-print { display: none !important; }
             #mainContentWrapper { margin-left: 0 !important; padding: 0 !important; }
+            
+            /* Impresión limpia de Proforma */
+            #proformaEditorSection,
+            #proformaTabsNavMobile,
+            .btn-refresh-float {
+                display: none !important;
+            }
+            #proformasView {
+                display: block !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            #proformaPreviewSection {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .proforma-sheet-container {
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .proforma-sheet {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                margin: 0 auto !important;
+                width: 210mm !important;
+                height: 297mm !important;
+                min-height: 297mm !important;
+                page-break-after: avoid;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
         }
     </style>
     
@@ -2497,7 +2579,8 @@
             'mantenimiento': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
             'taller': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>',
             'inventory': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
-            'clientes': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>'
+            'clientes': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>',
+            'proformas': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>'
         };
 
         const VIEW_INFO = {
@@ -2508,6 +2591,7 @@
             'contabilidad': { icon: SF_ICONS['contabilidad'], title: 'Caja y Liquidaciones' },
             'catalogo': { icon: SF_ICONS['catalogo'], title: 'Catálogo TEKA 2026' },
             'garantias': { icon: SF_ICONS['garantias'], title: 'Garantías y Repuestos' },
+            'proformas': { icon: SF_ICONS['proformas'], title: 'Proformas y Cotizaciones' },
             'notas': { icon: SF_ICONS['notas'], title: 'Notas y Tareas Rápidas' },
             'dashboard': { icon: SF_ICONS['dashboard'], title: 'Resultados Totales' },
             'reporte_teka': { icon: SF_ICONS['reporte_teka'], title: 'Reporte Oficial TEKA' },
@@ -2591,6 +2675,13 @@
             if (bNot) bNot.textContent = `${pendNotas.length} Pendientes`;
             if (iNot) iNot.innerHTML = `<span>${hoyNotas.length} para hoy</span> <span class="opacity-40">•</span> <span>${pendNotas.length} por ejecutar</span>`;
 
+            // PROFORMAS Y COTIZACIONES:
+            const profs = window.proformasArray || [];
+            const bProf = document.getElementById('metroTileBadge_proformas');
+            const iProf = document.getElementById('metroTileInfo_proformas');
+            if (bProf) bProf.textContent = `${profs.length} Cotiz.`;
+            if (iProf) iProf.innerHTML = `<span>Emisión rápida Word / PDF</span> <span class="opacity-40">•</span> <span>${profs.length} guardadas</span>`;
+
             // Bloque Secundario:
             const pendServicios = arr.filter(v => v.estado === 'PENDIENTE');
             const bPend = document.getElementById('metroTileBadge_pendientes');
@@ -2634,6 +2725,7 @@
             if (v === 'reporte_diario') return document.getElementById('reporteDiarioView');
             if (v === 'solicitudes_garantia') return document.getElementById('garantiasView');
             if (v === 'notas') return document.getElementById('notasView');
+            if (v === 'proformas') return document.getElementById('proformasView');
             return document.getElementById(v + 'View');
         };
 
@@ -2754,7 +2846,7 @@
             }
 
             // Limpiar clases y órdenes flex de todos los paneles
-            const allViews = ['inicioView', 'dashboardView', 'clientesView', 'buscadorView', 'reporte_adminView', 'tallerView', 'garantiasView', 'pendientesView', 'mantenimientoView', 'inventoryView', 'ruteroView', 'reporteDiarioView', 'reporteTekaView', 'catalogoView', 'contabilidadView', 'notasView'];
+            const allViews = ['inicioView', 'dashboardView', 'clientesView', 'buscadorView', 'reporte_adminView', 'tallerView', 'garantiasView', 'pendientesView', 'mantenimientoView', 'inventoryView', 'ruteroView', 'reporteDiarioView', 'reporteTekaView', 'catalogoView', 'contabilidadView', 'notasView', 'proformasView'];
             allViews.forEach(function(id) {
                 const el = document.getElementById(id);
                 if (el) {
@@ -2897,6 +2989,9 @@
             } else if(v === 'notas') {
                 const nv = document.getElementById('notasView'); if(nv) nv.classList.remove('hidden');
                 if(window.renderNotasRapidasView) renderNotasRapidasView();
+            } else if(v === 'proformas') {
+                const pv = document.getElementById('proformasView'); if(pv) pv.classList.remove('hidden');
+                if(window.renderProformaModule) renderProformaModule();
             } else {
                 const el = document.getElementById(v + 'View'); if(el) el.classList.remove('hidden');
             }
@@ -2916,7 +3011,7 @@
                 'reporte_adminView', 'tallerView', 'garantiasView',
                 'pendientesView', 'mantenimientoView', 'inventoryView',
                 'ruteroView', 'reporteDiarioView', 'reporteTekaView',
-                'catalogoView', 'contabilidadView', 'notasView'
+                'catalogoView', 'contabilidadView', 'notasView', 'proformasView'
             ];
 
             // 1. Ocultar y limpiar clases/orden de todos los paneles
@@ -2999,7 +3094,7 @@
                 return;
             }
 
-            const sections = ['inicioView', 'reporte_adminView', 'formContainer', 'contabilidadView', 'reporteTekaView', 'reporteDiarioView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'solicitudesGarantiaView', 'clientesView', 'dashboardView', 'catalogoView', 'notasView'];
+            const sections = ['inicioView', 'reporte_adminView', 'formContainer', 'contabilidadView', 'reporteTekaView', 'reporteDiarioView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'solicitudesGarantiaView', 'clientesView', 'dashboardView', 'catalogoView', 'notasView', 'proformasView'];
             sections.forEach(function(id) { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
 
             window.activateSingleView(currentView);
@@ -9668,6 +9763,22 @@ function getEditModalData() {
             }, error => {
                 console.error("Database error (solicitudes_garantia):", error);
             });
+            database.ref('proformas').on('value', snap => {
+                const val = snap.val();
+                if (val) {
+                    window.proformasArray = Object.entries(val).map(item => Object.assign({}, item[1], { id: item[0] }));
+                    window.proformasArray.sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+                    try { localStorage.setItem('fix_proformas_backup', JSON.stringify(window.proformasArray)); } catch(e){}
+                }
+                if (window.updateProformasBadge) window.updateProformasBadge();
+                if (window.renderInicioMosaicos) renderInicioMosaicos();
+                if (currentView === 'proformas') {
+                    const hBadge = document.getElementById('proformaHistoryBadge');
+                    if (hBadge) hBadge.textContent = (window.proformasArray || []).length;
+                }
+            }, error => {
+                console.error("Database error (proformas):", error);
+            });
         }
 
         window.saveMantenimiento = function(isPending = false) {
@@ -10365,6 +10476,10 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
             <svg class="sf-symbol sf-symbol-sm" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             <span class="text-[9px] mt-1 font-medium">Notas</span>
         </button>
+        <button onclick="changeMasterView('proformas')" class="mobile-nav-btn flex flex-col items-center p-2 text-slate-400 transition-all shrink-0" data-view="proformas">
+            <svg class="sf-symbol sf-symbol-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            <span class="text-[9px] mt-1 font-medium">Proformas</span>
+        </button>
         <button onclick="changeMasterView('reporte_teka')" class="mobile-nav-btn flex flex-col items-center p-2 text-slate-400 transition-all shrink-0" data-view="reporte_teka">
             <svg class="sf-symbol sf-symbol-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <span class="text-[9px] mt-1 font-medium">TEKA</span>
@@ -10527,6 +10642,20 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <div class="sidebar-subtext text-[10.5px] text-orange-200/90 font-medium truncate">Borrador Operativo Ágil</div>
                         </div>
                     </button>
+
+                    <!-- 8. PROFORMAS -->
+                    <button type="button" onclick="changeMasterView('proformas')" class="sidebar-nav-btn view-btn sidebar-priority-btn sidebar-btn-proformas w-full text-left" data-view="proformas" title="Proformas: Cotizaciones Oficiales con Membrete y Catálogo">
+                        <span class="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white border border-cyan-300/40 flex items-center justify-center shrink-0 shadow-md">
+                            <svg class="sf-symbol sf-symbol-sm text-white" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        </span>
+                        <div class="sidebar-label min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-xs sm:text-sm text-white tracking-tight">Proformas</span>
+                                <span id="sidebarProformasBadge" class="sidebar-badge text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-cyan-500/30 text-cyan-100 border border-cyan-400/40">Word/PDF</span>
+                            </div>
+                            <div class="sidebar-subtext text-[10.5px] text-cyan-200/90 font-medium truncate">Cotizaciones Membretadas</div>
+                        </div>
+                    </button>
                 </div>
             </div>
 
@@ -10667,6 +10796,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <option value="contabilidad">Caja Chica y Finanzas</option>
                         <option value="catalogo">Catálogo TEKA 2026</option>
                         <option value="garantias">Garantías y Repuestos</option>
+                        <option value="proformas">Proformas y Cotizaciones</option>
                         <option value="notas">Notas y Tareas Rápidas</option>
                         <option value="dashboard">Resultados Totales</option>
                         <option value="reporte_teka">Reporte Oficial TEKA</option>
@@ -10716,6 +10846,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <option value="contabilidad">Caja Chica y Finanzas</option>
                         <option value="catalogo">Catálogo TEKA 2026</option>
                         <option value="garantias">Garantías y Repuestos</option>
+                        <option value="proformas">Proformas y Cotizaciones</option>
                         <option value="notas">Notas y Tareas Rápidas</option>
                         <option value="dashboard">Resultados Totales</option>
                         <option value="reporte_teka">Reporte Oficial TEKA</option>
@@ -10820,29 +10951,29 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <svg class="sf-symbol sf-symbol-watermark" viewBox="0 0 24 24"><rect x="1" y="3" width="14" height="13" rx="2"/><polygon points="15 8 19 8 22 11 22 16 15 16 15 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="17.5" cy="18.5" r="2.5"/></svg>
                         </div>
 
-                        <!-- 3. NOTAS & TAREAS RÁPIDAS (Wide: col-span-2) -->
-                        <div onclick="changeMasterView('notas')" class="metro-tile col-span-2" style="background: linear-gradient(145deg, #d97706 0%, #92400e 100%);">
+                        <!-- 3. PROFORMAS & COTIZACIONES (Wide: col-span-2) -->
+                        <div onclick="changeMasterView('proformas')" class="metro-tile col-span-2" style="background: linear-gradient(145deg, #0891b2 0%, #0e7490 50%, #164e63 100%);">
                             <div class="metro-tile-header">
                                 <div class="metro-tile-icon-container text-white">
-                                    <svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                    <svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                                 </div>
-                                <span id="metroTileBadge_notas" class="metro-tile-badge">Borrador Ágil</span>
+                                <span id="metroTileBadge_proformas" class="metro-tile-badge">Proformas</span>
                             </div>
                             <div class="metro-tile-slider">
-                                <div class="metro-slide-track metro-track-3">
+                                <div class="metro-slide-track metro-track-9">
                                     <div class="metro-slide-item">
-                                        <div class="metro-tile-title">NOTAS & TAREAS RÁPIDAS</div>
-                                        <div class="metro-tile-sub">Anotar Pendientes con Enter y Tachar</div>
+                                        <div class="metro-tile-title">PROFORMAS</div>
+                                        <div class="metro-tile-sub">Cotizaciones Membretadas Word & PDF</div>
                                     </div>
                                     <div class="metro-slide-item">
-                                        <div class="text-[9.5px] font-semibold uppercase text-amber-200 tracking-wider flex items-center gap-1.5">
-                                            <span class="metro-live-dot"></span> TAREAS PENDIENTES
+                                        <div class="text-[9.5px] font-semibold uppercase text-cyan-200 tracking-wider flex items-center gap-1.5">
+                                            <span class="metro-live-dot"></span> CATÁLOGO DIRECTO
                                         </div>
-                                        <div id="metroTileInfo_notas" class="metro-tile-live-text truncate">0 tareas pendientes</div>
+                                        <div id="metroTileInfo_proformas" class="metro-tile-live-text truncate">Búsqueda rápida y cálculo de IVA 15%</div>
                                     </div>
                                 </div>
                             </div>
-                            <svg class="sf-symbol sf-symbol-watermark" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                            <svg class="sf-symbol sf-symbol-watermark" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                         </div>
 
                         <!-- 4. BUSCADOR GLOBAL (Square: col-span-1) -->
@@ -10853,16 +10984,14 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                 </div>
                                 <span id="metroTileBadge_buscador" class="metro-tile-badge">Historial</span>
                             </div>
-                            <div class="metro-tile-slider">
-                                <div class="metro-slide-track metro-track-4">
-                                    <div class="metro-slide-item">
-                                        <div class="metro-tile-title">BUSCADOR</div>
-                                        <div class="metro-tile-sub">Historial Clientes</div>
-                                    </div>
-                                    <div class="metro-slide-item">
-                                        <div class="text-[9px] font-semibold uppercase text-indigo-200 tracking-wider">EXPEDIENTES</div>
-                                        <div id="metroTileInfo_buscador" class="metro-tile-live-text text-[10px] truncate">Búsqueda global</div>
-                                    </div>
+                            <div class="metro-slide-track metro-track-4">
+                                <div class="metro-slide-item">
+                                    <div class="metro-tile-title">BUSCADOR</div>
+                                    <div class="metro-tile-sub">Historial Clientes</div>
+                                </div>
+                                <div class="metro-slide-item">
+                                    <div class="text-[9px] font-semibold uppercase text-indigo-200 tracking-wider">EXPEDIENTES</div>
+                                    <div id="metroTileInfo_buscador" class="metro-tile-live-text text-[10px] truncate">Búsqueda global</div>
                                 </div>
                             </div>
                             <svg class="sf-symbol sf-symbol-watermark" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7.5"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
@@ -10937,8 +11066,33 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <svg class="sf-symbol sf-symbol-watermark" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
                         </div>
 
-                        <!-- 8. RESULTADOS TOTALES (Wide: col-span-2) -->
-                        <div onclick="changeMasterView('dashboard')" class="metro-tile col-span-2" style="background: linear-gradient(145deg, #0284c7 0%, #082f49 100%);">
+                        <!-- 8. NOTAS & TAREAS RÁPIDAS (Wide: col-span-2) -->
+                        <div onclick="changeMasterView('notas')" class="metro-tile col-span-2" style="background: linear-gradient(145deg, #d97706 0%, #92400e 100%);">
+                            <div class="metro-tile-header">
+                                <div class="metro-tile-icon-container text-white">
+                                    <svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                </div>
+                                <span id="metroTileBadge_notas" class="metro-tile-badge">Borrador Ágil</span>
+                            </div>
+                            <div class="metro-tile-slider">
+                                <div class="metro-slide-track metro-track-3">
+                                    <div class="metro-slide-item">
+                                        <div class="metro-tile-title">NOTAS & TAREAS RÁPIDAS</div>
+                                        <div class="metro-tile-sub">Anotar Pendientes con Enter y Tachar</div>
+                                    </div>
+                                    <div class="metro-slide-item">
+                                        <div class="text-[9.5px] font-semibold uppercase text-amber-200 tracking-wider flex items-center gap-1.5">
+                                            <span class="metro-live-dot"></span> TAREAS PENDIENTES
+                                        </div>
+                                        <div id="metroTileInfo_notas" class="metro-tile-live-text truncate">0 tareas pendientes</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <svg class="sf-symbol sf-symbol-watermark" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                        </div>
+
+                        <!-- 9. RESULTADOS TOTALES (Wide: col-span-2 sm:col-span-3 lg:col-span-6) -->
+                        <div onclick="changeMasterView('dashboard')" class="metro-tile col-span-2 sm:col-span-3 lg:col-span-6" style="background: linear-gradient(145deg, #0284c7 0%, #082f49 100%);">
                             <div class="metro-tile-header">
                                 <div class="metro-tile-icon-container text-white">
                                     <svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
@@ -10961,7 +11115,6 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             </div>
                             <svg class="sf-symbol sf-symbol-watermark" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
                         </div>
-
                     </div>
                 </div>
 
@@ -12933,6 +13086,91 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
 
                 </div>
             </div>
+
+            <!-- VISTA PROFORMAS Y COTIZACIONES (HOJA MEMBRETADA FIX OFICIAL) -->
+            <div id="proformasView" class="hidden lg:col-span-3 space-y-6 admin-only">
+                <div class="glass-card p-3 sm:p-5 md:p-6 rounded-2xl">
+                    
+                    <!-- Barra Superior / Encabezado de Proformas -->
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 border-b border-stone-200/80 dark:border-slate-700/80 pb-4">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-cyan-600 text-white text-[10px] px-2.5 py-1 rounded-lg font-black tracking-wider uppercase">Documento Oficial FIX</span>
+                                <span class="text-xs text-slate-500 font-bold">📄 Membrete & Catálogo TEKA</span>
+                            </div>
+                            <h2 class="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight mt-1 flex items-center gap-2">
+                                <span>📑</span> Proformas y Cotizaciones
+                            </h2>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Formato oficial con hoja membretada, autocompletado de códigos de repuestos, cálculo de IVA (15%) y exportación a Word (.docx) y PDF.</p>
+                        </div>
+                        
+                        <!-- Botones de Acción Global -->
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button type="button" onclick="initNewProforma()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95" title="Crear proforma en blanco">
+                                <span>➕</span> <span>Nueva</span>
+                            </button>
+                            <button type="button" onclick="openProformaHistoryModal()" class="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95" title="Ver proformas guardadas">
+                                <span>📂</span> <span>Historial</span>
+                                <span id="proformaHistoryBadge" class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-600 text-white font-mono">0</span>
+                            </button>
+                            <button type="button" onclick="saveProformaToHistory()" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95" title="Guardar proforma actual">
+                                <span>💾</span> <span>Guardar</span>
+                            </button>
+                            <button type="button" onclick="generateWordProforma()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95" title="Descargar documento Word editable (.docx) con membrete">
+                                <span>📝</span> <span>Descargar Word</span>
+                            </button>
+                            <button type="button" onclick="printProformaSheet()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95" title="Imprimir o guardar en PDF">
+                                <span>🖨️</span> <span>Imprimir / PDF</span>
+                            </button>
+                            <button type="button" onclick="shareProformaWhatsApp()" class="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95" title="Enviar cotización por WhatsApp">
+                                <span>💬</span> <span>WhatsApp</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Pestañas para Móvil/Tablet (Editor vs Vista Previa de Hoja) -->
+                    <div id="proformaTabsNavMobile" class="lg:hidden flex items-center gap-2 mb-4 bg-stone-100 dark:bg-slate-800 p-1 rounded-xl">
+                        <button type="button" id="proformaTabBtn_editor" onclick="switchProformaTab('editor')" class="flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wide bg-sky-600 text-white shadow-xs transition-all">
+                            ✏️ Editor de Datos
+                        </button>
+                        <button type="button" id="proformaTabBtn_preview" onclick="switchProformaTab('preview')" class="flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-wide text-stone-600 dark:text-slate-300 hover:text-sky-600 transition-all">
+                            👁️ Vista Previa Hoja
+                        </button>
+                    </div>
+
+                    <!-- Contenedor Dividido: Columna Izquierda (Editor) + Columna Derecha (Hoja Membretada en Vivo) -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        
+                        <!-- COLUMNA IZQUIERDA: Formulario Editor -->
+                        <div id="proformaEditorSection" class="lg:col-span-6 space-y-4">
+                            <div id="proformaEditorContainer">
+                                <!-- Se rellena vía renderProformaEditor() -->
+                            </div>
+                        </div>
+
+                        <!-- COLUMNA DERECHA: Hoja Membretada en Vivo (WYSIWYG) -->
+                        <div id="proformaPreviewSection" class="lg:col-span-6 space-y-3">
+                            <div class="flex items-center justify-between px-2">
+                                <div class="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <span>Vista Previa en Vivo (Formato A4 Oficial)</span>
+                                </div>
+                                <div class="text-[11px] text-slate-500 font-mono">
+                                    210mm x 297mm
+                                </div>
+                            </div>
+
+                            <!-- Contenedor con Scroll para la hoja A4 -->
+                            <div class="proforma-sheet-container bg-slate-200/70 dark:bg-slate-900/60 rounded-2xl p-4 border border-stone-300 dark:border-slate-700 max-h-[820px] overflow-y-auto">
+                                <div id="proformaLiveSheet" class="proforma-sheet">
+                                    <!-- Se rellena vía updateProformaLiveSheetDOM() -->
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -13748,6 +13986,81 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
             <button onclick="closeInstallHelpModal()" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wide transition-all shadow-md cursor-pointer active:scale-95">
                 ¡Entendido!
             </button>
+        </div>
+    </div>
+
+    <!-- MODAL BUSCADOR / PICKER DE REPUESTOS EN PROFORMA -->
+    <div id="modalProformaRepuestoPicker" class="hidden fixed inset-0 z-[35000] modal-overlay flex items-center justify-center p-3 sm:p-4">
+        <div class="glass-card w-full max-w-2xl rounded-2xl shadow-2xl p-5 sm:p-6 border border-white/90 bg-white/95 dark:bg-slate-900/95 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 border-b border-stone-200 dark:border-slate-700 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-600 flex items-center justify-center text-base">🔍</span>
+                    <div>
+                        <h3 class="text-base font-black uppercase text-slate-800 dark:text-white">Catálogo TEKA - Selector de Repuestos</h3>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Busca por código oficial o descripción de la pieza</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeProformaRepuestoModal()" class="text-stone-400 hover:text-rose-600 text-2xl w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer">×</button>
+            </div>
+            
+            <div class="mb-3">
+                <input type="text" id="searchProformaRepuestoPickerInput" oninput="filterProformaRepuestoPicker()" placeholder="Escribe el código (ej: 1110000002) o nombre del repuesto..." class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-slate-600 bg-stone-50 dark:bg-slate-800 text-stone-900 dark:text-white font-bold text-xs uppercase outline-none focus:ring-2 focus:ring-sky-500 shadow-inner">
+            </div>
+
+            <div class="flex-1 overflow-y-auto border border-stone-200 dark:border-slate-700 rounded-xl">
+                <table class="w-full border-collapse text-left">
+                    <thead class="bg-stone-100 dark:bg-slate-800 sticky top-0 border-b border-stone-200 dark:border-slate-700 text-[11px] uppercase font-bold text-stone-600 dark:text-slate-300">
+                        <tr>
+                            <th class="p-2.5 text-center w-28">Código</th>
+                            <th class="p-2.5">Descripción</th>
+                            <th class="p-2.5 text-right w-24">Precio</th>
+                            <th class="p-2.5 text-center w-28">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="proformaRepuestoPickerTableBody">
+                        <!-- Llenado vía filterProformaRepuestoPicker() -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-stone-200 dark:border-slate-700 flex justify-end">
+                <button type="button" onclick="closeProformaRepuestoModal()" class="px-4 py-2 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold uppercase transition-all cursor-pointer">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL HISTORIAL DE PROFORMAS -->
+    <div id="modalProformasHistory" class="hidden fixed inset-0 z-[35000] modal-overlay flex items-center justify-center p-3 sm:p-4">
+        <div class="glass-card w-full max-w-3xl rounded-2xl shadow-2xl p-5 sm:p-6 border border-white/90 bg-white/95 dark:bg-slate-900/95 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 border-b border-stone-200 dark:border-slate-700 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-600 flex items-center justify-center text-base">📂</span>
+                    <div>
+                        <h3 class="text-base font-black uppercase text-slate-800 dark:text-white">Historial de Proformas Guardadas</h3>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Revisa, carga, duplica o imprime cotizaciones anteriores</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeProformaHistoryModal()" class="text-stone-400 hover:text-rose-600 text-2xl w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer">×</button>
+            </div>
+
+            <div class="mb-3">
+                <input type="text" id="proformaHistoryFilterInput" oninput="renderProformaHistoryList()" placeholder="Filtrar por número, cliente o RUC..." class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-slate-600 bg-stone-50 dark:bg-slate-800 text-stone-900 dark:text-white font-bold text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner">
+            </div>
+
+            <div id="proformasHistoryListContainer" class="flex-1 overflow-y-auto space-y-2.5 pr-1 max-h-[55vh]">
+                <!-- Llenado vía renderProformaHistoryList() -->
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-stone-200 dark:border-slate-700 flex justify-between items-center">
+                <button type="button" onclick="initNewProforma(); closeProformaHistoryModal();" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold uppercase transition-all shadow-xs cursor-pointer">
+                    + Nueva Proforma
+                </button>
+                <button type="button" onclick="closeProformaHistoryModal()" class="px-4 py-2 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold uppercase transition-all cursor-pointer">
+                    Cerrar
+                </button>
+            </div>
         </div>
     </div>
 
