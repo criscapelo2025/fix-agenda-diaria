@@ -24,7 +24,13 @@
         (function() {
             try {
                 var theme = localStorage.getItem('fix_theme_mode') || 'dark';
-                document.documentElement.classList.add(theme === 'light' ? 'theme-light' : 'theme-dark');
+                if (theme === 'light') {
+                    document.documentElement.classList.add('theme-light', 'light');
+                    document.documentElement.classList.remove('theme-dark', 'dark');
+                } else {
+                    document.documentElement.classList.add('theme-dark', 'dark');
+                    document.documentElement.classList.remove('theme-light', 'light');
+                }
             } catch(e){}
         })();
     </script>
@@ -50,6 +56,7 @@
     <script src="proformas.js"></script>
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
                 extend: {
                     fontFamily: {
@@ -974,9 +981,12 @@
            SISTEMA DE TEMAS: MODO OSCURO / MODO CLARO (GLOBAL)
            ======================================================== */
         
-        /* 1. MODO OSCURO (PREDETERMINADO / MACBOOK PRO M3 SLATE) */
+        /* --------------------------------------------------------
+           1. MODO OSCURO (PREDETERMINADO / MACBOOK PRO M3 SLATE)
+           -------------------------------------------------------- */
         body.theme-dark,
         html.theme-dark body,
+        html.dark body,
         body:not(.theme-light) {
             background-color: #0b0f19 !important;
             background-image: 
@@ -986,6 +996,7 @@
             color-scheme: dark;
         }
 
+        /* Sidebar en Modo Oscuro */
         body.theme-dark .sidebar-main,
         body:not(.theme-light) .sidebar-main {
             background-color: #0f172a !important;
@@ -1013,7 +1024,7 @@
             border-top-color: rgba(255, 255, 255, 0.08) !important;
         }
 
-        /* Tarjetas y Paneles en Modo Oscuro */
+        /* Tarjetas, Paneles y Contenedores en Modo Oscuro */
         body.theme-dark .glass-card,
         body:not(.theme-light) .glass-card,
         body.theme-dark .glass-panel,
@@ -1026,7 +1037,73 @@
             box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45) !important;
         }
 
-        /* Textos y Encabezados en Modo Oscuro */
+        /* =========================================================
+           ELIMINACIÓN RADICAL DE "FONDO PLATA" EN MODO OSCURO:
+           Mapea todos los fondos blancos traslúcidos y fondos claros
+           a tonos oscuros profundos y elegantes con alto contraste.
+           ========================================================= */
+        body.theme-dark [class*="bg-white/"]:not(.proforma-sheet):not(.proforma-sheet *),
+        body:not(.theme-light) [class*="bg-white/"]:not(.proforma-sheet):not(.proforma-sheet *) {
+            background-color: #162033 !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f8fafc !important;
+        }
+
+        body.theme-dark .bg-white:not(.proforma-sheet):not(.proforma-sheet *),
+        body:not(.theme-light) .bg-white:not(.proforma-sheet):not(.proforma-sheet *),
+        body.theme-dark .bg-stone-50, body:not(.theme-light) .bg-stone-50,
+        body.theme-dark .bg-stone-100, body:not(.theme-light) .bg-stone-100,
+        body.theme-dark .bg-stone-200, body:not(.theme-light) .bg-stone-200,
+        body.theme-dark .bg-stone-300, body:not(.theme-light) .bg-stone-300,
+        body.theme-dark .bg-slate-50, body:not(.theme-light) .bg-slate-50,
+        body.theme-dark .bg-slate-100, body:not(.theme-light) .bg-slate-100,
+        body.theme-dark .bg-slate-200, body:not(.theme-light) .bg-slate-200,
+        body.theme-dark .bg-slate-300, body:not(.theme-light) .bg-slate-300,
+        body.theme-dark .bg-gray-50, body:not(.theme-light) .bg-gray-50,
+        body.theme-dark .bg-gray-100, body:not(.theme-light) .bg-gray-100,
+        body.theme-dark .bg-gray-200, body:not(.theme-light) .bg-gray-200,
+        body.theme-dark .bg-zinc-50, body:not(.theme-light) .bg-zinc-50,
+        body.theme-dark .bg-zinc-100, body:not(.theme-light) .bg-zinc-100,
+        body.theme-dark [class*="bg-stone-50/"], body:not(.theme-light) [class*="bg-stone-50/"],
+        body.theme-dark [class*="bg-stone-100/"], body:not(.theme-light) [class*="bg-stone-100/"] {
+            background-color: #1a2236 !important;
+            color: #f8fafc !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        /* Paneles con acento de color en Modo Oscuro (Evita fondo plata en KPI y tarjetas) */
+        body.theme-dark [class*="bg-amber-50"], body:not(.theme-light) [class*="bg-amber-50"] {
+            background-color: rgba(120, 53, 15, 0.28) !important;
+            border-color: rgba(245, 158, 11, 0.35) !important;
+            color: #fde68a !important;
+        }
+        body.theme-dark [class*="bg-emerald-50"], body:not(.theme-light) [class*="bg-emerald-50"] {
+            background-color: rgba(6, 78, 59, 0.28) !important;
+            border-color: rgba(16, 185, 129, 0.35) !important;
+            color: #a7f3d0 !important;
+        }
+        body.theme-dark [class*="bg-rose-50"], body:not(.theme-light) [class*="bg-rose-50"] {
+            background-color: rgba(136, 19, 55, 0.28) !important;
+            border-color: rgba(244, 63, 94, 0.35) !important;
+            color: #fecdd3 !important;
+        }
+        body.theme-dark [class*="bg-blue-50"], body:not(.theme-light) [class*="bg-blue-50"] {
+            background-color: rgba(30, 58, 138, 0.28) !important;
+            border-color: rgba(59, 130, 246, 0.35) !important;
+            color: #bfdbfe !important;
+        }
+        body.theme-dark [class*="bg-indigo-50"], body:not(.theme-light) [class*="bg-indigo-50"] {
+            background-color: rgba(49, 46, 129, 0.28) !important;
+            border-color: rgba(99, 102, 241, 0.35) !important;
+            color: #c7d2fe !important;
+        }
+        body.theme-dark [class*="bg-purple-50"], body:not(.theme-light) [class*="bg-purple-50"] {
+            background-color: rgba(88, 28, 135, 0.28) !important;
+            border-color: rgba(168, 85, 247, 0.35) !important;
+            color: #e9d5ff !important;
+        }
+
+        /* Colores de texto de alta legibilidad en Modo Oscuro */
         body.theme-dark h1, body:not(.theme-light) h1,
         body.theme-dark h2, body:not(.theme-light) h2,
         body.theme-dark h3, body:not(.theme-light) h3,
@@ -1036,8 +1113,7 @@
         body.theme-dark .text-stone-800, body:not(.theme-light) .text-stone-800,
         body.theme-dark .text-slate-900, body:not(.theme-light) .text-slate-900,
         body.theme-dark .text-slate-800, body:not(.theme-light) .text-slate-800,
-        body.theme-dark .text-emerald-950, body:not(.theme-light) .text-emerald-950,
-        body.theme-dark .text-indigo-950, body:not(.theme-light) .text-indigo-950 {
+        body.theme-dark .text-fix-main, body:not(.theme-light) .text-fix-main {
             color: #f8fafc !important;
         }
         body.theme-dark .text-stone-700, body:not(.theme-light) .text-stone-700,
@@ -1047,17 +1123,60 @@
             color: #cbd5e1 !important;
         }
         body.theme-dark .text-stone-500, body:not(.theme-light) .text-stone-500,
-        body.theme-dark .text-stone-400, body:not(.theme-light) .text-stone-400 {
+        body.theme-dark .text-stone-400, body:not(.theme-light) .text-stone-400,
+        body.theme-dark .text-slate-500, body:not(.theme-light) .text-slate-500,
+        body.theme-dark .text-slate-400, body:not(.theme-light) .text-slate-400 {
             color: #94a3b8 !important;
         }
 
+        /* Textos coloreados en Modo Oscuro (Vibrantes y legibles) */
+        body.theme-dark .text-amber-900, body:not(.theme-light) .text-amber-900,
+        body.theme-dark .text-amber-800, body:not(.theme-light) .text-amber-800,
+        body.theme-dark .text-amber-700, body:not(.theme-light) .text-amber-700 {
+            color: #fbbf24 !important;
+        }
+        body.theme-dark .text-emerald-950, body:not(.theme-light) .text-emerald-950,
+        body.theme-dark .text-emerald-900, body:not(.theme-light) .text-emerald-900,
+        body.theme-dark .text-emerald-800, body:not(.theme-light) .text-emerald-800,
+        body.theme-dark .text-emerald-700, body:not(.theme-light) .text-emerald-700 {
+            color: #34d399 !important;
+        }
+        body.theme-dark .text-blue-900, body:not(.theme-light) .text-blue-900,
+        body.theme-dark .text-blue-800, body:not(.theme-light) .text-blue-800,
+        body.theme-dark .text-blue-700, body:not(.theme-light) .text-blue-700 {
+            color: #60a5fa !important;
+        }
+        body.theme-dark .text-indigo-950, body:not(.theme-light) .text-indigo-950,
+        body.theme-dark .text-indigo-900, body:not(.theme-light) .text-indigo-900,
+        body.theme-dark .text-indigo-800, body:not(.theme-light) .text-indigo-800,
+        body.theme-dark .text-indigo-700, body:not(.theme-light) .text-indigo-700 {
+            color: #a5b4fc !important;
+        }
+        body.theme-dark .text-rose-900, body:not(.theme-light) .text-rose-900,
+        body.theme-dark .text-rose-800, body:not(.theme-light) .text-rose-800,
+        body.theme-dark .text-rose-700, body:not(.theme-light) .text-rose-700 {
+            color: #fb7185 !important;
+        }
+        body.theme-dark .text-purple-900, body:not(.theme-light) .text-purple-900,
+        body.theme-dark .text-purple-800, body:not(.theme-light) .text-purple-800,
+        body.theme-dark .text-purple-700, body:not(.theme-light) .text-purple-700 {
+            color: #c084fc !important;
+        }
+        body.theme-dark .kpi-val, body:not(.theme-light) .kpi-val {
+            color: #ffffff !important;
+        }
+
         /* Inputs y Selectores en Modo Oscuro */
-        body.theme-dark input:not([type="checkbox"]):not([type="radio"]), body:not(.theme-light) input:not([type="checkbox"]):not([type="radio"]),
-        body.theme-dark select, body:not(.theme-light) select,
-        body.theme-dark textarea, body:not(.theme-light) textarea,
-        body.theme-dark .glass-input, body:not(.theme-light) .glass-input {
+        body.theme-dark input:not([type="checkbox"]):not([type="radio"]):not(.proforma-input),
+        body:not(.theme-light) input:not([type="checkbox"]):not([type="radio"]):not(.proforma-input),
+        body.theme-dark select:not(.proforma-select),
+        body:not(.theme-light) select:not(.proforma-select),
+        body.theme-dark textarea:not(.proforma-textarea),
+        body:not(.theme-light) textarea:not(.proforma-textarea),
+        body.theme-dark .glass-input:not(.proforma-input),
+        body:not(.theme-light) .glass-input:not(.proforma-input) {
             background-color: #1e293b !important;
-            border-color: rgba(255, 255, 255, 0.14) !important;
+            border-color: rgba(255, 255, 255, 0.16) !important;
             color: #ffffff !important;
         }
         body.theme-dark input::placeholder, body:not(.theme-light) input::placeholder,
@@ -1072,71 +1191,89 @@
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
         }
 
-        /* Tablas en Modo Oscuro */
-        body.theme-dark .admin-table thead th, body:not(.theme-light) .admin-table thead th,
-        body.theme-dark .rutero-table thead th, body:not(.theme-light) .rutero-table thead th {
+        /* Tablas y Contenedores con Scroll en Modo Oscuro (Elimina Fondo Plata) */
+        body.theme-dark div.overflow-x-auto:not(.proforma-sheet-container),
+        body:not(.theme-light) div.overflow-x-auto:not(.proforma-sheet-container),
+        body.theme-dark #ruteroTableContainer,
+        body:not(.theme-light) #ruteroTableContainer {
+            background-color: #111827 !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        body.theme-dark table:not(.proforma-table),
+        body:not(.theme-light) table:not(.proforma-table) {
+            background-color: transparent !important;
+        }
+        body.theme-dark table:not(.proforma-table) thead tr,
+        body:not(.theme-light) table:not(.proforma-table) thead tr,
+        body.theme-dark table:not(.proforma-table) thead th,
+        body:not(.theme-light) table:not(.proforma-table) thead th {
             background-color: #1e293b !important;
-            color: #94a3b8 !important;
+            color: #cbd5e1 !important;
             border-color: rgba(255, 255, 255, 0.08) !important;
         }
-        body.theme-dark .admin-table tbody td, body:not(.theme-light) .admin-table tbody td,
-        body.theme-dark .rutero-table tbody td, body:not(.theme-light) .rutero-table tbody td {
+        body.theme-dark table:not(.proforma-table) tbody,
+        body:not(.theme-light) table:not(.proforma-table) tbody {
+            background-color: #111827 !important;
+        }
+        body.theme-dark table:not(.proforma-table) tbody td,
+        body:not(.theme-light) table:not(.proforma-table) tbody td {
             background-color: #111827 !important;
             color: #f8fafc !important;
             border-color: rgba(255, 255, 255, 0.06) !important;
         }
-        body.theme-dark .admin-table tbody tr:hover td, body:not(.theme-light) .admin-table tbody tr:hover td,
-        body.theme-dark .rutero-table tbody tr:hover td, body:not(.theme-light) .rutero-table tbody tr:hover td {
+        body.theme-dark table:not(.proforma-table) tbody tr:hover td,
+        body:not(.theme-light) table:not(.proforma-table) tbody tr:hover td {
             background-color: #1e293b !important;
         }
-        body.theme-dark #ruteroTableContainer, body:not(.theme-light) #ruteroTableContainer {
-            background-color: #111827 !important;
-            border-color: rgba(255, 255, 255, 0.1) !important;
-        }
-
-        /* Contenedores con fondos claros en Modo Oscuro */
-        body.theme-dark .bg-white, body:not(.theme-light) .bg-white,
-        body.theme-dark .bg-stone-50, body:not(.theme-light) .bg-stone-50,
-        body.theme-dark .bg-stone-100, body:not(.theme-light) .bg-stone-100,
-        body.theme-dark .bg-stone-200, body:not(.theme-light) .bg-stone-200,
-        body.theme-dark .bg-slate-50, body:not(.theme-light) .bg-slate-50,
-        body.theme-dark .bg-slate-100, body:not(.theme-light) .bg-slate-100 {
-            background-color: #1a2236 !important;
-            color: #f8fafc !important;
-            border-color: rgba(255, 255, 255, 0.08) !important;
-        }
-        body.theme-dark .bg-white\/30, body:not(.theme-light) .bg-white\/30,
-        body.theme-dark .bg-white\/40, body:not(.theme-light) .bg-white\/40,
-        body.theme-dark .bg-white\/50, body:not(.theme-light) .bg-white\/50,
-        body.theme-dark .bg-white\/60, body:not(.theme-light) .bg-white\/60,
-        body.theme-dark .bg-white\/80, body:not(.theme-light) .bg-white\/80 {
+        body.theme-dark table:not(.proforma-table) tfoot,
+        body:not(.theme-light) table:not(.proforma-table) tfoot,
+        body.theme-dark table:not(.proforma-table) tfoot tr,
+        body:not(.theme-light) table:not(.proforma-table) tfoot tr,
+        body.theme-dark table:not(.proforma-table) tfoot td,
+        body:not(.theme-light) table:not(.proforma-table) tfoot td,
+        body.theme-dark table:not(.proforma-table) tfoot th,
+        body:not(.theme-light) table:not(.proforma-table) tfoot th {
             background-color: #162033 !important;
-            border-color: rgba(255, 255, 255, 0.08) !important;
-        }
-        body.theme-dark .border-stone-200, body:not(.theme-light) .border-stone-200,
-        body.theme-dark .border-stone-300, body:not(.theme-light) .border-stone-300,
-        body.theme-dark .border-slate-200, body:not(.theme-light) .border-slate-200,
-        body.theme-dark .border-slate-300, body:not(.theme-light) .border-slate-300 {
-            border-color: rgba(255, 255, 255, 0.08) !important;
-        }
-        body.theme-dark .kpi-val, body:not(.theme-light) .kpi-val {
             color: #f8fafc !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
         }
 
         /* Modales en Modo Oscuro */
         body.theme-dark .modal-content, body:not(.theme-light) .modal-content,
         body.theme-dark [id$="Modal"] .bg-white, body:not(.theme-light) [id$="Modal"] .bg-white,
-        body.theme-dark [id$="Modal"] .glass-card, body:not(.theme-light) [id$="Modal"] .glass-card {
+        body.theme-dark [id$="Modal"] .glass-card, body:not(.theme-light) [id$="Modal"] .glass-card,
+        body.theme-dark [id$="Modal"] [class*="bg-white/"], body:not(.theme-light) [id$="Modal"] [class*="bg-white/"] {
             background-color: #111827 !important;
             color: #f8fafc !important;
             border: 1px solid rgba(255, 255, 255, 0.12) !important;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
         }
 
+        /* Listas desplegables de sugerencias en Modo Oscuro */
+        body.theme-dark [id*="Suggestions_"],
+        body:not(.theme-light) [id*="Suggestions_"] {
+            background-color: #162033 !important;
+            border-color: rgba(255, 255, 255, 0.14) !important;
+            color: #f8fafc !important;
+        }
+        body.theme-dark [id*="Suggestions_"] div,
+        body:not(.theme-light) [id*="Suggestions_"] div {
+            border-color: rgba(255, 255, 255, 0.08) !important;
+            color: #f8fafc !important;
+        }
+        body.theme-dark [id*="Suggestions_"] div:hover,
+        body:not(.theme-light) [id*="Suggestions_"] div:hover {
+            background-color: #1e293b !important;
+            color: #38bdf8 !important;
+        }
 
-        /* 2. MODO CLARO (APPLE RETINA EXECUTIVE LIGHT THEME) */
+
+        /* --------------------------------------------------------
+           2. MODO CLARO (APPLE RETINA EXECUTIVE LIGHT THEME)
+           -------------------------------------------------------- */
         body.theme-light,
-        html.theme-light body {
+        html.theme-light body,
+        html.light body {
             background-color: #f1f5f9 !important;
             background-image: 
                 radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.07), transparent 70%),
@@ -1145,6 +1282,7 @@
             color-scheme: light;
         }
 
+        /* Sidebar Base en Modo Claro */
         body.theme-light .sidebar-main {
             background-color: #ffffff !important;
             border-right-color: #e2e8f0 !important;
@@ -1165,24 +1303,268 @@
             background-color: #f8fafc !important;
             border-top-color: #e2e8f0 !important;
         }
+
+        /* =========================================================
+           BARRA LATERAL EN MODO CLARO - 100% LEGIBLE Y ALTO CONTRASTE
+           Elimina textos blancos/pálidos sobre fondo blanco.
+           ========================================================= */
+
+        /* Títulos de Sección en Barra Lateral */
         body.theme-light .sidebar-section-title {
-            color: #64748b !important;
-        }
-        body.theme-light .sidebar-secondary-btn {
             color: #334155 !important;
+            font-weight: 800 !important;
+        }
+        body.theme-light .sidebar-section-title span:first-child {
+            color: #0f172a !important;
+            font-weight: 800 !important;
+        }
+        body.theme-light .sidebar-section-title span.text-blue-200,
+        body.theme-light .sidebar-section-title span.text-slate-200 {
+            background-color: #e2e8f0 !important;
+            color: #334155 !important;
+            border-color: #cbd5e1 !important;
+            font-weight: 700 !important;
+        }
+        body.theme-light .sidebar-section-title svg {
+            color: #2563eb !important;
+        }
+
+        /* 1. Botón Inicio en Modo Claro */
+        body.theme-light .sidebar-btn-inicio:not(.active) {
+            background-color: #f0f9ff !important;
+            border: 1px solid #bae6fd !important;
+            box-shadow: 0 1px 2px rgba(2, 132, 199, 0.06) !important;
+        }
+        body.theme-light .sidebar-btn-inicio:not(.active) .sidebar-label span.tracking-tight {
+            color: #0369a1 !important;
+            font-weight: 800 !important;
+        }
+        body.theme-light .sidebar-btn-inicio:not(.active) .sidebar-subtext {
+            color: #0284c7 !important;
+            font-weight: 600 !important;
+        }
+        body.theme-light .sidebar-btn-inicio:not(.active) .sidebar-badge {
+            background-color: #e0f2fe !important;
+            color: #0369a1 !important;
+            border: 1px solid #7dd3fc !important;
+            font-weight: 800 !important;
+        }
+
+        /* 2. Botón Registro en Modo Claro */
+        body.theme-light .sidebar-btn-registro:not(.active) {
+            background-color: #eff6ff !important;
+            border: 1px solid #bfdbfe !important;
+            box-shadow: 0 1px 2px rgba(37, 99, 235, 0.06) !important;
+        }
+        body.theme-light .sidebar-btn-registro:not(.active) .sidebar-label span.tracking-tight {
+            color: #1e40af !important;
+            font-weight: 800 !important;
+        }
+        body.theme-light .sidebar-btn-registro:not(.active) .sidebar-subtext {
+            color: #2563eb !important;
+            font-weight: 600 !important;
+        }
+        body.theme-light .sidebar-btn-registro:not(.active) .sidebar-badge {
+            background-color: #dbeafe !important;
+            color: #1e40af !important;
+            border: 1px solid #93c5fd !important;
+            font-weight: 800 !important;
+        }
+
+        /* 3. Botón Rutero / Logística en Modo Claro */
+        body.theme-light .sidebar-btn-rutero:not(.active) {
+            background-color: #ecfdf5 !important;
+            border: 1px solid #a7f3d0 !important;
+            box-shadow: 0 1px 2px rgba(5, 150, 105, 0.06) !important;
+        }
+        body.theme-light .sidebar-btn-rutero:not(.active) .sidebar-label span.tracking-tight {
+            color: #065f46 !important;
+            font-weight: 800 !important;
+        }
+        body.theme-light .sidebar-btn-rutero:not(.active) .sidebar-subtext {
+            color: #059669 !important;
+            font-weight: 600 !important;
+        }
+        body.theme-light .sidebar-btn-rutero:not(.active) .sidebar-badge {
+            background-color: #d1fae5 !important;
+            color: #065f46 !important;
+            border: 1px solid #6ee7b7 !important;
+            font-weight: 800 !important;
+        }
+
+        /* 4. Botón Buscador en Modo Claro */
+        body.theme-light .sidebar-btn-buscador:not(.active) {
+            background-color: #faf5ff !important;
+            border: 1px solid #e9d5ff !important;
+            box-shadow: 0 1px 2px rgba(126, 34, 206, 0.06) !important;
+        }
+        body.theme-light .sidebar-btn-buscador:not(.active) .sidebar-label span.tracking-tight {
+            color: #581c87 !important;
+            font-weight: 800 !important;
+        }
+        body.theme-light .sidebar-btn-buscador:not(.active) .sidebar-subtext {
+            color: #7e22ce !important;
+            font-weight: 600 !important;
+        }
+        body.theme-light .sidebar-btn-buscador:not(.active) .sidebar-badge {
+            background-color: #f3e8ff !important;
+            color: #581c87 !important;
+            border: 1px solid #d8b4fe !important;
+            font-weight: 800 !important;
+        }
+
+        /* 5. Botón Contabilidad en Modo Claro */
+        body.theme-light .sidebar-btn-contabilidad:not(.active) {
+            background-color: #fffbeb !important;
+            border: 1px solid #fde68a !important;
+            box-shadow: 0 1px 2px rgba(180, 83, 9, 0.06) !important;
+        }
+        body.theme-light .sidebar-btn-contabilidad:not(.active) .sidebar-label span.tracking-tight {
+            color: #78350f !important;
+            font-weight: 800 !important;
+        }
+        body.theme-light .sidebar-btn-contabilidad:not(.active) .sidebar-subtext {
+            color: #b45309 !important;
+            font-weight: 600 !important;
+        }
+        body.theme-light .sidebar-btn-contabilidad:not(.active) .sidebar-badge {
+            background-color: #fef3c7 !important;
+            color: #78350f !important;
+            border: 1px solid #fcd34d !important;
+            font-weight: 800 !important;
+        }
+
+        /* 6. Botón Catálogo en Modo Claro */
+        body.theme-light .sidebar-btn-catalogo:not(.active) {
+            background-color: #fff1f2 !important;
+            border: 1px solid #fecdd3 !important;
+            box-shadow: 0 1px 2px rgba(190, 18, 60, 0.06) !important;
+        }
+        body.theme-light .sidebar-btn-catalogo:not(.active) .sidebar-label span.tracking-tight {
+            color: #881337 !important;
+            font-weight: 800 !important;
+        }
+        body.theme-light .sidebar-btn-catalogo:not(.active) .sidebar-subtext {
+            color: #be123c !important;
+            font-weight: 600 !important;
+        }
+        body.theme-light .sidebar-btn-catalogo:not(.active) .sidebar-badge {
+            background-color: #ffe4e6 !important;
+            color: #881337 !important;
+            border: 1px solid #fda4af !important;
+            font-weight: 800 !important;
+        }
+
+        /* 7. Botón Garantías en Modo Claro */
+        body.theme-light .sidebar-btn-garantias:not(.active) {
+            background-color: #eef2ff !important;
+            border: 1px solid #c7d2fe !important;
+            box-shadow: 0 1px 2px rgba(67, 56, 202, 0.06) !important;
+        }
+        body.theme-light .sidebar-btn-garantias:not(.active) .sidebar-label span.tracking-tight {
+            color: #312e81 !important;
+            font-weight: 800 !important;
+        }
+        body.theme-light .sidebar-btn-garantias:not(.active) .sidebar-subtext {
+            color: #4338ca !important;
+            font-weight: 600 !important;
+        }
+        body.theme-light .sidebar-btn-garantias:not(.active) .sidebar-badge {
+            background-color: #e0e7ff !important;
+            color: #312e81 !important;
+            border: 1px solid #a5b4fc !important;
+            font-weight: 800 !important;
+        }
+
+        /* 8. Botón Notas Rápidas en Modo Claro */
+        body.theme-light .sidebar-btn-notas:not(.active) {
+            background-color: #fff7ed !important;
+            border: 1px solid #fed7aa !important;
+            box-shadow: 0 1px 2px rgba(194, 65, 12, 0.06) !important;
+        }
+        body.theme-light .sidebar-btn-notas:not(.active) .sidebar-label span.tracking-tight {
+            color: #7c2d12 !important;
+            font-weight: 800 !important;
+        }
+        body.theme-light .sidebar-btn-notas:not(.active) .sidebar-subtext {
+            color: #c2410c !important;
+            font-weight: 600 !important;
+        }
+        body.theme-light .sidebar-btn-notas:not(.active) .sidebar-badge {
+            background-color: #ffedd5 !important;
+            color: #7c2d12 !important;
+            border: 1px solid #fdba74 !important;
+            font-weight: 800 !important;
+        }
+
+        /* 9. Botón Proformas en Modo Claro */
+        body.theme-light .sidebar-btn-proformas:not(.active) {
+            background-color: #eef2ff !important;
+            border: 1px solid #c7d2fe !important;
+            box-shadow: 0 1px 2px rgba(67, 56, 202, 0.06) !important;
+        }
+        body.theme-light .sidebar-btn-proformas:not(.active) .sidebar-label span.tracking-tight {
+            color: #312e81 !important;
+            font-weight: 800 !important;
+        }
+        body.theme-light .sidebar-btn-proformas:not(.active) .sidebar-subtext {
+            color: #4338ca !important;
+            font-weight: 600 !important;
+        }
+        body.theme-light .sidebar-btn-proformas:not(.active) .sidebar-badge {
+            background-color: #e0e7ff !important;
+            color: #312e81 !important;
+            border: 1px solid #a5b4fc !important;
+            font-weight: 800 !important;
+        }
+
+        /* Botones Destacados en Estado ACTIVO en Modo Claro:
+           Gradientes saturados vibrantes con texto blanco puro y sombra nítida */
+        body.theme-light .sidebar-priority-btn.active .sidebar-label span.tracking-tight,
+        body.theme-light .sidebar-priority-btn.active .sidebar-subtext {
+            color: #ffffff !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
+        }
+        body.theme-light .sidebar-priority-btn.active .sidebar-badge {
+            background-color: rgba(255, 255, 255, 0.28) !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(255, 255, 255, 0.5) !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
+        }
+
+        /* Botones Secundarios en Modo Claro (Resultados, Reporte Teka, etc.) */
+        body.theme-light .sidebar-secondary-btn {
+            background-color: transparent !important;
+            border: 1px solid transparent !important;
+        }
+        body.theme-light .sidebar-secondary-btn .sidebar-label,
+        body.theme-light .sidebar-secondary-btn span.text-slate-100,
+        body.theme-light .sidebar-secondary-btn span {
+            color: #0f172a !important;
+            font-weight: 700 !important;
         }
         body.theme-light .sidebar-secondary-btn:hover {
             background-color: #f1f5f9 !important;
-            color: #0f172a !important;
+            border-color: #e2e8f0 !important;
+        }
+        body.theme-light .sidebar-secondary-btn:hover .sidebar-label,
+        body.theme-light .sidebar-secondary-btn:hover span.text-slate-100 {
+            color: #0284c7 !important;
         }
         body.theme-light .sidebar-secondary-btn.active {
-            background-color: rgba(59, 130, 246, 0.12) !important;
+            background-color: #eff6ff !important;
+            border-color: #bfdbfe !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+        }
+        body.theme-light .sidebar-secondary-btn.active .sidebar-label,
+        body.theme-light .sidebar-secondary-btn.active span.text-slate-100 {
             color: #1d4ed8 !important;
-            border-color: rgba(59, 130, 246, 0.3) !important;
+            font-weight: 800 !important;
         }
 
+        /* Header en Modo Claro */
         body.theme-light #slimTopHeader {
-            background-color: rgba(255, 255, 255, 0.92) !important;
+            background-color: rgba(255, 255, 255, 0.94) !important;
             border-color: #e2e8f0 !important;
             color: #0f172a !important;
             box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
@@ -1224,7 +1606,7 @@
             color: #0284c7 !important;
         }
 
-        /* Tarjetas en Modo Claro */
+        /* Tarjetas, Paneles y Contenedores en Modo Claro */
         body.theme-light .glass-card,
         body.theme-light .glass-panel,
         body.theme-light .tech-card {
@@ -1240,6 +1622,9 @@
         body.theme-light h3, 
         body.theme-light h4, 
         body.theme-light label {
+            color: #0f172a !important;
+        }
+        body.theme-light .text-fix-main {
             color: #0f172a !important;
         }
         body.theme-light .kpi-val {
@@ -1268,22 +1653,31 @@
         }
 
         /* Tablas en Modo Claro */
+        body.theme-light table:not(.proforma-table) thead tr,
+        body.theme-light table:not(.proforma-table) thead th,
         body.theme-light .admin-table thead th,
         body.theme-light .rutero-table thead th {
             background-color: #f8fafc !important;
-            color: #475569 !important;
+            color: #334155 !important;
             border-color: #e2e8f0 !important;
         }
+        body.theme-light table:not(.proforma-table) thead th span,
+        body.theme-light table:not(.proforma-table) thead th * {
+            color: #334155 !important;
+        }
+        body.theme-light table:not(.proforma-table) tbody td,
         body.theme-light .admin-table tbody td,
         body.theme-light .rutero-table tbody td {
             background-color: #ffffff !important;
             color: #0f172a !important;
             border-color: #f1f5f9 !important;
         }
+        body.theme-light table:not(.proforma-table) tbody tr:hover td,
         body.theme-light .admin-table tbody tr:hover td,
         body.theme-light .rutero-table tbody tr:hover td {
             background-color: #f8fafc !important;
         }
+        body.theme-light div.overflow-x-auto:not(.proforma-sheet-container),
         body.theme-light #ruteroTableContainer {
             background-color: #ffffff !important;
             border-color: #e2e8f0 !important;
@@ -1441,6 +1835,91 @@
         }
         body.theme-light #ruteroCardsContainer .bg-slate-200\/90 {
             background-color: #e2e8f0 !important;
+        }
+
+        /* Modales en Modo Claro */
+        body.theme-light .modal-content,
+        body.theme-light [id$="Modal"] .bg-white,
+        body.theme-light [id$="Modal"] .glass-card,
+        body.theme-light [id$="Modal"] [class*="bg-white/"] {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+        }
+
+        /* --------------------------------------------------------
+           3. EXCEPCIÓN VITAL: HOJA OFICIAL PROFORMA (MEMBRETE A4)
+           Garantiza que la proforma impresa/previsualizada se mantenga
+           con fondo blanco y texto negro puro en AMBOS temas.
+           -------------------------------------------------------- */
+        body.theme-dark .proforma-sheet,
+        body:not(.theme-light) .proforma-sheet,
+        body.theme-light .proforma-sheet,
+        .proforma-sheet {
+            background-color: #ffffff !important;
+            background-image: url('hoja_membretada_fix.png') !important;
+            color: #000000 !important;
+            color-scheme: light !important;
+        }
+        body.theme-dark .proforma-sheet *,
+        body:not(.theme-light) .proforma-sheet *,
+        body.theme-light .proforma-sheet *,
+        .proforma-sheet * {
+            color-scheme: light !important;
+        }
+        body.theme-dark .proforma-sheet table,
+        body:not(.theme-light) .proforma-sheet table,
+        body.theme-light .proforma-sheet table {
+            background-color: #ffffff !important;
+        }
+        body.theme-dark .proforma-sheet thead tr,
+        body:not(.theme-light) .proforma-sheet thead tr,
+        body.theme-light .proforma-sheet thead tr,
+        body.theme-dark .proforma-sheet thead th,
+        body:not(.theme-light) .proforma-sheet thead th,
+        body.theme-light .proforma-sheet thead th {
+            background-color: #1e3a8a !important;
+            color: #ffffff !important;
+            border-color: #1e3a8a !important;
+        }
+        body.theme-dark .proforma-sheet thead th span,
+        body:not(.theme-light) .proforma-sheet thead th span,
+        body.theme-light .proforma-sheet thead th span {
+            color: #ffffff !important;
+        }
+        body.theme-dark .proforma-sheet tbody td,
+        body:not(.theme-light) .proforma-sheet tbody td,
+        body.theme-light .proforma-sheet tbody td {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            border-color: #cbd5e1 !important;
+        }
+        body.theme-dark .proforma-sheet tfoot,
+        body:not(.theme-light) .proforma-sheet tfoot,
+        body.theme-light .proforma-sheet tfoot,
+        body.theme-dark .proforma-sheet tfoot tr,
+        body:not(.theme-light) .proforma-sheet tfoot tr,
+        body.theme-light .proforma-sheet tfoot tr,
+        body.theme-dark .proforma-sheet tfoot td,
+        body:not(.theme-light) .proforma-sheet tfoot td,
+        body.theme-light .proforma-sheet tfoot td {
+            background-color: #f8fafc !important;
+            color: #000000 !important;
+            border-color: #cbd5e1 !important;
+        }
+        body.theme-dark .proforma-sheet input,
+        body:not(.theme-light) .proforma-sheet input,
+        body.theme-light .proforma-sheet input,
+        body.theme-dark .proforma-sheet select,
+        body:not(.theme-light) .proforma-sheet select,
+        body.theme-light .proforma-sheet select,
+        body.theme-dark .proforma-sheet textarea,
+        body:not(.theme-light) .proforma-sheet textarea,
+        body.theme-light .proforma-sheet textarea {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            border-color: #cbd5e1 !important;
         }
 
         /* Transiciones suaves entre temas */
@@ -3710,18 +4189,18 @@
             const bodyEl = document.body;
             
             if (isDark) {
-                htmlEl.classList.remove('theme-light');
-                htmlEl.classList.add('theme-dark');
+                htmlEl.classList.remove('theme-light', 'light');
+                htmlEl.classList.add('theme-dark', 'dark');
                 if (bodyEl) {
-                    bodyEl.classList.remove('theme-light');
-                    bodyEl.classList.add('theme-dark');
+                    bodyEl.classList.remove('theme-light', 'light');
+                    bodyEl.classList.add('theme-dark', 'dark');
                 }
             } else {
-                htmlEl.classList.remove('theme-dark');
-                htmlEl.classList.add('theme-light');
+                htmlEl.classList.remove('theme-dark', 'dark');
+                htmlEl.classList.add('theme-light', 'light');
                 if (bodyEl) {
-                    bodyEl.classList.remove('theme-dark');
-                    bodyEl.classList.add('theme-light');
+                    bodyEl.classList.remove('theme-dark', 'dark');
+                    bodyEl.classList.add('theme-light', 'light');
                 }
             }
             
