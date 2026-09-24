@@ -12,6 +12,32 @@ window.currentProforma = null;
 window.proformaPickerRowIndex = null;
 window.proformaActiveTab = 'editor'; // 'editor' | 'preview'
 
+// Pre-cargar repuestos personalizados guardados en LocalStorage de inmediato
+try {
+    const savedCustomParts = localStorage.getItem('fix_repuestos_custom');
+    if (savedCustomParts && window.LISTA_REPUESTOS_TEKA) {
+        const customParts = JSON.parse(savedCustomParts);
+        if (Array.isArray(customParts)) {
+            const existingCodes = new Set(window.LISTA_REPUESTOS_TEKA.map(r => String(r.cod).trim().toUpperCase()));
+            customParts.forEach(cp => {
+                if (cp && cp.cod && !existingCodes.has(String(cp.cod).trim().toUpperCase())) {
+                    window.LISTA_REPUESTOS_TEKA.unshift({
+                        cod: String(cp.cod).trim().toUpperCase(),
+                        desc: String(cp.desc || '').trim().toUpperCase(),
+                        precio: Number(cp.precio) || 0,
+                        isCustom: true
+                    });
+                    existingCodes.add(String(cp.cod).trim().toUpperCase());
+                    if (!window.CATALOGO_TEKA_BASE) window.CATALOGO_TEKA_BASE = {};
+                    window.CATALOGO_TEKA_BASE[String(cp.cod).trim().toUpperCase()] = String(cp.desc || '').trim().toUpperCase();
+                }
+            });
+        }
+    }
+} catch (e) {
+    console.warn('Error precargando repuestos_custom:', e);
+}
+
 // Utilidad decodificar base64 a Uint8Array
 function proformaB64ToUint8(base64) {
     const raw = window.atob(base64);
@@ -138,7 +164,7 @@ window.calcProformaTotals = function() {
 };
 
 // ============================================================================
-// 2. BUSCADOR Y AUTOCOMPLETADO DE REPUESTOS TEKA
+// 2. BUSCADOR Y AUTOCOMPLETADO DE REPUESTOS TEKA + GRABADO DE NUEVOS REPUESTOS
 // ============================================================================
 window.searchRepuestoInCatalogs = function(codeQuery) {
     if (!codeQuery) return null;
@@ -162,25 +188,36 @@ window.getRepuestoSuggestions = function(query, limit = 8) {
     const clean = String(query).trim().toUpperCase();
     const repuestos = window.LISTA_REPUESTOS_TEKA || [];
     const results = [];
+    const seenCodes = new Set();
     
     // Coincidencias por código (prioridad alta)
     for (const r of repuestos) {
         if (r.cod && String(r.cod).toUpperCase().includes(clean)) {
-            results.push(r);
-            if (results.length >= limit) return results;
+            const c = String(r.cod).trim().toUpperCase();
+            if (!seenCodes.has(c)) {
+                seenCodes.add(c);
+                results.push(r);
+                if (results.length >= limit) return results;
+            }
         }
     }
     // Coincidencias por descripción si aún hay cupo
     for (const r of repuestos) {
-        if (!results.includes(r) && r.desc && r.desc.toUpperCase().includes(clean)) {
-            results.push(r);
-            if (results.length >= limit) return results;
+        if (r.desc && r.desc.toUpperCase().includes(clean)) {
+            const c = String(r.cod || '').trim().toUpperCase();
+            if (!seenCodes.has(c)) {
+                seenCodes.add(c);
+                results.push(r);
+                if (results.length >= limit) return results;
+            }
         }
     }
     // Catálogo base de productos
     if (window.CATALOGO_TEKA_BASE) {
         for (const [k, v] of Object.entries(window.CATALOGO_TEKA_BASE)) {
-            if (k.toUpperCase().includes(clean) || v.toUpperCase().includes(clean)) {
+            const cleanK = k.toUpperCase();
+            if ((cleanK.includes(clean) || v.toUpperCase().includes(clean)) && !seenCodes.has(cleanK)) {
+                seenCodes.add(cleanK);
                 results.push({ cod: k, desc: v, precio: 0 });
                 if (results.length >= limit) return results;
             }
@@ -189,40 +226,253 @@ window.getRepuestoSuggestions = function(query, limit = 8) {
     return results;
 };
 
+// Renderizar badge de estado de catálogo en la fila
+window.renderProformaRowStatusBadge = function(rowIndex, item) {
+    if (!item) return '';
+    const cod = (item.codigo || '').trim().toUpperCase();
+    if (!cod) {
+        return `<div class="text-[10px] text-stone-400 font-medium">💡 Escribe el código oficial o búscalo con 🔍</div>`;
+    }
+
+    const matched = window.searchRepuestoInCatalogs(cod);
+    if (matched) {
+        const pLista = matched.precio > 0 ? formatMoney(matched.precio) : formatMoney(item.unit || 0);
+        return `
+            <div class="flex items-center flex-wrap gap-2 text-[10.5px]">
+                <span class="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                    <span>✓</span> Catálogo TEKA
+                </span>
+                <span class="font-mono font-semibold text-stone-600 dark:text-slate-300">
+                    P. Lista Oficial: <strong class="text-emerald-600 dark:text-emerald-400">$${pLista}</strong>
+                </span>
+            </div>
+        `;
+    }
+
+    // Código no está en catálogo -> botón para registrarlo
+    return `
+        <div class="flex items-center justify-between flex-wrap gap-2 text-[10.5px] bg-amber-50/90 dark:bg-amber-950/30 p-1.5 rounded-lg border border-amber-200 dark:border-amber-800/60">
+            <div class="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
+                <span>✨</span>
+                <span>Código nuevo (no registrado en catálogo)</span>
+            </div>
+            <button type="button" onclick="saveNewRepuestoFromRow(${rowIndex})" 
+                class="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md font-bold text-[10px] uppercase shadow-xs transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
+                title="Grabar este código, descripción y precio en el catálogo TEKA">
+                <span>💾</span> Grabar en Catálogo
+            </button>
+        </div>
+    `;
+};
+
+// Grabar un nuevo repuesto en el catálogo (Memoria, LocalStorage y Firebase)
+window.saveNewRepuestoToCatalog = function(codigo, desc, precio, rowIndex = null) {
+    const cleanCod = String(codigo || '').trim().toUpperCase();
+    const cleanDesc = String(desc || '').trim().toUpperCase();
+    const cleanPrecio = Math.max(0, parseFloat(precio) || 0);
+
+    if (!cleanCod || cleanCod.length < 2) {
+        if (typeof showMessage === 'function') showMessage("⚠️ Ingrese un código válido para el repuesto", "fix-accent");
+        return false;
+    }
+    if (!cleanDesc) {
+        if (typeof showMessage === 'function') showMessage("⚠️ Ingrese la descripción del repuesto antes de grabar", "fix-accent");
+        return false;
+    }
+
+    if (!window.LISTA_REPUESTOS_TEKA) window.LISTA_REPUESTOS_TEKA = [];
+
+    const repuestoObj = {
+        cod: cleanCod,
+        desc: cleanDesc,
+        precio: cleanPrecio,
+        isCustom: true,
+        fechaCreacion: new Date().toISOString()
+    };
+
+    // 1. Guardar en memoria (LISTA_REPUESTOS_TEKA y CATALOGO_TEKA_BASE)
+    const existingIdx = window.LISTA_REPUESTOS_TEKA.findIndex(r => r.cod && String(r.cod).trim().toUpperCase() === cleanCod);
+    if (existingIdx >= 0) {
+        window.LISTA_REPUESTOS_TEKA[existingIdx] = repuestoObj;
+    } else {
+        window.LISTA_REPUESTOS_TEKA.unshift(repuestoObj);
+    }
+
+    if (!window.CATALOGO_TEKA_BASE) window.CATALOGO_TEKA_BASE = {};
+    window.CATALOGO_TEKA_BASE[cleanCod] = cleanDesc;
+
+    // 2. Guardar en LocalStorage (respaldo permanente offline)
+    try {
+        let customList = [];
+        const saved = localStorage.getItem('fix_repuestos_custom');
+        if (saved) {
+            customList = JSON.parse(saved);
+        }
+        if (!Array.isArray(customList)) customList = [];
+        const localIdx = customList.findIndex(r => r.cod && String(r.cod).trim().toUpperCase() === cleanCod);
+        if (localIdx >= 0) {
+            customList[localIdx] = repuestoObj;
+        } else {
+            customList.unshift(repuestoObj);
+        }
+        localStorage.setItem('fix_repuestos_custom', JSON.stringify(customList));
+    } catch (e) {
+        console.warn('Error guardando en localStorage fix_repuestos_custom:', e);
+    }
+
+    // 3. Guardar en Firebase Realtime Database
+    if (typeof database !== 'undefined' && database && database.ref) {
+        try {
+            const safeKey = cleanCod.replace(/[\.\$#\[\]\/]/g, '_');
+            database.ref('repuestos_custom/' + safeKey).set({
+                cod: cleanCod,
+                desc: cleanDesc,
+                precio: cleanPrecio,
+                fechaCreacion: new Date().toISOString(),
+                creadoPor: (window.currentTechUser || 'ADMIN')
+            }).catch(err => console.warn('Firebase repuestos_custom error:', err));
+        } catch (e) {
+            console.warn('Firebase error:', e);
+        }
+    }
+
+    if (typeof showMessage === 'function') {
+        showMessage(`✅ Repuesto [${cleanCod}] grabado en el catálogo`, 'fix-report');
+    }
+
+    // Actualizar badge de la fila si aplica
+    if (rowIndex !== null) {
+        const statusEl = document.getElementById(`proformaRowStatus_${rowIndex}`);
+        if (statusEl) {
+            statusEl.innerHTML = window.renderProformaRowStatusBadge(rowIndex, {
+                codigo: cleanCod,
+                desc: cleanDesc,
+                unit: cleanPrecio
+            });
+        }
+    }
+
+    // Refrescar selector modal si está abierto
+    if (window.filterProformaRepuestoPicker) {
+        window.filterProformaRepuestoPicker();
+    }
+    // Refrescar catálogo general si está en pantalla
+    if (typeof renderCatalogoRepuestos === 'function' && window.currentView === 'catalogo') {
+        renderCatalogoRepuestos();
+    }
+
+    return true;
+};
+
+// Grabar repuesto nuevo directamente desde la fila
+window.saveNewRepuestoFromRow = function(rowIndex) {
+    if (!window.currentProforma || !window.currentProforma.items[rowIndex]) return;
+    const item = window.currentProforma.items[rowIndex];
+    window.saveNewRepuestoToCatalog(item.codigo, item.desc, item.unit, rowIndex);
+};
+
+// Preparar fila para escribir nuevo repuesto y enfocar descripción
+window.prepareNewRepuestoFromInput = function(rowIndex) {
+    window.closeProformaDropdown(rowIndex);
+    const descEl = document.getElementById(`proformaDescInput_${rowIndex}`);
+    if (descEl) {
+        descEl.focus();
+        descEl.placeholder = 'Escribe la descripción del nuevo repuesto...';
+    }
+    const statusEl = document.getElementById(`proformaRowStatus_${rowIndex}`);
+    if (statusEl && window.currentProforma && window.currentProforma.items[rowIndex]) {
+        statusEl.innerHTML = window.renderProformaRowStatusBadge(rowIndex, window.currentProforma.items[rowIndex]);
+    }
+};
+
 // Manejar escritura en el campo código con autocompletado en tiempo real
 window.handleProformaCodeInput = function(rowIndex, value) {
     if (!window.currentProforma || !window.currentProforma.items[rowIndex]) return;
     const item = window.currentProforma.items[rowIndex];
     item.codigo = value;
 
-    const matched = window.searchRepuestoInCatalogs(value);
+    const clean = String(value).trim().toUpperCase();
+    const matched = window.searchRepuestoInCatalogs(clean);
+
     if (matched) {
         item.desc = matched.desc || item.desc;
         if (matched.precio > 0 || !item.unit) {
             item.unit = matched.precio || 0;
         }
+        item.total = Math.round((Number(item.cant) || 1) * (Number(item.unit) || 0) * 100) / 100;
         window.calcProformaTotals();
-        window.updateProformaRowDOM(rowIndex);
+
+        // Actualizar directamente en DOM sin re-renderizar todo (preserva el foco del teclado)
+        const descEl = document.getElementById(`proformaDescInput_${rowIndex}`);
+        if (descEl) descEl.value = item.desc;
+        const unitEl = document.getElementById(`proformaUnitInput_${rowIndex}`);
+        if (unitEl) unitEl.value = item.unit;
+        const totEl = document.getElementById(`proformaItemTotal_${rowIndex}`);
+        if (totEl) totEl.innerText = `$${formatMoney(item.total)}`;
+        const statusEl = document.getElementById(`proformaRowStatus_${rowIndex}`);
+        if (statusEl) statusEl.innerHTML = window.renderProformaRowStatusBadge(rowIndex, item);
+
+        window.updateProformaTotalsDOM();
         window.updateProformaLiveSheetDOM();
         window.closeProformaDropdown(rowIndex);
         return;
     }
 
-    // Desplegar sugerencias flotantes
-    const suggestions = window.getRepuestoSuggestions(value, 6);
+    // Desplegar sugerencias flotantes con código, descripción y precio de lista
     const drop = document.getElementById(`proformaDropdown_${rowIndex}`);
+    const statusEl = document.getElementById(`proformaRowStatus_${rowIndex}`);
+    if (statusEl) statusEl.innerHTML = window.renderProformaRowStatusBadge(rowIndex, item);
+
     if (!drop) return;
 
-    if (suggestions.length > 0 && value.trim().length >= 2) {
-        drop.innerHTML = suggestions.map(s => `
-            <div onclick="selectRepuestoForProformaRow(${rowIndex}, '${s.cod.replace(/'/g, "\\'")}', '${s.desc.replace(/'/g, "\\'")}', ${s.precio || 0})" class="p-2 hover:bg-sky-50 dark:hover:bg-slate-700 cursor-pointer border-b border-stone-100 dark:border-slate-600 flex items-center justify-between gap-2 text-xs transition-colors">
-                <div class="min-w-0 flex-1">
-                    <span class="font-mono font-bold text-sky-600 dark:text-sky-400">${s.cod}</span>
-                    <span class="text-stone-700 dark:text-slate-200 ml-1.5 truncate block">${s.desc}</span>
+    if (clean.length >= 2) {
+        const suggestions = window.getRepuestoSuggestions(clean, 7);
+        let html = '';
+
+        if (suggestions.length > 0) {
+            html += suggestions.map(s => `
+                <div onclick="selectRepuestoForProformaRow(${rowIndex}, '${s.cod.replace(/'/g, "\\'")}', '${(s.desc || '').replace(/'/g, "\\'")}', ${s.precio || 0})" 
+                    class="p-2.5 hover:bg-sky-50 dark:hover:bg-slate-700 cursor-pointer border-b border-stone-100 dark:border-slate-700 flex items-center justify-between gap-3 text-xs transition-colors">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-mono font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/50 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-800 text-[11px]">${s.cod}</span>
+                        </div>
+                        <div class="text-stone-700 dark:text-slate-200 mt-0.5 truncate font-medium text-[11.5px]">${s.desc}</div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span class="text-[9.5px] block text-stone-400 dark:text-slate-500 font-bold uppercase">P. Lista</span>
+                        <span class="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">$${Number(s.precio || 0).toFixed(2)}</span>
+                    </div>
                 </div>
-                <span class="font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0">$${Number(s.precio || 0).toFixed(2)}</span>
-            </div>
-        `).join('');
+            `).join('');
+
+            // Opción al pie para registrar nuevo repuesto si no es coincidencia exacta
+            html += `
+                <div onclick="prepareNewRepuestoFromInput(${rowIndex})" 
+                    class="p-2 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 dark:from-amber-950/40 dark:to-orange-950/40 dark:hover:from-amber-900/60 dark:hover:to-orange-900/60 cursor-pointer border-t border-amber-200 dark:border-amber-800 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200 font-bold transition-colors">
+                    <span class="truncate">✨ Registrar "${clean}" como nuevo repuesto...</span>
+                    <span class="text-base shrink-0">➕</span>
+                </div>
+            `;
+        } else {
+            // No hay sugerencias coincidentes
+            html = `
+                <div class="p-3 text-xs text-stone-600 dark:text-slate-300">
+                    <div class="flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-400 mb-1">
+                        <span>✨</span> Código no encontrado en catálogo
+                    </div>
+                    <p class="text-[11px] text-stone-500 dark:text-slate-400 mb-2.5">
+                        Puedes escribir la descripción y su precio de lista. Se grabará en el catálogo.
+                    </p>
+                    <button type="button" onclick="prepareNewRepuestoFromInput(${rowIndex})" 
+                        class="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-xs uppercase shadow-xs transition-all active:scale-95 cursor-pointer">
+                        Continuar y Escribir Descripción
+                    </button>
+                </div>
+            `;
+        }
+
+        drop.innerHTML = html;
         drop.classList.remove('hidden');
     } else {
         drop.classList.add('hidden');
@@ -246,7 +496,20 @@ window.selectRepuestoForProformaRow = function(rowIndex, cod, desc, precio) {
     item.total = Math.round((Number(item.cant) || 1) * item.unit * 100) / 100;
     
     window.calcProformaTotals();
-    window.updateProformaRowDOM(rowIndex);
+
+    // Actualizar directamente en DOM sin destruir inputs ni perder foco
+    const codeEl = document.getElementById(`proformaCodeInput_${rowIndex}`);
+    if (codeEl) codeEl.value = item.codigo;
+    const descEl = document.getElementById(`proformaDescInput_${rowIndex}`);
+    if (descEl) descEl.value = item.desc;
+    const unitEl = document.getElementById(`proformaUnitInput_${rowIndex}`);
+    if (unitEl) unitEl.value = item.unit;
+    const totEl = document.getElementById(`proformaItemTotal_${rowIndex}`);
+    if (totEl) totEl.innerText = `$${formatMoney(item.total)}`;
+    const statusEl = document.getElementById(`proformaRowStatus_${rowIndex}`);
+    if (statusEl) statusEl.innerHTML = window.renderProformaRowStatusBadge(rowIndex, item);
+
+    window.updateProformaTotalsDOM();
     window.updateProformaLiveSheetDOM();
     window.closeProformaDropdown(rowIndex);
 };
@@ -302,6 +565,10 @@ window.updateProformaRowField = function(rowIndex, field, value) {
     const totalEl = document.getElementById(`proformaItemTotal_${rowIndex}`);
     if (totalEl) totalEl.innerText = `$${formatMoney(item.total)}`;
     
+    // Actualizar badge de la fila
+    const statusEl = document.getElementById(`proformaRowStatus_${rowIndex}`);
+    if (statusEl) statusEl.innerHTML = window.renderProformaRowStatusBadge(rowIndex, item);
+
     window.updateProformaTotalsDOM();
     window.updateProformaLiveSheetDOM();
 };
@@ -532,6 +799,18 @@ window.saveProformaToHistory = function() {
     const p = window.currentProforma;
     p.updatedAt = new Date().toISOString();
 
+    // Auto-grabar en catálogo los repuestos ingresados que no existan previamente
+    (p.items || []).forEach(it => {
+        const cod = (it.codigo || '').trim().toUpperCase();
+        const desc = (it.desc || '').trim();
+        if (cod && cod.length >= 2 && desc && cod !== 'SERV-MO') {
+            const exists = (window.LISTA_REPUESTOS_TEKA || []).some(r => r.cod && String(r.cod).trim().toUpperCase() === cod);
+            if (!exists) {
+                window.saveNewRepuestoToCatalog(cod, desc, it.unit || 0);
+            }
+        }
+    });
+
     // Actualizar en array en memoria
     const existingIdx = window.proformasArray.findIndex(x => x.id === p.id);
     if (existingIdx >= 0) {
@@ -675,6 +954,7 @@ window.renderProformaEditor = function() {
                 <div class="flex items-center gap-1 shrink-0">
                     <span class="text-[11px] font-bold text-stone-500 dark:text-slate-400">Cant:</span>
                     <input type="number" min="1" step="1" value="${it.cant || 1}" 
+                        id="proformaCantInput_${idx}"
                         onchange="updateProformaRowField(${idx}, 'cant', this.value)"
                         class="w-16 px-2 py-1 rounded-lg border border-stone-300 dark:border-slate-600 bg-stone-50 dark:bg-slate-900 text-stone-900 dark:text-white font-mono font-bold text-xs text-center focus:ring-2 focus:ring-sky-500">
                 </div>
@@ -686,7 +966,7 @@ window.renderProformaEditor = function() {
 
                 <!-- Botón Eliminar Fila -->
                 <button type="button" onclick="removeProformaRow(${idx})" title="Eliminar fila" 
-                    class="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-all">
+                    class="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-all cursor-pointer">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 </button>
             </div>
@@ -698,17 +978,17 @@ window.renderProformaEditor = function() {
                         Código Repuesto:
                     </label>
                     <div class="relative flex items-center">
-                        <input type="text" value="${it.codigo || ''}" placeholder="Ej: 1110000002"
+                        <input type="text" id="proformaCodeInput_${idx}" value="${it.codigo || ''}" placeholder="Ej: 1110000002"
                             oninput="handleProformaCodeInput(${idx}, this.value)"
                             onfocus="handleProformaCodeInput(${idx}, this.value)"
                             class="w-full pl-2.5 pr-8 py-1.5 rounded-lg border border-stone-300 dark:border-slate-600 bg-stone-50 dark:bg-slate-900 text-stone-900 dark:text-white font-mono font-bold text-xs uppercase focus:ring-2 focus:ring-sky-500">
                         <button type="button" onclick="openProformaRepuestoModal(${idx})" title="Buscar en catálogo TEKA"
-                            class="absolute right-1 p-1 text-sky-600 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-slate-800 rounded-md transition-all">
+                            class="absolute right-1 p-1 text-sky-600 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-slate-800 rounded-md transition-all cursor-pointer">
                             🔍
                         </button>
                     </div>
                     <!-- Dropdown flotante de sugerencias -->
-                    <div id="proformaDropdown_${idx}" class="hidden absolute left-0 top-full mt-1 w-72 sm:w-80 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-stone-300 dark:border-slate-600 rounded-xl shadow-xl z-50"></div>
+                    <div id="proformaDropdown_${idx}" class="hidden absolute left-0 top-full mt-1 w-80 sm:w-96 max-h-56 overflow-y-auto bg-white dark:bg-slate-800 border border-stone-300 dark:border-slate-600 rounded-xl shadow-2xl z-50"></div>
                 </div>
 
                 <!-- Descripción -->
@@ -716,20 +996,25 @@ window.renderProformaEditor = function() {
                     <label class="block text-[10px] font-bold uppercase tracking-wider text-stone-600 dark:text-slate-300 mb-0.5">
                         Descripción:
                     </label>
-                    <input type="text" value="${it.desc || ''}" placeholder="Descripción del repuesto o servicio..."
-                        onchange="updateProformaRowField(${idx}, 'desc', this.value)"
+                    <input type="text" id="proformaDescInput_${idx}" value="${it.desc || ''}" placeholder="Descripción del repuesto o servicio..."
+                        oninput="updateProformaRowField(${idx}, 'desc', this.value)"
                         class="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-slate-600 bg-stone-50 dark:bg-slate-900 text-stone-900 dark:text-white font-semibold text-xs focus:ring-2 focus:ring-sky-500">
                 </div>
 
                 <!-- Precio Unitario -->
                 <div class="sm:col-span-3">
                     <label class="block text-[10px] font-bold uppercase tracking-wider text-stone-600 dark:text-slate-300 mb-0.5">
-                        V. Unitario ($):
+                        P. Lista / V. Unit ($):
                     </label>
-                    <input type="number" step="0.01" min="0" value="${it.unit || 0}"
-                        onchange="updateProformaRowField(${idx}, 'unit', this.value)"
+                    <input type="number" id="proformaUnitInput_${idx}" step="0.01" min="0" value="${it.unit || 0}"
+                        oninput="updateProformaRowField(${idx}, 'unit', this.value)"
                         class="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-slate-600 bg-stone-50 dark:bg-slate-900 text-stone-900 dark:text-white font-mono font-bold text-xs text-right focus:ring-2 focus:ring-sky-500">
                 </div>
+            </div>
+
+            <!-- Indicador de Catálogo y Botón de Grabar en Fila -->
+            <div id="proformaRowStatus_${idx}" class="pt-0.5">
+                ${window.renderProformaRowStatusBadge(idx, it)}
             </div>
         </div>
     `).join('');
@@ -881,9 +1166,18 @@ window.setProformaIntroPreset = function(type) {
 };
 
 window.updateProformaRowDOM = function(rowIndex) {
+    if (!window.currentProforma || !window.currentProforma.items[rowIndex]) return;
     const it = window.currentProforma.items[rowIndex];
-    if (!it) return;
-    window.renderProformaEditor();
+    const codeEl = document.getElementById(`proformaCodeInput_${rowIndex}`);
+    if (codeEl) codeEl.value = it.codigo || '';
+    const descEl = document.getElementById(`proformaDescInput_${rowIndex}`);
+    if (descEl) descEl.value = it.desc || '';
+    const unitEl = document.getElementById(`proformaUnitInput_${rowIndex}`);
+    if (unitEl) unitEl.value = it.unit || 0;
+    const totalEl = document.getElementById(`proformaItemTotal_${rowIndex}`);
+    if (totalEl) totalEl.innerText = `$${formatMoney(it.total)}`;
+    const statusEl = document.getElementById(`proformaRowStatus_${rowIndex}`);
+    if (statusEl) statusEl.innerHTML = window.renderProformaRowStatusBadge(rowIndex, it);
 };
 
 window.updateProformaTotalsDOM = function() {
@@ -1097,21 +1391,98 @@ window.filterProformaRepuestoPicker = function() {
     if (query) {
         list = repuestos.filter(r => (r.cod && r.cod.toUpperCase().includes(query)) || (r.desc && r.desc.toUpperCase().includes(query)));
     }
+
+    if (list.length === 0 && query) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="p-6 text-center">
+                    <div class="text-amber-500 text-3xl mb-2">🔍</div>
+                    <div class="font-bold text-stone-800 dark:text-white text-sm mb-1">
+                        No se encontró el repuesto "${query}" en el catálogo
+                    </div>
+                    <div class="text-xs text-stone-500 dark:text-slate-400 mb-3">
+                        ¿Deseas registrarlo como un nuevo repuesto con este código?
+                    </div>
+                    <button type="button" onclick="openQuickNewRepuestoModal('${query.replace(/'/g, "\\'")}')" 
+                        class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs uppercase shadow-md transition-all active:scale-95 cursor-pointer">
+                        ➕ Registrar "${query}" en el Catálogo
+                    </button>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
     const display = list.slice(0, 50);
 
     tbody.innerHTML = display.map(r => `
         <tr class="border-b border-stone-200 dark:border-slate-700 hover:bg-sky-50/70 dark:hover:bg-slate-700/50 transition-colors">
-            <td class="p-2.5 font-mono font-bold text-sky-800 dark:text-sky-300 text-xs text-center">${r.cod}</td>
+            <td class="p-2.5 font-mono font-bold text-sky-800 dark:text-sky-300 text-xs text-center">
+                ${r.cod}
+                ${r.isCustom ? `<span class="block text-[9px] text-amber-600 dark:text-amber-400 font-sans font-black">NUEVO</span>` : ''}
+            </td>
             <td class="p-2.5 font-semibold text-stone-800 dark:text-slate-200 text-xs">${r.desc}</td>
             <td class="p-2.5 font-mono font-bold text-emerald-700 dark:text-emerald-400 text-xs text-right">$${Number(r.precio || 0).toFixed(2)}</td>
             <td class="p-2.5 text-center">
-                <button type="button" onclick="selectRepuestoFromModalPicker('${r.cod.replace(/'/g, "\\'")}', '${r.desc.replace(/'/g, "\\'")}', ${r.precio || 0})"
-                    class="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold uppercase transition-all shadow-xs active:scale-95">
+                <button type="button" onclick="selectRepuestoFromModalPicker('${r.cod.replace(/'/g, "\\'")}', '${(r.desc || '').replace(/'/g, "\\'")}', ${r.precio || 0})"
+                    class="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold uppercase transition-all shadow-xs active:scale-95 cursor-pointer">
                     Seleccionar
                 </button>
             </td>
         </tr>
     `).join('');
+};
+
+window.openQuickNewRepuestoModal = function(codePrefill = '') {
+    const box = document.getElementById('proformaNewRepuestoQuickForm');
+    if (box) {
+        box.classList.remove('hidden');
+        const codInp = document.getElementById('quickNewRepuestoCod');
+        if (codInp) codInp.value = codePrefill || '';
+        const descInp = document.getElementById('quickNewRepuestoDesc');
+        if (descInp) {
+            descInp.value = '';
+            descInp.focus();
+        }
+        const precInp = document.getElementById('quickNewRepuestoPrecio');
+        if (precInp) precInp.value = '';
+    }
+};
+
+window.toggleQuickNewRepuestoModal = function() {
+    const box = document.getElementById('proformaNewRepuestoQuickForm');
+    if (!box) return;
+    if (box.classList.contains('hidden')) {
+        const input = document.getElementById('searchProformaRepuestoPickerInput');
+        window.openQuickNewRepuestoModal(input ? input.value.trim().toUpperCase() : '');
+    } else {
+        box.classList.add('hidden');
+    }
+};
+
+window.saveQuickNewRepuestoFromModal = function() {
+    const codInp = document.getElementById('quickNewRepuestoCod');
+    const descInp = document.getElementById('quickNewRepuestoDesc');
+    const precInp = document.getElementById('quickNewRepuestoPrecio');
+    const cod = codInp ? codInp.value.trim().toUpperCase() : '';
+    const desc = descInp ? descInp.value.trim().toUpperCase() : '';
+    const precio = precInp ? parseFloat(precInp.value) || 0 : 0;
+
+    if (!cod || cod.length < 2) {
+        if (typeof showMessage === 'function') showMessage("⚠️ Ingrese un código para el repuesto", "fix-accent");
+        return;
+    }
+    if (!desc) {
+        if (typeof showMessage === 'function') showMessage("⚠️ Ingrese la descripción del repuesto", "fix-accent");
+        return;
+    }
+
+    const ok = window.saveNewRepuestoToCatalog(cod, desc, precio);
+    if (ok) {
+        const box = document.getElementById('proformaNewRepuestoQuickForm');
+        if (box) box.classList.add('hidden');
+        window.selectRepuestoFromModalPicker(cod, desc, precio);
+    }
 };
 
 window.selectRepuestoFromModalPicker = function(cod, desc, precio) {
