@@ -54,6 +54,7 @@
     <script src="reporte_diario.js"></script>
     <script src="notas_rapidas.js"></script>
     <script src="proformas.js"></script>
+    <script src="solicitudes_venta.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -3561,7 +3562,8 @@
                 showMessage("🔒 ACCESO SOLO TÉCNICOS", "fix-error");
                 return;
             }
-            currentView = (view === 'solicitudes_garantia') ? 'garantias' : view;
+            const isVentaReq = (view === 'repuestos_venta');
+            currentView = (view === 'solicitudes_garantia' || isVentaReq) ? 'garantias' : view;
             
             // If split screen is active, update the focused split panel
             if (window.isSplitScreenActive) {
@@ -3582,7 +3584,7 @@
             document.querySelectorAll('.sidebar-nav-btn').forEach(function(btn) {
                 btn.classList.remove('active');
             });
-            const sidebarTarget = document.querySelector(`.sidebar-nav-btn[data-view="${currentView}"]`);
+            const sidebarTarget = isVentaReq ? document.querySelector('.sidebar-nav-btn[data-view="repuestos_venta"]') : document.querySelector(`.sidebar-nav-btn[data-view="${currentView}"]`);
             if(sidebarTarget) sidebarTarget.classList.add('active');
 
             // Legacy Desktop Nav
@@ -3609,6 +3611,12 @@
                 targetMobileBtn.classList.remove('text-stone-400');
             }
 
+            if (isVentaReq) {
+                setTimeout(() => {
+                    if (window.switchGarantiaInnerTab) window.switchGarantiaInnerTab('venta');
+                }, 40);
+            }
+
             if (window.innerWidth < 1024) {
                 window.toggleMobileSidebar(false);
             }
@@ -3619,7 +3627,7 @@
         window.garantiaActiveInnerTab = 'solicitudes';
         window.switchGarantiaInnerTab = function(tabName) {
             window.garantiaActiveInnerTab = tabName;
-            ['solicitudes', 'tramite', 'maestro'].forEach(t => {
+            ['solicitudes', 'tramite', 'maestro', 'venta'].forEach(t => {
                 const sec = document.getElementById('garantia_sec_' + t);
                 const btn = document.getElementById('gTabBtn_' + t);
                 const badge = document.getElementById('badge_count_' + t);
@@ -3646,6 +3654,7 @@
             if (tabName === 'solicitudes' && window.renderSolicitudesGarantiaView) renderSolicitudesGarantiaView();
             if (tabName === 'tramite') renderGarantias();
             if (tabName === 'maestro') renderMaestroGarantias();
+            if (tabName === 'venta' && window.renderSolicitudesVentaView) renderSolicitudesVentaView();
             if (window.updateGarantiaTabBadges) window.updateGarantiaTabBadges();
         };
 
@@ -3657,14 +3666,19 @@
                 return false;
             }).length;
             const maestroCount = visitsArray.filter(v => v.tipoAtencion === 'Garantía' && v.estado === 'Atendido').length;
+            const ventaCount = (window.solicitudesVentaArray || []).length;
 
             const bSol = document.getElementById('badge_count_solicitudes');
             const bTra = document.getElementById('badge_count_tramite');
             const bMae = document.getElementById('badge_count_maestro');
+            const bVen = document.getElementById('badge_count_venta');
+            const sVen = document.getElementById('sidebarVentaBadge');
 
             if (bSol) bSol.textContent = solCount;
             if (bTra) bTra.textContent = tramiteCount;
             if (bMae) bMae.textContent = maestroCount;
+            if (bVen) bVen.textContent = ventaCount;
+            if (sVen) sVen.textContent = ventaCount || '070';
         };
 
         window.getTechAppBaseUrl = function() {
@@ -7690,6 +7704,12 @@
                 const dInput = document.getElementById('solicitud_desc_repuesto');
                 if (cInput) cInput.value = cod;
                 if (dInput) dInput.value = desc;
+            } else if (target.type === 'solicitud_venta_row') {
+                const idx = target.index;
+                const cInput = document.getElementById(`venta_item_cod_${idx}`);
+                const dInput = document.getElementById(`venta_item_desc_${idx}`);
+                if (cInput) cInput.value = cod;
+                if (dInput) dInput.value = desc;
             }
 
             closeRepuestoPicker();
@@ -10242,6 +10262,17 @@ function getEditModalData() {
             }, error => {
                 console.error("Database error (solicitudes_garantia):", error);
             });
+            database.ref('solicitudes_venta').on('value', snap => {
+                window.solicitudesVentaArray = snap.val() ? Object.entries(snap.val()).map(item => Object.assign({}, item[1], { id: item[0] })) : [];
+                window.solicitudesVentaArray.sort((a, b) => (b.numeroSecuencia || 0) - (a.numeroSecuencia || 0));
+                try { localStorage.setItem('fix_solicitudes_venta_backup', JSON.stringify(window.solicitudesVentaArray)); } catch(e){}
+                if (currentView === 'garantias' && window.renderSolicitudesVentaView) {
+                    renderSolicitudesVentaView();
+                }
+                if (window.updateGarantiaTabBadges) window.updateGarantiaTabBadges();
+            }, error => {
+                console.error("Database error (solicitudes_venta):", error);
+            });
             database.ref('proformas').on('value', snap => {
                 const val = snap.val();
                 if (val) {
@@ -11135,6 +11166,20 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                 <span class="sidebar-badge text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-indigo-500/30 text-indigo-100 border border-indigo-400/40">TEKA</span>
                             </div>
                             <div class="sidebar-subtext text-[10.5px] text-indigo-200/90 font-medium truncate">Solicitud y Repuestos</div>
+                        </div>
+                    </button>
+
+                    <!-- REPUESTOS VENTA -->
+                    <button type="button" onclick="changeMasterView('repuestos_venta')" class="sidebar-nav-btn view-btn sidebar-priority-btn sidebar-btn-venta w-full text-left" data-view="repuestos_venta" title="Repuestos de Venta TEKA (Excel Oficial)">
+                        <span class="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 text-white border border-amber-300/40 flex items-center justify-center shrink-0 shadow-md">
+                            <svg class="sf-symbol sf-symbol-sm text-white" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                        </span>
+                        <div class="sidebar-label min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-xs sm:text-sm text-white tracking-tight">Repuestos Venta</span>
+                                <span id="sidebarVentaBadge" class="sidebar-badge text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-amber-500/30 text-amber-100 border border-amber-400/40">Excel</span>
+                            </div>
+                            <div class="sidebar-subtext text-[10.5px] text-amber-200/90 font-medium truncate">Pedidos y Ventas Directas</div>
                         </div>
                     </button>
 
@@ -12302,8 +12347,11 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <button onclick="openConfigGoogleScriptModal()" class="bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 active:scale-95 font-black py-3 px-4 rounded-xl text-xs shadow-2xs flex items-center gap-2 transition-all cursor-pointer" title="Configurar Conector Gmail Automático con TEKA">
                                 <span>⚙️</span> <span class="hidden sm:inline">CONECTOR GMAIL</span>
                             </button>
-                            <button onclick="openNuevaSolicitudModal()" class="bg-indigo-700 hover:bg-indigo-800 active:scale-95 text-white font-black py-3 px-5 rounded-xl text-xs shadow-md flex items-center gap-2 transition-all cursor-pointer">
-                                <span class="text-base">➕</span> NUEVA SOLICITUD DE REPUESTO
+                            <button onclick="openNuevaSolicitudModal()" class="bg-indigo-700 hover:bg-indigo-800 active:scale-95 text-white font-black py-3 px-4 rounded-xl text-xs shadow-md flex items-center gap-2 transition-all cursor-pointer" title="Nueva Solicitud de Repuesto en Garantía">
+                                <span class="text-base">🛡️</span> NUEVA GARANTÍA
+                            </button>
+                            <button onclick="openNuevaSolicitudVentaModal()" class="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-black py-3 px-4 rounded-xl text-xs shadow-md flex items-center gap-2 transition-all cursor-pointer" title="Nueva Solicitud de Repuesto para Venta (Excel Oficial)">
+                                <span class="text-base">🛒</span> NUEVA VENTA REPUESTO
                             </button>
                         </div>
                     </div>
@@ -12311,8 +12359,12 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                     <!-- Subtabs de Navegación -->
                     <div class="flex flex-wrap gap-2">
                         <button id="gTabBtn_solicitudes" onclick="switchGarantiaInnerTab('solicitudes')" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase transition-all bg-indigo-700 text-white border-indigo-800 shadow-md active">
-                            <span>📦 Solicitudes de Repuestos (TEKA)</span>
+                            <span>📦 Repuestos Garantía (TEKA)</span>
                             <span id="badge_count_solicitudes" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-black bg-white/20 text-white">0</span>
+                        </button>
+                        <button id="gTabBtn_venta" onclick="switchGarantiaInnerTab('venta')" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase transition-all bg-white text-stone-600 hover:bg-amber-50 border border-stone-200 shadow-xs">
+                            <span>🛒 Repuestos de Venta</span>
+                            <span id="badge_count_venta" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-black bg-stone-100 text-stone-800 border border-stone-200">0</span>
                         </button>
                         <button id="gTabBtn_tramite" onclick="switchGarantiaInnerTab('tramite')" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase transition-all bg-white text-stone-600 hover:bg-indigo-50 border border-stone-200 shadow-xs">
                             <span>🚚 Garantías en Trámite y en Ruta</span>
@@ -12433,6 +12485,91 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                     <tr><th>Compra</th><th>Intervención</th><th>Cant.</th><th>Código rep.</th><th>Desc. Repuesto</th><th>Cod Prod.</th><th>Desc. Producto</th><th>Serie</th><th>Garantía</th><th>Técnico</th><th>Cliente</th><th>Observación</th><th>Pago</th><th>Cédula</th><th>Correo</th><th>Teléfono</th><th>Viático</th><th>Factura</th></tr>
                                 </thead>
                                 <tbody id="maestroGarantiasBody" class="uppercase font-bold text-[8px] text-stone-800"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 4: SOLICITUDES DE REPUESTOS DE VENTA -->
+                <div id="garantia_sec_venta" class="hidden space-y-6">
+                    <div class="glass-card p-6 md:p-8 rounded-2xl border-amber-300">
+                        <!-- Header interno de Venta -->
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-amber-100 pb-5 mb-6">
+                            <div>
+                                <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                                    <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-950 font-black text-xs border border-amber-300">🛒 PEDIDOS DE VENTA DIRECTA A FÁBRICA</span>
+                                    <span id="ventaNextNumBadge" class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 font-mono font-black text-xs border border-emerald-300">PRÓXIMA: N° 070 2026</span>
+                                </div>
+                                <h3 class="text-xl font-black text-slate-900 tracking-tight uppercase">SOLICITUDES DE REPUESTOS DE VENTA (TEKA)</h3>
+                                <p class="text-slate-500 text-xs mt-0.5">Gestión de pedidos de piezas de repuesto para clientes de venta, con generación exacta del formato Excel oficial y correlativo desde 070.</p>
+                            </div>
+                            <button onclick="openNuevaSolicitudVentaModal()" class="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-black py-3 px-5 rounded-xl text-xs shadow-md flex items-center gap-2 transition-all cursor-pointer shrink-0">
+                                <span class="text-base">➕</span> NUEVA SOLICITUD DE VENTA
+                            </button>
+                        </div>
+
+                        <!-- Mini KPIs de Venta -->
+                        <div class="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-6">
+                            <div class="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-center">
+                                <p class="text-[9px] uppercase font-black text-slate-500">Solicitudes</p>
+                                <p id="ventaKpiTotal" class="text-2xl font-black font-mono text-amber-950 mt-1">0</p>
+                            </div>
+                            <div class="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-200 shadow-2xs text-center">
+                                <p class="text-[9px] uppercase font-black text-indigo-900">Piezas Totales</p>
+                                <p id="ventaKpiPiezas" class="text-2xl font-black font-mono text-indigo-800 mt-1">0</p>
+                            </div>
+                            <div class="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200 shadow-2xs text-center">
+                                <p class="text-[9px] uppercase font-black text-amber-800">En Espera</p>
+                                <p id="ventaKpiSolicitados" class="text-2xl font-black font-mono text-amber-700 mt-1">0</p>
+                            </div>
+                            <div class="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200 shadow-2xs text-center">
+                                <p class="text-[9px] uppercase font-black text-blue-800">Enviadas Fábrica</p>
+                                <p id="ventaKpiEnviados" class="text-2xl font-black font-mono text-blue-700 mt-1">0</p>
+                            </div>
+                            <div class="p-3.5 rounded-xl bg-purple-50/60 border border-purple-200 shadow-2xs text-center">
+                                <p class="text-[9px] uppercase font-black text-purple-800">Recibidas FIX</p>
+                                <p id="ventaKpiRecibidos" class="text-2xl font-black font-mono text-purple-700 mt-1">0</p>
+                            </div>
+                            <div class="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200 shadow-2xs text-center">
+                                <p class="text-[9px] uppercase font-black text-emerald-800">Entregadas</p>
+                                <p id="ventaKpiCerrados" class="text-2xl font-black font-mono text-emerald-700 mt-1">0</p>
+                            </div>
+                        </div>
+
+                        <!-- Filtros y Buscador -->
+                        <div class="flex flex-col sm:flex-row justify-between items-center gap-3 mb-5">
+                            <div class="w-full sm:w-80">
+                                <input type="text" id="solicitudesVentaSearchInput" oninput="renderSolicitudesVentaView()" placeholder="🔍 BUSCAR POR CLIENTE, CÓDIGO O N°..." class="w-full p-3 glass-input bg-white rounded-xl text-xs font-bold uppercase border border-slate-300 shadow-inner outline-none">
+                            </div>
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <label class="text-[10px] font-black uppercase text-slate-500 whitespace-nowrap">Estado:</label>
+                                <select id="solicitudesVentaEstadoFilter" onchange="renderSolicitudesVentaView()" class="p-3 glass-input bg-white rounded-xl text-xs font-black uppercase border border-slate-300 shadow-2xs outline-none">
+                                    <option value="TODOS">TODOS LOS ESTADOS</option>
+                                    <option value="SOLICITADO">⏳ SOLICITADO / ESPERA</option>
+                                    <option value="ENVIADO A FÁBRICA">📤 ENVIADO A FÁBRICA</option>
+                                    <option value="REPUESTO RECIBIDO">📦 RECIBIDO EN FIX</option>
+                                    <option value="ENTREGADO AL CLIENTE">✅ ENTREGADO / CERRADO</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Tabla de Solicitudes de Venta -->
+                        <div class="overflow-x-auto rounded-2xl border border-stone-200 shadow-xs bg-white">
+                            <table class="w-full border-collapse text-left">
+                                <thead class="bg-amber-50/80 text-[10px] uppercase font-black text-amber-950 border-b border-amber-200">
+                                    <tr>
+                                        <th class="p-3.5 text-center">N° Solicitud</th>
+                                        <th class="p-3.5 text-center">Fecha Envío</th>
+                                        <th class="p-3.5">Cliente & Teléfono</th>
+                                        <th class="p-3.5 text-center">Cantidad</th>
+                                        <th class="p-3.5">Repuestos Solicitados (Código • Descripción [Modelo])</th>
+                                        <th class="p-3.5 text-center">Estado</th>
+                                        <th class="p-3.5 text-center">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="solicitudesVentaTableBody" class="divide-y divide-stone-100">
+                                    <tr><td colspan="7" class="p-8 text-center text-stone-400 font-bold uppercase">Cargando solicitudes de venta...</td></tr>
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -14176,6 +14313,132 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                 <div class="flex items-center gap-2 flex-wrap">
                     <button type="button" onclick="saveSolicitudGarantiaForm()" class="px-6 py-3 rounded-xl text-xs font-black uppercase bg-indigo-700 hover:bg-indigo-800 text-white shadow-md active:scale-95 transition-all">
                         💾 Guardar Expediente
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL EXPEDIENTE DE SOLICITUD DE REPUESTO DE VENTA -->
+    <div id="solicitudVentaModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl max-w-5xl w-full p-5 sm:p-7 shadow-2xl border border-slate-200 my-auto max-h-[92vh] flex flex-col space-y-4">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-start border-b border-slate-200 pb-3 shrink-0">
+                <div>
+                    <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-950 text-[10px] font-black uppercase border border-amber-300">TEKA • REPUESTOS DE VENTA DIRECTA</span>
+                    <h3 class="text-xl font-black text-slate-900 mt-1 uppercase tracking-tight">Expediente de Solicitud de Repuesto (Ventas)</h3>
+                    <p class="text-slate-500 text-xs mt-0.5">Formato oficial idéntico a Excel de repuestos, con pestaña y leyenda "Ventas" y numeración correlativa desde 070.</p>
+                </div>
+                <button onclick="closeSolicitudVentaModal()" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-lg font-bold transition-all cursor-pointer">✕</button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="overflow-y-auto pr-1 flex-grow space-y-5">
+                <form id="solicitudVentaForm" onsubmit="event.preventDefault();" class="space-y-5">
+                    <!-- Selector Rápido de Cliente de la Visita -->
+                    <div class="p-4 rounded-2xl bg-amber-50/60 border border-amber-200">
+                        <label class="text-[10px] uppercase font-black text-amber-950 block mb-1.5">⚡ Autocompletar desde Cliente / Visita Registrada en FIX (Opcional):</label>
+                        <select id="venta_visit_selector" onchange="autoFillVentaFromVisit(this.value)" class="w-full p-3 bg-white rounded-xl text-xs font-black uppercase text-amber-950 border border-amber-300 shadow-2xs outline-none">
+                        </select>
+                        <p class="text-[9px] text-amber-800 font-medium mt-1">Al seleccionar un cliente, se cargarán su nombre, teléfono, dirección y repuestos si estuvieran registrados.</p>
+                    </div>
+
+                    <!-- Datos Generales de la Solicitud -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="text-[10px] uppercase font-black text-slate-700 block mb-1">N° Solicitud (Arranca en 070):</label>
+                            <div class="flex items-center gap-1">
+                                <button type="button" onclick="stepSolicitudVentaNumero(-1)" class="px-2.5 py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-black text-xs text-slate-700 shadow-2xs active:scale-95 transition-all cursor-pointer" title="Número anterior">▼</button>
+                                <input type="text" id="venta_numero" class="w-full p-3 bg-slate-50 rounded-xl text-xs font-black font-mono text-amber-950 border border-slate-300 uppercase text-center" placeholder="070 2026">
+                                <button type="button" onclick="stepSolicitudVentaNumero(1)" class="px-2.5 py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-black text-xs text-slate-700 shadow-2xs active:scale-95 transition-all cursor-pointer" title="Siguiente número">▲</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] uppercase font-black text-slate-700 block mb-1">Fecha de Envío:</label>
+                            <input type="date" id="venta_fecha_envio" class="w-full p-3 bg-slate-50 rounded-xl text-xs font-black font-mono text-slate-800 border border-slate-300">
+                        </div>
+                        <div>
+                            <label class="text-[10px] uppercase font-black text-slate-700 block mb-1">Estado de la Solicitud:</label>
+                            <select id="venta_estado" class="w-full p-3 bg-slate-50 rounded-xl text-xs font-black uppercase text-slate-800 border border-slate-300">
+                                <option value="SOLICITADO">⏳ SOLICITADO / ESPERA</option>
+                                <option value="ENVIADO A FÁBRICA">📤 ENVIADO A FÁBRICA</option>
+                                <option value="REPUESTO RECIBIDO">📦 RECIBIDO EN FIX</option>
+                                <option value="ENTREGADO AL CLIENTE">✅ ENTREGADO / CERRADO</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Datos del Cliente -->
+                    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                        <p class="text-[10px] uppercase font-black text-slate-700">👤 Datos del Cliente (Se replican automáticamente en cada fila de repuesto):</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="sm:col-span-2">
+                                <label class="text-[9px] uppercase font-bold text-slate-600 block mb-1">Nombre Completo del Cliente*:</label>
+                                <input type="text" id="venta_cliente" oninput="syncVentaClientPhoneToRows()" required class="w-full p-2.5 bg-white rounded-lg text-xs font-black uppercase text-slate-900 border border-slate-300" placeholder="NOMBRE DEL CLIENTE">
+                            </div>
+                            <div>
+                                <label class="text-[9px] uppercase font-bold text-slate-600 block mb-1">Teléfono*:</label>
+                                <input type="text" id="venta_telefono" oninput="syncVentaClientPhoneToRows()" class="w-full p-2.5 bg-white rounded-lg text-xs font-black font-mono text-slate-900 border border-slate-300" placeholder="099...">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-[9px] uppercase font-bold text-slate-600 block mb-1">Dirección / Sector:</label>
+                                <input type="text" id="venta_direccion" class="w-full p-2.5 bg-white rounded-lg text-xs font-black uppercase text-slate-900 border border-slate-300" placeholder="DIRECCIÓN DEL CLIENTE">
+                            </div>
+                            <div>
+                                <label class="text-[9px] uppercase font-bold text-slate-600 block mb-1">Ciudad:</label>
+                                <input type="text" id="venta_ciudad" class="w-full p-2.5 bg-white rounded-lg text-xs font-black uppercase text-slate-900 border border-slate-300" value="Cuenca">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Repuestos Solicitados (Múltiples celdas / piezas) -->
+                    <div class="p-4 rounded-2xl bg-amber-50/70 border border-amber-300 space-y-3">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div>
+                                <p class="text-[11px] uppercase font-black text-amber-950">📦 Piezas de Repuesto Solicitadas a Fábrica:</p>
+                                <p class="text-[9px] text-amber-800">Al ingresar el código se autorrellena la descripción desde el catálogo TEKA. Se pueden agregar varias celdas con varios repuestos.</p>
+                            </div>
+                            <button type="button" onclick="addRepuestoVentaRow()" class="px-3.5 py-2 bg-amber-700 hover:bg-amber-800 active:scale-95 text-white rounded-xl text-xs font-black uppercase shadow-xs flex items-center gap-1.5 cursor-pointer">
+                                <span>➕</span> AGREGAR OTRO REPUESTO
+                            </button>
+                        </div>
+
+                        <div class="overflow-x-auto rounded-xl border border-amber-200 bg-white">
+                            <table class="w-full border-collapse text-left text-xs">
+                                <thead class="bg-amber-100/70 text-[9px] uppercase font-black text-amber-950 border-b border-amber-200">
+                                    <tr>
+                                        <th class="p-2 text-center w-8">#</th>
+                                        <th class="p-2 min-w-[150px]">Código Repuesto</th>
+                                        <th class="p-2 min-w-[240px]">Descripción Repuesto (Auto)</th>
+                                        <th class="p-2 min-w-[150px]">Modelo Equipo (Manual)</th>
+                                        <th class="p-2 min-w-[130px]">Cliente (Auto)</th>
+                                        <th class="p-2 min-w-[110px]">Teléfono (Auto)</th>
+                                        <th class="p-2 min-w-[110px]">Serie</th>
+                                        <th class="p-2 text-center w-10">Quitar</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ventaRepuestosTableBody" class="divide-y divide-stone-100">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="border-t border-slate-200 pt-4 mt-2 flex flex-wrap justify-between items-center gap-3 shrink-0">
+                <button type="button" onclick="closeSolicitudVentaModal()" class="px-5 py-3 rounded-xl text-xs font-black uppercase bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer">
+                    ✕ Cancelar
+                </button>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button type="button" onclick="downloadCurrentVentaExcelDirect()" class="px-5 py-3 rounded-xl text-xs font-black uppercase bg-emerald-700 hover:bg-emerald-800 text-white shadow-md active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer" title="Generar y descargar el archivo Excel inmediatamente">
+                        <span>📊</span> <span>Descargar Excel</span>
+                    </button>
+                    <button type="button" onclick="saveSolicitudVentaForm()" class="px-6 py-3 rounded-xl text-xs font-black uppercase bg-amber-600 hover:bg-amber-700 text-white shadow-md active:scale-95 transition-all cursor-pointer">
+                        💾 Guardar Solicitud
                     </button>
                 </div>
             </div>
