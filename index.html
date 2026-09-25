@@ -55,6 +55,8 @@
     <script src="notas_rapidas.js"></script>
     <script src="proformas.js"></script>
     <script src="solicitudes_venta.js"></script>
+    <script src="historial_instalaciones_data.js"></script>
+    <script src="historial_instalaciones.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -3060,7 +3062,8 @@
             'taller': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>',
             'inventory': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
             'clientes': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>',
-            'proformas': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>'
+            'proformas': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>',
+            'historial_instalaciones': '<svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6z"/></svg>'
         };
 
         const VIEW_INFO = {
@@ -3080,7 +3083,8 @@
             'mantenimiento': { icon: SF_ICONS['mantenimiento'], title: 'Mantenimientos' },
             'taller': { icon: SF_ICONS['taller'], title: 'Taller Físico' },
             'inventory': { icon: SF_ICONS['inventory'], title: 'Inventario' },
-            'clientes': { icon: SF_ICONS['clientes'], title: 'Directorio Clientes' }
+            'clientes': { icon: SF_ICONS['clientes'], title: 'Directorio Clientes' },
+            'historial_instalaciones': { icon: SF_ICONS['historial_instalaciones'], title: 'Historial Instalaciones (2023-2026+)' }
         };
 
         window.renderInicioMosaicos = function() {
@@ -3206,6 +3210,7 @@
             if (v === 'solicitudes_garantia') return document.getElementById('garantiasView');
             if (v === 'notas') return document.getElementById('notasView');
             if (v === 'proformas') return document.getElementById('proformasView');
+            if (v === 'historial_instalaciones') return document.getElementById('historialInstalacionesView');
             return document.getElementById(v + 'View');
         };
 
@@ -3472,6 +3477,9 @@
             } else if(v === 'proformas') {
                 const pv = document.getElementById('proformasView'); if(pv) pv.classList.remove('hidden');
                 if(window.renderProformaModule) renderProformaModule();
+            } else if(v === 'historial_instalaciones') {
+                const hv = document.getElementById('historialInstalacionesView'); if(hv) hv.classList.remove('hidden');
+                if(window.renderHistorialInstalacionesView) renderHistorialInstalacionesView();
             } else {
                 const el = document.getElementById(v + 'View'); if(el) el.classList.remove('hidden');
             }
@@ -3491,7 +3499,8 @@
                 'reporte_adminView', 'tallerView', 'garantiasView',
                 'pendientesView', 'mantenimientoView', 'inventoryView',
                 'ruteroView', 'reporteDiarioView', 'reporteTekaView',
-                'catalogoView', 'contabilidadView', 'notasView', 'proformasView'
+                'catalogoView', 'contabilidadView', 'notasView', 'proformasView',
+                'historialInstalacionesView'
             ];
 
             // 1. Ocultar y limpiar clases/orden de todos los paneles
@@ -3575,7 +3584,7 @@
                 return;
             }
 
-            const sections = ['inicioView', 'reporte_adminView', 'formContainer', 'contabilidadView', 'reporteTekaView', 'reporteDiarioView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'solicitudesGarantiaView', 'clientesView', 'dashboardView', 'catalogoView', 'notasView', 'proformasView'];
+            const sections = ['inicioView', 'reporte_adminView', 'formContainer', 'contabilidadView', 'reporteTekaView', 'reporteDiarioView', 'agendaContainer', 'ruteroView', 'mantenimientoView', 'inventoryView', 'pendientesView', 'buscadorView', 'tallerView', 'garantiasView', 'solicitudesGarantiaView', 'clientesView', 'dashboardView', 'catalogoView', 'notasView', 'proformasView', 'historialInstalacionesView'];
             sections.forEach(function(id) { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
 
             window.activateSingleView(currentView);
@@ -10220,6 +10229,7 @@ function getEditModalData() {
                 if(currentView === 'contabilidad') processFinancialBalance(); 
                 if(currentView === 'buscador') renderBuscador();
                 if(currentView === 'clientes') renderClientes();
+                if(currentView === 'historial_instalaciones' && window.renderHistorialInstalacionesView) renderHistorialInstalacionesView();
             }, error => {
                 console.error("Database error (visits):", error);
             });
@@ -11210,6 +11220,20 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <div class="sidebar-subtext text-[10.5px] text-cyan-200/90 font-medium truncate">Cotizaciones Membretadas</div>
                         </div>
                     </button>
+
+                    <!-- 9. HISTORIAL DE INSTALACIONES (2023-2026+) -->
+                    <button type="button" onclick="changeMasterView('historial_instalaciones')" class="sidebar-nav-btn view-btn sidebar-priority-btn sidebar-btn-historial w-full text-left" data-view="historial_instalaciones" title="Historial Instalaciones: Consultas 2023-2026 y En Vivo FIX">
+                        <span class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-800 text-white border border-indigo-300/40 flex items-center justify-center shrink-0 shadow-md">
+                            <svg class="sf-symbol sf-symbol-sm text-white" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6z"/></svg>
+                        </span>
+                        <div class="sidebar-label min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-xs sm:text-sm text-white tracking-tight">Historial Instal.</span>
+                                <span id="sidebarHistorialBadge" class="sidebar-badge text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-indigo-500/30 text-indigo-100 border border-indigo-400/40">6.964+</span>
+                            </div>
+                            <div class="sidebar-subtext text-[10.5px] text-indigo-200/90 font-medium truncate">Base 2023-26 + En Vivo</div>
+                        </div>
+                    </button>
                 </div>
             </div>
 
@@ -11645,7 +11669,32 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <svg class="sf-symbol sf-symbol-watermark" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                         </div>
 
-                        <!-- 9. RESULTADOS TOTALES (Wide: col-span-2 sm:col-span-3 lg:col-span-6) -->
+                        <!-- 9. HISTORIAL DE INSTALACIONES (Wide: col-span-2) -->
+                        <div onclick="changeMasterView('historial_instalaciones')" class="metro-tile col-span-2" style="background: linear-gradient(145deg, #4338ca 0%, #1e1b4b 100%);">
+                            <div class="metro-tile-header">
+                                <div class="metro-tile-icon-container text-white">
+                                    <svg class="sf-symbol sf-symbol-md" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6z"/></svg>
+                                </div>
+                                <span id="metroTileBadge_historial" class="metro-tile-badge">2023-2026+</span>
+                            </div>
+                            <div class="metro-tile-slider">
+                                <div class="metro-slide-track metro-track-4">
+                                    <div class="metro-slide-item">
+                                        <div class="metro-tile-title">HISTORIAL INSTALACIONES</div>
+                                        <div class="metro-tile-sub">Consultas 2023-2026 + En Vivo FIX</div>
+                                    </div>
+                                    <div class="metro-slide-item">
+                                        <div class="text-[9.5px] font-semibold uppercase text-indigo-200 tracking-wider flex items-center gap-1.5">
+                                            <span class="metro-live-dot"></span> ARCHIVO COMPLETO
+                                        </div>
+                                        <div id="metroTileInfo_historial" class="metro-tile-live-text truncate">6.964+ registros disponibles</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <svg class="sf-symbol sf-symbol-watermark" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6z"/></svg>
+                        </div>
+
+                        <!-- 10. RESULTADOS TOTALES (Wide: col-span-2 sm:col-span-3 lg:col-span-6) -->
                         <div onclick="changeMasterView('dashboard')" class="metro-tile col-span-2 sm:col-span-3 lg:col-span-6" style="background: linear-gradient(145deg, #0284c7 0%, #082f49 100%);">
                             <div class="metro-tile-header">
                                 <div class="metro-tile-icon-container text-white">
@@ -12142,6 +12191,216 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                 <!-- Contenido generado por renderClientes() -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            <!-- VISTA DE CONSULTA HISTÓRICA DE INSTALACIONES (2023 - 2026 + EN VIVO FIX) -->
+            <div id="historialInstalacionesView" class="hidden lg:col-span-3 space-y-6 admin-only">
+                <!-- Tarjeta Principal -->
+                <div class="glass-card p-6 md:p-8 rounded-2xl">
+                    <!-- Cabecera de la Vista -->
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/10 pb-4">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-black uppercase border border-indigo-500/30">BASE CONSOLIDADA & EN VIVO</span>
+                                <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20 flex items-center gap-1.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    <span>Base de datos sincronizada</span>
+                                </span>
+                            </div>
+                            <h2 class="text-xl md:text-2xl font-black uppercase text-white mt-1 tracking-tight flex items-center gap-2">
+                                <span>🏛️ Consulta Histórica de Instalaciones</span>
+                                <span class="text-xs font-mono font-bold text-sky-400 px-2 py-0.5 rounded bg-sky-500/10 border border-sky-500/20">2023 - 2026+</span>
+                            </h2>
+                            <p class="text-slate-400 text-xs mt-0.5">Búsqueda unificada en tiempo real de los 6.964 reportes históricos oficiales y de todos los servicios registrados día a día en FIX.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="exportHistorialToCSV()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md active:scale-95 cursor-pointer">
+                                <span>📥 Exportar Consulta a Excel/CSV</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard de Métricas y KPIs -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+                        <!-- KPI 1: Total Registros Unificados -->
+                        <div class="p-4 rounded-2xl bg-slate-900/60 border border-white/10 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between text-slate-400 text-[10px] font-black uppercase tracking-wider">
+                                <span>TOTAL UNIFICADO</span>
+                                <span class="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-300 flex items-center justify-center text-xs">📈</span>
+                            </div>
+                            <div id="historialKpiTotal" class="text-2xl sm:text-3xl font-black text-white font-mono mt-2">-</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Histórico + En Vivo FIX</div>
+                        </div>
+
+                        <!-- KPI 2: Coincidencias Filtradas -->
+                        <div class="p-4 rounded-2xl bg-slate-900/60 border border-white/10 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between text-slate-400 text-[10px] font-black uppercase tracking-wider">
+                                <span>COINCIDENCIAS</span>
+                                <span class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-xs">🔍</span>
+                            </div>
+                            <div id="historialKpiFiltered" class="text-2xl sm:text-3xl font-black text-sky-400 font-mono mt-2">-</div>
+                            <div class="text-[10px] text-slate-400 mt-1">
+                                <span id="historialKpiHistorico" class="font-bold text-slate-300">-</span> Históricos • <span id="historialKpiLive" class="font-bold text-emerald-400">-</span> En Vivo
+                            </div>
+                        </div>
+
+                        <!-- KPI 3: Desglose por Año -->
+                        <div class="p-4 rounded-2xl bg-slate-900/60 border border-white/10 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between text-slate-400 text-[10px] font-black uppercase tracking-wider mb-1">
+                                <span>DISTRIBUCIÓN POR AÑO</span>
+                                <span class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-xs">📅</span>
+                            </div>
+                            <div id="historialKpiYearList" class="space-y-1"></div>
+                        </div>
+
+                        <!-- KPI 4: Técnicos Principales -->
+                        <div class="p-4 rounded-2xl bg-slate-900/60 border border-white/10 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between text-slate-400 text-[10px] font-black uppercase tracking-wider mb-1">
+                                <span>TÉCNICOS PRINCIPALES</span>
+                                <span class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-xs">🔧</span>
+                            </div>
+                            <div id="historialKpiTechList" class="space-y-1"></div>
+                        </div>
+
+                        <!-- KPI 5: Productos / Códigos Frecuentes -->
+                        <div class="p-4 rounded-2xl bg-slate-900/60 border border-white/10 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between text-slate-400 text-[10px] font-black uppercase tracking-wider mb-1">
+                                <span>MÁS INSTALADOS</span>
+                                <span class="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center text-xs">📦</span>
+                            </div>
+                            <div id="historialKpiProdList" class="space-y-1"></div>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Búsqueda Principal -->
+                    <div class="p-4 rounded-2xl bg-slate-950/60 border border-white/10 space-y-3 mb-6">
+                        <div class="flex flex-col sm:flex-row items-stretch gap-2.5">
+                            <div class="relative flex-1">
+                                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">🔍</span>
+                                <input type="text" id="historialGlobalSearch" oninput="onHistorialSearchInput()" placeholder="Buscar por cliente, cédula, factura, serie, código, técnico, ciudad, dirección, repuesto, observaciones..." class="w-full pl-10 pr-4 py-3 bg-slate-900/90 border border-white/10 rounded-xl text-xs font-semibold text-white placeholder-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all">
+                            </div>
+                            <button type="button" onclick="toggleHistorialAdvancedFilters()" class="px-3.5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
+                                <span id="historialFilterToggleIcon">⚙️</span>
+                                <span id="historialFilterToggleText">Filtros Específicos</span>
+                            </button>
+                            <button type="button" onclick="performHistorialSearch(true)" class="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shadow-sm">
+                                Buscar
+                            </button>
+                            <button type="button" onclick="clearHistorialFilters()" class="px-3.5 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer whitespace-nowrap">
+                                Limpiar
+                            </button>
+                        </div>
+
+                        <!-- Panel Desplegable de Filtros Avanzados -->
+                        <div id="historialAdvancedFiltersPanel" class="hidden pt-3 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                            <div>
+                                <label class="text-[9.5px] font-black uppercase text-slate-400 block mb-1">Fecha Desde:</label>
+                                <input type="date" id="historialFilterDateStart" onchange="performHistorialSearch(true)" class="w-full p-2.5 bg-slate-900 border border-white/10 rounded-lg text-xs font-mono text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[9.5px] font-black uppercase text-slate-400 block mb-1">Fecha Hasta:</label>
+                                <input type="date" id="historialFilterDateEnd" onchange="performHistorialSearch(true)" class="w-full p-2.5 bg-slate-900 border border-white/10 rounded-lg text-xs font-mono text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[9.5px] font-black uppercase text-slate-400 block mb-1">N° Factura:</label>
+                                <input type="text" id="historialFilterFactura" oninput="onHistorialSearchInput()" placeholder="Buscar factura..." class="w-full p-2.5 bg-slate-900 border border-white/10 rounded-lg text-xs font-mono text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[9.5px] font-black uppercase text-slate-400 block mb-1">Cédula / RUC:</label>
+                                <input type="text" id="historialFilterCedula" oninput="onHistorialSearchInput()" placeholder="Buscar cédula..." class="w-full p-2.5 bg-slate-900 border border-white/10 rounded-lg text-xs font-mono text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[9.5px] font-black uppercase text-slate-400 block mb-1">Serie del Equipo:</label>
+                                <input type="text" id="historialFilterSerie" oninput="onHistorialSearchInput()" placeholder="Buscar serie..." class="w-full p-2.5 bg-slate-900 border border-white/10 rounded-lg text-xs font-mono text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[9.5px] font-black uppercase text-slate-400 block mb-1">Código TEKA:</label>
+                                <input type="text" id="historialFilterCodigo" oninput="onHistorialSearchInput()" placeholder="Buscar código..." class="w-full p-2.5 bg-slate-900 border border-white/10 rounded-lg text-xs font-mono text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[9.5px] font-black uppercase text-slate-400 block mb-1">Nombre del Cliente:</label>
+                                <input type="text" id="historialFilterCliente" oninput="onHistorialSearchInput()" placeholder="Nombre cliente..." class="w-full p-2.5 bg-slate-900 border border-white/10 rounded-lg text-xs text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[9.5px] font-black uppercase text-slate-400 block mb-1">Teléfono / Celular:</label>
+                                <input type="text" id="historialFilterTelefono" oninput="onHistorialSearchInput()" placeholder="Teléfono..." class="w-full p-2.5 bg-slate-900 border border-white/10 rounded-lg text-xs text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[9.5px] font-black uppercase text-slate-400 block mb-1">Técnico:</label>
+                                <input type="text" id="historialFilterTecnico" oninput="onHistorialSearchInput()" placeholder="Técnico..." class="w-full p-2.5 bg-slate-900 border border-white/10 rounded-lg text-xs text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[9.5px] font-black uppercase text-slate-400 block mb-1">Ciudad:</label>
+                                <input type="text" id="historialFilterCiudad" oninput="onHistorialSearchInput()" placeholder="Ciudad..." class="w-full p-2.5 bg-slate-900 border border-white/10 rounded-lg text-xs text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="text-[9.5px] font-black uppercase text-slate-400 block mb-1">Origen de Datos:</label>
+                                <select id="historialFilterOrigen" onchange="performHistorialSearch(true)" class="w-full p-2.5 bg-slate-900 border border-white/10 rounded-lg text-xs font-bold text-white outline-none">
+                                    <option value="TODOS">Todos los Orígenes</option>
+                                    <option value="HISTORICO">🏛️ Solo Histórico 2023-2026</option>
+                                    <option value="FIX_LIVE">⚡ Solo FIX En Vivo</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Información de Resultados -->
+                    <div class="flex items-center justify-between mb-3 px-1">
+                        <div id="historialTableCountBadge" class="text-xs font-bold text-slate-300">
+                            Cargando registros...
+                        </div>
+                        <div class="text-[11px] text-slate-400">
+                            💡 Haz clic en cualquier fila para ver el expediente completo
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Resultados -->
+                    <div id="historialTableContainer" class="overflow-x-auto rounded-2xl border border-white/10 shadow-sm bg-slate-950/40 backdrop-blur-md">
+                        <table class="w-full text-left font-sans">
+                            <thead>
+                                <tr class="bg-slate-900/80 border-b border-white/10 text-[10.5px] font-black uppercase tracking-wider text-slate-300">
+                                    <th class="p-3 text-center w-28">ORIGEN</th>
+                                    <th class="p-3 w-28">FECHA</th>
+                                    <th class="p-3 w-52">CLIENTE</th>
+                                    <th class="p-3 w-32">CÉDULA / RUC</th>
+                                    <th class="p-3 w-36">FACTURA</th>
+                                    <th class="p-3 w-36">SERIE</th>
+                                    <th class="p-3 w-28">CÓDIGO</th>
+                                    <th class="p-3">DESCRIPCIÓN</th>
+                                    <th class="p-3 w-36">TÉCNICO</th>
+                                    <th class="p-3 w-28">CIUDAD</th>
+                                    <th class="p-3 text-center w-24">ACCIÓN</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historialTableBody">
+                                <!-- Filas generadas dinámicamente -->
+                            </tbody>
+                        </table>
+
+                        <!-- Estado Vacío -->
+                        <div id="historialEmptyState" class="hidden p-12 text-center text-slate-400">
+                            <div class="text-3xl mb-2">🔍</div>
+                            <h3 class="text-base font-bold text-white mb-1">No se encontraron resultados</h3>
+                            <p class="text-xs text-slate-400">Intenta ajustar los términos de búsqueda o limpiar los filtros.</p>
+                            <button type="button" onclick="clearHistorialFilters()" class="mt-4 px-4 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-bold transition-all">
+                                Restablecer Filtros
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Paginación -->
+                    <div id="historialPaginationArea" class="hidden flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-3 border-t border-white/10">
+                        <div class="text-xs text-slate-400" id="historialPageIndicator">
+                            Página 1
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" id="historialBtnPrev" onclick="historialChangePage(-1)" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-slate-200 transition-all border border-white/10">
+                                ◀ Anterior
+                            </button>
+                            <button type="button" id="historialBtnNext" onclick="historialChangePage(1)" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-slate-200 transition-all border border-white/10">
+                                Siguiente ▶
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -14867,6 +15126,137 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                     + Nueva Proforma
                 </button>
                 <button type="button" onclick="closeProformaHistoryModal()" class="px-4 py-2 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold uppercase transition-all cursor-pointer">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    <!-- MODAL DE INSPECCIÓN DETALLADA DE INSTALACIÓN (HISTÓRICO 2023-2026 + FIX EN VIVO) -->
+    <div id="modalHistorialDetalle" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[36000] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+        <div class="glass-card rounded-3xl max-w-4xl w-full p-5 sm:p-7 shadow-2xl border border-white/20 bg-slate-900 text-slate-100 my-auto max-h-[92vh] flex flex-col space-y-4">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-start border-b border-white/10 pb-3 shrink-0">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-black uppercase border border-indigo-500/30">TEKA • EXPEDIENTE DE INSTALACIÓN</span>
+                    </div>
+                    <h3 id="histModalTitle" class="text-xl font-black text-white mt-1 uppercase tracking-tight">Detalle del Registro</h3>
+                    <p id="histModalDateSub" class="text-slate-400 text-xs mt-0.5">Fecha de Instalación: -</p>
+                </div>
+                <button type="button" onclick="closeHistorialDetailModal()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center text-lg font-bold transition-all cursor-pointer">✕</button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="overflow-y-auto pr-1 flex-grow space-y-5">
+                <!-- Metadata Box & Live Action -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div id="histModalMetaBox" class="flex-1 p-3.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-xs text-slate-300">
+                        <!-- Origin details -->
+                    </div>
+                    <button id="histModalLiveActionBtn" type="button" class="hidden px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer">
+                        <span>👁️ Abrir Visita en Agenda</span>
+                    </button>
+                </div>
+
+                <!-- Unified Fields Section -->
+                <div>
+                    <h4 class="text-xs font-black uppercase tracking-wider text-indigo-400 mb-3 border-b border-indigo-500/20 pb-1">
+                        Información General del Cliente y Equipo
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Cliente</div>
+                            <div id="histDetCliente" class="text-sm font-bold text-white mt-0.5 break-words">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Cédula / RUC</div>
+                            <div id="histDetCedula" class="text-sm font-mono font-bold text-sky-400 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">N° Factura</div>
+                            <div id="histDetFactura" class="text-sm font-mono font-bold text-amber-300 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Fecha Instalación</div>
+                            <div id="histDetFechaInst" class="text-sm font-mono text-slate-200 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Fecha de Compra</div>
+                            <div id="histDetFechaCompra" class="text-sm font-mono text-slate-200 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Serie del Equipo</div>
+                            <div id="histDetSerie" class="text-sm font-mono font-bold text-sky-300 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Código TEKA</div>
+                            <div id="histDetCodigo" class="text-sm font-mono font-bold text-purple-300 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Teléfono / Celular</div>
+                            <div id="histDetTelefono" class="text-sm font-bold text-emerald-400 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Correo Electrónico</div>
+                            <div id="histDetCorreo" class="text-xs font-mono text-slate-300 mt-0.5 break-all">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Ciudad / Provincia</div>
+                            <div id="histDetCiudad" class="text-xs font-bold text-slate-200 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Técnico Asignado</div>
+                            <div id="histDetTecnico" class="text-xs font-bold text-slate-200 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Lugar de Compra</div>
+                            <div id="histDetLugarCompra" class="text-xs font-bold text-slate-200 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Garantía / Asunto</div>
+                            <div id="histDetGarantia" class="text-xs font-bold text-slate-200 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Precio / Costo</div>
+                            <div id="histDetPrecio" class="text-xs font-mono font-bold text-emerald-300 mt-0.5">-</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/60 border border-white/5">
+                            <div class="text-[10px] font-bold uppercase text-slate-400">Estado</div>
+                            <div id="histDetEstado" class="text-xs font-bold text-amber-300 mt-0.5">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dirección Completa -->
+                <div class="p-3.5 rounded-xl bg-slate-950/60 border border-white/5">
+                    <div class="text-[10px] font-bold uppercase text-slate-400">Dirección de Instalación</div>
+                    <div id="histDetDireccion" class="text-xs text-slate-200 mt-0.5">-</div>
+                </div>
+
+                <!-- Descripción & Observaciones -->
+                <div class="space-y-3">
+                    <div class="p-3.5 rounded-xl bg-slate-950/60 border border-white/5">
+                        <div class="text-[10px] font-bold uppercase text-slate-400">Descripción del Producto / Equipo</div>
+                        <div id="histDetDescripcion" class="text-xs font-bold text-white mt-0.5">-</div>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-slate-950/60 border border-white/5">
+                        <div class="text-[10px] font-bold uppercase text-slate-400">Observaciones / Notas</div>
+                        <div id="histDetObservaciones" class="text-xs text-slate-300 mt-0.5 whitespace-pre-wrap">-</div>
+                    </div>
+                </div>
+
+                <!-- Collapsible Extra Raw Excel Row -->
+                <div class="space-y-2">
+                    <button id="histModalRawTrigger" type="button" onclick="toggleHistorialRawContent()" class="w-full p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left text-xs font-bold text-slate-200 flex items-center justify-between transition-colors cursor-pointer">
+                        <span>Ver Fila Original de Excel Completa (Atributos Adicionales)</span>
+                        <span id="histModalRawArrow">▼</span>
+                    </button>
+                    <div id="histModalRawContent" class="hidden"></div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="flex justify-end items-center gap-3 pt-3 border-t border-white/10 shrink-0">
+                <button type="button" onclick="closeHistorialDetailModal()" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-bold transition-all cursor-pointer">
                     Cerrar
                 </button>
             </div>
