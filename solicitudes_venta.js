@@ -623,24 +623,24 @@ window.renderSolicitudesVentaView = function() {
             return `
                 <div class="text-[11px] leading-tight pb-1 border-b border-stone-100 last:border-0 last:pb-0">
                     <span class="font-mono font-black text-amber-900">${it.cod || 'S/C'}</span> • 
-                    <span class="font-bold text-slate-800 uppercase">${it.desc || 'REPUESTO'}</span> 
-                    ${it.modelo ? `<span class="text-stone-400 text-[10px] font-medium font-mono">[${it.modelo}]</span>` : ''}
+                    <span class="font-bold text-slate-900 uppercase">${it.desc || 'REPUESTO'}</span> 
+                    ${it.modelo ? `<span class="text-indigo-900 bg-indigo-50 border border-indigo-200 text-[10px] font-bold font-mono px-1.5 py-0.5 rounded shadow-2xs">[${it.modelo}]</span>` : ''}
                 </div>
             `;
         }).join('');
 
         return `
-            <tr class="border-b border-stone-200/70 hover:bg-amber-50/30 transition-colors font-medium text-xs text-stone-800">
+            <tr class="border-b border-stone-200/70 hover:bg-amber-50/40 transition-colors font-medium text-xs text-stone-900">
                 <td class="p-3.5 text-center font-mono font-black text-amber-950">
-                    <span class="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-950 border border-amber-300 block mb-1">${s.numeroSolicitud || '---'}</span>
+                    <span class="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-950 border border-amber-300 block mb-1 shadow-2xs">${s.numeroSolicitud || '---'}</span>
                     <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-emerald-100 text-emerald-900 border border-emerald-300">🛒 Venta</span>
                 </td>
-                <td class="p-3.5 font-mono text-[11px] text-stone-600 whitespace-nowrap text-center">
+                <td class="p-3.5 font-mono text-[11px] font-bold text-slate-700 whitespace-nowrap text-center">
                     ${s.fechaEnvio || '---'}
                 </td>
                 <td class="p-3.5">
-                    <p class="font-black text-slate-900 uppercase text-xs">${s.cliente || '---'}</p>
-                    <p class="text-[10px] text-stone-500 font-mono">📞 ${s.telefono || '---'} • 📍 ${s.ciudad || 'Cuenca'}</p>
+                    <p class="font-black text-slate-950 uppercase text-xs">${s.cliente || '---'}</p>
+                    <p class="text-[10px] text-slate-600 font-mono font-bold">📞 ${s.telefono || '---'} • 📍 ${s.ciudad || 'Cuenca'}</p>
                 </td>
                 <td class="p-3.5 text-center">
                     <span class="px-2.5 py-1 rounded-full text-xs font-mono font-black ${itemCount > 1 ? 'bg-indigo-100 text-indigo-900 border border-indigo-200' : 'bg-stone-100 text-stone-800'}">

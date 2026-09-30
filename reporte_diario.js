@@ -61,6 +61,17 @@ function extractEquiposVisitDiario(v, isHoy) {
     
     // 1. Caso de Mantenimiento específico
     if (v.esMantenimiento && v.mantenimientoEquipo) {
+        const parts = String(v.mantenimientoEquipo).split(',').map(p => p.trim()).filter(Boolean);
+        if (parts.length > 1) {
+            parts.forEach(part => {
+                results.push({
+                    equipo: part.toUpperCase(),
+                    serie: isHoy ? String(v.serieEquipo || '').toUpperCase().trim() : 'ABIERTO',
+                    motivo: 'MANTENIMIENTO PREVENTIVO'
+                });
+            });
+            return results;
+        }
         results.push({
             equipo: String(v.mantenimientoEquipo).toUpperCase().trim(),
             serie: isHoy ? String(v.serieEquipo || '').toUpperCase().trim() : 'ABIERTO',
