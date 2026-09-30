@@ -10633,10 +10633,23 @@
             document.getElementById('edit_lugarCompra').value = v.lugarCompra || "";
             if(document.getElementById('edit_tipoAtencion')) document.getElementById('edit_tipoAtencion').value = v.tipoAtencion || "Instalación";
             if(document.getElementById('edit_estado')) document.getElementById('edit_estado').value = v.estado || "PENDIENTE";
-            document.getElementById('edit_observaciones').value = v.observacionesAdmin || "";
-            document.getElementById('edit_numEquipos').value = v.equipos ? v.equipos.length : 1;
             
-            window.rebuildEditEquipmentInputs(v.equipos || []);
+            const isMaint = Boolean(v.esMantenimiento || v.tipoAtencion === 'Mantenimiento');
+            document.getElementById('edit_observaciones').value = v.observacionesAdmin || v.mantenimientoDescripcion || v.descFalla || "";
+            
+            let initialEquipos = v.equipos;
+            if ((!initialEquipos || initialEquipos.length === 0) && isMaint) {
+                if (Array.isArray(v.equiposMantenimiento) && v.equiposMantenimiento.length > 0) {
+                    initialEquipos = v.equiposMantenimiento.map(eq => ({ descProducto: eq, manualName: eq, costoBase: 0, codProducto: '', serieEquipo: '' }));
+                } else if (v.mantenimientoEquipo) {
+                    initialEquipos = v.mantenimientoEquipo.split(',').map(s => s.trim()).filter(Boolean).map(eq => ({ descProducto: eq, manualName: eq, costoBase: 0, codProducto: '', serieEquipo: '' }));
+                }
+            }
+            
+            const eqCount = (initialEquipos && initialEquipos.length > 0) ? initialEquipos.length : 1;
+            document.getElementById('edit_numEquipos').value = eqCount;
+            
+            window.rebuildEditEquipmentInputs(initialEquipos || []);
             
             const accContainer = document.getElementById('editAccesoriosContainer');
             if(accContainer) {
@@ -10684,21 +10697,24 @@
 
             const currentTipo = document.getElementById('edit_tipoAtencion') ? document.getElementById('edit_tipoAtencion').value : '';
             const isGarantiaEdit = (currentTipo === 'Garantía');
+            const isMaintEdit = (currentTipo === 'Mantenimiento');
 
             for(let i = 0; i < count; i++) {
                 const eq = equiposActuales[i] || { descProducto: "", manualName: "", costoBase: 0, codProducto: "", serieEquipo: "", conRepuesto: false, codRepuesto: "", descRepuesto: "" };
                 let currentDesc = (eq.descProducto || "").toUpperCase();
-                let defaultCost = eq.costoBase;
+                let defaultCost = (typeof eq.costoBase === 'number' && !isNaN(eq.costoBase)) ? eq.costoBase : (parseFloat(eq.costoBase) || 0);
                 
-                if (isGarantiaEdit) {
-                    if (eq.costoBase === 0 || Math.abs(eq.costoBase - 14.23) < 0.01) {
+                if (isMaintEdit) {
+                    defaultCost = 0;
+                } else if (isGarantiaEdit) {
+                    if (defaultCost === 0 || Math.abs(defaultCost - 14.23) < 0.01) {
                         defaultCost = getGarantiaCost(eq);
                     }
                 } else if (currentDesc.includes("BBQ") || currentDesc.includes("BARBACOA")) {
-                    if (eq.costoBase === 0) defaultCost = 29.00;
+                    if (defaultCost === 0) defaultCost = 29.00;
                 } else if (currentDesc.includes("ISLA")) {
-                    if (eq.costoBase === 0) defaultCost = (count === 1) ? 45.00 : 30.00;
-                } else if (eq.costoBase === 0 && !eq.descProducto) {
+                    if (defaultCost === 0) defaultCost = (count === 1) ? 45.00 : 30.00;
+                } else if (defaultCost === 0 && !eq.descProducto) {
                     if (count === 1) defaultCost = 25; 
                     else if (count === 2) defaultCost = 20;
                     else defaultCost = 15;
@@ -10708,6 +10724,9 @@
                 const repCode = eq.codRepuesto || '';
                 const repDesc = eq.descRepuesto || '';
 
+                const isInTipos = TIPOS_EQUIPO.some(t => t.toUpperCase() === currentDesc);
+                const customOption = (!isInTipos && currentDesc) ? `<option value="${eq.descProducto}" selected>${eq.descProducto}</option>` : '';
+
                 container.innerHTML += `
                 <div class="equipment-edit-row p-5 glass-panel bg-white/70 mb-5 shadow-sm italic font-black border border-white/90">
                     <p class="text-[10px] font-black mb-4 text-fix-main uppercase italic underline tracking-tighter">EQUIPO REGISTRADO ${i+1}</p>
@@ -10715,8 +10734,9 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <select class="edit-eq-select w-full p-4 text-[10px] font-black uppercase rounded-xl glass-input outline-none text-stone-800">
                                 <option value="">-- ELEGIR PRODUCTO --</option>
+                                ${customOption}
                                 ${TIPOS_EQUIPO.map(t => {
-                                    const isSelected = (currentDesc === t.toUpperCase()) ? 'selected' : '';
+                                    const isSelected = (!customOption && currentDesc === t.toUpperCase()) ? 'selected' : '';
                                     return `<option value="${t}" ${isSelected}>${t}</option>`;
                                 }).join('')}
                             </select>
@@ -10735,7 +10755,7 @@
                         </div>
 
                         <!-- Sección de Repuesto en Edición -->
-                        <div class="mt-2 p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+                        <div class="mt-2 p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2 ${isMaintEdit ? 'hidden' : ''}">
                             <div class="flex items-center justify-between">
                                 <label class="text-[9px] font-black text-amber-900 flex items-center gap-1.5">
                                     🔧 ¿LLEVA REPUESTO EN GARANTÍA?
@@ -10762,7 +10782,7 @@
                             </div>
                         </div>
 
-                        <div class="mt-3"><label class="text-[9px] text-fix-main font-black italic block mb-2">💰 PRECIO LIQUIDACIÓN / COBRO:</label><input type="number" step="0.01" value="${defaultCost.toFixed(2)}" class="edit-eq-cost w-full p-4 text-base font-mono font-black rounded-xl glass-input bg-stone-100/80 border border-stone-300 text-fix-report outline-none"></div>
+                        <div class="mt-3 ${isMaintEdit ? 'hidden' : ''}"><label class="text-[9px] text-fix-main font-black italic block mb-2">💰 PRECIO LIQUIDACIÓN / COBRO:</label><input type="number" step="0.01" value="${(Number(defaultCost) || 0).toFixed(2)}" class="edit-eq-cost w-full p-4 text-base font-mono font-black rounded-xl glass-input bg-stone-100/80 border border-stone-300 text-fix-report outline-none"></div>
                     </div>
                 </div>`;
             }
@@ -10914,6 +10934,18 @@ function getEditModalData() {
             };
 
             if (originalVisit) {
+                if (isMaint) {
+                    data.esMantenimiento = true;
+                    const obs = document.getElementById('edit_observaciones')?.value?.trim().toUpperCase() || '';
+                    data.mantenimientoDescripcion = obs;
+                    data.descripcionMantenimiento = obs;
+                    data.descFalla = obs;
+                    const eqNames = updatedEquipos.map(e => e.manualName || e.descProducto).filter(Boolean);
+                    if (eqNames.length > 0) {
+                        data.mantenimientoEquipo = eqNames.join(', ');
+                        data.equiposMantenimiento = eqNames;
+                    }
+                }
                 if (originalVisit.estado === 'A Taller') {
                     data.fechaEntregaProgramada = editedDate;
                 } else if (originalVisit.estado === 'Garantia en Tramite') {
@@ -11374,7 +11406,8 @@ function getEditModalData() {
                         descProducto: eq,
                         manualName: eq,
                         serieEquipo: '',
-                        codProducto: ''
+                        codProducto: '',
+                        costoBase: 0
                     })),
                     tecnico: data.mTecnico || '',
                     tipoAtencion: "Mantenimiento",
