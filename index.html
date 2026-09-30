@@ -5983,6 +5983,47 @@
             });
         };
 
+        window.cancelarPendientesAnterioresAgosto = function() {
+            const list = window.visitsArray || [];
+            const isPendState = s => Boolean(s && s !== "Atendido" && s !== "ATENDIDO" && s !== "Cancelado" && s !== "CANCELADO" && s !== "A Taller");
+            const targets = list.filter(v => {
+                if (!isPendState(v.estado)) return false;
+                const fDate = v.fechaInstalacion ? String(v.fechaInstalacion).split("T")[0] : "";
+                return fDate && fDate < "2026-08-01";
+            });
+
+            if (targets.length === 0) {
+                showMessage("ℹ️ No hay visitas pendientes anteriores a Agosto 2026", "fix-report");
+                return;
+            }
+
+            showConfirmModal(`¿Confirmar cancelación masiva de ${targets.length} visitas pendientes anteriores a Agosto 2026? Se guardarán como 'Cancelado' con su observación y ningún dato será eliminado.`, function() {
+                const nowIso = new Date().toISOString();
+                const nowLegible = new Date().toLocaleString("es-EC");
+                const updates = {};
+                targets.forEach(v => {
+                    const prevReason = v.razonNoAtencion ? v.razonNoAtencion.trim() : "";
+                    const newReason = prevReason 
+                      ? `${prevReason} | CANCELADO - ANTERIOR A AGOSTO 2026` 
+                      : "CANCELADO - REGISTRO ANTERIOR A AGOSTO 2026";
+                    updates[`visits/${v.id}/estado`] = "Cancelado";
+                    updates[`visits/${v.id}/motivoCancelacion`] = "CANCELADO - REGISTRO ANTERIOR A AGOSTO 2026";
+                    updates[`visits/${v.id}/razonNoAtencion`] = newReason;
+                    updates[`visits/${v.id}/fechaCancelacion`] = nowIso;
+                    updates[`visits/${v.id}/canceladoPor`] = "ADMINISTRACIÓN / SEGUIMIENTO";
+                    updates[`visits/${v.id}/canceladoFechaLegible`] = nowLegible;
+                });
+
+                database.ref().update(updates).then(() => {
+                    showMessage(`🚫 ${targets.length} visitas marcadas como Cancelado`, "fix-report");
+                    if (typeof window.renderPendientes === 'function') window.renderPendientes();
+                    if (typeof window.updateMetroLiveBadges === 'function') window.updateMetroLiveBadges(window.visitsArray || []);
+                }).catch(err => {
+                    showMessage("❌ Error: " + err.message, "fix-error");
+                });
+            });
+        };
+
         window.reagendarVisita = function(id) {
             const dateInput = document.getElementById('reage_date_' + id);
             const newDate = dateInput ? dateInput.value : '';
@@ -13917,6 +13958,11 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             <select id="pendingTechFilter" onchange="renderPendientes()" class="p-2.5 glass-input bg-white/95 dark:bg-slate-900 rounded-xl text-xs font-black uppercase outline-none shadow-sm text-stone-800 dark:text-stone-100 border border-slate-300 dark:border-slate-700 cursor-pointer">
                                 <option value="">Técnicos: Todos</option>
                             </select>
+
+                            <!-- BOTÓN LIMPIEZA MASIVA ANTERIORES A AGOSTO -->
+                            <button type="button" onclick="cancelarPendientesAnterioresAgosto()" class="p-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/40 text-xs font-black uppercase shadow-xs transition-all flex items-center gap-1 cursor-pointer shrink-0" title="Marcar como canceladas todas las visitas pendientes anteriores a Agosto 2026 conservando datos">
+                                <span>🧹</span><span class="hidden sm:inline">Depurar &lt; Agosto</span>
+                            </button>
 
                             <!-- SELECTOR DE VISTA: AMBOS / SOLO MANTENIMIENTOS / SOLO SERVICIOS -->
                             <div class="inline-flex rounded-xl bg-slate-800/80 p-0.5 border border-slate-700 shrink-0">
