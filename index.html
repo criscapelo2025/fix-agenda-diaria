@@ -4013,14 +4013,31 @@
             if (window.updateGarantiaTabBadges) window.updateGarantiaTabBadges();
         };
 
+        window.isGarantiaEnTramite = function(v) {
+            if (!v) return false;
+            const est = (v.estado || '').trim();
+            // Casos ya concluidos o cancelados no están en trámite activo
+            if (est === 'Atendido' || est === 'ATENDIDO' || est === 'Cancelado' || est === 'CANCELADO') return false;
+            // Estado directo asignado en el cierre o rutero
+            if (est === 'Garantia en Tramite') return true;
+            // Visita de garantía agendada en ruta para colocar repuesto / entrega
+            if (v.garantiaAgendadaRuta) return true;
+            // Fecha de ingreso a trámite de garantía
+            if (v.fechaIngresoGarantia) return true;
+            // Trámite formal iniciado (repuesto solicitado, nota de crédito, cambio de producto o fecha nueva visita)
+            if (v.repuestoRecibido || v.fechaNuevaVisita || v.repuestoSolicitadoGarantia || v.tramiteGarantiaTipo) return true;
+            // Revisar si algún equipo tiene repuesto oficial solicitado
+            if (v.equipos && Array.isArray(v.equipos) && v.equipos.some(e => e && (e.conRepuesto || e.codRepuesto || (e.descRepuesto && e.descRepuesto !== 'REVISIÓN TÉCNICA')))) return true;
+            // Revisar si existe expediente oficial en solicitudes de garantía
+            const solArr = window.solicitudesGarantiaArray || [];
+            if (solArr.some(s => String(s.visitId) === String(v.id) && s.estado !== 'INSTALADO / CERRADO' && s.estado !== 'ANULADO')) return true;
+            return false;
+        };
+
         window.updateGarantiaTabBadges = function() {
             const solCount = (window.solicitudesGarantiaArray || []).length;
-            const tramiteCount = visitsArray.filter(v => {
-                if (v.estado === 'Garantia en Tramite') return true;
-                if (v.estado === 'PENDIENTE' && (v.garantiaAgendadaRuta || (v.tipoAtencion === 'Garantía' && (v.repuestoRecibido || v.fechaNuevaVisita || v.repuestoSolicitadoGarantia || v.tramiteGarantiaTipo)))) return true;
-                return false;
-            }).length;
-            const maestroCount = visitsArray.filter(v => v.tipoAtencion === 'Garantía' && v.estado === 'Atendido').length;
+            const tramiteCount = (window.visitsArray || []).filter(v => window.isGarantiaEnTramite(v)).length;
+            const maestroCount = (window.visitsArray || []).filter(v => (v.tipoAtencion === 'Garantía' || v.tipoServicioGlobal === 'Garantía') && (v.estado === 'Atendido' || v.estado === 'ATENDIDO')).length;
             const ventaCount = (window.solicitudesVentaArray || []).length;
 
             const bSol = document.getElementById('badge_count_solicitudes');
@@ -5985,9 +6002,10 @@
 
         window.cancelarPendientesAnterioresAgosto = function() {
             const list = window.visitsArray || [];
-            const isPendState = s => Boolean(s && s !== "Atendido" && s !== "ATENDIDO" && s !== "Cancelado" && s !== "CANCELADO" && s !== "A Taller");
+            const isPendState = s => Boolean(s && s !== "Atendido" && s !== "ATENDIDO" && s !== "Cancelado" && s !== "CANCELADO" && s !== "A Taller" && s !== "Garantia en Tramite");
             const targets = list.filter(v => {
                 if (!isPendState(v.estado)) return false;
+                if (window.isGarantiaEnTramite && window.isGarantiaEnTramite(v)) return false;
                 const fDate = v.fechaInstalacion ? String(v.fechaInstalacion).split("T")[0] : "";
                 return fDate && fDate < "2026-08-01";
             });
@@ -6111,7 +6129,7 @@
             function isPendState(s) {
                 if (!s) return false;
                 const est = s.trim();
-                return est !== 'Atendido' && est !== 'ATENDIDO' && est !== 'Cancelado' && est !== 'CANCELADO' && est !== 'A Taller';
+                return est !== 'Atendido' && est !== 'ATENDIDO' && est !== 'Cancelado' && est !== 'CANCELADO' && est !== 'A Taller' && est !== 'Garantia en Tramite';
             }
 
             function getFDate(v) {
@@ -6128,9 +6146,13 @@
                     if (est !== 'Cancelado' && est !== 'CANCELADO') return false;
                 } else if (scopeFilter === 'todas') {
                     if (!isPendState(est)) return false;
+                    // Las garantías que ya están en trámite en la pestaña de garantías no deben aparecer en seguimiento
+                    if (window.isGarantiaEnTramite && window.isGarantiaEnTramite(v)) return false;
                 } else {
                     // Default 'vencidas': pasadas de fecha (fechaInstalacion < hoy) y que siguen como pendientes
                     if (!isPendState(est)) return false;
+                    // Las garantías que ya están en trámite en la pestaña de garantías no deben aparecer en seguimiento
+                    if (window.isGarantiaEnTramite && window.isGarantiaEnTramite(v)) return false;
                     if (!fDate || fDate >= hoy) return false;
                 }
 
@@ -6145,6 +6167,7 @@
                         v.direccion,
                         v.tecnico,
                         v.tipoAtencion,
+                        v.tipoServicioGlobal,
                         v.mantenimientoEquipo,
                         v.mantenimientoDescripcion,
                         v.descFalla,
@@ -6210,7 +6233,7 @@
                 let tagTipoHtml = '';
                 if (isMaint) {
                     tagTipoHtml = `<span class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">⚙️ MANTENIMIENTO</span>`;
-                } else if (v.tipoAtencion === 'Garantía' || v.garantiaAgendadaRuta || v.repuestoSolicitadoGarantia) {
+                } else if (v.tipoAtencion === 'Garantía' || v.tipoServicioGlobal === 'Garantía') {
                     tagTipoHtml = `<span class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-purple-500/20 text-purple-300 border border-purple-400/40">🛡️ GARANTÍA</span>`;
                 } else {
                     tagTipoHtml = `<span class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-blue-500/20 text-blue-300 border border-blue-400/40">🛠️ ${v.tipoAtencion || 'SERVICIO TÉCNICO'}</span>`;
@@ -6229,7 +6252,8 @@
 
                 const descStr = v.mantenimientoDescripcion || v.descFalla || v.descripcion || v.observacionesAdmin || '';
 
-                const borderColor = isCancelView ? 'border-rose-500' : (isMaint ? 'border-cyan-500' : (v.tipoAtencion === 'Garantía' ? 'border-purple-500' : 'border-blue-500'));
+                const isGar = (v.tipoAtencion === 'Garantía' || v.tipoServicioGlobal === 'Garantía');
+                const borderColor = isCancelView ? 'border-rose-500' : (isMaint ? 'border-cyan-500' : (isGar ? 'border-purple-500' : 'border-blue-500'));
 
                 return `
                 <div class="pending-card glass-card p-4 sm:p-5 rounded-2xl border-l-[6px] ${borderColor} border-t border-r border-b border-white/10 shadow-md">
@@ -6542,11 +6566,7 @@
         function renderGarantias() {
             const container = document.getElementById('garantiasList'); if(!container) return;
             const query = document.getElementById('garantiasSearchInput')?.value.toUpperCase() || "";
-            let filtered = visitsArray.filter(v => {
-                if (v.estado === 'Garantia en Tramite') return true;
-                if (v.estado === 'PENDIENTE' && (v.garantiaAgendadaRuta || (v.tipoAtencion === 'Garantía' && (v.repuestoRecibido || v.fechaNuevaVisita || v.repuestoSolicitadoGarantia || v.tramiteGarantiaTipo)))) return true;
-                return false;
-            });
+            let filtered = (window.visitsArray || []).filter(v => window.isGarantiaEnTramite(v));
             if(query) filtered = filtered.filter(v => v.nombreCliente && v.nombreCliente.toUpperCase().includes(query));
 
             if(filtered.length === 0) { container.innerHTML = '<p class="p-10 text-center text-stone-500 font-black uppercase italic">No hay garantías en trámite o en ruta</p>'; return; }
@@ -13936,7 +13956,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                     <h2 class="text-lg sm:text-xl font-black uppercase text-amber-300 italic tracking-tight">Seguimiento de Visitas Pendientes</h2>
                                     <span id="pendingGlobalCountBadge" class="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 border border-amber-500/30">0 casos</span>
                                 </div>
-                                <p class="text-xs text-slate-400 font-medium">Visitas pasadas de fecha por atender, reagendar o cancelar con motivo registrado</p>
+                                <p class="text-xs text-slate-400 font-medium">Visitas pendientes por atender que no han sido visitadas (las garantías en trámite se gestionan en su pestaña)</p>
                             </div>
                         </div>
 
@@ -14004,7 +14024,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                             <h3 class="pending-header-title text-sm font-black text-indigo-200 tracking-wide uppercase">Servicio Técnico y Garantías</h3>
                                             <span id="badgeCountServicios" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-500/20 text-indigo-200 border border-indigo-400/40 font-mono">0 Pendientes</span>
                                         </div>
-                                        <p class="pending-header-sub text-[10.5px] text-indigo-300/70">Reparaciones, instalaciones y reclamos de fábrica</p>
+                                        <p class="pending-header-sub text-[10.5px] text-indigo-300/70">Reparaciones, instalaciones y garantías pendientes sin visitar</p>
                                     </div>
                                 </div>
                             </div>
