@@ -31,6 +31,8 @@
                     document.documentElement.classList.add('theme-dark', 'dark');
                     document.documentElement.classList.remove('theme-light', 'light');
                 }
+                var fontScale = localStorage.getItem('fix_app_font_scale') || 'grande';
+                document.documentElement.setAttribute('data-text-scale', fontScale);
             } catch(e){}
         })();
     </script>
@@ -99,6 +101,25 @@
             --text-muted: #64748b;
         }
 
+        /* ==========================================================================
+           SISTEMA GLOBAL DE ACCESIBILIDAD TIPOGRÁFICA Y ALTA LEGIBILIDAD
+           Eleva el tamaño de fuente en toda la aplicación preservando la estructura
+           ========================================================================== */
+        html {
+            font-size: 15.5px;
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+        html[data-text-scale="normal"] {
+            font-size: 14.5px;
+        }
+        html[data-text-scale="grande"] {
+            font-size: 16px;
+        }
+        html[data-text-scale="extragrande"] {
+            font-size: 17.5px;
+        }
+
         * {
             box-sizing: border-box;
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -114,9 +135,172 @@
                 radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.02) 1px, transparent 0);
             background-size: 100% 100%, 22px 22px;
             color: #f1f5f9;
-            font-size: 13px;
-            line-height: 1.5;
-            letter-spacing: -0.011em;
+            font-size: 14.5px;
+            line-height: 1.55;
+            letter-spacing: -0.01em;
+        }
+
+        html[data-text-scale="grande"] body {
+            font-size: 15.5px;
+            line-height: 1.55;
+        }
+        html[data-text-scale="extragrande"] body {
+            font-size: 16.5px;
+            line-height: 1.6;
+        }
+
+        /* ==========================================================================
+           ELEVACIÓN DE UMBRAL MÍNIMO DE FUENTES (Evita textos diminutos en toda la app)
+           ========================================================================== */
+        /* Nivel Base / Normal */
+        .text-\[6px\], .text-\[7px\], .text-\[8px\] { font-size: 11px !important; line-height: 1.3 !important; }
+        .text-\[9px\] { font-size: 11.5px !important; line-height: 1.35 !important; }
+        .text-\[10px\] { font-size: 12.5px !important; line-height: 1.35 !important; }
+        .text-\[11px\] { font-size: 13px !important; line-height: 1.4 !important; }
+        .text-xs { font-size: 13.5px !important; line-height: 1.4 !important; }
+        .text-sm { font-size: 15px !important; line-height: 1.45 !important; }
+
+        /* Nivel Grande (Default Recomendado para Legibilidad) */
+        html[data-text-scale="grande"] .text-\[6px\],
+        html[data-text-scale="grande"] .text-\[7px\],
+        html[data-text-scale="grande"] .text-\[8px\] { font-size: 11.5px !important; line-height: 1.3 !important; }
+        html[data-text-scale="grande"] .text-\[9px\] { font-size: 12.5px !important; line-height: 1.35 !important; }
+        html[data-text-scale="grande"] .text-\[10px\] { font-size: 13.5px !important; line-height: 1.35 !important; }
+        html[data-text-scale="grande"] .text-\[11px\] { font-size: 14px !important; line-height: 1.4 !important; }
+        html[data-text-scale="grande"] .text-xs { font-size: 14.5px !important; line-height: 1.4 !important; }
+        html[data-text-scale="grande"] .text-sm { font-size: 16px !important; line-height: 1.45 !important; }
+        html[data-text-scale="grande"] .text-base { font-size: 17.5px !important; line-height: 1.5 !important; }
+
+        /* Nivel Extra Grande (Máxima Claridad Visual) */
+        html[data-text-scale="extragrande"] .text-\[6px\],
+        html[data-text-scale="extragrande"] .text-\[7px\],
+        html[data-text-scale="extragrande"] .text-\[8px\] { font-size: 12.5px !important; line-height: 1.35 !important; }
+        html[data-text-scale="extragrande"] .text-\[9px\] { font-size: 13.5px !important; line-height: 1.35 !important; }
+        html[data-text-scale="extragrande"] .text-\[10px\] { font-size: 14.5px !important; line-height: 1.4 !important; }
+        html[data-text-scale="extragrande"] .text-\[11px\] { font-size: 15px !important; line-height: 1.4 !important; }
+        html[data-text-scale="extragrande"] .text-xs { font-size: 15.5px !important; line-height: 1.45 !important; }
+        html[data-text-scale="extragrande"] .text-sm { font-size: 17px !important; line-height: 1.5 !important; }
+        html[data-text-scale="extragrande"] .text-base { font-size: 18.5px !important; line-height: 1.55 !important; }
+
+        /* Controles de Formulario e Inputs Accesibles */
+        input:not([type="checkbox"]):not([type="radio"]),
+        select,
+        textarea {
+            font-size: 14.5px !important;
+            font-weight: 600 !important;
+        }
+        html[data-text-scale="grande"] input:not([type="checkbox"]):not([type="radio"]),
+        html[data-text-scale="grande"] select,
+        html[data-text-scale="grande"] textarea {
+            font-size: 15.5px !important;
+            font-weight: 600 !important;
+        }
+        html[data-text-scale="extragrande"] input:not([type="checkbox"]):not([type="radio"]),
+        html[data-text-scale="extragrande"] select,
+        html[data-text-scale="extragrande"] textarea {
+            font-size: 16.5px !important;
+            font-weight: 600 !important;
+        }
+
+        /* Tablas y Grillas de Datos */
+        .rutero-table td {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            padding: 9px 8px !important;
+        }
+        html[data-text-scale="grande"] .rutero-table td { font-size: 14px !important; }
+        html[data-text-scale="extragrande"] .rutero-table td { font-size: 15px !important; }
+
+        .report-cell {
+            font-size: 12.5px !important;
+            font-weight: 600 !important;
+        }
+        html[data-text-scale="grande"] .report-cell { font-size: 13.5px !important; }
+        html[data-text-scale="extragrande"] .report-cell { font-size: 14.5px !important; }
+
+        .admin-table thead th {
+            font-size: 0.78rem !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.02em;
+        }
+        html[data-text-scale="grande"] .admin-table thead th { font-size: 0.85rem !important; }
+        html[data-text-scale="extragrande"] .admin-table thead th { font-size: 0.92rem !important; }
+
+        .admin-table tbody td {
+            font-size: 0.88rem !important;
+        }
+        html[data-text-scale="grande"] .admin-table tbody td { font-size: 0.95rem !important; }
+        html[data-text-scale="extragrande"] .admin-table tbody td { font-size: 1.02rem !important; }
+
+        /* KPIs, Badges y Etiquetas */
+        .kpi-label { font-size: 12.5px !important; font-weight: 800 !important; letter-spacing: 0.4px; }
+        html[data-text-scale="grande"] .kpi-label { font-size: 13.5px !important; }
+        html[data-text-scale="extragrande"] .kpi-label { font-size: 14.5px !important; }
+
+        .kpi-sub { font-size: 12px !important; font-weight: 600 !important; }
+        html[data-text-scale="grande"] .kpi-sub { font-size: 13px !important; }
+        html[data-text-scale="extragrande"] .kpi-sub { font-size: 14px !important; }
+
+        .tag, .pill, .time-badge, .version-badge {
+            font-size: 12px !important;
+            font-weight: 700 !important;
+        }
+        html[data-text-scale="grande"] .tag,
+        html[data-text-scale="grande"] .pill,
+        html[data-text-scale="grande"] .time-badge,
+        html[data-text-scale="grande"] .version-badge {
+            font-size: 13px !important;
+        }
+        html[data-text-scale="extragrande"] .tag,
+        html[data-text-scale="extragrande"] .pill,
+        html[data-text-scale="extragrande"] .time-badge,
+        html[data-text-scale="extragrande"] .version-badge {
+            font-size: 14px !important;
+        }
+
+        /* Botones y Etiquetas de Barra Lateral */
+        .sidebar-priority-btn {
+            font-size: 0.92rem !important;
+            font-weight: 700 !important;
+        }
+        .sidebar-priority-btn .sidebar-label .text-xs {
+            font-size: 0.92rem !important;
+            font-weight: 700 !important;
+        }
+        .sidebar-priority-btn .sidebar-label .text-\[9px\] {
+            font-size: 0.78rem !important;
+            font-weight: 600 !important;
+        }
+        html[data-text-scale="grande"] .sidebar-priority-btn { font-size: 0.98rem !important; }
+        html[data-text-scale="extragrande"] .sidebar-priority-btn { font-size: 1.05rem !important; }
+
+        /* Mayor solidez en etiquetas de campos */
+        label {
+            font-weight: 700 !important;
+        }
+
+        /* Contraste Mejorado para Modo Oscuro */
+        body.theme-dark .text-stone-400, body:not(.theme-light) .text-stone-400,
+        body.theme-dark .text-slate-400, body:not(.theme-light) .text-slate-400,
+        body.theme-dark .text-stone-500, body:not(.theme-light) .text-stone-500,
+        body.theme-dark .text-slate-500, body:not(.theme-light) .text-slate-500 {
+            color: #cbd5e1 !important;
+        }
+        body.theme-dark .text-stone-600, body:not(.theme-light) .text-stone-600,
+        body.theme-dark .text-slate-600, body:not(.theme-light) .text-slate-600 {
+            color: #e2e8f0 !important;
+        }
+
+        /* Contraste Mejorado para Modo Claro */
+        body.theme-light .text-stone-400,
+        body.theme-light .text-slate-400,
+        body.theme-light .text-stone-500,
+        body.theme-light .text-slate-500 {
+            color: #334155 !important;
+        }
+        body.theme-light .text-stone-600,
+        body.theme-light .text-slate-600 {
+            color: #1e293b !important;
         }
 
         /* Tarjetas Principales estilo Dashboard */
@@ -1852,6 +2036,43 @@
         body.theme-dark #themeToggleHeaderBtn:hover,
         body:not(.theme-light) #themeToggleHeaderBtn:hover {
             background-color: rgba(51, 65, 85, 0.9) !important;
+        }
+
+        /* Botón de Escala Tipográfica (Header) */
+        body.theme-light #fontScaleHeaderBtn {
+            background-color: #f1f5f9 !important;
+            border-color: #cbd5e1 !important;
+            color: #0369a1 !important;
+        }
+        body.theme-light #fontScaleHeaderBtn:hover {
+            background-color: #e2e8f0 !important;
+        }
+        body.theme-light #fontScaleHeaderBtn #fontScaleHeaderLabel {
+            color: #0369a1 !important;
+        }
+        body.theme-dark #fontScaleHeaderBtn,
+        body:not(.theme-light) #fontScaleHeaderBtn {
+            background-color: rgba(30, 41, 59, 0.8) !important;
+            border-color: rgba(6, 182, 212, 0.4) !important;
+            color: #38bdf8 !important;
+        }
+        body.theme-dark #fontScaleHeaderBtn:hover,
+        body:not(.theme-light) #fontScaleHeaderBtn:hover {
+            background-color: rgba(51, 65, 85, 0.9) !important;
+        }
+
+        /* Botones de Escala en Sidebar para Modo Claro */
+        body.theme-light [id^="btnAppFont_"]:not(.bg-cyan-600) {
+            background-color: #e2e8f0 !important;
+            color: #334155 !important;
+        }
+        body.theme-light [id^="btnAppFont_"]:not(.bg-cyan-600):hover {
+            background-color: #cbd5e1 !important;
+        }
+        body.theme-light #fontScaleSidebarBadge {
+            background-color: #e0f2fe !important;
+            color: #0369a1 !important;
+            border-color: #bae6fd !important;
         }
 
         body.theme-light #themeToggleSidebarBtn {
@@ -4651,6 +4872,67 @@
                 savedTheme = localStorage.getItem('fix_theme_mode') || 'dark';
             } catch(e){}
             window.setTheme(savedTheme);
+        };
+
+        /* ==========================================================================
+           GESTIÓN DINÁMICA DE ESCALA TIPOGRÁFICA Y ACCESIBILIDAD VISUAL
+           ========================================================================== */
+        window.setAppFontScale = function(scale) {
+            const valid = (scale === 'normal' || scale === 'grande' || scale === 'extragrande') ? scale : 'grande';
+            document.documentElement.setAttribute('data-text-scale', valid);
+            if (document.body) {
+                document.body.setAttribute('data-text-scale', valid);
+            }
+            try {
+                localStorage.setItem('fix_app_font_scale', valid);
+            } catch(e) {}
+            window.updateAppFontScaleUI(valid);
+        };
+
+        window.cycleAppFontScale = function() {
+            const current = document.documentElement.getAttribute('data-text-scale') || 'grande';
+            let next = 'grande';
+            if (current === 'normal') next = 'grande';
+            else if (current === 'grande') next = 'extragrande';
+            else if (current === 'extragrande') next = 'normal';
+            window.setAppFontScale(next);
+            if (window.showMessage) {
+                const label = next === 'grande' ? '👁️ Letra Grande Activada (Recomendado)' : (next === 'extragrande' ? '🔍 Letra Extra Grande Activada' : '📏 Letra Estándar Activada');
+                window.showMessage(label, 'fix-main');
+            }
+        };
+
+        window.updateAppFontScaleUI = function(scale) {
+            const headerLabel = document.getElementById('fontScaleHeaderLabel');
+            if (headerLabel) {
+                if (scale === 'grande') headerLabel.textContent = 'Letra: Grande ★';
+                else if (scale === 'extragrande') headerLabel.textContent = 'Letra: Extra ++';
+                else headerLabel.textContent = 'Letra: Normal';
+            }
+            const badge = document.getElementById('fontScaleSidebarBadge');
+            if (badge) {
+                if (scale === 'grande') badge.textContent = 'Grande ★';
+                else if (scale === 'extragrande') badge.textContent = 'Extra ++';
+                else badge.textContent = 'Normal';
+            }
+            ['normal', 'grande', 'extragrande'].forEach(t => {
+                const btn = document.getElementById('btnAppFont_' + t);
+                if (btn) {
+                    if (t === scale) {
+                        btn.className = 'py-1 px-1 rounded-lg text-xs font-black text-center transition-all bg-cyan-600 text-white shadow-xs cursor-pointer border border-cyan-400';
+                    } else {
+                        btn.className = 'py-1 px-1 rounded-lg text-xs font-bold text-center transition-all bg-slate-700/80 text-slate-300 hover:bg-slate-600 cursor-pointer border border-transparent';
+                    }
+                }
+            });
+        };
+
+        window.initAppFontScale = function() {
+            let saved = 'grande';
+            try {
+                saved = localStorage.getItem('fix_app_font_scale') || 'grande';
+            } catch(e) {}
+            window.setAppFontScale(saved);
         };
 
         window.toggleDetail = function(id) { const det = document.getElementById("detail-" + id); if(det) det.classList.toggle('hidden'); };
@@ -11961,6 +12243,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
 
         document.addEventListener('DOMContentLoaded', function() {
             if (window.initTheme) window.initTheme();
+            if (window.initAppFontScale) window.initAppFontScale();
             const pad = (n) => String(n).padStart(2, '0');
             const dHoy = new Date();
             const hoyLocal = `${dHoy.getFullYear()}-${pad(dHoy.getMonth() + 1)}-${pad(dHoy.getDate())}`;
@@ -12431,6 +12714,20 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                     <div class="text-[9px] text-blue-300 font-normal truncate">Abrir 2 pestañas a la vez</div>
                 </div>
             </button>
+            <!-- Selector de Tamaño de Letra (Accesibilidad Visual) -->
+            <div class="sidebar-label p-2 rounded-xl bg-slate-800/80 border border-cyan-500/30 text-slate-200">
+                <div class="flex items-center justify-between mb-1.5 px-0.5">
+                    <span class="text-[11px] font-black uppercase text-cyan-300 flex items-center gap-1">
+                        <span>👁️</span> Letra
+                    </span>
+                    <span id="fontScaleSidebarBadge" class="text-[10px] font-mono font-black text-cyan-200 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-700">Grande ★</span>
+                </div>
+                <div class="grid grid-cols-3 gap-1">
+                    <button type="button" onclick="setAppFontScale('normal')" id="btnAppFont_normal" class="py-1 px-1 rounded-lg text-xs font-bold text-center transition-all bg-slate-700/80 text-slate-300 hover:bg-slate-600 cursor-pointer">Normal</button>
+                    <button type="button" onclick="setAppFontScale('grande')" id="btnAppFont_grande" class="py-1 px-1 rounded-lg text-xs font-black text-center transition-all bg-cyan-600 text-white shadow-xs cursor-pointer border border-cyan-400">Grande ★</button>
+                    <button type="button" onclick="setAppFontScale('extragrande')" id="btnAppFont_extragrande" class="py-1 px-1 rounded-lg text-xs font-bold text-center transition-all bg-slate-700/80 text-slate-300 hover:bg-slate-600 cursor-pointer">Extra ++</button>
+                </div>
+            </div>
             <div class="sidebar-footer-text flex items-center justify-between text-[10px] text-slate-400 px-1 pt-0.5">
                 <span class="flex items-center gap-1 font-bold text-slate-300">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Sistema OK
@@ -12476,6 +12773,10 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
 
             <!-- Right: Split Screen Toggle + Cloud Status -->
             <div class="flex items-center gap-2 shrink-0">
+                <button id="fontScaleHeaderBtn" onclick="cycleAppFontScale()" type="button" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 bg-slate-800/80 hover:bg-slate-700/80 text-cyan-300 border border-cyan-500/30" title="Cambiar tamaño de letra (Normal / Grande ★ / Extra ++)">
+                    <span class="text-sm font-black leading-none">A<span class="text-[10px] font-black">+</span></span>
+                    <span id="fontScaleHeaderLabel" class="hidden sm:inline text-xs font-black">Letra: Grande ★</span>
+                </button>
                 <button id="themeToggleHeaderBtn" onclick="toggleTheme()" type="button" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-white/10" title="Cambiar Tema (Oscuro / Claro)">
                     <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                     <span class="hidden sm:inline text-xs font-bold text-slate-200">Claro</span>
