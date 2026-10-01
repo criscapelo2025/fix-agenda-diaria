@@ -5182,12 +5182,19 @@
                 database.ref('visits/' + id).update(updateObj).then(function() { 
                     showMessage("✅ Visita guardada correctamente", "fix-report"); 
                     delete window["photos_" + id];
+                    if (v) {
+                        Object.assign(v, updateObj);
+                        if (!v.financiera) v.financiera = {};
+                        v.financiera.totalCliente = totalFinal;
+                        v.financiera.formaPago = pay;
+                    }
                     renderRutero(); 
                     renderPendientes(); 
                     renderTaller();
                     renderGarantias();
                     if (window.renderSolicitudesGarantiaView) renderSolicitudesGarantiaView();
                     if (window.updateGarantiaTabBadges) window.updateGarantiaTabBadges();
+                    processFinancialBalance();
 
                     if (s === 'No Atendido' && !currentTechUser) {
                         changeMasterView('pendientes');
@@ -10364,27 +10371,29 @@
             if (!v.financiera) return 0;
             if (v.esMantenimiento || v.tipoAtencion === 'Mantenimiento') return 0;
             
-            const isGarantia = (v.tipoAtencion === 'Garantía' || v.tipoServicioGlobal === 'Garantía');
-            
             // 1. Accesorios (excluyendo "Segunda visita")
             let accTotal = 0;
             if (v.accesoriosVendidos && Array.isArray(v.accesoriosVendidos)) {
                 v.accesoriosVendidos.forEach(function(acc) {
                     const name = (acc.nombre || "").toUpperCase();
                     if (name !== "SEGUNDA VISITA") {
-                        let p = parseFloat(acc.precio) || 0;
-                        if (p === 0 && (name.includes("FUERA DE GARANT") || name.includes("MOVILIZACION $20") || name.includes("MOVILIZACIÓN $20"))) {
-                            p = 20.00;
-                        }
-                        const q = parseFloat(acc.cantidad) || 1;
-                        accTotal += q * p;
+                        accTotal += (parseFloat(acc.cantidad) || 0) * (parseFloat(acc.precio) || 0);
                     }
                 });
             }
+
+            // En garantías: la mano de obra básica no se cobra al cliente ($0).
+            // Pero si se registró cobro al cliente (por accesorios, visita fuera de garantía o liquidación):
+            if (v.tipoAtencion === 'Garantía') {
+                if (accTotal > 0) return accTotal;
+                const totalCliente = (v.financiera && !isNaN(parseFloat(v.financiera.totalCliente))) ? parseFloat(v.financiera.totalCliente) : 0;
+                if (totalCliente > 0) return totalCliente;
+                return 0;
+            }
             
-            // 2. Equipos / Mano de obra (en Garantías de fábrica la mano de obra básica no se cobra al cliente en caja)
+            // 2. Equipos / Mano de obra
             let moParaCaja = 0;
-            if (!isGarantia && !v.esMantenimiento) {
+            if (!v.esMantenimiento) {
                 const eqs = v.equipos || [];
                 const eqCount = eqs.length;
                 if (eqCount === 1) {
@@ -10405,36 +10414,10 @@
                 }
             }
             
-            const guardado = (v.financiera && !isNaN(parseFloat(v.financiera.totalCliente))) ? parseFloat(v.financiera.totalCliente) : 0;
-            const calculado = moParaCaja + accTotal;
-
-            // En garantías:
-            if (isGarantia) {
-                if (guardado > 0) return guardado;
-                if (accTotal > 0) return accTotal;
-                // Si fue registrado por concepto de fuera de garantía con pago
-                const isFueraGarConceptG = (String(v.observacionesAdmin || '').toUpperCase().includes('FUERA DE GARANT') || 
-                    String(v.commentarioCliente || '').toUpperCase().includes('FUERA DE GARANT') ||
-                    String(v.razonNoAtencion || '').toUpperCase().includes('FUERA DE GARANT'));
-                if (isFueraGarConceptG && (v.financiera.formaPago === 'TRANSFERENCIA' || v.financiera.formaPago === 'EFECTIVO')) {
-                    return 20.00;
-                }
-                return 0;
-            }
-
-            // En servicios no-garantía (Instalación, Fuera de Garantía, etc.):
-            if (guardado > 0 && calculado === 0) return guardado;
-            if (calculado > 0) return calculado;
-            if (guardado > 0) return guardado;
-
-            // Detección automática por concepto/observación si fue registrado como fuera de garantía con pago
-            const isFueraGarConcept = (v.tipoAtencion === 'Fuera de Garantía' || 
-                String(v.observacionesAdmin || '').toUpperCase().includes('FUERA DE GARANT') || 
-                String(v.commentarioCliente || '').toUpperCase().includes('FUERA DE GARANT') ||
-                String(v.razonNoAtencion || '').toUpperCase().includes('FUERA DE GARANT'));
-            if (isFueraGarConcept && (v.financiera.formaPago === 'TRANSFERENCIA' || v.financiera.formaPago === 'EFECTIVO')) {
-                return 20.00;
-            }
+            const totalCalc = moParaCaja + accTotal;
+            if (totalCalc > 0) return totalCalc;
+            const totalCli = (v.financiera && !isNaN(parseFloat(v.financiera.totalCliente))) ? parseFloat(v.financiera.totalCliente) : 0;
+            if (totalCli > 0) return totalCli;
 
             return 0;
         }
@@ -10443,17 +10426,9 @@
             let todos = [];
             const pad = (n) => String(n).padStart(2, '0');
             
-            visitsArray.filter(v => {
-                if (v.esMantenimiento || v.tipoAtencion === 'Mantenimiento') return false;
-                if (!v.financiera) return false;
-                const st = String(v.estado || '').trim().toUpperCase();
-                const isAtendido = (st === 'ATENDIDO' || st === 'FINALIZADO' || st === 'FINALIZADA' || v.estado === 'Atendido');
-                const hasPayment = (getVisitCajaAmount(v) > 0) || (v.financiera && parseFloat(v.financiera.totalCliente) > 0);
-                return isAtendido || hasPayment;
-            }).forEach(v => {
+            visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Mantenimiento' && v.estado === 'Atendido' && v.financiera).forEach(v => {
                 let monto = getVisitCajaAmount(v);
                 let concepto = "VISITA: " + (v.nombreCliente || 'CLIENTE');
-                const dInstalacion = v.fechaInstalacion || (v.attendedDate ? v.attendedDate.split('T')[0] : (v.createdAt ? new Date(v.createdAt).toISOString().split('T')[0] : ''));
                 
                 todos.push({ 
                     id: v.id, 
@@ -10461,7 +10436,7 @@
                     type: 'INGRESO', 
                     concepto: concepto, 
                     fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : (v.createdAt || Date.now()), 
-                    dateStr: dInstalacion, 
+                    dateStr: v.fechaInstalacion || '', 
                     source: 'VISITA', 
                     tecnico: v.tecnico || '---', 
                     formaPago: String((v.financiera && v.financiera.formaPago) ? v.financiera.formaPago : 'EFECTIVO').trim().toUpperCase() 
@@ -10978,7 +10953,6 @@
             document.getElementById('edit_lugarCompra').value = v.lugarCompra || "";
             if(document.getElementById('edit_tipoAtencion')) document.getElementById('edit_tipoAtencion').value = v.tipoAtencion || "Instalación";
             if(document.getElementById('edit_estado')) document.getElementById('edit_estado').value = v.estado || "PENDIENTE";
-            if(document.getElementById('edit_formaPago')) document.getElementById('edit_formaPago').value = (v.financiera && v.financiera.formaPago) ? v.financiera.formaPago : "EFECTIVO";
             
             const isMaint = Boolean(v.esMantenimiento || v.tipoAtencion === 'Mantenimiento');
             document.getElementById('edit_observaciones').value = v.observacionesAdmin || v.mantenimientoDescripcion || v.descFalla || "";
@@ -11186,7 +11160,7 @@ function getEditModalData() {
 
             const originalVisit = visitsArray.find(item => item.id === document.getElementById('edit_id').value);
             const isMaint = originalVisit && (originalVisit.esMantenimiento || originalVisit.tipoAtencion === 'Mantenimiento');
-            const isGar = document.getElementById('edit_tipoAtencion')?.value === 'Garantía';
+            const isGar = (document.getElementById('edit_tipoAtencion')?.value === 'Garantía') || Boolean(originalVisit && originalVisit.tipoAtencion === 'Garantía');
             const editRows = document.querySelectorAll('.equipment-edit-row');
 
             for(let i=0; i<selects.length; i++) {
@@ -11276,12 +11250,8 @@ function getEditModalData() {
                 equipos: updatedEquipos, 
                 accesoriosVendidos: updatedAccs, 
                 observacionesAdmin: document.getElementById('edit_observaciones').value.toUpperCase(),
-                'financiera/totalCliente': isMaint ? 0 : (isGar ? accTotal : (moTotal + accTotal))
+                'financiera/totalCliente': isMaint ? 0 : (isGar ? (accTotal > 0 ? accTotal : (originalVisit?.financiera?.totalCliente || 0)) : (moTotal + accTotal))
             };
-
-            if (document.getElementById('edit_formaPago') && document.getElementById('edit_formaPago').value) {
-                data['financiera/formaPago'] = document.getElementById('edit_formaPago').value;
-            }
 
             if (originalVisit) {
                 if (isMaint) {
@@ -16182,13 +16152,6 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <option value="Garantia en Tramite">🛡️ GARANTÍA EN TRÁMITE</option>
                         <option value="No Atendido">❌ NO ATENDIDO</option>
                         <option value="Pendiente (Tramite)">⏳ PENDIENTE (TRAMITE)</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">FORMA DE PAGO</label>
-                    <select id="edit_formaPago" class="w-full p-3 glass-input rounded-xl text-[10px] uppercase outline-none text-stone-800 shadow-inner bg-white font-black">
-                        <option value="EFECTIVO">💵 EFECTIVO</option>
-                        <option value="TRANSFERENCIA">💳 TRANSFERENCIA</option>
                     </select>
                 </div>
                 <div><label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">FECHA ATENCION</label><input type="date" id="edit_fecha" class="w-full p-3 glass-input rounded-xl text-xs font-mono text-stone-800 shadow-inner outline-none"></div>
