@@ -5041,7 +5041,7 @@
 
                 let moParaCaja = 0; let totalAccs = 0; const accs = [];
                 const isMantenimiento = v.esMantenimiento || v.tipoAtencion === 'Mantenimiento';
-                const isGarantiaCase = (v.tipoAtencion === 'Garantía' || t === 'Garantía' || s === 'Garantia en Tramite');
+                const isGarantiaCase = (t === 'Garantía' || (t !== 'Fuera de Garantía' && v.tipoAtencion === 'Garantía') || s === 'Garantia en Tramite');
 
                 if (!isMantenimiento) {
                     const primaryAccs = isCard ? document.querySelectorAll(".card-acc-" + id) : document.querySelectorAll(".acc-" + id);
@@ -5111,7 +5111,7 @@
                       } 
                  }
                  
-                 const totalFinal = (isMantenimiento || isGarantiaCase) ? 0 : (moParaCaja + totalAccs);
+                 const totalFinal = isMantenimiento ? 0 : (isGarantiaCase ? totalAccs : (moParaCaja + totalAccs));
                  const updateObj = { 
                      estado: s, 
                      tipoAtencion: t, 
@@ -10342,10 +10342,15 @@
             }
             if (v.accesoriosVendidos && v.accesoriosVendidos.length > 0) {
                 v.accesoriosVendidos.forEach(a => {
-                    const itemTotal = a.cantidad * a.precio;
-                    html += `<div class="flex justify-between items-center glass-input bg-white/60 p-5 rounded-2xl shadow-sm border border-white"><div class="flex flex-col"><span class="text-[10px] font-black text-stone-800 uppercase tracking-tighter">${a.nombre}</span><span class="text-[8px] font-bold text-stone-500 mt-1">CANT: ${a.cantidad} x $${a.precio.toFixed(2)}</span></div><span class="font-mono font-black text-fix-report text-base">$${itemTotal.toFixed(2)}</span></div>`;
+                    const itemTotal = (parseFloat(a.cantidad) || 1) * (parseFloat(a.precio) || 0);
+                    html += `<div class="flex justify-between items-center glass-input bg-white/60 p-5 rounded-2xl shadow-sm border border-white"><div class="flex flex-col"><span class="text-[10px] font-black text-stone-800 uppercase tracking-tighter">${a.nombre}</span><span class="text-[8px] font-bold text-stone-500 mt-1">CANT: ${a.cantidad} x $${(parseFloat(a.precio) || 0).toFixed(2)}</span></div><span class="font-mono font-black text-fix-report text-base">$${itemTotal.toFixed(2)}</span></div>`;
                     totalGeneral += itemTotal;
                 });
+            }
+            if (totalGeneral === 0 && v.financiera && parseFloat(v.financiera.totalCliente) > 0) {
+                const ft = parseFloat(v.financiera.totalCliente);
+                html += `<div class="flex justify-between items-center glass-input bg-white/60 p-5 rounded-2xl shadow-sm border border-white"><div class="flex flex-col"><span class="text-[10px] font-black text-stone-800 uppercase tracking-tighter">COBRO REGISTRADO</span><span class="text-[8px] font-bold text-stone-500 mt-1">FORMA PAGO: ${v.financiera.formaPago || 'EFECTIVO'}</span></div><span class="font-mono font-black text-fix-report text-base">$${ft.toFixed(2)}</span></div>`;
+                totalGeneral += ft;
             }
             html += `<div class="pt-6 border-t border-stone-400/30 flex justify-between items-end"><span class="text-[10px] font-black text-stone-600 uppercase italic">Total Cobrado:</span><span class="text-4xl font-mono font-black text-stone-900 tracking-tighter drop-shadow-sm">$${totalGeneral.toFixed(2)}</span></div></div>`;
             document.getElementById('desgloseTitle').textContent = v.nombreCliente;
@@ -10358,7 +10363,8 @@
         function getVisitCajaAmount(v) {
             if (!v.financiera) return 0;
             if (v.esMantenimiento || v.tipoAtencion === 'Mantenimiento') return 0;
-            if (v.tipoAtencion === 'Garantía') return 0;
+            
+            const isGarantia = (v.tipoAtencion === 'Garantía' || v.tipoServicioGlobal === 'Garantía');
             
             // 1. Accesorios (excluyendo "Segunda visita")
             let accTotal = 0;
@@ -10366,14 +10372,19 @@
                 v.accesoriosVendidos.forEach(function(acc) {
                     const name = (acc.nombre || "").toUpperCase();
                     if (name !== "SEGUNDA VISITA") {
-                        accTotal += (acc.cantidad || 0) * (acc.precio || 0);
+                        let p = parseFloat(acc.precio) || 0;
+                        if (p === 0 && (name.includes("FUERA DE GARANT") || name.includes("MOVILIZACION $20") || name.includes("MOVILIZACIÓN $20"))) {
+                            p = 20.00;
+                        }
+                        const q = parseFloat(acc.cantidad) || 1;
+                        accTotal += q * p;
                     }
                 });
             }
             
-            // 2. Equipos / Mano de obra
+            // 2. Equipos / Mano de obra (en Garantías de fábrica la mano de obra básica no se cobra al cliente en caja)
             let moParaCaja = 0;
-            if (!v.esMantenimiento) {
+            if (!isGarantia && !v.esMantenimiento) {
                 const eqs = v.equipos || [];
                 const eqCount = eqs.length;
                 if (eqCount === 1) {
@@ -10381,29 +10392,68 @@
                     const desc = (eq.descProducto || "").toUpperCase();
                     const isBBQ = desc === "PARRILLA BBQ" || desc.includes("BARBACOA") || desc.includes("BBQ");
                     if (!isBBQ) {
-                        moParaCaja += eq.costoBase || 0;
+                        moParaCaja += parseFloat(eq.costoBase) || 0;
                     }
                 } else if (eqCount > 1) {
                     eqs.forEach(function(eq) {
                         const desc = (eq.descProducto || "").toUpperCase();
                         const isTriturador = desc === "TRITURADOR" || desc.includes("TRITURAD");
                         if (isTriturador) {
-                            moParaCaja += eq.costoBase || 0;
+                            moParaCaja += parseFloat(eq.costoBase) || 0;
                         }
                     });
                 }
             }
             
-            return moParaCaja + accTotal;
+            const guardado = (v.financiera && !isNaN(parseFloat(v.financiera.totalCliente))) ? parseFloat(v.financiera.totalCliente) : 0;
+            const calculado = moParaCaja + accTotal;
+
+            // En garantías:
+            if (isGarantia) {
+                if (guardado > 0) return guardado;
+                if (accTotal > 0) return accTotal;
+                // Si fue registrado por concepto de fuera de garantía con pago
+                const isFueraGarConceptG = (String(v.observacionesAdmin || '').toUpperCase().includes('FUERA DE GARANT') || 
+                    String(v.commentarioCliente || '').toUpperCase().includes('FUERA DE GARANT') ||
+                    String(v.razonNoAtencion || '').toUpperCase().includes('FUERA DE GARANT'));
+                if (isFueraGarConceptG && (v.financiera.formaPago === 'TRANSFERENCIA' || v.financiera.formaPago === 'EFECTIVO')) {
+                    return 20.00;
+                }
+                return 0;
+            }
+
+            // En servicios no-garantía (Instalación, Fuera de Garantía, etc.):
+            if (guardado > 0 && calculado === 0) return guardado;
+            if (calculado > 0) return calculado;
+            if (guardado > 0) return guardado;
+
+            // Detección automática por concepto/observación si fue registrado como fuera de garantía con pago
+            const isFueraGarConcept = (v.tipoAtencion === 'Fuera de Garantía' || 
+                String(v.observacionesAdmin || '').toUpperCase().includes('FUERA DE GARANT') || 
+                String(v.commentarioCliente || '').toUpperCase().includes('FUERA DE GARANT') ||
+                String(v.razonNoAtencion || '').toUpperCase().includes('FUERA DE GARANT'));
+            if (isFueraGarConcept && (v.financiera.formaPago === 'TRANSFERENCIA' || v.financiera.formaPago === 'EFECTIVO')) {
+                return 20.00;
+            }
+
+            return 0;
         }
 
         function getAllFinancialMovements() {
             let todos = [];
             const pad = (n) => String(n).padStart(2, '0');
             
-            visitsArray.filter(v => !v.esMantenimiento && v.tipoAtencion !== 'Mantenimiento' && v.estado === 'Atendido' && v.financiera).forEach(v => {
+            visitsArray.filter(v => {
+                if (v.esMantenimiento || v.tipoAtencion === 'Mantenimiento') return false;
+                if (!v.financiera) return false;
+                const st = String(v.estado || '').trim().toUpperCase();
+                const isAtendido = (st === 'ATENDIDO' || st === 'FINALIZADO' || st === 'FINALIZADA' || v.estado === 'Atendido');
+                const hasPayment = (getVisitCajaAmount(v) > 0) || (v.financiera && parseFloat(v.financiera.totalCliente) > 0);
+                return isAtendido || hasPayment;
+            }).forEach(v => {
                 let monto = getVisitCajaAmount(v);
                 let concepto = "VISITA: " + (v.nombreCliente || 'CLIENTE');
+                const dInstalacion = v.fechaInstalacion || (v.attendedDate ? v.attendedDate.split('T')[0] : (v.createdAt ? new Date(v.createdAt).toISOString().split('T')[0] : ''));
                 
                 todos.push({ 
                     id: v.id, 
@@ -10411,7 +10461,7 @@
                     type: 'INGRESO', 
                     concepto: concepto, 
                     fecha: v.attendedDate ? new Date(v.attendedDate).getTime() : (v.createdAt || Date.now()), 
-                    dateStr: v.fechaInstalacion || '', 
+                    dateStr: dInstalacion, 
                     source: 'VISITA', 
                     tecnico: v.tecnico || '---', 
                     formaPago: String((v.financiera && v.financiera.formaPago) ? v.financiera.formaPago : 'EFECTIVO').trim().toUpperCase() 
@@ -10928,6 +10978,7 @@
             document.getElementById('edit_lugarCompra').value = v.lugarCompra || "";
             if(document.getElementById('edit_tipoAtencion')) document.getElementById('edit_tipoAtencion').value = v.tipoAtencion || "Instalación";
             if(document.getElementById('edit_estado')) document.getElementById('edit_estado').value = v.estado || "PENDIENTE";
+            if(document.getElementById('edit_formaPago')) document.getElementById('edit_formaPago').value = (v.financiera && v.financiera.formaPago) ? v.financiera.formaPago : "EFECTIVO";
             
             const isMaint = Boolean(v.esMantenimiento || v.tipoAtencion === 'Mantenimiento');
             document.getElementById('edit_observaciones').value = v.observacionesAdmin || v.mantenimientoDescripcion || v.descFalla || "";
@@ -11169,7 +11220,7 @@ function getEditModalData() {
                 });
             }
 
-            if (!isMaint) {
+            if (!isMaint && !isGar) {
                 const eqCount = updatedEquipos.length;
                 if (eqCount === 1) {
                     const eq = updatedEquipos[0];
@@ -11225,8 +11276,12 @@ function getEditModalData() {
                 equipos: updatedEquipos, 
                 accesoriosVendidos: updatedAccs, 
                 observacionesAdmin: document.getElementById('edit_observaciones').value.toUpperCase(),
-                'financiera/totalCliente': isMaint ? 0 : (moTotal + accTotal)
+                'financiera/totalCliente': isMaint ? 0 : (isGar ? accTotal : (moTotal + accTotal))
             };
+
+            if (document.getElementById('edit_formaPago') && document.getElementById('edit_formaPago').value) {
+                data['financiera/formaPago'] = document.getElementById('edit_formaPago').value;
+            }
 
             if (originalVisit) {
                 if (isMaint) {
@@ -11765,8 +11820,14 @@ function getEditModalData() {
             if (source === 'VISITA') {
                 paymentContainer.classList.remove('hidden');
                 const v = visitsArray.find(item => item.id === id);
-                if (v && v.financiera) {
-                    formaPagoSelect.value = v.financiera.formaPago || 'EFECTIVO';
+                if (v) {
+                    const effMonto = getVisitCajaAmount(v);
+                    if (effMonto > 0 && (!currentMonto || currentMonto === 0)) {
+                        document.getElementById('finance_monto').value = effMonto;
+                    }
+                    if (v.financiera) {
+                        formaPagoSelect.value = v.financiera.formaPago || 'EFECTIVO';
+                    }
                 }
             } else if (source === 'MANUAL') {
                 paymentContainer.classList.remove('hidden');
@@ -11794,16 +11855,30 @@ function getEditModalData() {
                     concepto: nuevoConcepto.replace('MANUAL: ', ''),
                     formaPago: nuevaFormaPago
                 }).then(() => {
+                    const localM = movementsArray.find(item => item.id === id);
+                    if (localM) {
+                        localM.monto = nuevoMonto;
+                        localM.concepto = nuevoConcepto.replace('MANUAL: ', '');
+                        localM.formaPago = nuevaFormaPago;
+                    }
                     showMessage("✅ Movimiento Actualizado", "fix-report");
                     window.closeEditFinanceModal();
+                    processFinancialBalance();
                 }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
             } else {
                 database.ref('visits/' + id).update({ 
                     'financiera/totalCliente': nuevoMonto,
                     'financiera/formaPago': nuevaFormaPago
                 }).then(() => {
+                    const localV = visitsArray.find(item => item.id === id);
+                    if (localV) {
+                        if (!localV.financiera) localV.financiera = {};
+                        localV.financiera.totalCliente = nuevoMonto;
+                        localV.financiera.formaPago = nuevaFormaPago;
+                    }
                     showMessage("✅ Liquidación Actualizada", "fix-report");
                     window.closeEditFinanceModal();
+                    processFinancialBalance();
                 }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
             }
         };
@@ -16107,6 +16182,13 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                         <option value="Garantia en Tramite">🛡️ GARANTÍA EN TRÁMITE</option>
                         <option value="No Atendido">❌ NO ATENDIDO</option>
                         <option value="Pendiente (Tramite)">⏳ PENDIENTE (TRAMITE)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">FORMA DE PAGO</label>
+                    <select id="edit_formaPago" class="w-full p-3 glass-input rounded-xl text-[10px] uppercase outline-none text-stone-800 shadow-inner bg-white font-black">
+                        <option value="EFECTIVO">💵 EFECTIVO</option>
+                        <option value="TRANSFERENCIA">💳 TRANSFERENCIA</option>
                     </select>
                 </div>
                 <div><label class="text-[7px] text-stone-500 ml-2 uppercase block mb-1">FECHA ATENCION</label><input type="date" id="edit_fecha" class="w-full p-3 glass-input rounded-xl text-xs font-mono text-stone-800 shadow-inner outline-none"></div>
