@@ -5041,7 +5041,7 @@
 
                 let moParaCaja = 0; let totalAccs = 0; const accs = [];
                 const isMantenimiento = v.esMantenimiento || v.tipoAtencion === 'Mantenimiento';
-                const isGarantiaCase = (t === 'Garantía' || (t !== 'Fuera de Garantía' && v.tipoAtencion === 'Garantía') || s === 'Garantia en Tramite');
+                const isGarantiaCase = (v.tipoAtencion === 'Garantía' || t === 'Garantía' || s === 'Garantia en Tramite');
 
                 if (!isMantenimiento) {
                     const primaryAccs = isCard ? document.querySelectorAll(".card-acc-" + id) : document.querySelectorAll(".acc-" + id);
@@ -5111,7 +5111,7 @@
                       } 
                  }
                  
-                 const totalFinal = isMantenimiento ? 0 : (isGarantiaCase ? totalAccs : (moParaCaja + totalAccs));
+                 const totalFinal = (isMantenimiento || isGarantiaCase) ? 0 : (moParaCaja + totalAccs);
                  const updateObj = { 
                      estado: s, 
                      tipoAtencion: t, 
@@ -5182,19 +5182,12 @@
                 database.ref('visits/' + id).update(updateObj).then(function() { 
                     showMessage("✅ Visita guardada correctamente", "fix-report"); 
                     delete window["photos_" + id];
-                    if (v) {
-                        Object.assign(v, updateObj);
-                        if (!v.financiera) v.financiera = {};
-                        v.financiera.totalCliente = totalFinal;
-                        v.financiera.formaPago = pay;
-                    }
                     renderRutero(); 
                     renderPendientes(); 
                     renderTaller();
                     renderGarantias();
                     if (window.renderSolicitudesGarantiaView) renderSolicitudesGarantiaView();
                     if (window.updateGarantiaTabBadges) window.updateGarantiaTabBadges();
-                    processFinancialBalance();
 
                     if (s === 'No Atendido' && !currentTechUser) {
                         changeMasterView('pendientes');
@@ -10349,15 +10342,10 @@
             }
             if (v.accesoriosVendidos && v.accesoriosVendidos.length > 0) {
                 v.accesoriosVendidos.forEach(a => {
-                    const itemTotal = (parseFloat(a.cantidad) || 1) * (parseFloat(a.precio) || 0);
-                    html += `<div class="flex justify-between items-center glass-input bg-white/60 p-5 rounded-2xl shadow-sm border border-white"><div class="flex flex-col"><span class="text-[10px] font-black text-stone-800 uppercase tracking-tighter">${a.nombre}</span><span class="text-[8px] font-bold text-stone-500 mt-1">CANT: ${a.cantidad} x $${(parseFloat(a.precio) || 0).toFixed(2)}</span></div><span class="font-mono font-black text-fix-report text-base">$${itemTotal.toFixed(2)}</span></div>`;
+                    const itemTotal = a.cantidad * a.precio;
+                    html += `<div class="flex justify-between items-center glass-input bg-white/60 p-5 rounded-2xl shadow-sm border border-white"><div class="flex flex-col"><span class="text-[10px] font-black text-stone-800 uppercase tracking-tighter">${a.nombre}</span><span class="text-[8px] font-bold text-stone-500 mt-1">CANT: ${a.cantidad} x $${a.precio.toFixed(2)}</span></div><span class="font-mono font-black text-fix-report text-base">$${itemTotal.toFixed(2)}</span></div>`;
                     totalGeneral += itemTotal;
                 });
-            }
-            if (totalGeneral === 0 && v.financiera && parseFloat(v.financiera.totalCliente) > 0) {
-                const ft = parseFloat(v.financiera.totalCliente);
-                html += `<div class="flex justify-between items-center glass-input bg-white/60 p-5 rounded-2xl shadow-sm border border-white"><div class="flex flex-col"><span class="text-[10px] font-black text-stone-800 uppercase tracking-tighter">COBRO REGISTRADO</span><span class="text-[8px] font-bold text-stone-500 mt-1">FORMA PAGO: ${v.financiera.formaPago || 'EFECTIVO'}</span></div><span class="font-mono font-black text-fix-report text-base">$${ft.toFixed(2)}</span></div>`;
-                totalGeneral += ft;
             }
             html += `<div class="pt-6 border-t border-stone-400/30 flex justify-between items-end"><span class="text-[10px] font-black text-stone-600 uppercase italic">Total Cobrado:</span><span class="text-4xl font-mono font-black text-stone-900 tracking-tighter drop-shadow-sm">$${totalGeneral.toFixed(2)}</span></div></div>`;
             document.getElementById('desgloseTitle').textContent = v.nombreCliente;
@@ -10370,6 +10358,7 @@
         function getVisitCajaAmount(v) {
             if (!v.financiera) return 0;
             if (v.esMantenimiento || v.tipoAtencion === 'Mantenimiento') return 0;
+            if (v.tipoAtencion === 'Garantía') return 0;
             
             // 1. Accesorios (excluyendo "Segunda visita")
             let accTotal = 0;
@@ -10377,18 +10366,9 @@
                 v.accesoriosVendidos.forEach(function(acc) {
                     const name = (acc.nombre || "").toUpperCase();
                     if (name !== "SEGUNDA VISITA") {
-                        accTotal += (parseFloat(acc.cantidad) || 0) * (parseFloat(acc.precio) || 0);
+                        accTotal += (acc.cantidad || 0) * (acc.precio || 0);
                     }
                 });
-            }
-
-            // En garantías: la mano de obra básica no se cobra al cliente ($0).
-            // Pero si se registró cobro al cliente (por accesorios, visita fuera de garantía o liquidación):
-            if (v.tipoAtencion === 'Garantía') {
-                if (accTotal > 0) return accTotal;
-                const totalCliente = (v.financiera && !isNaN(parseFloat(v.financiera.totalCliente))) ? parseFloat(v.financiera.totalCliente) : 0;
-                if (totalCliente > 0) return totalCliente;
-                return 0;
             }
             
             // 2. Equipos / Mano de obra
@@ -10401,25 +10381,20 @@
                     const desc = (eq.descProducto || "").toUpperCase();
                     const isBBQ = desc === "PARRILLA BBQ" || desc.includes("BARBACOA") || desc.includes("BBQ");
                     if (!isBBQ) {
-                        moParaCaja += parseFloat(eq.costoBase) || 0;
+                        moParaCaja += eq.costoBase || 0;
                     }
                 } else if (eqCount > 1) {
                     eqs.forEach(function(eq) {
                         const desc = (eq.descProducto || "").toUpperCase();
                         const isTriturador = desc === "TRITURADOR" || desc.includes("TRITURAD");
                         if (isTriturador) {
-                            moParaCaja += parseFloat(eq.costoBase) || 0;
+                            moParaCaja += eq.costoBase || 0;
                         }
                     });
                 }
             }
             
-            const totalCalc = moParaCaja + accTotal;
-            if (totalCalc > 0) return totalCalc;
-            const totalCli = (v.financiera && !isNaN(parseFloat(v.financiera.totalCliente))) ? parseFloat(v.financiera.totalCliente) : 0;
-            if (totalCli > 0) return totalCli;
-
-            return 0;
+            return moParaCaja + accTotal;
         }
 
         function getAllFinancialMovements() {
@@ -11160,7 +11135,7 @@ function getEditModalData() {
 
             const originalVisit = visitsArray.find(item => item.id === document.getElementById('edit_id').value);
             const isMaint = originalVisit && (originalVisit.esMantenimiento || originalVisit.tipoAtencion === 'Mantenimiento');
-            const isGar = (document.getElementById('edit_tipoAtencion')?.value === 'Garantía') || Boolean(originalVisit && originalVisit.tipoAtencion === 'Garantía');
+            const isGar = document.getElementById('edit_tipoAtencion')?.value === 'Garantía';
             const editRows = document.querySelectorAll('.equipment-edit-row');
 
             for(let i=0; i<selects.length; i++) {
@@ -11194,7 +11169,7 @@ function getEditModalData() {
                 });
             }
 
-            if (!isMaint && !isGar) {
+            if (!isMaint) {
                 const eqCount = updatedEquipos.length;
                 if (eqCount === 1) {
                     const eq = updatedEquipos[0];
@@ -11250,7 +11225,7 @@ function getEditModalData() {
                 equipos: updatedEquipos, 
                 accesoriosVendidos: updatedAccs, 
                 observacionesAdmin: document.getElementById('edit_observaciones').value.toUpperCase(),
-                'financiera/totalCliente': isMaint ? 0 : (isGar ? (accTotal > 0 ? accTotal : (originalVisit?.financiera?.totalCliente || 0)) : (moTotal + accTotal))
+                'financiera/totalCliente': isMaint ? 0 : (moTotal + accTotal)
             };
 
             if (originalVisit) {
@@ -11790,14 +11765,8 @@ function getEditModalData() {
             if (source === 'VISITA') {
                 paymentContainer.classList.remove('hidden');
                 const v = visitsArray.find(item => item.id === id);
-                if (v) {
-                    const effMonto = getVisitCajaAmount(v);
-                    if (effMonto > 0 && (!currentMonto || currentMonto === 0)) {
-                        document.getElementById('finance_monto').value = effMonto;
-                    }
-                    if (v.financiera) {
-                        formaPagoSelect.value = v.financiera.formaPago || 'EFECTIVO';
-                    }
+                if (v && v.financiera) {
+                    formaPagoSelect.value = v.financiera.formaPago || 'EFECTIVO';
                 }
             } else if (source === 'MANUAL') {
                 paymentContainer.classList.remove('hidden');
@@ -11825,30 +11794,16 @@ function getEditModalData() {
                     concepto: nuevoConcepto.replace('MANUAL: ', ''),
                     formaPago: nuevaFormaPago
                 }).then(() => {
-                    const localM = movementsArray.find(item => item.id === id);
-                    if (localM) {
-                        localM.monto = nuevoMonto;
-                        localM.concepto = nuevoConcepto.replace('MANUAL: ', '');
-                        localM.formaPago = nuevaFormaPago;
-                    }
                     showMessage("✅ Movimiento Actualizado", "fix-report");
                     window.closeEditFinanceModal();
-                    processFinancialBalance();
                 }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
             } else {
                 database.ref('visits/' + id).update({ 
                     'financiera/totalCliente': nuevoMonto,
                     'financiera/formaPago': nuevaFormaPago
                 }).then(() => {
-                    const localV = visitsArray.find(item => item.id === id);
-                    if (localV) {
-                        if (!localV.financiera) localV.financiera = {};
-                        localV.financiera.totalCliente = nuevoMonto;
-                        localV.financiera.formaPago = nuevaFormaPago;
-                    }
                     showMessage("✅ Liquidación Actualizada", "fix-report");
                     window.closeEditFinanceModal();
-                    processFinancialBalance();
                 }).catch(() => showMessage("❌ Error al guardar", "fix-error"));
             }
         };
