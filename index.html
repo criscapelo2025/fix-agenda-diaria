@@ -9014,8 +9014,8 @@
                 list.forEach(v => {
                     const eqs = getNormalizedEquipos(v);
                     eqs.forEach(eq => {
-                        if (countSetter) countSetter();
                         const costo = getEquipmentCost(v, eq, catType);
+                        if (countSetter) countSetter(costo);
                         granTotalMO += costo;
                         const cod = eq.codProducto || '';
                         const desc = (eq.descProducto || eq.manualName || (window.CATALOGO_TEKA_BASE && window.CATALOGO_TEKA_BASE[cod]) || '').toUpperCase();
@@ -9047,10 +9047,15 @@
                 tb.innerHTML = html;
             };
 
-            renderStandardServiceRows('tekaTableBody_promocion', promocionVisits, 'MULTI', () => { promoEquiposCount++; });
-            renderStandardServiceRows('tekaTableBody_bbq', bbqsVisits, 'BBQ', () => { bbqEquiposCount++; });
-            renderStandardServiceRows('tekaTableBody_unproducto', unProductoVisits, 'SINGLE', () => { unProdEquiposCount++; });
-            renderStandardServiceRows('tekaTableBody_almacen', almacenesVisits, 'ALMACEN', () => { almacenEquiposCount++; });
+            let totalMontoPromo = 0;
+            let totalMontoBBQ = 0;
+            let totalMontoUnProducto = 0;
+            let totalMontoAlmacen = 0;
+
+            renderStandardServiceRows('tekaTableBody_promocion', promocionVisits, 'MULTI', (costo) => { promoEquiposCount++; totalMontoPromo += costo; });
+            renderStandardServiceRows('tekaTableBody_bbq', bbqsVisits, 'BBQ', (costo) => { bbqEquiposCount++; totalMontoBBQ += costo; });
+            renderStandardServiceRows('tekaTableBody_unproducto', unProductoVisits, 'SINGLE', (costo) => { unProdEquiposCount++; totalMontoUnProducto += costo; });
+            renderStandardServiceRows('tekaTableBody_almacen', almacenesVisits, 'ALMACEN', (costo) => { almacenEquiposCount++; totalMontoAlmacen += costo; });
 
             // RENDER RESUMEN PROMOCIÓN (3 Tarifas: $15, $20, $30 + Total)
             let promoCount15 = 0;
@@ -9167,6 +9172,19 @@
             setVal('kpiTekaGarantias', garantiasEquiposCount);
             setVal('kpiTekaAlmacen', almacenEquiposCount);
             setVal('kpiTekaGranTotal', formatMonedaReporte(granTotalMO));
+
+            // Actualizar cuadro inferior combinado (Un Producto + BBQ + Almacén) en tiempo real
+            const totalEquiposTrio = unProdEquiposCount + bbqEquiposCount + almacenEquiposCount;
+            const totalMontoTrio = totalMontoUnProducto + totalMontoBBQ + totalMontoAlmacen;
+
+            setVal('bottomTrio_cantUnProducto', unProdEquiposCount + (unProdEquiposCount === 1 ? ' eq' : ' eqs'));
+            setVal('bottomTrio_totalUnProducto', formatMonedaReporte(totalMontoUnProducto));
+            setVal('bottomTrio_cantBBQ', bbqEquiposCount + (bbqEquiposCount === 1 ? ' eq' : ' eqs'));
+            setVal('bottomTrio_totalBBQ', formatMonedaReporte(totalMontoBBQ));
+            setVal('bottomTrio_cantAlmacen', almacenEquiposCount + (almacenEquiposCount === 1 ? ' eq' : ' eqs'));
+            setVal('bottomTrio_totalAlmacen', formatMonedaReporte(totalMontoAlmacen));
+            setVal('bottomTrio_totalEquipos', totalEquiposTrio + (totalEquiposTrio === 1 ? ' equipo' : ' equipos'));
+            setVal('bottomTrio_montoTotal', formatMonedaReporte(totalMontoTrio));
 
             // Actualizar badges en pestañas
             setVal('badge_consolidado', consolidadoEquiposCount);
@@ -9752,11 +9770,13 @@
                     cellSumBBQ.alignment = { horizontal: 'right', vertical: 'middle' };
                 }
 
-                // 4. HOJA: BASE  (905 productos base oficiales)
+                // 4. HOJA: BASE  (Pestaña presente en el libro, pero con datos ocultos que no se visualizan)
                 if (!soloConsolidado) {
                     const wsBase = wb.addWorksheet('BASE ');
                     wsBase.getColumn(1).width = 20;
                     wsBase.getColumn(2).width = 80;
+                    wsBase.getColumn(1).hidden = true;
+                    wsBase.getColumn(2).hidden = true;
 
                     const r1Base = wsBase.getRow(1);
                     r1Base.getCell(1).value = "Cód. Artículo";
@@ -9766,12 +9786,14 @@
                     r1Base.getCell(1).fill = FILL_HEADER;
                     r1Base.getCell(2).fill = FILL_HEADER;
                     r1Base.height = 28;
+                    r1Base.hidden = true;
 
                     const r2Base = wsBase.getRow(2);
                     r2Base.getCell(1).value = "Almacén";
                     r2Base.getCell(2).value = "Alm1";
                     r2Base.getCell(1).font = FONT_BODY;
                     r2Base.getCell(2).font = FONT_BODY;
+                    r2Base.hidden = true;
 
                     let baseRowIndex = 3;
                     const catalogEntries = Object.entries(window.CATALOGO_TEKA_BASE || {});
@@ -9783,6 +9805,7 @@
                         row.getCell(2).font = FONT_BODY;
                         row.getCell(1).border = BORDER_BOX;
                         row.getCell(2).border = BORDER_BOX;
+                        row.hidden = true;
                     });
                 }
 
@@ -15410,6 +15433,93 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                 </thead>
                                 <tbody id="tekaTableBody_almacen" class="text-[9px] font-semibold text-stone-800 uppercase"></tbody>
                             </table>
+                        </div>
+                    </div>
+
+                    <!-- ========================================================================= -->
+                    <!-- CUADRO INFERIOR: SUMA EN TIEMPO REAL (UN PRODUCTO + BBQ + ALMACÉN)        -->
+                    <!-- ========================================================================= -->
+                    <div class="mt-8 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 md:p-8 border border-indigo-400/30 shadow-2xl">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-indigo-800/50 gap-3">
+                            <div class="flex items-center gap-3">
+                                <span class="w-11 h-11 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-2xl font-black border border-indigo-500/30 shadow-inner">
+                                    ∑
+                                </span>
+                                <div>
+                                    <h3 class="text-sm md:text-base font-black uppercase tracking-tight text-white flex items-center gap-2">
+                                        SUMA COMBINADA: UN PRODUCTO + BBQ + ALMACÉN
+                                    </h3>
+                                    <p class="text-[10px] text-indigo-200/70 font-normal normal-case mt-0.5">
+                                        Consolidado automático y en vivo para la liquidación mensual de servicios TEKA.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 self-start md:self-auto">
+                                <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 shadow-xs">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> EN TIEMPO REAL
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- 4 Bloques: 3 Categorías + Total Suma Combinada -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+                            
+                            <!-- 1. UN PRODUCTO -->
+                            <div class="p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all shadow-sm">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[9px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                                        <span>🔹</span> UN PRODUCTO
+                                    </span>
+                                    <span id="bottomTrio_cantUnProducto" class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">0 eqs</span>
+                                </div>
+                                <div class="mt-2.5">
+                                    <span id="bottomTrio_totalUnProducto" class="text-2xl font-mono font-black text-white">$0,00</span>
+                                </div>
+                                <span class="text-[8px] text-stone-400 block mt-1 normal-case font-normal">Tarifa estándar $25,00 (Isla $45,00)</span>
+                            </div>
+
+                            <!-- 2. BBQ -->
+                            <div class="p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all shadow-sm">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[9px] font-black text-orange-400 uppercase tracking-wider flex items-center gap-1">
+                                        <span>🔥</span> BBQ / PARRILLAS
+                                    </span>
+                                    <span id="bottomTrio_cantBBQ" class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-orange-500/20 text-orange-300 border border-orange-500/30">0 eqs</span>
+                                </div>
+                                <div class="mt-2.5">
+                                    <span id="bottomTrio_totalBBQ" class="text-2xl font-mono font-black text-white">$0,00</span>
+                                </div>
+                                <span class="text-[8px] text-stone-400 block mt-1 normal-case font-normal">Tarifa plana oficial $29,00</span>
+                            </div>
+
+                            <!-- 3. ALMACÉN -->
+                            <div class="p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all shadow-sm">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[9px] font-black text-teal-400 uppercase tracking-wider flex items-center gap-1">
+                                        <span>🏬</span> ALMACÉN / SHOWROOM
+                                    </span>
+                                    <span id="bottomTrio_cantAlmacen" class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">0 eqs</span>
+                                </div>
+                                <div class="mt-2.5">
+                                    <span id="bottomTrio_totalAlmacen" class="text-2xl font-mono font-black text-white">$0,00</span>
+                                </div>
+                                <span class="text-[8px] text-stone-400 block mt-1 normal-case font-normal">Tarifa exhibición $15,00</span>
+                            </div>
+
+                            <!-- 4. TOTAL SUMA (UN PRODUCTO + BBQ + ALMACÉN) -->
+                            <div class="p-4 rounded-2xl bg-indigo-600/30 border-2 border-indigo-400/50 shadow-lg backdrop-blur-sm relative overflow-hidden">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[9px] font-black text-indigo-300 uppercase tracking-wider flex items-center gap-1">
+                                        <span>🎯</span> SUMA TOTAL COMBINADA
+                                    </span>
+                                    <span id="bottomTrio_totalEquipos" class="px-2.5 py-0.5 rounded-md text-[10px] font-mono font-black bg-indigo-500 text-white shadow-sm">0 equipos</span>
+                                </div>
+                                <div class="mt-2.5">
+                                    <span id="bottomTrio_montoTotal" class="text-2xl font-mono font-black text-amber-300 drop-shadow">$0,00</span>
+                                </div>
+                                <span class="text-[8px] text-indigo-200/90 block mt-1 font-bold">Un Producto + BBQ + Almacén</span>
+                            </div>
+
                         </div>
                     </div>
 
