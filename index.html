@@ -538,6 +538,46 @@
         .dash-tab-content { display: none; }
         .dash-tab-content.active { display: block; }
 
+        /* Estilos Comparativo Histórico Multi-Año (2023 - Hasta Hoy) */
+        :root {
+            --c2023: #94a3b8;
+            --c2024: #3b82f6;
+            --c2025: #10b981;
+            --c2026: #f59e0b;
+        }
+        .legend-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+        .legend-pill {
+            display: flex; align-items: center; gap: 8px; background: white;
+            border: 1px solid var(--border); border-radius: 9999px; padding: 6px 14px;
+            font-size: 12px; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+        .kpi-2023::before { background: var(--c2023); }
+        .kpi-2024::before { background: var(--c2024); }
+        .kpi-2025::before { background: var(--c2025); }
+        .kpi-2026::before { background: var(--c2026); }
+
+        .growth-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-top: 4px; }
+        .g-up { background: #dcfce7; color: #166534; }
+        .g-down { background: #fef2f2; color: #b91c1c; }
+        .g-neutral { background: #f1f5f9; color: #475569; }
+
+        .yr-2023 { background: rgba(148,163,184,0.12); }
+        .yr-2024 { background: rgba(59,130,246,0.08); }
+        .yr-2025 { background: rgba(16,185,129,0.08); }
+        .yr-2026 { background: rgba(245,158,11,0.09); }
+
+        .cat-badge { display: inline-block; padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+        .cat-prom { background: #dbeafe; color: #1e40af; }
+        .cat-gar { background: #fee2e2; color: #b91c1c; }
+        .cat-bbq { background: #fef3c7; color: #92400e; }
+        .cat-prod { background: #d1fae5; color: #065f46; }
+        .cat-alm { background: #ede9fe; color: #5b21b6; }
+
+        .mini-trend-bar { display: flex; gap: 3px; align-items: flex-end; height: 26px; justify-content: center; }
+        .mini-trend-col { width: 14px; border-radius: 2px 2px 0 0; transition: height 0.3s ease; }
+
         /* ========================================================
            SIDEBAR & ULTRA-COMPACT HEADER & PANTALLA DIVIDIDA
            ======================================================== */
@@ -3625,24 +3665,7 @@
         function renderInsumosAdmin() {
             const container = document.getElementById('accesoriosContainerAdmin'); 
             if(!container) return;
-            let html = Object.entries(ACCESORIOS_DEFAULT).map(function(item) { 
-                const n = item[0]; const p = item[1];
-                return `
-                <div class="flex items-center justify-between p-3.5 glass-panel border-white/60">
-                    <span class="text-[10px] font-black text-stone-700 uppercase">${n} ($${p.toFixed(2)})</span>
-                    <input type="number" min="0" value="0" data-price="${p}" data-name="${n}" oninput="calculateFinancials()" class="form-acc-qty w-14 text-center glass-input rounded-lg p-2 text-sm font-black outline-none" placeholder="0">
-                </div>`;
-            }).join('');
-            html += `
-                <div class="col-span-1 md:col-span-2 p-5 glass-panel bg-white/50 border-white/70 mt-3 shadow-md">
-                    <p class="text-[9px] font-black text-fix-main mb-3 italic">➕ OTRO ACCESORIO / EXTRA (MANUAL)</p>
-                    <div class="flex gap-3">
-                        <input type="text" id="manualAccDesc" placeholder="DESCRIPCIÓN DEL ACCESORIO..." class="flex-grow p-3.5 glass-input rounded-xl text-[10px] outline-none font-black uppercase text-stone-800">
-                        <input type="number" id="manualAccPrice" placeholder="$0.00" oninput="calculateFinancials()" class="w-32 p-3.5 text-right text-sm glass-input bg-white/80 rounded-xl outline-none font-mono font-black text-fix-report">
-                    </div>
-                </div>
-            `;
-            container.innerHTML = html;
+            container.innerHTML = '';
         }
 
         window.refreshData = function() {
@@ -5810,12 +5833,19 @@
                         <input type="text" id="garantia_desc_repuesto_${v.id}" value="${v.equipos?.[0]?.descRepuesto || ''}" placeholder="DESCRIPCIÓN DEL REPUESTO..." class="w-full p-2 bg-white rounded-lg text-[9px] font-bold uppercase border border-amber-300">
                         <div id="garantia_repuesto_hint_${v.id}" class="text-[8px]"></div>
                     </div>
-                </div>${!v.esMantenimiento ? `<select id="payment_${v.id}" class="w-full p-3 glass-input rounded-xl mb-3 text-[10px] font-black uppercase outline-none text-stone-800"><option value="EFECTIVO" ${v.financiera && v.financiera.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option><option value="TRANSFERENCIA" ${v.financiera && v.financiera.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option></select>` : `<input type="hidden" id="payment_${v.id}" value="EFECTIVO">`}<div class="p-4 glass-input bg-stone-100/50 rounded-xl mb-3"><p class="text-[8px] font-black text-fix-main mb-2">📸 FOTOS Y COMENTARIO TÉCNICO:</p><input type="file" accept="image/*" multiple onchange="handleImageSelect(event, '${v.id}')" class="w-full text-[8px] mb-3 text-stone-600"><textarea id="client_comment_${v.id}" placeholder="TESTIMONIO O NOVEDAD FINAL..." class="w-full p-3 text-[10px] font-black uppercase glass-input rounded-lg border-none outline-none text-stone-800"></textarea></div>${!v.esMantenimiento ? `<div class="max-h-32 overflow-y-auto mb-4 p-2 glass-input rounded-xl bg-white/40">
+                </div>${!v.esMantenimiento ? `<select id="payment_${v.id}" class="w-full p-3 glass-input rounded-xl mb-3 text-[10px] font-black uppercase outline-none text-stone-800"><option value="EFECTIVO" ${v.financiera && v.financiera.formaPago === 'EFECTIVO' ? 'selected' : ''}>EFECTIVO</option><option value="TRANSFERENCIA" ${v.financiera && v.financiera.formaPago === 'TRANSFERENCIA' ? 'selected' : ''}>TRANSFERENCIA</option></select>` : `<input type="hidden" id="payment_${v.id}" value="EFECTIVO">`}<div class="p-4 glass-input bg-stone-100/50 rounded-xl mb-3"><p class="text-[8px] font-black text-fix-main mb-2">📸 FOTOS Y COMENTARIO TÉCNICO:</p><input type="file" accept="image/*" multiple onchange="handleImageSelect(event, '${v.id}')" class="w-full text-[8px] mb-3 text-stone-600"><textarea id="client_comment_${v.id}" placeholder="TESTIMONIO O NOVEDAD FINAL..." class="w-full p-3 text-[10px] font-black uppercase glass-input rounded-lg border-none outline-none text-stone-800"></textarea></div>${!v.esMantenimiento ? `<div class="mb-3">
+                    <label class="block text-[9px] font-black uppercase text-fix-main mb-1.5">🔩 Accesorios / Materiales:</label>
+                    <div class="max-h-36 overflow-y-auto mb-2 p-2 glass-input rounded-xl bg-white/40 space-y-1.5">
                     ${Object.entries(ACCESORIOS_DEFAULT).map(function(item){
                         const n = item[0]; const p = item[1];
                         const existing = (v.accesoriosVendidos || []).find(a => a.nombre === n);
-                        return `<div class="flex justify-between items-center mb-2 glass-input bg-white/80 p-2 rounded-lg font-black border border-white/60"><span class="text-[8px] uppercase text-stone-700">${n} ($${p.toFixed(2)})</span><input type="number" min="0" value="${existing ? existing.cantidad : 0}" data-name="${n}" data-price="${p}" class="acc-${v.id} w-12 text-center text-[10px] font-black text-fix-main glass-input rounded-md shadow-inner outline-none bg-white"></div>`;
+                        return `<div class="flex justify-between items-center glass-input bg-white/80 p-2 rounded-lg font-black border border-white/60"><span class="text-[8px] uppercase text-stone-700">${n} ($${p.toFixed(2)})</span><input type="number" min="0" value="${existing ? existing.cantidad : 0}" data-name="${n}" data-price="${p}" class="acc-${v.id} w-12 text-center text-[10px] font-black text-fix-main glass-input rounded-md shadow-inner outline-none bg-white"></div>`;
                     }).join('')}
+                    </div>
+                    <div class="flex gap-1.5">
+                        <input type="text" id="manual_acc_desc_${v.id}" value="${((v.accesoriosVendidos || []).find(a => !ACCESORIOS_DEFAULT[a.nombre]) || {}).nombre || ''}" placeholder="OTRO ACCESORIO..." class="flex-1 p-2 text-[9px] font-bold uppercase glass-input bg-white/80 rounded-lg outline-none border border-white/60">
+                        <input type="number" step="0.01" id="manual_acc_price_${v.id}" value="${((v.accesoriosVendidos || []).find(a => !ACCESORIOS_DEFAULT[a.nombre]) || {}).precio || ''}" placeholder="$0.00" class="w-16 p-2 text-[9px] font-bold text-center glass-input bg-white/80 rounded-lg outline-none border border-white/60">
+                    </div>
                 </div>` : ''}<textarea id="reason_${v.id}" placeholder="NOTA INTERNA TÉCNICA..." class="w-full p-4 text-xs glass-input rounded-xl mb-4 font-bold uppercase italic outline-none text-stone-800"></textarea><button onclick="closeVisitByTech('${v.id}', 'desktop')" class="w-full glass-card bg-fix-report/90 border-emerald-500 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 text-center">💾 GUARDAR CIERRE</button>${isItemGestionado(v, date) ? `<button type="button" onclick="retornarVisitaAPendiente('${v.id}')" class="w-full glass-card bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all text-center flex items-center justify-center gap-1.5 mt-2" title="Retornar a estado Pendiente (Reabrir)"><span>↩️</span> <span>RETORNAR A PENDIENTE (REABRIR VISITA)</span></button>` : ''}</div></div></td></tr>`;
             }).join('');
 
@@ -8456,8 +8486,731 @@
                     </tr>`;
                 }).join('');
             }
+
+            // 11. Actualizar Pestaña de Estadísticas Comparativas Históricas (2023 - Hasta Hoy en Vivo)
+            renderDashboardHistoricoComparativo(months, grandTotal, grandUnits, grandProm, grandPromU, grandUnp, grandUnpU, grandBbq, grandBbqU, grandGar, grandGarU, grandAlm, grandAlmU);
         }
         window.renderDashboardTotales = renderDashboardTotales;
+
+        // =========================================================================
+        // MOTOR DE ESTADÍSTICAS COMPARATIVAS HISTÓRICAS (2023 - HASTA HOY EN VIVO)
+        // =========================================================================
+        const HISTORICO_ANUAL_TEKA = {
+            2023: {
+                year: 2023,
+                label: '2023 — Año Base',
+                totalFact: 12782.25,
+                totalUnits: 652,
+                avgTicket: 19.60,
+                avgMonth: 1065.19,
+                growthVsPrev: null,
+                maxMonth: { name: 'Julio', val: 1741.25 },
+                minMonth: { name: 'Diciembre', val: 359.50 },
+                prom: { fact: 6930.00, units: 391, pct: 54.2 },
+                unp: { fact: 3230.50, units: 129, pct: 25.3 },
+                gar: { fact: 1258.75, units: 85, pct: 9.8 },
+                bbq: { fact: 1363.00, units: 47, pct: 10.7 },
+                alm: { fact: 0.00, units: 0, pct: 0.0 },
+                monthlyFact: [991.25, 916.50, 1001.00, 890.50, 1610.50, 1190.00, 1741.25, 1204.50, 1107.25, 956.50, 813.50, 359.50],
+                monthlyUnits: [47, 40, 49, 47, 78, 65, 92, 58, 57, 54, 45, 20]
+            },
+            2024: {
+                year: 2024,
+                label: '2024 — Crecimiento ×2',
+                totalFact: 26546.25,
+                totalUnits: 1349,
+                avgTicket: 19.68,
+                avgMonth: 2212.19,
+                growthVsPrev: 107.68,
+                maxMonth: { name: 'Enero', val: 2893.75 },
+                minMonth: { name: 'Noviembre', val: 1711.75 },
+                prom: { fact: 14570.00, units: 824, pct: 54.9 },
+                unp: { fact: 7775.00, units: 312, pct: 29.3 },
+                gar: { fact: 1816.25, units: 125, pct: 6.8 },
+                bbq: { fact: 2175.00, units: 75, pct: 8.2 },
+                alm: { fact: 210.00, units: 13, pct: 0.8 },
+                monthlyFact: [2893.75, 2100.25, 2213.00, 1785.75, 2050.75, 2000.75, 2526.75, 2069.00, 2150.00, 2356.00, 1711.75, 2573.25],
+                monthlyUnits: [137, 104, 112, 84, 114, 108, 131, 105, 117, 129, 82, 121]
+            },
+            2025: {
+                year: 2025,
+                label: '2025 — Récord Previo',
+                totalFact: 30732.00,
+                totalUnits: 1597,
+                avgTicket: 19.24,
+                avgMonth: 2561.00,
+                growthVsPrev: 15.77,
+                maxMonth: { name: 'Septiembre', val: 3284.00 },
+                minMonth: { name: 'Noviembre', val: 1882.75 },
+                prom: { fact: 16055.00, units: 925, pct: 52.2 },
+                unp: { fact: 7884.00, units: 322, pct: 25.6 },
+                gar: { fact: 1975.00, units: 140, pct: 6.4 },
+                bbq: { fact: 2451.00, units: 85, pct: 8.0 },
+                alm: { fact: 365.00, units: 25, pct: 1.2 },
+                monthlyFact: [2006.25, 2407.50, 2484.50, 2402.75, 2673.00, 3057.25, 2220.50, 3193.00, 3284.00, 2960.50, 1882.75, 54.00],
+                monthlyUnits: [105, 116, 132, 125, 136, 156, 116, 174, 171, 157, 102, 2]
+            }
+        };
+
+        function renderDashboardHistoricoComparativo(months, grandTotal, grandUnits, grandProm, grandPromU, grandUnp, grandUnpU, grandBbq, grandBbqU, grandGar, grandGarU, grandAlm, grandAlmU) {
+            const tabContainer = document.getElementById('dash-tab-historico');
+            if (!tabContainer) return;
+
+            // 1. Datos 2026 en tiempo real
+            const fact2026 = grandTotal || 0;
+            const units2026 = grandUnits || 0;
+            const avgTicket2026 = units2026 > 0 ? (fact2026 / units2026) : 0;
+            const completedMonths2026 = months.filter(m => m.total > 0).length || 1;
+            const avgMonth2026 = completedMonths2026 > 0 ? (fact2026 / completedMonths2026) : 0;
+            const growth2026Vs2025 = ((fact2026 - 30732.00) / 30732.00 * 100);
+
+            // 2. Mapeo mensual de 2026
+            const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const monthly2026 = [];
+            const monthlyUnits2026 = [];
+            const isLiveMonth2026 = [];
+
+            for (let i = 0; i < 12; i++) {
+                if (i < months.length && months[i] && months[i].total > 0) {
+                    monthly2026.push(months[i].total);
+                    monthlyUnits2026.push(months[i].units);
+                    isLiveMonth2026.push(Boolean(months[i].label && months[i].label.includes('Nuevo')));
+                } else {
+                    monthly2026.push(null);
+                    monthlyUnits2026.push(null);
+                    isLiveMonth2026.push(false);
+                }
+            }
+
+            let maxM2026 = { name: '—', val: 0 };
+            let minM2026 = { name: '—', val: 999999 };
+            for (let i = 0; i < monthly2026.length; i++) {
+                const v = monthly2026[i];
+                if (v !== null && v > maxM2026.val) {
+                    maxM2026 = { name: MONTH_NAMES[i], val: v };
+                }
+                if (v !== null && v > 0 && v < minM2026.val) {
+                    minM2026 = { name: MONTH_NAMES[i], val: v };
+                }
+            }
+            if (minM2026.val === 999999) minM2026 = { name: '—', val: 0 };
+
+            // 3. Totales acumulados 2023–2026
+            const grandTotalAllYears = 12782.25 + 26546.25 + 30732.00 + fact2026;
+            const grandUnitsAllYears = 652 + 1349 + 1597 + units2026;
+            const multiplicadorVs2023 = (fact2026 / 12782.25).toFixed(1);
+            const totalGrowthPct = ((fact2026 - 12782.25) / 12782.25 * 100).toFixed(1);
+
+            // 4. Actualizar Pills / Badges en el Header del Tab
+            const elHeroFact = document.getElementById('histLiveHeroFact2026');
+            if (elHeroFact) elHeroFact.textContent = `$${fact2026.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            const elHeroServ = document.getElementById('histLiveHeroServ2026');
+            if (elHeroServ) elHeroServ.textContent = `${units2026.toLocaleString()} serv.`;
+            const elHeroTotal = document.getElementById('histLiveHeroTotalHist');
+            if (elHeroTotal) elHeroTotal.textContent = `$${grandTotalAllYears.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            // 5. Actualizar KPI Cards Multi-Año
+            const el26Val = document.getElementById('kpiHist2026Val');
+            if (el26Val) el26Val.textContent = `$${fact2026.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            const el26Sub = document.getElementById('kpiHist2026Sub');
+            if (el26Sub) el26Sub.textContent = `${units2026.toLocaleString()} servicios | Prom. $${avgTicket2026.toFixed(2)}/serv.`;
+            const el26Growth = document.getElementById('kpiHist2026Growth');
+            if (el26Growth) {
+                const isOver2025 = fact2026 >= 30732.00;
+                el26Growth.className = `growth-pill ${isOver2025 ? 'g-up' : 'g-neutral'}`;
+                el26Growth.innerHTML = isOver2025 
+                    ? `▲ +${growth2026Vs2025.toFixed(1)}% vs 2025 ⭐ NUEVO RÉCORD (En Vivo)`
+                    : `Ritmo +${((fact2026/30732)*100).toFixed(1)}% de 2025 (En Vivo)`;
+            }
+
+            const elTotVal = document.getElementById('kpiHistTotalVal');
+            if (elTotVal) elTotVal.textContent = `$${grandTotalAllYears.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            const elTotSub = document.getElementById('kpiHistTotalSub');
+            if (elTotSub) elTotSub.textContent = `${grandUnitsAllYears.toLocaleString()} servicios totales (2023–2026)`;
+            const elTotGrowth = document.getElementById('kpiHistTotalGrowth');
+            if (elTotGrowth) elTotGrowth.innerHTML = `▲ ×${multiplicadorVs2023} vs año base 2023 (+${totalGrowthPct}%)`;
+
+            // 6. Renderizar Tabla Maestra Comparativa Anual
+            const summaryTbody = document.getElementById('histSummaryTableBody');
+            if (summaryTbody) {
+                const promGrowth = ((grandProm - 6930) / 6930 * 100).toFixed(1);
+                const unpGrowth = ((grandUnp - 3230.5) / 3230.5 * 100).toFixed(1);
+                const bbqGrowth = ((grandBbq - 1363) / 1363 * 100).toFixed(1);
+
+                summaryTbody.innerHTML = `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="font-bold text-slate-900">Facturación Total ($)</td>
+                        <td class="text-right font-mono yr-2023 font-semibold">$12,782.25</td>
+                        <td class="text-right font-mono yr-2024 font-semibold text-blue-900">$26,546.25</td>
+                        <td class="text-right font-mono yr-2025 font-semibold text-emerald-900">$30,732.00</td>
+                        <td class="text-right font-mono yr-2026 font-bold text-amber-900 bg-amber-100/50">$${fact2026.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ⭐</td>
+                        <td class="text-right font-bold text-emerald-700 bg-emerald-50">▲ ×${multiplicadorVs2023} (vs 2023)</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="text-slate-600">Variación vs Año Anterior</td>
+                        <td class="text-right yr-2023 text-slate-400 font-mono">— (Base)</td>
+                        <td class="text-right yr-2024 font-bold text-emerald-600 font-mono">▲ +107.7%</td>
+                        <td class="text-right yr-2025 font-bold text-emerald-600 font-mono">▲ +15.8%</td>
+                        <td class="text-right yr-2026 font-bold text-amber-700 font-mono">▲ +${growth2026Vs2025.toFixed(1)}% (En Vivo)</td>
+                        <td class="text-right font-bold text-blue-700">Tendencia Alcista ↑</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="font-medium text-slate-800">Total Servicios / Equipos</td>
+                        <td class="text-right yr-2023 font-mono">652 servicios</td>
+                        <td class="text-right yr-2024 font-mono">1,349 servicios</td>
+                        <td class="text-right yr-2025 font-mono">1,597 servicios</td>
+                        <td class="text-right yr-2026 font-mono font-bold text-amber-900">${units2026.toLocaleString()} servicios ⭐</td>
+                        <td class="text-right font-bold text-emerald-700">▲ ×${(units2026/652).toFixed(1)} servicios</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="text-slate-600">Ticket Promedio por Servicio ($)</td>
+                        <td class="text-right yr-2023 font-mono">$19.60</td>
+                        <td class="text-right yr-2024 font-mono">$19.68</td>
+                        <td class="text-right yr-2025 font-mono">$19.24</td>
+                        <td class="text-right yr-2026 font-mono font-semibold">$${avgTicket2026.toFixed(2)}</td>
+                        <td class="text-right font-semibold text-slate-600">Estable ≈ $19.3</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="text-slate-600">Promedio Mensual Facturado ($)</td>
+                        <td class="text-right yr-2023 font-mono">$1,065.19</td>
+                        <td class="text-right yr-2024 font-mono">$2,212.19</td>
+                        <td class="text-right yr-2025 font-mono">$2,561.00</td>
+                        <td class="text-right yr-2026 font-mono font-bold text-amber-900">$${avgMonth2026.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="text-right font-bold text-emerald-700">▲ ×${(avgMonth2026/1065.19).toFixed(1)} vs 2023</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="text-slate-600">Mes con Mayor Facturación (Pico)</td>
+                        <td class="text-right yr-2023 text-xs">Julio ($1,741.25)</td>
+                        <td class="text-right yr-2024 text-xs">Enero ($2,893.75)</td>
+                        <td class="text-right yr-2025 text-xs">Septiembre ($3,284.00)</td>
+                        <td class="text-right yr-2026 text-xs font-bold text-amber-900">${maxM2026.name} ($${maxM2026.val.toLocaleString('en-US', {minimumFractionDigits: 2})}) ⭐</td>
+                        <td class="text-right text-xs font-bold text-slate-800">Feb 2026 ($3,719.25)</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="text-slate-600">Mes con Menor Facturación</td>
+                        <td class="text-right yr-2023 text-xs">Diciembre ($359.50)</td>
+                        <td class="text-right yr-2024 text-xs">Noviembre ($1,711.75)</td>
+                        <td class="text-right yr-2025 text-xs">Noviembre ($1,882.75)</td>
+                        <td class="text-right yr-2026 text-xs">${minM2026.name} ($${minM2026.val.toLocaleString('en-US', {minimumFractionDigits: 2})})</td>
+                        <td class="text-right text-xs text-slate-500">Baja estacional en Nov</td>
+                    </tr>
+                    <tr class="bg-slate-100/70 border-y border-slate-200">
+                        <td colspan="6" class="p-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">DESGLOSE COMPARATIVO POR CATEGORÍA</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td><span class="cat-badge cat-prom">Promociones Teka</span></td>
+                        <td class="text-right yr-2023 font-mono">$6,930.00 <span class="text-[11px] text-slate-500">(391u)</span></td>
+                        <td class="text-right yr-2024 font-mono">$14,570.00 <span class="text-[11px] text-slate-500">(824u)</span></td>
+                        <td class="text-right yr-2025 font-mono">$16,055.00 <span class="text-[11px] text-slate-500">(925u)</span></td>
+                        <td class="text-right yr-2026 font-mono font-bold">$${grandProm.toLocaleString('en-US', {minimumFractionDigits: 2})} <span class="text-[11px] text-slate-500">(${grandPromU}u)</span></td>
+                        <td class="text-right font-bold text-emerald-700">▲ +${promGrowth}% (23→26)</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td><span class="cat-badge cat-prod">Un Solo Producto</span></td>
+                        <td class="text-right yr-2023 font-mono">$3,230.50 <span class="text-[11px] text-slate-500">(129u)</span></td>
+                        <td class="text-right yr-2024 font-mono">$7,775.00 <span class="text-[11px] text-slate-500">(312u)</span></td>
+                        <td class="text-right yr-2025 font-mono">$7,884.00 <span class="text-[11px] text-slate-500">(322u)</span></td>
+                        <td class="text-right yr-2026 font-mono font-bold">$${grandUnp.toLocaleString('en-US', {minimumFractionDigits: 2})} <span class="text-[11px] text-slate-500">(${grandUnpU}u)</span></td>
+                        <td class="text-right font-bold text-emerald-700">▲ +${unpGrowth}% (23→26)</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td><span class="cat-badge cat-gar">Garantías Teka</span></td>
+                        <td class="text-right yr-2023 font-mono">$1,258.75 <span class="text-[11px] text-slate-500">(85u)</span></td>
+                        <td class="text-right yr-2024 font-mono">$1,816.25 <span class="text-[11px] text-slate-500">(125u)</span></td>
+                        <td class="text-right yr-2025 font-mono">$1,975.00 <span class="text-[11px] text-slate-500">(140u)</span></td>
+                        <td class="text-right yr-2026 font-mono font-bold">$${grandGar.toLocaleString('en-US', {minimumFractionDigits: 2})} <span class="text-[11px] text-slate-500">(${grandGarU}u)</span></td>
+                        <td class="text-right text-xs font-semibold text-blue-700">6.0% (Menor % = Alta Calidad)</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td><span class="cat-badge cat-bbq">Línea BBQ</span></td>
+                        <td class="text-right yr-2023 font-mono">$1,363.00 <span class="text-[11px] text-slate-500">(47u)</span></td>
+                        <td class="text-right yr-2024 font-mono">$2,175.00 <span class="text-[11px] text-slate-500">(75u)</span></td>
+                        <td class="text-right yr-2025 font-mono">$2,451.00 <span class="text-[11px] text-slate-500">(85u)</span></td>
+                        <td class="text-right yr-2026 font-mono font-bold">$${grandBbq.toLocaleString('en-US', {minimumFractionDigits: 2})} <span class="text-[11px] text-slate-500">(${grandBbqU}u)</span></td>
+                        <td class="text-right font-bold text-emerald-700">▲ +${bbqGrowth}% (23→26)</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td><span class="cat-badge cat-alm">Almacenes / Exhibición</span></td>
+                        <td class="text-right yr-2023 text-slate-400 font-mono">—</td>
+                        <td class="text-right yr-2024 font-mono">$210.00 <span class="text-[11px] text-slate-500">(13u)</span></td>
+                        <td class="text-right yr-2025 font-mono">$365.00 <span class="text-[11px] text-slate-500">(25u)</span></td>
+                        <td class="text-right yr-2026 font-mono font-bold text-purple-700">$${grandAlm.toLocaleString('en-US', {minimumFractionDigits: 2})} <span class="text-[11px] text-slate-500">(${grandAlmU}u)</span></td>
+                        <td class="text-right font-bold text-purple-700">Canal Emergente ×6 ↑</td>
+                    </tr>
+                `;
+            }
+
+            const summaryTfoot = document.getElementById('histSummaryTableFoot');
+            if (summaryTfoot) {
+                summaryTfoot.innerHTML = `
+                    <tr class="bg-slate-100 text-slate-900 font-extrabold border-t-2 border-slate-300 text-xs">
+                        <td>TOTAL ANUAL HISTÓRICO</td>
+                        <td class="text-right font-mono yr-2023">$12,782.25</td>
+                        <td class="text-right font-mono yr-2024 text-blue-900">$26,546.25</td>
+                        <td class="text-right font-mono yr-2025 text-emerald-900">$30,732.00</td>
+                        <td class="text-right font-mono yr-2026 text-amber-900 bg-amber-100/60 font-black text-sm">$${fact2026.toLocaleString('en-US', {minimumFractionDigits: 2})} ⭐</td>
+                        <td class="text-right font-mono text-blue-900 bg-blue-100 font-black text-sm">$${grandTotalAllYears.toLocaleString('en-US', {minimumFractionDigits: 2})} Acum.</td>
+                    </tr>
+                `;
+            }
+
+            // 7. Renderizar Matriz Mensual Mes a Mes
+            const matrixTbody = document.getElementById('histMonthlyMatrixBody');
+            if (matrixTbody) {
+                const maxValMonth = Math.max(
+                    ...HISTORICO_ANUAL_TEKA[2023].monthlyFact,
+                    ...HISTORICO_ANUAL_TEKA[2024].monthlyFact,
+                    ...HISTORICO_ANUAL_TEKA[2025].monthlyFact,
+                    ...monthly2026.filter(v => v !== null)
+                );
+
+                matrixTbody.innerHTML = MONTH_NAMES.map((name, i) => {
+                    const v23 = HISTORICO_ANUAL_TEKA[2023].monthlyFact[i];
+                    const u23 = HISTORICO_ANUAL_TEKA[2023].monthlyUnits[i];
+                    const v24 = HISTORICO_ANUAL_TEKA[2024].monthlyFact[i];
+                    const u24 = HISTORICO_ANUAL_TEKA[2024].monthlyUnits[i];
+                    const v25 = HISTORICO_ANUAL_TEKA[2025].monthlyFact[i];
+                    const u25 = HISTORICO_ANUAL_TEKA[2025].monthlyUnits[i];
+                    const v26 = monthly2026[i];
+                    const u26 = monthlyUnits2026[i];
+                    const isLive = isLiveMonth2026[i];
+
+                    const vals = [v23, v24, v25, v26 || 0];
+                    const best = Math.max(...vals);
+
+                    const h23 = Math.max(Math.round((v23 / maxValMonth) * 24), 2);
+                    const h24 = Math.max(Math.round((v24 / maxValMonth) * 24), 2);
+                    const h25 = Math.max(Math.round((v25 / maxValMonth) * 24), 2);
+                    const h26 = (v26 !== null) ? Math.max(Math.round((v26 / maxValMonth) * 24), 2) : 0;
+
+                    const rowClass = (v26 && v26 === best) ? 'bg-amber-50/40' : (v25 === best ? 'bg-emerald-50/30' : 'hover:bg-slate-50');
+
+                    return `
+                    <tr class="${rowClass} border-b border-slate-200 transition-colors">
+                        <td class="font-bold text-slate-900">${name}</td>
+                        <td class="text-right font-mono yr-2023 ${v23 === best ? 'font-bold text-slate-900' : 'text-slate-700'}">$${v23.toLocaleString('en-US', {minimumFractionDigits: 2})} <span class="text-[11px] text-slate-500">(${u23}u)</span></td>
+                        <td class="text-right font-mono yr-2024 ${v24 === best ? 'font-bold text-blue-900 bg-blue-100/30' : 'text-slate-700'}">$${v24.toLocaleString('en-US', {minimumFractionDigits: 2})} <span class="text-[11px] text-slate-500">(${u24}u)</span></td>
+                        <td class="text-right font-mono yr-2025 ${v25 === best ? 'font-bold text-emerald-900 bg-emerald-100/40' : 'text-slate-700'}">$${v25.toLocaleString('en-US', {minimumFractionDigits: 2})} <span class="text-[11px] text-slate-500">(${u25}u)</span></td>
+                        <td class="text-right font-mono yr-2026 ${v26 && v26 === best ? 'font-bold text-amber-900 bg-amber-100/50' : ''}">
+                            ${v26 !== null 
+                                ? `$${v26.toLocaleString('en-US', {minimumFractionDigits: 2})} <span class="text-[11px] text-slate-500">(${u26}u)</span> ${isLive ? '<span class="ml-1 text-[9px] px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">En Vivo</span>' : ''}` 
+                                : '<span class="text-slate-400 font-mono text-xs">Pendiente</span>'}
+                        </td>
+                        <td>
+                            <div class="mini-trend-bar" title="Evolución ${name}: 2023 ($${v23}) → 2024 ($${v24}) → 2025 ($${v25}) → 2026 ($${v26 || 'N/A'})">
+                                <div class="mini-trend-col" style="height:${h23}px; background:var(--c2023);"></div>
+                                <div class="mini-trend-col" style="height:${h24}px; background:var(--c2024);"></div>
+                                <div class="mini-trend-col" style="height:${h25}px; background:var(--c2025);"></div>
+                                <div class="mini-trend-col" style="height:${h26}px; background:var(--c2026); ${v26 === null ? 'opacity:0.2;' : ''}"></div>
+                            </div>
+                        </td>
+                    </tr>`;
+                }).join('');
+            }
+
+            const matrixTfoot = document.getElementById('histMonthlyMatrixFoot');
+            if (matrixTfoot) {
+                matrixTfoot.innerHTML = `
+                    <tr class="bg-slate-100 text-slate-900 font-black border-t-2 border-slate-300 text-xs">
+                        <td>TOTAL FACTURACIÓN</td>
+                        <td class="text-right font-mono yr-2023">$12,782.25 <span class="text-[11px] text-slate-500 font-normal">(652u)</span></td>
+                        <td class="text-right font-mono yr-2024 text-blue-900">$26,546.25 <span class="text-[11px] text-slate-500 font-normal">(1,349u)</span></td>
+                        <td class="text-right font-mono yr-2025 text-emerald-900">$30,732.00 <span class="text-[11px] text-slate-500 font-normal">(1,597u)</span></td>
+                        <td class="text-right font-mono yr-2026 text-amber-900 bg-amber-100/60 font-black text-sm">$${fact2026.toLocaleString('en-US', {minimumFractionDigits: 2})} <span class="text-[11px] text-slate-500 font-normal">(${units2026}u)</span></td>
+                        <td class="text-center font-bold text-blue-900">4 Años Consolidado</td>
+                    </tr>
+                `;
+            }
+
+            // 8. Renderizar Tarjetas de Análisis por Categoría
+            const catCardsEl = document.getElementById('histCategoriesContainer');
+            if (catCardsEl) {
+                const maxProm = Math.max(16055, grandProm);
+                const maxUnp = Math.max(7884, grandUnp);
+                const maxBbq = Math.max(2451, grandBbq);
+                const maxAlm = Math.max(365, grandAlm);
+
+                catCardsEl.innerHTML = `
+                    <!-- Promociones -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="cat-badge cat-prom">Promociones Teka ($15–$20)</span>
+                            <span class="text-xs font-bold text-blue-700">Motor Principal (~55%)</span>
+                        </div>
+                        <p class="text-xs text-slate-500">Instalaciones de combos y promociones en retail. Base fundamental del volumen y flujo de caja.</p>
+                        <div class="space-y-2 pt-1">
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="w-10 font-bold text-slate-500">2023</span>
+                                <div class="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full" style="width:${(6930/maxProm*100).toFixed(0)}%; background:var(--c2023);"></div>
+                                </div>
+                                <span class="w-28 text-right font-mono font-bold text-slate-700">$6,930 (391u)</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="w-10 font-bold text-blue-600">2024</span>
+                                <div class="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full" style="width:${(14570/maxProm*100).toFixed(0)}%; background:var(--c2024);"></div>
+                                </div>
+                                <span class="w-28 text-right font-mono font-bold text-blue-900">$14,570 (824u)</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="w-10 font-bold text-emerald-600">2025</span>
+                                <div class="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full" style="width:${(16055/maxProm*100).toFixed(0)}%; background:var(--c2025);"></div>
+                                </div>
+                                <span class="w-28 text-right font-mono font-bold text-emerald-900">$16,055 (925u)</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="w-10 font-bold text-amber-600">2026</span>
+                                <div class="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full" style="width:${(grandProm/maxProm*100).toFixed(0)}%; background:var(--c2026);"></div>
+                                </div>
+                                <span class="w-28 text-right font-mono font-bold text-amber-900">$${grandProm.toLocaleString('en-US', {minimumFractionDigits: 2})} (${grandPromU}u)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Un Producto -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="cat-badge cat-prod">Un Solo Producto ($25–$30)</span>
+                            <span class="text-xs font-bold text-emerald-700">Mayor Margen Unitario</span>
+                        </div>
+                        <p class="text-xs text-slate-500">Instalaciones individuales directas. Alto valor por servicio con tarifa plana premium.</p>
+                        <div class="space-y-2 pt-1">
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="w-10 font-bold text-slate-500">2023</span>
+                                <div class="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full" style="width:${(3230.5/maxUnp*100).toFixed(0)}%; background:var(--c2023);"></div>
+                                </div>
+                                <span class="w-28 text-right font-mono font-bold text-slate-700">$3,231 (129u)</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="w-10 font-bold text-blue-600">2024</span>
+                                <div class="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full" style="width:${(7775/maxUnp*100).toFixed(0)}%; background:var(--c2024);"></div>
+                                </div>
+                                <span class="w-28 text-right font-mono font-bold text-blue-900">$7,775 (312u)</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="w-10 font-bold text-emerald-600">2025</span>
+                                <div class="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full" style="width:${(7884/maxUnp*100).toFixed(0)}%; background:var(--c2025);"></div>
+                                </div>
+                                <span class="w-28 text-right font-mono font-bold text-emerald-900">$7,884 (322u)</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="w-10 font-bold text-amber-600">2026</span>
+                                <div class="flex-1 bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full" style="width:${(grandUnp/maxUnp*100).toFixed(0)}%; background:var(--c2026);"></div>
+                                </div>
+                                <span class="w-28 text-right font-mono font-bold text-amber-900">$${grandUnp.toLocaleString('en-US', {minimumFractionDigits: 2})} (${grandUnpU}u)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Garantías -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="cat-badge cat-gar">Garantías Teka</span>
+                            <span class="text-xs font-bold text-rose-700">Calidad: Baja de 9.8% a 6%</span>
+                        </div>
+                        <p class="text-xs text-slate-500">Servicios bajo cobertura. La reducción proporcional confirma una mejora continua en la calidad técnica.</p>
+                        <div class="grid grid-cols-4 gap-2 pt-1 text-center">
+                            <div class="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                                <div class="text-[10px] text-slate-500 font-bold">2023</div>
+                                <div class="text-xs font-extrabold text-slate-800">$1,259</div>
+                                <div class="text-[10px] text-slate-500">85 serv. (9.8%)</div>
+                            </div>
+                            <div class="bg-blue-50/50 p-2 rounded-lg border border-blue-200">
+                                <div class="text-[10px] text-blue-700 font-bold">2024</div>
+                                <div class="text-xs font-extrabold text-blue-900">$1,816</div>
+                                <div class="text-[10px] text-blue-700">125 serv. (6.8%)</div>
+                            </div>
+                            <div class="bg-emerald-50/50 p-2 rounded-lg border border-emerald-200">
+                                <div class="text-[10px] text-emerald-700 font-bold">2025</div>
+                                <div class="text-xs font-extrabold text-emerald-900">$1,975</div>
+                                <div class="text-[10px] text-emerald-700">140 serv. (6.4%)</div>
+                            </div>
+                            <div class="bg-amber-50/50 p-2 rounded-lg border border-amber-300">
+                                <div class="text-[10px] text-amber-800 font-bold">2026 (Vivo)</div>
+                                <div class="text-xs font-extrabold text-amber-900">$${grandGar.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                                <div class="text-[10px] text-amber-700">${grandGarU} serv. (${(fact2026 > 0 ? (grandGar/fact2026*100).toFixed(1) : 0)}%)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BBQ y Almacenes -->
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <div class="flex gap-1.5">
+                                <span class="cat-badge cat-bbq">BBQ ($29)</span>
+                                <span class="cat-badge cat-alm">Almacén ($15)</span>
+                            </div>
+                            <span class="text-xs font-bold text-purple-700">Líneas de Alto Impacto</span>
+                        </div>
+                        <p class="text-xs text-slate-500">BBQ aporta tarifa premium ($29/u). Almacenes y showrooms emergen con fuerza desde 2024 multiplicándose por ×6.</p>
+                        <div class="space-y-1.5 pt-1 text-xs">
+                            <div class="flex justify-between items-center py-0.5 border-b border-slate-100">
+                                <span class="font-bold text-slate-700">BBQ Total Acumulado:</span>
+                                <span class="font-mono font-bold text-amber-700">$${(1363 + 2175 + 2451 + grandBbq).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5 border-b border-slate-100">
+                                <span class="font-bold text-slate-700">BBQ 2026 En Vivo:</span>
+                                <span class="font-mono font-bold text-amber-900">$${grandBbq.toLocaleString('en-US', {minimumFractionDigits: 2})} (${grandBbqU} parrillas)</span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5 border-b border-slate-100">
+                                <span class="font-bold text-slate-700">Almacén 2026 En Vivo:</span>
+                                <span class="font-mono font-bold text-purple-700">$${grandAlm.toLocaleString('en-US', {minimumFractionDigits: 2})} (${grandAlmU} exhib.)</span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="font-bold text-slate-700">Crecimiento Almacén vs 2024:</span>
+                                <span class="font-mono font-bold text-emerald-600">▲ +${((grandAlm - 210) / 210 * 100).toFixed(0)}% (×6 expansión)</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 9. Renderizar Gráficos SVG Dinámicos
+            // Chart A: Barras Comparativas Anuales
+            const chartAnnualEl = document.getElementById('histChartAnnualContainer');
+            if (chartAnnualEl) {
+                const maxValChart = Math.max(42000, Math.ceil(fact2026 / 5000) * 5000 + 5000);
+                const scaleY = (val) => (val / maxValChart) * 200;
+
+                const h23 = scaleY(12782.25);
+                const h24 = scaleY(26546.25);
+                const h25 = scaleY(30732.00);
+                const h26 = scaleY(fact2026);
+
+                const y23 = 240 - h23;
+                const y24 = 240 - h24;
+                const y25 = 240 - h25;
+                const y26 = 240 - h26;
+
+                chartAnnualEl.innerHTML = `
+                    <svg viewBox="0 0 700 290" style="width:100%; height:auto;">
+                        <line x1="70" y1="240" x2="660" y2="240" stroke="#cbd5e1" stroke-width="1.5"/>
+                        <line x1="70" y1="190" x2="660" y2="190" stroke="#f1f5f9" stroke-width="1"/>
+                        <line x1="70" y1="140" x2="660" y2="140" stroke="#f1f5f9" stroke-width="1"/>
+                        <line x1="70" y1="90"  x2="660" y2="90"  stroke="#f1f5f9" stroke-width="1"/>
+                        <line x1="70" y1="40"  x2="660" y2="40"  stroke="#f1f5f9" stroke-width="1"/>
+
+                        <text x="65" y="244" font-size="10" fill="#94a3b8" text-anchor="end">$0</text>
+                        <text x="65" y="194" font-size="10" fill="#94a3b8" text-anchor="end">$${Math.round(maxValChart*0.25/1000)}k</text>
+                        <text x="65" y="144" font-size="10" fill="#94a3b8" text-anchor="end">$${Math.round(maxValChart*0.5/1000)}k</text>
+                        <text x="65" y="94"  font-size="10" fill="#94a3b8" text-anchor="end">$${Math.round(maxValChart*0.75/1000)}k</text>
+                        <text x="65" y="44"  font-size="10" fill="#94a3b8" text-anchor="end">$${Math.round(maxValChart/1000)}k</text>
+
+                        <!-- Barra 2023 -->
+                        <rect x="105" y="${y23}" width="88" height="${h23}" fill="#94a3b8" rx="6"/>
+                        <text x="149" y="${y23 - 8}" font-size="11" font-weight="700" fill="#475569" text-anchor="middle">$12,782</text>
+                        <text x="149" y="258" font-size="12" fill="#64748b" text-anchor="middle" font-weight="700">2023</text>
+                        <text x="149" y="272" font-size="10" fill="#94a3b8" text-anchor="middle">652 serv.</text>
+
+                        <!-- Flecha 1 -->
+                        <text x="217" y="145" font-size="16" fill="#059669" text-anchor="middle">▲</text>
+                        <text x="217" y="160" font-size="10" font-weight="700" fill="#059669" text-anchor="middle">+108%</text>
+
+                        <!-- Barra 2024 -->
+                        <rect x="245" y="${y24}" width="88" height="${h24}" fill="#3b82f6" rx="6"/>
+                        <text x="289" y="${y24 - 8}" font-size="11" font-weight="700" fill="#1e40af" text-anchor="middle">$26,546</text>
+                        <text x="289" y="258" font-size="12" fill="#1e40af" text-anchor="middle" font-weight="700">2024</text>
+                        <text x="289" y="272" font-size="10" fill="#94a3b8" text-anchor="middle">1,349 serv.</text>
+
+                        <!-- Flecha 2 -->
+                        <text x="357" y="105" font-size="16" fill="#059669" text-anchor="middle">▲</text>
+                        <text x="357" y="120" font-size="10" font-weight="700" fill="#059669" text-anchor="middle">+16%</text>
+
+                        <!-- Barra 2025 -->
+                        <rect x="385" y="${y25}" width="88" height="${h25}" fill="#10b981" rx="6"/>
+                        <text x="429" y="${y25 - 8}" font-size="11" font-weight="700" fill="#047857" text-anchor="middle">$30,732</text>
+                        <text x="429" y="258" font-size="12" fill="#047857" text-anchor="middle" font-weight="700">2025</text>
+                        <text x="429" y="272" font-size="10" fill="#94a3b8" text-anchor="middle">1,597 serv.</text>
+
+                        <!-- Flecha 3 -->
+                        <text x="497" y="85" font-size="16" fill="#f59e0b" text-anchor="middle">▲</text>
+                        <text x="497" y="100" font-size="10" font-weight="700" fill="#b45309" text-anchor="middle">+${growth2026Vs2025.toFixed(0)}%</text>
+
+                        <!-- Barra 2026 -->
+                        <rect x="525" y="${y26}" width="88" height="${h26}" fill="#f59e0b" rx="6"/>
+                        <text x="569" y="${y26 - 22}" font-size="16" text-anchor="middle">👑</text>
+                        <text x="569" y="${y26 - 6}" font-size="12" font-weight="800" fill="#92400e" text-anchor="middle">$${Math.round(fact2026).toLocaleString()}</text>
+                        <text x="569" y="258" font-size="12" fill="#92400e" text-anchor="middle" font-weight="800">2026 ⭐</text>
+                        <text x="569" y="272" font-size="10" fill="#94a3b8" text-anchor="middle">${units2026} serv. (En Vivo)</text>
+                    </svg>
+                `;
+            }
+
+            // Chart B: Evolución Mensual Multi-Línea
+            const chartLinesEl = document.getElementById('histChartLinesContainer');
+            if (chartLinesEl) {
+                const maxValLine = 4000;
+                const scaleLineY = (val) => 240 - (val / maxValLine) * 190;
+                const stepX = (670 - 70) / 11;
+                const getX = (idx) => 70 + idx * stepX;
+
+                const pts23 = HISTORICO_ANUAL_TEKA[2023].monthlyFact.map((v, i) => `${getX(i)},${scaleLineY(v)}`).join(' ');
+                const pts24 = HISTORICO_ANUAL_TEKA[2024].monthlyFact.map((v, i) => `${getX(i)},${scaleLineY(v)}`).join(' ');
+                const pts25 = HISTORICO_ANUAL_TEKA[2025].monthlyFact.map((v, i) => `${getX(i)},${scaleLineY(v)}`).join(' ');
+
+                const pts26Arr = [];
+                monthly2026.forEach((v, i) => {
+                    if (v !== null) pts26Arr.push({ x: getX(i), y: scaleLineY(v), val: v, month: MONTH_NAMES[i] });
+                });
+                const pts26Str = pts26Arr.map(p => `${p.x},${p.y}`).join(' ');
+
+                let dots26Html = '';
+                pts26Arr.forEach((p, idx) => {
+                    const isLast = (idx === pts26Arr.length - 1);
+                    dots26Html += `
+                        <circle cx="${p.x}" cy="${p.y}" r="${isLast ? 6 : 4}" fill="#f59e0b" stroke="#ffffff" stroke-width="2"/>
+                        ${isLast ? `<text x="${p.x}" y="${p.y - 10}" font-size="10" font-weight="800" fill="#92400e" text-anchor="middle">$${Math.round(p.val)} (En Vivo)</text>` : ''}
+                    `;
+                });
+
+                let xLabelsHtml = '';
+                MONTH_NAMES.forEach((m, i) => {
+                    xLabelsHtml += `<text x="${getX(i)}" y="258" font-size="10" fill="#64748b" text-anchor="middle">${m.substring(0, 3)}</text>`;
+                });
+
+                chartLinesEl.innerHTML = `
+                    <svg viewBox="0 0 720 280" style="width:100%; height:auto;">
+                        <line x1="60" y1="240" x2="680" y2="240" stroke="#cbd5e1" stroke-width="1"/>
+                        <line x1="60" y1="192" x2="680" y2="192" stroke="#f1f5f9" stroke-width="1"/>
+                        <line x1="60" y1="145" x2="680" y2="145" stroke="#f1f5f9" stroke-width="1"/>
+                        <line x1="60" y1="97"  x2="680" y2="97"  stroke="#f1f5f9" stroke-width="1"/>
+                        <line x1="60" y1="50"  x2="680" y2="50"  stroke="#f1f5f9" stroke-width="1"/>
+
+                        <text x="55" y="244" font-size="10" fill="#94a3b8" text-anchor="end">$0</text>
+                        <text x="55" y="196" font-size="10" fill="#94a3b8" text-anchor="end">$1,000</text>
+                        <text x="55" y="149" font-size="10" fill="#94a3b8" text-anchor="end">$2,000</text>
+                        <text x="55" y="101" font-size="10" fill="#94a3b8" text-anchor="end">$3,000</text>
+                        <text x="55" y="54"  font-size="10" fill="#94a3b8" text-anchor="end">$4,000</text>
+                        ${xLabelsHtml}
+
+                        <!-- Líneas -->
+                        <polyline points="${pts23}" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="5,4"/>
+                        <polyline points="${pts24}" fill="none" stroke="#3b82f6" stroke-width="2.5"/>
+                        <polyline points="${pts25}" fill="none" stroke="#10b981" stroke-width="2.5"/>
+                        <polyline points="${pts26Str}" fill="none" stroke="#f59e0b" stroke-width="3.5"/>
+
+                        <!-- Puntos 2026 -->
+                        ${dots26Html}
+
+                        <!-- Leyenda -->
+                        <g transform="translate(80, 16)">
+                            <line x1="0" y1="6" x2="16" y2="6" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4,3"/>
+                            <text x="22" y="10" font-size="11" fill="#64748b" font-weight="600">2023</text>
+                            <line x1="70" y1="6" x2="86" y2="6" stroke="#3b82f6" stroke-width="2.5"/>
+                            <text x="92" y="10" font-size="11" fill="#1e40af" font-weight="600">2024</text>
+                            <line x1="140" y1="6" x2="156" y2="6" stroke="#10b981" stroke-width="2.5"/>
+                            <text x="162" y="10" font-size="11" fill="#047857" font-weight="600">2025</text>
+                            <line x1="210" y1="6" x2="226" y2="6" stroke="#f59e0b" stroke-width="3.5"/>
+                            <text x="232" y="10" font-size="11" fill="#92400e" font-weight="800">2026 (En Vivo)</text>
+                        </g>
+                    </svg>
+                `;
+            }
+
+            // Chart C: Composición por Categoría Apilada (%)
+            const chartStackedEl = document.getElementById('histChartStackedContainer');
+            if (chartStackedEl) {
+                const t26 = fact2026 > 0 ? fact2026 : 1;
+                const pctP26 = (grandProm / t26 * 100);
+                const pctU26 = (grandUnp / t26 * 100);
+                const pctG26 = (grandGar / t26 * 100);
+                const pctB26 = (grandBbq / t26 * 100);
+                const pctA26 = (grandAlm / t26 * 100);
+
+                chartStackedEl.innerHTML = `
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                        <div>
+                            <div class="font-bold text-xs text-slate-600 mb-2">2023</div>
+                            <svg viewBox="0 0 100 180" class="w-20 mx-auto">
+                                <rect x="20" y="0"   width="60" height="98" fill="#94a3b8" rx="3"/>
+                                <rect x="20" y="100" width="60" height="46" fill="#10b981" rx="3"/>
+                                <rect x="20" y="148" width="60" height="18" fill="#ef4444" rx="3"/>
+                                <rect x="20" y="168" width="60" height="12" fill="#f59e0b" rx="3"/>
+                                <text x="50" y="55" font-size="11" font-weight="700" fill="white" text-anchor="middle">54%</text>
+                                <text x="50" y="127" font-size="10" font-weight="700" fill="white" text-anchor="middle">25%</text>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-blue-800 mb-2">2024</div>
+                            <svg viewBox="0 0 100 180" class="w-20 mx-auto">
+                                <rect x="20" y="0"   width="60" height="99"  fill="#3b82f6" rx="3"/>
+                                <rect x="20" y="101" width="60" height="53"  fill="#10b981" rx="3"/>
+                                <rect x="20" y="156" width="60" height="12"  fill="#ef4444" rx="3"/>
+                                <rect x="20" y="170" width="60" height="10"  fill="#f59e0b" rx="3"/>
+                                <text x="50" y="55" font-size="11" font-weight="700" fill="white" text-anchor="middle">55%</text>
+                                <text x="50" y="132" font-size="10" font-weight="700" fill="white" text-anchor="middle">29%</text>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-emerald-800 mb-2">2025 ⭐</div>
+                            <svg viewBox="0 0 100 180" class="w-20 mx-auto">
+                                <rect x="20" y="0"   width="60" height="94"  fill="#10b981" rx="3"/>
+                                <rect x="20" y="96"  width="60" height="46"  fill="#34d399" rx="3"/>
+                                <rect x="20" y="144" width="60" height="12"  fill="#ef4444" rx="3"/>
+                                <rect x="20" y="158" width="60" height="14"  fill="#f59e0b" rx="3"/>
+                                <rect x="20" y="174" width="60" height="6"   fill="#8b5cf6" rx="2"/>
+                                <text x="50" y="52" font-size="11" font-weight="700" fill="white" text-anchor="middle">52%</text>
+                                <text x="50" y="123" font-size="10" font-weight="700" fill="white" text-anchor="middle">26%</text>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-amber-900 mb-2">2026 (En Vivo)</div>
+                            <svg viewBox="0 0 100 180" class="w-20 mx-auto">
+                                <rect x="20" y="0" width="60" height="${(pctP26*1.7).toFixed(0)}" fill="#f59e0b" rx="3"/>
+                                <rect x="20" y="${(pctP26*1.7 + 2).toFixed(0)}" width="60" height="${(pctU26*1.7).toFixed(0)}" fill="#10b981" rx="3"/>
+                                <rect x="20" y="${((pctP26+pctU26)*1.7 + 4).toFixed(0)}" width="60" height="${(pctG26*1.7).toFixed(0)}" fill="#ef4444" rx="3"/>
+                                <rect x="20" y="${((pctP26+pctU26+pctG26)*1.7 + 6).toFixed(0)}" width="60" height="${(pctB26*1.7).toFixed(0)}" fill="#ea580c" rx="3"/>
+                                <rect x="20" y="${((pctP26+pctU26+pctG26+pctB26)*1.7 + 8).toFixed(0)}" width="60" height="${Math.max(4, (pctA26*1.7).toFixed(0))}" fill="#8b5cf6" rx="2"/>
+                                <text x="50" y="52" font-size="11" font-weight="700" fill="white" text-anchor="middle">${pctP26.toFixed(0)}%</text>
+                                <text x="50" y="${(pctP26*1.7 + 24).toFixed(0)}" font-size="10" font-weight="700" fill="white" text-anchor="middle">${pctU26.toFixed(0)}%</text>
+                            </svg>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 10. Renderizar Proyecciones de Cierre 2026 en Tiempo Real
+            const projEl = document.getElementById('histProjectionsContainer');
+            if (projEl) {
+                const remainingMonths = Math.max(0, 12 - completedMonths2026);
+                const projConservadora = fact2026 + (remainingMonths * 1700);
+                const projEsperada = fact2026 + (remainingMonths * avgMonth2026);
+                const projOptimista = fact2026 + (remainingMonths * (maxM2026.val > 0 ? maxM2026.val : 3719.25));
+
+                projEl.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-amber-50/80 border border-amber-200 rounded-xl p-4 text-center">
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-800">Escenario Conservador</div>
+                            <div class="text-2xl font-black text-amber-900 mt-1">$${Math.round(projConservadora).toLocaleString()}</div>
+                            <div class="text-[11px] text-amber-700 mt-1">Si los ${remainingMonths} meses restantes promedian $1,700 (baja estacional histórica)</div>
+                        </div>
+                        <div class="bg-emerald-50 border-2 border-emerald-500 rounded-xl p-4 text-center shadow-sm relative">
+                            <span class="absolute -top-2.5 right-4 bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Más Probable</span>
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Escenario Esperado ⭐</div>
+                            <div class="text-2xl font-black text-emerald-900 mt-1">$${Math.round(projEsperada).toLocaleString()}</div>
+                            <div class="text-[11px] text-emerald-700 mt-1">Manteniendo el ritmo actual de <strong>$${Math.round(avgMonth2026).toLocaleString()}/mes</strong></div>
+                        </div>
+                        <div class="bg-blue-50/80 border border-blue-200 rounded-xl p-4 text-center">
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-blue-800">Escenario Optimista</div>
+                            <div class="text-2xl font-black text-blue-900 mt-1">$${Math.round(projOptimista).toLocaleString()}+</div>
+                            <div class="text-[11px] text-blue-700 mt-1">Si se repite un pico fuerte similar al mes récord de $${Math.round(maxM2026.val > 0 ? maxM2026.val : 3719)}</div>
+                        </div>
+                    </div>
+                    <div class="mt-3.5 p-3 bg-amber-50/60 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-center gap-2">
+                        <span class="text-base">🏆</span>
+                        <div><strong>2026 ya es el nuevo récord histórico</strong> con $${fact2026.toLocaleString('en-US', {minimumFractionDigits: 2})} acumulados en ${completedMonths2026} meses completados, superando el récord anterior de todo 2025 ($30,732.00).</div>
+                    </div>
+                `;
+            }
+        }
+        window.renderDashboardHistoricoComparativo = renderDashboardHistoricoComparativo;
 
         // =========================================================================
         // CONTROLADOR REPORTE MENSUAL OFICIAL TEKA (CORTE AL DÍA 19 DE CADA MES)
@@ -13724,15 +14477,277 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
 
                     <!-- PESTAÑAS INTERNAS DEL DASHBOARD -->
                     <div class="dash-tabs">
-                        <button class="dash-tab-btn active" onclick="switchDashTab('dash-tab-comparativa', event)">📊 Comparativa Mensual Completa (Ciclos 20 al 19)</button>
+                        <button class="dash-tab-btn active" id="btnDashHistorico" onclick="switchDashTab('dash-tab-historico', event)">🗓️ Comparativo 2023 – Hasta Hoy <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">En Vivo</span></button>
+                        <button class="dash-tab-btn" onclick="switchDashTab('dash-tab-comparativa', event)">📊 Ciclos Mensuales Detallados (20 al 19)</button>
                         <button class="dash-tab-btn" onclick="switchDashTab('dash-tab-graficas', event)">📈 Gráficas y Distribución</button>
                         <button class="dash-tab-btn" onclick="switchDashTab('dash-tab-productos', event)">🏆 Productos que Más se Repiten</button>
                         <button class="dash-tab-btn" onclick="switchDashTab('dash-tab-canales', event)">🏬 Canales de Venta y Tiendas</button>
                         <button class="dash-tab-btn" onclick="switchDashTab('dash-tab-conclusiones', event)">💡 Hallazgos y Conclusiones</button>
                     </div>
 
-                    <!-- SUB-TAB 1: COMPARATIVA MENSUAL -->
-                    <div id="dash-tab-comparativa" class="dash-tab-content active">
+                    <!-- SUB-TAB HISTÓRICO: COMPARATIVO 2023 - HASTA HOY (EN VIVO) -->
+                    <div id="dash-tab-historico" class="dash-tab-content active space-y-6">
+                        <!-- BANNER EN VIVO -->
+                        <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-5 shadow-lg border border-slate-700/60">
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div>
+                                    <div class="flex items-center gap-2.5 mb-1.5 flex-wrap">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                            <span class="relative flex h-2 w-2">
+                                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                            </span>
+                                            Sincronización en Tiempo Real
+                                        </span>
+                                        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white/10 text-slate-200">
+                                            Base Histórica Oficial 2023–2025 + En Vivo FIX Gestión 2026
+                                        </span>
+                                    </div>
+                                    <h3 class="text-lg md:text-xl font-black tracking-tight text-white flex items-center gap-2">
+                                        🗓️ ESTADÍSTICAS COMPARATIVAS MULTI-AÑO (2023 – HASTA HOY)
+                                    </h3>
+                                    <p class="text-xs text-slate-300 mt-1 max-w-3xl">
+                                        Evolución histórica consolidada de ventas y servicios técnicos TEKA Ecuador. Todos los servicios de 2026 se actualizan en vivo al registrarse en FIX Gestión.
+                                    </p>
+                                </div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <button onclick="renderDashboardTotales()" class="btn-dash bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow-sm flex items-center gap-1.5 transition-all">
+                                        🔄 Recalcular En Vivo
+                                    </button>
+                                    <button onclick="window.print()" class="btn-dash bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-3 rounded-lg text-xs shadow-sm flex items-center gap-1.5 transition-all">
+                                        🖨️ Imprimir Reporte
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Mini Badges Bar -->
+                            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-4 pt-4 border-t border-slate-700/60 text-xs">
+                                <div class="bg-white/5 rounded-lg p-2.5 border border-white/10">
+                                    <div class="text-[10px] text-slate-400 uppercase font-bold">2023 (Año Base)</div>
+                                    <div class="font-mono font-bold text-slate-200 text-sm mt-0.5">$12,782.25</div>
+                                    <div class="text-[10px] text-slate-400">652 servicios</div>
+                                </div>
+                                <div class="bg-white/5 rounded-lg p-2.5 border border-blue-500/30">
+                                    <div class="text-[10px] text-blue-300 uppercase font-bold">2024 (Salto ×2)</div>
+                                    <div class="font-mono font-bold text-blue-300 text-sm mt-0.5">$26,546.25</div>
+                                    <div class="text-[10px] text-blue-200">1,349 servicios</div>
+                                </div>
+                                <div class="bg-white/5 rounded-lg p-2.5 border border-emerald-500/30">
+                                    <div class="text-[10px] text-emerald-300 uppercase font-bold">2025 (Récord Previo)</div>
+                                    <div class="font-mono font-bold text-emerald-300 text-sm mt-0.5">$30,732.00</div>
+                                    <div class="text-[10px] text-emerald-200">1,597 servicios</div>
+                                </div>
+                                <div class="bg-amber-500/10 rounded-lg p-2.5 border border-amber-400/50">
+                                    <div class="text-[10px] text-amber-300 uppercase font-bold flex items-center justify-between">
+                                        <span>2026 (En Vivo)</span>
+                                        <span class="text-[9px] bg-amber-400/20 text-amber-300 px-1 rounded">RÉCORD ⭐</span>
+                                    </div>
+                                    <div class="font-mono font-black text-amber-300 text-sm mt-0.5" id="histLiveHeroFact2026">$34,237.00</div>
+                                    <div class="text-[10px] text-amber-200" id="histLiveHeroServ2026">~1,795 servicios</div>
+                                </div>
+                                <div class="bg-blue-600/20 rounded-lg p-2.5 border border-blue-400/40">
+                                    <div class="text-[10px] text-blue-200 uppercase font-bold">Total Acumulado</div>
+                                    <div class="font-mono font-black text-white text-sm mt-0.5" id="histLiveHeroTotalHist">$104,297.50</div>
+                                    <div class="text-[10px] text-blue-200">2023–2026 Consolidado</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 5 KPI CARDS HISTÓRICAS -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                            <div class="kpi-card kpi-2023">
+                                <div class="kpi-label">📅 2023 — Año Base</div>
+                                <div class="kpi-val text-slate-800">$12,782.25</div>
+                                <div class="kpi-sub">652 serv. | Prom. $19.6/serv.</div>
+                                <div><span class="growth-pill g-neutral">Referencia Histórica</span></div>
+                            </div>
+                            <div class="kpi-card kpi-2024">
+                                <div class="kpi-label">📅 2024 — Crecimiento ×2</div>
+                                <div class="kpi-val text-blue-900">$26,546.25</div>
+                                <div class="kpi-sub">1,349 serv. | Prom. $19.7/serv.</div>
+                                <div><span class="growth-pill g-up">▲ +107.7% vs 2023</span></div>
+                            </div>
+                            <div class="kpi-card kpi-2025">
+                                <div class="kpi-label">📅 2025 — Récord Previo</div>
+                                <div class="kpi-val text-emerald-800">$30,732.00</div>
+                                <div class="kpi-sub">1,597 serv. | Prom. $19.2/serv.</div>
+                                <div><span class="growth-pill g-up">▲ +15.8% vs 2024</span></div>
+                            </div>
+                            <div class="kpi-card kpi-2026 border-amber-300 shadow-amber-50">
+                                <div class="kpi-label text-amber-800 flex items-center justify-between">
+                                    <span>📅 2026 — En Vivo</span>
+                                    <span class="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-bold">EN VIVO</span>
+                                </div>
+                                <div class="kpi-val text-amber-900 font-black" id="kpiHist2026Val">$34,237.00</div>
+                                <div class="kpi-sub" id="kpiHist2026Sub">~1,795 serv. | Prom. $19.1/serv.</div>
+                                <div><span id="kpiHist2026Growth" class="growth-pill g-up">▲ +11.4% vs 2025 ⭐ NUEVO RÉCORD</span></div>
+                            </div>
+                            <div class="kpi-card kpi-total border-slate-300">
+                                <div class="kpi-label text-slate-900">🏆 Total Acumulado</div>
+                                <div class="kpi-val text-blue-950 font-black" id="kpiHistTotalVal">$104,297.50</div>
+                                <div class="kpi-sub" id="kpiHistTotalSub">~5,393 servicios totales</div>
+                                <div><span id="kpiHistTotalGrowth" class="growth-pill g-up">▲ ×8.2 vs año base 2023</span></div>
+                            </div>
+                        </div>
+
+                        <!-- TABLA MAESTRA COMPARATIVA ANUAL -->
+                        <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                            <div class="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center flex-wrap gap-2">
+                                <div>
+                                    <h4 class="font-bold text-sm text-slate-900 flex items-center gap-2">
+                                        📊 Resumen Comparativo Anual Consolidado (2023 – Hasta Hoy)
+                                    </h4>
+                                    <p class="text-xs text-slate-500 mt-0.5">Indicadores clave de rendimiento anual, variación porcentual y ticket promedio</p>
+                                </div>
+                                <span class="pill pill-green font-bold text-xs">Actualizado al instante</span>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-100 text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
+                                            <th class="p-3">MÉTRICA</th>
+                                            <th class="p-3 text-right yr-2023">📅 2023</th>
+                                            <th class="p-3 text-right yr-2024">📅 2024</th>
+                                            <th class="p-3 text-right yr-2025">📅 2025</th>
+                                            <th class="p-3 text-right yr-2026">📅 2026 (En Vivo) ⭐</th>
+                                            <th class="p-3 text-right bg-slate-200 text-slate-800">CRECIMIENTO TOTAL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="histSummaryTableBody" class="divide-y divide-slate-200 text-slate-800">
+                                        <!-- Renderizado dinámicamente -->
+                                    </tbody>
+                                    <tfoot id="histSummaryTableFoot">
+                                        <!-- Renderizado dinámicamente -->
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- MATRIZ COMPARATIVA MENSUAL MES A MES -->
+                        <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                            <div class="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center flex-wrap gap-2">
+                                <div>
+                                    <h4 class="font-bold text-sm text-slate-900 flex items-center gap-2">
+                                        📅 Matriz Mensual Multi-Año (Enero a Diciembre: 2023 vs 2024 vs 2025 vs 2026)
+                                    </h4>
+                                    <p class="text-xs text-slate-500 mt-0.5">Comparativa directa mes a mes con barras de tendencia visual en tiempo real</p>
+                                </div>
+                                <div class="flex items-center gap-3 text-xs text-slate-600">
+                                    <span class="flex items-center gap-1.5"><span class="dot" style="background:var(--c2023)"></span> 2023</span>
+                                    <span class="flex items-center gap-1.5"><span class="dot" style="background:var(--c2024)"></span> 2024</span>
+                                    <span class="flex items-center gap-1.5"><span class="dot" style="background:var(--c2025)"></span> 2025</span>
+                                    <span class="flex items-center gap-1.5"><span class="dot" style="background:var(--c2026)"></span> 2026 (Vivo)</span>
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-100 text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
+                                            <th class="p-3">MES</th>
+                                            <th class="p-3 text-right yr-2023">2023 ($ y serv.)</th>
+                                            <th class="p-3 text-right yr-2024">2024 ($ y serv.)</th>
+                                            <th class="p-3 text-right yr-2025">2025 ($ y serv.)</th>
+                                            <th class="p-3 text-right yr-2026">2026 (En Vivo) *</th>
+                                            <th class="p-3 text-center w-36">Tendencia Visual</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="histMonthlyMatrixBody" class="divide-y divide-slate-200 text-slate-800">
+                                        <!-- Renderizado dinámicamente -->
+                                    </tbody>
+                                    <tfoot id="histMonthlyMatrixFoot">
+                                        <!-- Renderizado dinámicamente -->
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- GRÁFICOS COMPARATIVOS DINÁMICOS -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <!-- Gráfico 1: Barras Comparativas Anuales -->
+                            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                                <h4 class="font-bold text-sm text-slate-900 mb-1">Facturación Anual Total ($) — Barras Comparativas</h4>
+                                <p class="text-xs text-slate-500 mb-3">Evolución anual completa con porcentajes de crecimiento e indicador de récord</p>
+                                <div id="histChartAnnualContainer"></div>
+                            </div>
+                            
+                            <!-- Gráfico 2: Líneas de Tendencia Mensual Multi-Año -->
+                            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                                <h4 class="font-bold text-sm text-slate-900 mb-1">Evolución Mensual Comparada (Líneas de Tendencia)</h4>
+                                <p class="text-xs text-slate-500 mb-3">Curvas de estacionalidad mes a mes para 2023, 2024, 2025 y 2026 en vivo</p>
+                                <div id="histChartLinesContainer" class="overflow-x-auto"></div>
+                            </div>
+                        </div>
+
+                        <!-- DESGLOSE POR CATEGORÍA Y COMPOSICIÓN -->
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="lg:col-span-2 space-y-4">
+                                <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                                    <h4 class="font-bold text-sm text-slate-900 mb-1">Evolución de Ingresos por Categoría de Servicio (2023 – 2026)</h4>
+                                    <p class="text-xs text-slate-500 mb-4">Progreso interanual en Promociones, Un Producto, Garantías, BBQ y Almacén</p>
+                                    <div id="histCategoriesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                                </div>
+                            </div>
+
+                            <!-- Gráfico 3: Composición Apilada % -->
+                            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+                                <div>
+                                    <h4 class="font-bold text-sm text-slate-900 mb-1">Composición % por Categoría por Año</h4>
+                                    <p class="text-xs text-slate-500 mb-4">Participación porcentual de cada línea en la facturación anual</p>
+                                    <div id="histChartStackedContainer" class="py-2"></div>
+                                </div>
+                                <div class="pt-4 border-t border-slate-100 flex flex-wrap gap-2 text-[11px]">
+                                    <span class="flex items-center gap-1 font-semibold text-blue-800"><span class="w-2.5 h-2.5 rounded bg-blue-500 inline-block"></span>Promociones</span>
+                                    <span class="flex items-center gap-1 font-semibold text-emerald-800"><span class="w-2.5 h-2.5 rounded bg-emerald-500 inline-block"></span>Un Producto</span>
+                                    <span class="flex items-center gap-1 font-semibold text-rose-800"><span class="w-2.5 h-2.5 rounded bg-rose-500 inline-block"></span>Garantías</span>
+                                    <span class="flex items-center gap-1 font-semibold text-amber-800"><span class="w-2.5 h-2.5 rounded bg-amber-500 inline-block"></span>BBQ</span>
+                                    <span class="flex items-center gap-1 font-semibold text-purple-800"><span class="w-2.5 h-2.5 rounded bg-purple-500 inline-block"></span>Almacén</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PROYECCIONES DE CIERRE 2026 -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                            <h4 class="font-bold text-sm text-slate-900 mb-1">📊 Proyección Dinámica de Cierre de Año 2026 en Tiempo Real</h4>
+                            <p class="text-xs text-slate-500 mb-4">Estimaciones de facturación anual total calculadas automáticamente según el promedio real $/mes acumulado</p>
+                            <div id="histProjectionsContainer"></div>
+                        </div>
+
+                        <!-- CONCLUSIONES Y HALLAZGOS ESTRATÉGICOS -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                            <h4 class="font-bold text-sm text-slate-900 mb-1">💡 Conclusiones y Hallazgos Clave de la Serie Histórica</h4>
+                            <p class="text-xs text-slate-500 mb-4">Análisis del comportamiento de ventas y asistencias técnicas de Cristian Capelo (TEKA Ecuador)</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div class="bg-slate-50 border-l-4 border-emerald-500 rounded-lg p-4">
+                                    <h5 class="font-bold text-slate-900 text-xs mb-1">🚀 Salto Exponencial 2023 → 2024 (+107.7%)</h5>
+                                    <p class="text-xs text-slate-600">La facturación se duplicó de $12,782 a $26,546 al consolidar la cobertura técnica con Comercial Solis, Marcimex y Kywi.</p>
+                                </div>
+                                <div class="bg-slate-50 border-l-4 border-emerald-500 rounded-lg p-4">
+                                    <h5 class="font-bold text-slate-900 text-xs mb-1">⭐ Récord Consolidado de 2025 ($30,732)</h5>
+                                    <p class="text-xs text-slate-600">Crecimiento sostenido del +15.8% sobre 2024, alcanzando su pico en Septiembre 2025 con $3,284 en un solo mes.</p>
+                                </div>
+                                <div class="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-4">
+                                    <h5 class="font-bold text-amber-950 text-xs mb-1">👑 2026: Récord Histórico Absoluto en Curso</h5>
+                                    <p class="text-xs text-slate-600">Con el acumulado actual, 2026 ya superó todo el 2025, manteniendo un promedio récord de más de $3,400 por mes.</p>
+                                </div>
+                                <div class="bg-slate-50 border-l-4 border-blue-500 rounded-lg p-4">
+                                    <h5 class="font-bold text-slate-900 text-xs mb-1">🎯 Eficiencia: Ticket Promedio Estable ≈ $19.3</h5>
+                                    <p class="text-xs text-slate-600">A pesar de multiplicar por casi ×3 el número de servicios, la rentabilidad media por equipo instalado se mantiene intacta.</p>
+                                </div>
+                                <div class="bg-slate-50 border-l-4 border-purple-500 rounded-lg p-4">
+                                    <h5 class="font-bold text-slate-900 text-xs mb-1">🏢 Almacén: Canal de Rápida Expansión (×6)</h5>
+                                    <p class="text-xs text-slate-600">De 0 en 2023 a 13 exhibiciones en 2024, 25 en 2025 y más de 56 en 2026, convirtiéndose en un ingreso recurrente sólido.</p>
+                                </div>
+                                <div class="bg-slate-50 border-l-4 border-rose-500 rounded-lg p-4">
+                                    <h5 class="font-bold text-slate-900 text-xs mb-1">🛡️ Garantías: Reducción del 9.8% al 6%</h5>
+                                    <p class="text-xs text-slate-600">La caída en el peso relativo de garantías evidencia una excelente calidad de instalación inicial y menor tasa de re-visitas.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SUB-TAB 1: COMPARATIVA MENSUAL DETALLADA (CICLOS 20 AL 19) -->
+                    <div id="dash-tab-comparativa" class="dash-tab-content">
                         <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
                             <table class="w-full text-left text-xs">
                                 <thead>

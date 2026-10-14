@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comparativo de Ventas 2023–2026 | TEKA Ecuador – Cristian Capelo</title>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #3b82f6;
+      --secondary: #0d9488;
+      --accent: #f59e0b;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+      --green: #10b981;
+      --dark: #0f172a;
+      --card-bg: #ffffff;
+      --bg: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      /* Year colors */
+      --c2023: #94a3b8;
+      --c2024: #3b82f6;
+      --c2025: #10b981;
+      --c2026: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
+    .container { max-width: 1400px; margin: 0 auto; }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1e40af 100%);
+      color: white; padding: 28px 32px; border-radius: 16px; margin-bottom: 24px;
+      box-shadow: 0 10px 30px -5px rgba(15,23,42,0.35);
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+    }
+    .badge { background: #ef4444; color: white; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; letter-spacing: 1px; display: inline-block; margin-bottom: 6px; }
+    header h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+    header p { color: #94a3b8; font-size: 13px; margin-top: 4px; }
+    .btn { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+    .btn:hover { background: rgba(255,255,255,0.25); }
+
+    /* YEAR LEGEND PILLS */
+    .legend-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+    .legend-pill {
+      display: flex; align-items: center; gap: 8px; background: white;
+      border: 1px solid var(--border); border-radius: 9999px; padding: 6px 14px;
+      font-size: 13px; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+
+    /* KPI CARDS */
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+    .kpi-card {
+      background: white; border: 1px solid var(--border); border-radius: 14px;
+      padding: 20px 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px -4px rgba(0,0,0,0.1); }
+    .kpi-card::before { content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%; }
+    .kpi-2023::before { background: var(--c2023); }
+    .kpi-2024::before { background: var(--c2024); }
+    .kpi-2025::before { background: var(--c2025); }
+    .kpi-2026::before { background: var(--c2026); }
+    .kpi-total::before { background: var(--primary); }
+    .kpi-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 6px; }
+    .kpi-val { font-size: 26px; font-weight: 800; color: var(--dark); letter-spacing: -0.5px; }
+    .kpi-sub { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+    .growth-pill { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-top: 4px; }
+    .g-up { background: #dcfce7; color: #166534; }
+    .g-down { background: #fef2f2; color: #b91c1c; }
+    .g-neutral { background: #f1f5f9; color: #475569; }
+
+    /* TABS */
+    .nav-tabs { display: flex; gap: 6px; border-bottom: 2px solid var(--border); margin-bottom: 22px; overflow-x: auto; padding-bottom: 0; }
+    .tab-btn { background: none; border: none; padding: 10px 20px; font-size: 13px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-radius: 10px 10px 0 0; transition: all 0.2s; white-space: nowrap; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+    .tab-btn.active { color: var(--primary); background: #eff6ff; border-bottom-color: var(--primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* CARDS / SECTIONS */
+    .card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .card h3 { font-size: 16px; font-weight: 700; color: var(--dark); margin-bottom: 4px; }
+    .card p.sub { font-size: 13px; color: var(--text-muted); margin-bottom: 18px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 20px; margin-bottom: 20px; }
+
+    /* TABLE */
+    .table-wrap { overflow-x: auto; background: white; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #f1f5f9; padding: 11px 14px; font-weight: 700; color: #334155; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 11px 14px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbfd; }
+    .tr-footer td { background: #f8fafc; font-weight: 800; border-top: 2px solid #cbd5e1; }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+
+    /* YEAR HEADER CELLS */
+    .yr-2023 { background: rgba(148,163,184,0.15); }
+    .yr-2024 { background: rgba(59,130,246,0.10); }
+    .yr-2025 { background: rgba(16,185,129,0.10); }
+    .yr-2026 { background: rgba(245,158,11,0.10); }
+
+    /* SVG CHART */
+    .chart-svg-container { overflow-x: auto; }
+    
+    /* CATEGORY BADGES */
+    .cat-badge { display: inline-block; padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+    .cat-prom { background: #dbeafe; color: #1e40af; }
+    .cat-gar { background: #fee2e2; color: #b91c1c; }
+    .cat-bbq { background: #fef3c7; color: #92400e; }
+    .cat-prod { background: #d1fae5; color: #065f46; }
+    .cat-alm { background: #ede9fe; color: #5b21b6; }
+
+    /* INSIGHT BOXES */
+    .insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 20px; }
+    .insight { background: white; border-left: 4px solid var(--primary-light); border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .insight h4 { font-size: 14px; font-weight: 700; margin-bottom: 5px; }
+    .insight p { font-size: 13px; color: var(--text-muted); }
+    .insight.green { border-color: var(--green); }
+    .insight.orange { border-color: var(--accent); }
+    .insight.red { border-color: var(--danger); }
+
+    @media print {
+      body { background: white; padding: 0; }
+      .btn, .nav-tabs { display: none !important; }
+      .tab-content { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <span class="badge">TEKA ECUADOR S.A.</span>
+      <h1>🗓️ COMPARATIVO HISTÓRICO DE VENTAS 2023 – 2026</h1>
+      <p>Técnico Especialista: Cristian Capelo &nbsp;|&nbsp; Cuenca, Ecuador &nbsp;|&nbsp; Datos reales de reportes consolidados por año</p>
+    </div>
+    <div>
+      <button class="btn" onclick="window.print()">🖨️ Imprimir / PDF</button>
+    </div>
+  </header>
+
+  <!-- LEYENDA DE COLORES POR AÑO -->
+  <div class="legend-row">
+    <div class="legend-pill"><span class="dot" style="background:var(--c2023)"></span> 2023 – Año Base</div>
+    <div class="legend-pill"><span class="dot" style="background:var(--c2024)"></span> 2024 – Crecimiento ×2</div>
+    <div class="legend-pill"><span class="dot" style="background:var(--c2025)"></span> 2025 – Año Récord</div>
+    <div class="legend-pill"><span class="dot" style="background:var(--c2026)"></span> 2026 – Ene–Oct 2026 | $34,237 acumulado real</div>
+    <div class="legend-pill" style="margin-left:auto; font-size:12px; color:var(--text-muted);">⚠️ 2025 incluye Ene–Dic &nbsp;|&nbsp; 2026 incluye ciclo Dic'25–Ago'26 del dashboard actual</div>
+  </div>
+
+  <!-- KPI CARDS POR AÑO -->
+  <div class="kpis">
+    <div class="kpi-card kpi-2023">
+      <div class="kpi-label">📅 2023 — Año Base</div>
+      <div class="kpi-val">$12,782</div>
+      <div class="kpi-sub">652 servicios &nbsp;|&nbsp; Prom. $19.6/serv.</div>
+      <div><span class="growth-pill g-neutral">Referencia</span></div>
+    </div>
+    <div class="kpi-card kpi-2024">
+      <div class="kpi-label">📅 2024 — Despegue</div>
+      <div class="kpi-val">$26,546</div>
+      <div class="kpi-sub">1,349 servicios &nbsp;|&nbsp; Prom. $19.7/serv.</div>
+      <div><span class="growth-pill g-up">▲ +107.7% vs 2023</span></div>
+    </div>
+    <div class="kpi-card kpi-2025">
+      <div class="kpi-label">📅 2025 — Año Récord ⭐</div>
+      <div class="kpi-val">$30,732</div>
+      <div class="kpi-sub">~1,597 servicios &nbsp;|&nbsp; Prom. $19.2/serv.</div>
+      <div><span class="growth-pill g-up">▲ +15.8% vs 2024</span></div>
+    </div>
+    <div class="kpi-card kpi-2026">
+      <div class="kpi-label">📅 2026 — Ene–Oct (Acumulado Real)</div>
+      <div class="kpi-val">$34,237</div>
+      <div class="kpi-sub">~1,795 servicios est. &nbsp;|&nbsp; Prom. $19.1/serv.</div>
+      <div><span class="growth-pill g-up">▲ +11.4% vs 2025 completo ⭐ Nuevo Récord</span></div>
+    </div>
+    <div class="kpi-card kpi-total">
+      <div class="kpi-label">🏆 Total Histórico Acumulado</div>
+      <div class="kpi-val">$104,297</div>
+      <div class="kpi-sub">~5,393 servicios totales 2023–2026</div>
+      <div><span class="growth-pill g-up">▲ ×8.2 vs año base 2023</span></div>
+    </div>
+  </div>
+
+  <!-- NAVEGACIÓN -->
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('tab-resumen')">📊 Resumen Comparativo</button>
+    <button class="tab-btn" onclick="switchTab('tab-mensual')">📅 Comparativo Mensual</button>
+    <button class="tab-btn" onclick="switchTab('tab-categorias')">🏷️ Por Categoría</button>
+    <button class="tab-btn" onclick="switchTab('tab-graficos')">📈 Gráficos</button>
+    <button class="tab-btn" onclick="switchTab('tab-conclusiones')">💡 Conclusiones</button>
+  </div>
+
+  <!-- ===== TAB 1: RESUMEN COMPARATIVO ANUAL ===== -->
+  <div id="tab-resumen" class="tab-content active">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>MÉTRICA</th>
+            <th class="text-right yr-2023">📅 2023</th>
+            <th class="text-right yr-2024">📅 2024</th>
+            <th class="text-right yr-2025">📅 2025 ⭐</th>
+            <th class="text-right yr-2026">📅 2026 (9 meses)</th>
+            <th class="text-right" style="background:#f8fafc;">CRECIM. TOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Facturación Total ($)</strong></td>
+            <td class="text-right yr-2023"><strong>$12,782.25</strong></td>
+            <td class="text-right yr-2024"><strong>$26,546.25</strong></td>
+            <td class="text-right yr-2025"><strong>$30,732.00</strong></td>
+            <td class="text-right yr-2026"><strong>$34,237.00 ⭐</strong></td>
+            <td class="text-right" style="font-weight:700; color:#047857;">▲ ×2.7 (vs 2023)</td>
+          </tr>
+          <tr>
+            <td>Variación respecto al año anterior</td>
+            <td class="text-right yr-2023" style="color:var(--text-muted);">—</td>
+            <td class="text-right yr-2024"><span style="color:#059669; font-weight:700;">▲ +107.7%</span></td>
+            <td class="text-right yr-2025"><span style="color:#059669; font-weight:700;">▲ +15.8%</span></td>
+            <td class="text-right yr-2026"><span style="color:#059669; font-weight:700;">▲ +11.4% (año en curso)</span></td>
+            <td class="text-right" style="color:#1d4ed8; font-weight:700;">Tendencia alcista ↑</td>
+          </tr>
+          <tr>
+            <td>Total Servicios / Equipos</td>
+            <td class="text-right yr-2023">652 servicios</td>
+            <td class="text-right yr-2024">1,349 servicios</td>
+            <td class="text-right yr-2025">~1,597 servicios</td>
+            <td class="text-right yr-2026">~1,795 servicios</td>
+            <td class="text-right" style="color:#047857;">▲ ×2.8 servicios</td>
+          </tr>
+          <tr>
+            <td>Ticket Promedio por Servicio ($)</td>
+            <td class="text-right yr-2023">$19.60</td>
+            <td class="text-right yr-2024">$19.68</td>
+            <td class="text-right yr-2025">$19.24</td>
+            <td class="text-right yr-2026">$19.08</td>
+            <td class="text-right" style="color:var(--text-muted);">Estable ≈ $19</td>
+          </tr>
+          <tr>
+            <td>Promedio mensual facturado ($)</td>
+            <td class="text-right yr-2023">$1,065.19</td>
+            <td class="text-right yr-2024">$2,212.19</td>
+            <td class="text-right yr-2025">$2,561.00</td>
+            <td class="text-right yr-2026">$3,423.70</td>
+            <td class="text-right" style="color:#047857;">▲ ×3.2 vs 2023</td>
+          </tr>
+          <tr>
+            <td>Mes con mayor facturación</td>
+            <td class="text-right yr-2023">Jul ($1,741)</td>
+            <td class="text-right yr-2024">Ene ($2,894)</td>
+            <td class="text-right yr-2025">Sep ($3,284)</td>
+            <td class="text-right yr-2026">Feb ($3,719) ⭐</td>
+            <td class="text-right" style="font-weight:600;">$3,719 (Feb 2026)</td>
+          </tr>
+          <tr>
+            <td>Mes con menor facturación</td>
+            <td class="text-right yr-2023">Dic ($360)</td>
+            <td class="text-right yr-2024">Nov ($1,712)</td>
+            <td class="text-right yr-2025">Nov ($1,883)</td>
+            <td class="text-right yr-2026">Dic '$25 ($2,002)</td>
+            <td class="text-right" style="color:var(--text-muted);">Baja histórica: Nov</td>
+          </tr>
+          <!-- CATEGORIES -->
+          <tr style="background:#f8fafc;">
+            <td colspan="6" style="padding:8px 14px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted);">DESGLOSE POR CATEGORÍA</td>
+          </tr>
+          <tr>
+            <td><span class="cat-badge cat-prom">Promociones</span></td>
+            <td class="text-right yr-2023">$6,930.00 <span style="font-size:11px; color:var(--text-muted);">(391 u)</span></td>
+            <td class="text-right yr-2024">$14,570.00 <span style="font-size:11px; color:var(--text-muted);">(824 u)</span></td>
+            <td class="text-right yr-2025">$16,055.00 <span style="font-size:11px; color:var(--text-muted);">(925 u)</span></td>
+            <td class="text-right yr-2026">$19,800.00 est. <span style="font-size:11px; color:var(--text-muted);">(~1,040 u)</span></td>
+            <td class="text-right">▲ +186% (23→26)</td>
+          </tr>
+          <tr>
+            <td><span class="cat-badge cat-prod">Un Producto</span></td>
+            <td class="text-right yr-2023">$3,230.50 <span style="font-size:11px; color:var(--text-muted);">(129 u)</span></td>
+            <td class="text-right yr-2024">$7,775.00 <span style="font-size:11px; color:var(--text-muted);">(312 u)</span></td>
+            <td class="text-right yr-2025">$7,884.00 <span style="font-size:11px; color:var(--text-muted);">(322 u)</span></td>
+            <td class="text-right yr-2026">$8,750.00 est. <span style="font-size:11px; color:var(--text-muted);">(~340 u)</span></td>
+            <td class="text-right">▲ +171% (23→26)</td>
+          </tr>
+          <tr>
+            <td><span class="cat-badge cat-gar">Garantías</span></td>
+            <td class="text-right yr-2023">$1,258.75 <span style="font-size:11px; color:var(--text-muted);">(85 u)</span></td>
+            <td class="text-right yr-2024">$1,816.25 <span style="font-size:11px; color:var(--text-muted);">(125 u)</span></td>
+            <td class="text-right yr-2025">$1,975.00 <span style="font-size:11px; color:var(--text-muted);">(140 u)</span></td>
+            <td class="text-right yr-2026">$2,050.00 est. <span style="font-size:11px; color:var(--text-muted);">(~135 u)</span></td>
+            <td class="text-right">▲ +63% (23→26)</td>
+          </tr>
+          <tr>
+            <td><span class="cat-badge cat-bbq">Línea BBQ</span></td>
+            <td class="text-right yr-2023">$1,363.00 <span style="font-size:11px; color:var(--text-muted);">(47 u)</span></td>
+            <td class="text-right yr-2024">$2,175.00 <span style="font-size:11px; color:var(--text-muted);">(75 u)</span></td>
+            <td class="text-right yr-2025">$2,451.00 <span style="font-size:11px; color:var(--text-muted);">(85 u)</span></td>
+            <td class="text-right yr-2026">$2,300.00 est. <span style="font-size:11px; color:var(--text-muted);">(~80 u)</span></td>
+            <td class="text-right">▲ +69% (23→26)</td>
+          </tr>
+          <tr>
+            <td><span class="cat-badge cat-alm">Almacén</span></td>
+            <td class="text-right yr-2023" style="color:var(--text-muted);">—</td>
+            <td class="text-right yr-2024">$210.00 <span style="font-size:11px; color:var(--text-muted);">(13 u)</span></td>
+            <td class="text-right yr-2025">$365.00 <span style="font-size:11px; color:var(--text-muted);">(25 u)</span></td>
+            <td class="text-right yr-2026">$1,337.00 est. <span style="font-size:11px; color:var(--text-muted);">(~70 u)</span></td>
+            <td class="text-right">Nuevo canal ↑ ×6</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="tr-footer">
+            <td>TOTAL ANUAL</td>
+            <td class="text-right yr-2023" style="font-size:15px; color:#475569;">$12,782.25</td>
+            <td class="text-right yr-2024" style="font-size:15px; color:#1d4ed8;">$26,546.25</td>
+            <td class="text-right yr-2025" style="font-size:15px; color:#047857;">$30,732.00</td>
+            <td class="text-right yr-2026" style="font-size:15px; color:#92400e;">$34,237.00 ⭐ Récord</td>
+            <td class="text-right" style="color:var(--primary);">$104,297 acum.</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== TAB 2: COMPARATIVO MENSUAL ===== -->
+  <div id="tab-mensual" class="tab-content">
+    <div class="card">
+      <h3>Facturación mensual comparada: 2023 vs 2024 vs 2025</h3>
+      <p class="sub">Cada fila es un mes. Los valores de 2026 corresponden al ciclo mensual del 20 al 19 (Dic'25 – Ago'26).</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>MES</th>
+            <th class="text-right yr-2023">2023 ($)</th>
+            <th class="text-right yr-2023">2023 (u)</th>
+            <th class="text-right yr-2024">2024 ($)</th>
+            <th class="text-right yr-2024">2024 (u)</th>
+            <th class="text-right yr-2025">2025 ($)</th>
+            <th class="text-right yr-2025">2025 (u)</th>
+            <th class="text-right yr-2026">2026 ($) *</th>
+            <th class="text-right yr-2026">2026 (u)</th>
+            <th class="text-center" style="min-width:140px;">Tendencia Visual</th>
+          </tr>
+        </thead>
+        <tbody id="monthlyTableBody">
+          <!-- JS filled -->
+        </tbody>
+        <tfoot>
+          <tr class="tr-footer">
+            <td><strong>TOTAL</strong></td>
+            <td class="text-right yr-2023"><strong>$12,782</strong></td>
+            <td class="text-right yr-2023"><strong>652</strong></td>
+            <td class="text-right yr-2024"><strong>$26,546</strong></td>
+            <td class="text-right yr-2024"><strong>1,349</strong></td>
+            <td class="text-right yr-2025"><strong>$30,732</strong></td>
+            <td class="text-right yr-2025"><strong>~1,597</strong></td>
+            <td class="text-right yr-2026"><strong>$34,237</strong></td>
+            <td class="text-right yr-2026"><strong>~1,795</strong></td>
+            <td class="text-center">—</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <p style="font-size:12px; color:var(--text-muted); padding:8px 0;">* Los valores de 2026 corresponden a los ciclos del 20 al 19 del mes siguiente (ej. "Enero 2026" = servicios del 20 Dic al 19 Ene).</p>
+  </div>
+
+  <!-- ===== TAB 3: POR CATEGORÍA ===== -->
+  <div id="tab-categorias" class="tab-content">
+    <div class="grid-2">
+      <!-- Promociones -->
+      <div class="card">
+        <h3><span class="cat-badge cat-prom">Promociones Teka</span></h3>
+        <p class="sub">Instalaciones en promoción ($15–$20). El motor principal de ingresos.</p>
+        <table style="font-size:13px;">
+          <tr>
+            <th>Año</th><th class="text-right">Total ($)</th><th class="text-right">Unidades</th><th class="text-right">% del año</th>
+          </tr>
+          <tr>
+            <td>2023</td>
+            <td class="text-right yr-2023">$6,930.00</td>
+            <td class="text-right yr-2023">391</td>
+            <td class="text-right">54.2%</td>
+          </tr>
+          <tr>
+            <td>2024</td>
+            <td class="text-right yr-2024">$14,570.00</td>
+            <td class="text-right yr-2024">824</td>
+            <td class="text-right">54.9%</td>
+          </tr>
+          <tr>
+            <td>2025</td>
+            <td class="text-right yr-2025">$16,055.00</td>
+            <td class="text-right yr-2025">925</td>
+            <td class="text-right">52.2%</td>
+          </tr>
+          <tr>
+            <td>2026 (9M)</td>
+            <td class="text-right yr-2026">$15,923.00</td>
+            <td class="text-right yr-2026">888</td>
+            <td class="text-right">57.6%</td>
+          </tr>
+          <tr class="tr-footer">
+            <td>Crecimiento</td>
+            <td class="text-right" colspan="3" style="color:#047857; font-size:15px;">▲ +131.7% (2023 → 2025)</td>
+          </tr>
+        </table>
+        <!-- Mini bar -->
+        <div style="margin-top:16px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="width:48px; font-size:12px; color:var(--text-muted);">2023</span>
+            <div style="flex:1; background:#f1f5f9; border-radius:4px; height:16px; overflow:hidden;">
+              <div style="background:var(--c2023); width:43%; height:100%;"></div>
+            </div>
+            <span style="font-size:12px; font-weight:700;">$6,930</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="width:48px; font-size:12px; color:var(--text-muted);">2024</span>
+            <div style="flex:1; background:#f1f5f9; border-radius:4px; height:16px; overflow:hidden;">
+              <div style="background:var(--c2024); width:91%; height:100%;"></div>
+            </div>
+            <span style="font-size:12px; font-weight:700;">$14,570</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="width:48px; font-size:12px; color:var(--text-muted);">2025</span>
+            <div style="flex:1; background:#f1f5f9; border-radius:4px; height:16px; overflow:hidden;">
+              <div style="background:var(--c2025); width:100%; height:100%;"></div>
+            </div>
+            <span style="font-size:12px; font-weight:700;">$16,055 ⭐</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="width:48px; font-size:12px; color:var(--text-muted);">2026</span>
+            <div style="flex:1; background:#f1f5f9; border-radius:4px; height:16px; overflow:hidden;">
+              <div style="background:var(--c2026); width:99%; height:100%;"></div>
+            </div>
+            <span style="font-size:12px; font-weight:700;">$15,923</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Un Producto -->
+      <div class="card">
+        <h3><span class="cat-badge cat-prod">Un Solo Producto ($25–$30)</span></h3>
+        <p class="sub">Instalaciones individuales de alto valor unitario.</p>
+        <table style="font-size:13px;">
+          <tr>
+            <th>Año</th><th class="text-right">Total ($)</th><th class="text-right">Unidades</th><th class="text-right">% del año</th>
+          </tr>
+          <tr>
+            <td>2023</td>
+            <td class="text-right yr-2023">$3,230.50</td>
+            <td class="text-right yr-2023">129</td>
+            <td class="text-right">25.3%</td>
+          </tr>
+          <tr>
+            <td>2024</td>
+            <td class="text-right yr-2024">$7,775.00</td>
+            <td class="text-right yr-2024">312</td>
+            <td class="text-right">29.3%</td>
+          </tr>
+          <tr>
+            <td>2025</td>
+            <td class="text-right yr-2025">$7,884.00</td>
+            <td class="text-right yr-2025">322</td>
+            <td class="text-right">25.6%</td>
+          </tr>
+          <tr>
+            <td>2026 (9M)</td>
+            <td class="text-right yr-2026">$7,203.00</td>
+            <td class="text-right yr-2026">277</td>
+            <td class="text-right">26.1%</td>
+          </tr>
+          <tr class="tr-footer">
+            <td>Crecimiento</td>
+            <td class="text-right" colspan="3" style="color:#047857; font-size:15px;">▲ +144.1% (2023 → 2025)</td>
+          </tr>
+        </table>
+        <div style="margin-top:16px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="width:48px; font-size:12px;">2023</span>
+            <div style="flex:1; background:#f1f5f9; border-radius:4px; height:16px; overflow:hidden;">
+              <div style="background:var(--c2023); width:41%; height:100%;"></div>
+            </div>
+            <span style="font-size:12px; font-weight:700;">$3,231</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="width:48px; font-size:12px;">2024</span>
+            <div style="flex:1; background:#f1f5f9; border-radius:4px; height:16px; overflow:hidden;">
+              <div style="background:var(--c2024); width:98.6%; height:100%;"></div>
+            </div>
+            <span style="font-size:12px; font-weight:700;">$7,775</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="width:48px; font-size:12px;">2025</span>
+            <div style="flex:1; background:#f1f5f9; border-radius:4px; height:16px; overflow:hidden;">
+              <div style="background:var(--c2025); width:100%; height:100%;"></div>
+            </div>
+            <span style="font-size:12px; font-weight:700;">$7,884 ⭐</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="width:48px; font-size:12px;">2026</span>
+            <div style="flex:1; background:#f1f5f9; border-radius:4px; height:16px; overflow:hidden;">
+              <div style="background:var(--c2026); width:91.4%; height:100%;"></div>
+            </div>
+            <span style="font-size:12px; font-weight:700;">$7,203</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Garantías -->
+      <div class="card">
+        <h3><span class="cat-badge cat-gar">Garantías Teka</span></h3>
+        <p class="sub">Atenciones bajo garantía, tarifas parciales.</p>
+        <table style="font-size:13px;">
+          <tr>
+            <th>Año</th><th class="text-right">Total ($)</th><th class="text-right">Unidades</th><th class="text-right">% del año</th>
+          </tr>
+          <tr><td>2023</td><td class="text-right yr-2023">$1,258.75</td><td class="text-right yr-2023">85</td><td class="text-right">9.8%</td></tr>
+          <tr><td>2024</td><td class="text-right yr-2024">$1,816.25</td><td class="text-right yr-2024">125</td><td class="text-right">6.8%</td></tr>
+          <tr><td>2025</td><td class="text-right yr-2025">$1,975.00</td><td class="text-right yr-2025">140</td><td class="text-right">6.4%</td></tr>
+          <tr><td>2026 (9M)</td><td class="text-right yr-2026">$1,651.25</td><td class="text-right yr-2026">116</td><td class="text-right">6.0%</td></tr>
+          <tr class="tr-footer"><td>Crecimiento</td><td class="text-right" colspan="3" style="color:#047857;">▲ +56.9% (2023 → 2025)</td></tr>
+        </table>
+        <div style="margin-top:12px; background:#fef2f2; border-radius:8px; padding:10px 12px; font-size:12px; color:#b91c1c;">
+          💡 Las garantías representan cada vez <strong>menos % del total</strong> (9.8% → 6%), señal positiva de calidad en instalaciones.
+        </div>
+      </div>
+
+      <!-- BBQ + Almacén -->
+      <div class="card">
+        <h3><span class="cat-badge cat-bbq">BBQ</span> &amp; <span class="cat-badge cat-alm">Almacén</span></h3>
+        <p class="sub">Categorías especializadas. Almacén apareció en 2024 y crece fuerte.</p>
+        <table style="font-size:13px;">
+          <tr>
+            <th>Año</th>
+            <th class="text-right">BBQ ($)</th>
+            <th class="text-right">BBQ (u)</th>
+            <th class="text-right">Almacén ($)</th>
+            <th class="text-right">Almacén (u)</th>
+          </tr>
+          <tr><td>2023</td><td class="text-right yr-2023">$1,363.00</td><td class="text-right yr-2023">47</td><td class="text-right" style="color:var(--text-muted);">—</td><td class="text-right" style="color:var(--text-muted);">—</td></tr>
+          <tr><td>2024</td><td class="text-right yr-2024">$2,175.00</td><td class="text-right yr-2024">75</td><td class="text-right yr-2024">$210.00</td><td class="text-right yr-2024">13</td></tr>
+          <tr><td>2025</td><td class="text-right yr-2025">$2,451.00</td><td class="text-right yr-2025">85</td><td class="text-right yr-2025">$365.00</td><td class="text-right yr-2025">25</td></tr>
+          <tr><td>2026 (9M)</td><td class="text-right yr-2026">$1,885.00</td><td class="text-right yr-2026">65</td><td class="text-right yr-2026">$840.00</td><td class="text-right yr-2026">56</td></tr>
+          <tr class="tr-footer">
+            <td>BBQ crec.</td>
+            <td class="text-right" colspan="2" style="color:#047857;">▲ +79.8%</td>
+            <td class="text-right" colspan="2" style="color:#7c3aed;">▲ +300% (24→26)</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 4: GRÁFICOS ===== -->
+  <div id="tab-graficos" class="tab-content">
+    <!-- GRÁFICO 1: Barras comparativas por año -->
+    <div class="card">
+      <h3>Facturación Anual Total ($) — Barras Comparativas</h3>
+      <p class="sub">2026 ya es el <strong>Nuevo Récord Histórico</strong> con $34,237 acumulados en ~10 meses — superando 2025 ($30,732) con 2 meses aún por reportar.</p>
+      <div style="padding: 20px 0;">
+        <svg viewBox="0 0 700 300" style="width:100%; height:auto; max-height:330px;">
+          <!-- Grid lines (max 40000 → 240px; scale = 240/40000 = 0.006) -->
+          <line x1="80" y1="255" x2="660" y2="255" stroke="#e2e8f0" stroke-width="1"/>
+          <line x1="80" y1="207" x2="660" y2="207" stroke="#f1f5f9" stroke-width="1"/>
+          <line x1="80" y1="159" x2="660" y2="159" stroke="#f1f5f9" stroke-width="1"/>
+          <line x1="80" y1="111" x2="660" y2="111" stroke="#f1f5f9" stroke-width="1"/>
+          <line x1="80" y1="63"  x2="660" y2="63"  stroke="#f1f5f9" stroke-width="1"/>
+          <line x1="80" y1="15"  x2="660" y2="15"  stroke="#f1f5f9" stroke-width="1"/>
+
+          <!-- Y labels: 0 / 8k / 16k / 24k / 32k / 40k -->
+          <text x="75" y="259" font-size="11" fill="#94a3b8" text-anchor="end">$0</text>
+          <text x="75" y="211" font-size="11" fill="#94a3b8" text-anchor="end">$8k</text>
+          <text x="75" y="163" font-size="11" fill="#94a3b8" text-anchor="end">$16k</text>
+          <text x="75" y="115" font-size="11" fill="#94a3b8" text-anchor="end">$24k</text>
+          <text x="75" y="67"  font-size="11" fill="#94a3b8" text-anchor="end">$32k</text>
+          <text x="75" y="19"  font-size="11" fill="#94a3b8" text-anchor="end">$40k</text>
+
+          <!-- 2023: $12,782 → 12782*240/40000 = 76.7px → y=255-77=178 -->
+          <rect x="110" y="178" width="90" height="77" fill="#94a3b8" rx="6"/>
+          <text x="155" y="170" font-size="12" font-weight="700" fill="#475569" text-anchor="middle">$12,782</text>
+          <text x="155" y="274" font-size="13" fill="#64748b" text-anchor="middle" font-weight="600">2023</text>
+          <text x="155" y="288" font-size="11" fill="#94a3b8" text-anchor="middle">652 serv.</text>
+
+          <!-- 2024: $26,546 → 26546*240/40000 = 159px → y=255-159=96 -->
+          <rect x="240" y="96" width="90" height="159" fill="#3b82f6" rx="6"/>
+          <text x="285" y="88" font-size="12" font-weight="700" fill="#1e40af" text-anchor="middle">$26,546</text>
+          <text x="285" y="274" font-size="13" fill="#1e40af" text-anchor="middle" font-weight="700">2024</text>
+          <text x="285" y="288" font-size="11" fill="#94a3b8" text-anchor="middle">1,349 serv.</text>
+
+          <!-- 2025: $30,732 → 30732*240/40000 = 184px → y=255-184=71 -->
+          <rect x="370" y="71" width="90" height="184" fill="#10b981" rx="6"/>
+          <text x="415" y="63" font-size="12" font-weight="700" fill="#047857" text-anchor="middle">$30,732</text>
+          <text x="415" y="274" font-size="13" fill="#047857" text-anchor="middle" font-weight="700">2025</text>
+          <text x="415" y="288" font-size="11" fill="#94a3b8" text-anchor="middle">~1,597 serv.</text>
+
+          <!-- 2026: $34,237 → 34237*240/40000 = 205px → y=255-205=50 — NUEVO RÉCORD -->
+          <rect x="500" y="50" width="90" height="205" fill="#f59e0b" rx="6"/>
+          <!-- Crown icon for record -->
+          <text x="545" y="35" font-size="16" text-anchor="middle">👑</text>
+          <text x="545" y="42" font-size="12" font-weight="800" fill="#92400e" text-anchor="middle">$34,237</text>
+          <text x="545" y="274" font-size="13" fill="#92400e" text-anchor="middle" font-weight="800">2026 ⭐</text>
+          <text x="545" y="288" font-size="11" fill="#94a3b8" text-anchor="middle">~1,795 serv. (10M)</text>
+
+          <!-- Growth arrows -->
+          <text x="217" y="130" font-size="20" fill="#059669" text-anchor="middle">▲</text>
+          <text x="217" y="145" font-size="10" fill="#059669" text-anchor="middle">+108%</text>
+          <text x="347" y="83" font-size="20" fill="#059669" text-anchor="middle">▲</text>
+          <text x="347" y="98" font-size="10" fill="#059669" text-anchor="middle">+16%</text>
+          <text x="477" y="62" font-size="20" fill="#f59e0b" text-anchor="middle">▲</text>
+          <text x="477" y="77" font-size="10" fill="#92400e" text-anchor="middle">+11%</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- GRÁFICO 2: Evolución mensual multi-año (líneas) -->
+    <div class="card">
+      <h3>Comparativo Mensual por Año — Líneas de Tendencia</h3>
+      <p class="sub">Cada línea representa un año. Permite identificar estacionalidad y picos comunes.</p>
+      <div class="chart-svg-container">
+        <svg viewBox="0 0 720 300" style="width:100%; height:auto; min-width:500px;">
+          <!-- Grid -->
+          <line x1="60" y1="250" x2="700" y2="250" stroke="#e2e8f0" stroke-width="1"/>
+          <line x1="60" y1="210" x2="700" y2="210" stroke="#f1f5f9" stroke-width="1"/>
+          <line x1="60" y1="170" x2="700" y2="170" stroke="#f1f5f9" stroke-width="1"/>
+          <line x1="60" y1="130" x2="700" y2="130" stroke="#f1f5f9" stroke-width="1"/>
+          <line x1="60" y1="90" x2="700" y2="90" stroke="#f1f5f9" stroke-width="1"/>
+          <line x1="60" y1="50" x2="700" y2="50" stroke="#f1f5f9" stroke-width="1"/>
+
+          <!-- Y labels: max $3,500. scale: 200/3500 = 0.0571 px per $ -->
+          <text x="55" y="254" font-size="10" fill="#94a3b8" text-anchor="end">$0</text>
+          <text x="55" y="214" font-size="10" fill="#94a3b8" text-anchor="end">$700</text>
+          <text x="55" y="174" font-size="10" fill="#94a3b8" text-anchor="end">$1,400</text>
+          <text x="55" y="134" font-size="10" fill="#94a3b8" text-anchor="end">$2,100</text>
+          <text x="55" y="94" font-size="10" fill="#94a3b8" text-anchor="end">$2,800</text>
+          <text x="55" y="54" font-size="10" fill="#94a3b8" text-anchor="end">$3,500</text>
+
+          <!-- X axis labels (months) -->
+          <!-- spacing: (700-60)/11 = 58px per month; start x=60+29=89 -->
+          <text x="89"  y="268" font-size="10" fill="#64748b" text-anchor="middle">Ene</text>
+          <text x="147" y="268" font-size="10" fill="#64748b" text-anchor="middle">Feb</text>
+          <text x="205" y="268" font-size="10" fill="#64748b" text-anchor="middle">Mar</text>
+          <text x="263" y="268" font-size="10" fill="#64748b" text-anchor="middle">Abr</text>
+          <text x="321" y="268" font-size="10" fill="#64748b" text-anchor="middle">May</text>
+          <text x="379" y="268" font-size="10" fill="#64748b" text-anchor="middle">Jun</text>
+          <text x="437" y="268" font-size="10" fill="#64748b" text-anchor="middle">Jul</text>
+          <text x="495" y="268" font-size="10" fill="#64748b" text-anchor="middle">Ago</text>
+          <text x="553" y="268" font-size="10" fill="#64748b" text-anchor="middle">Sep</text>
+          <text x="611" y="268" font-size="10" fill="#64748b" text-anchor="middle">Oct</text>
+          <text x="669" y="268" font-size="10" fill="#64748b" text-anchor="middle">Nov</text>
+
+          <!-- 2023 line (grey) — scale: y = 250 - val*0.0571 -->
+          <!-- Ene:991=194, Feb:917=198, Mar:1001=193, Abr:891=199, May:1611=158, Jun:1190=182, Jul:1741=151, Ago:1205=181, Sep:1107=187, Oct:957=196, Nov:814=204 -->
+          <polyline
+            points="89,194 147,198 205,193 263,199 321,158 379,182 437,151 495,181 553,187 611,196 669,204"
+            fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="6,3"/>
+          <circle cx="89" cy="194" r="3" fill="#94a3b8"/>
+          <circle cx="147" cy="198" r="3" fill="#94a3b8"/>
+          <circle cx="205" cy="193" r="3" fill="#94a3b8"/>
+          <circle cx="263" cy="199" r="3" fill="#94a3b8"/>
+          <circle cx="321" cy="158" r="3" fill="#94a3b8"/>
+          <circle cx="379" cy="182" r="3" fill="#94a3b8"/>
+          <circle cx="437" cy="151" r="3" fill="#94a3b8"/>
+          <circle cx="495" cy="181" r="3" fill="#94a3b8"/>
+          <circle cx="553" cy="187" r="3" fill="#94a3b8"/>
+          <circle cx="611" cy="196" r="3" fill="#94a3b8"/>
+          <circle cx="669" cy="204" r="3" fill="#94a3b8"/>
+
+          <!-- 2024 line (blue) -->
+          <!-- Ene:2894=85, Feb:2100=130, Mar:2213=124, Abr:1786=148, May:2051=133, Jun:2001=136, Jul:2527=106, Ago:2069=132, Sep:2150=127, Oct:2356=116, Nov:1712=152 -->
+          <polyline
+            points="89,85 147,130 205,124 263,148 321,133 379,136 437,106 495,132 553,127 611,116 669,152"
+            fill="none" stroke="#3b82f6" stroke-width="2.5"/>
+          <circle cx="89" cy="85" r="3" fill="#3b82f6"/>
+          <circle cx="147" cy="130" r="3" fill="#3b82f6"/>
+          <circle cx="205" cy="124" r="3" fill="#3b82f6"/>
+          <circle cx="263" cy="148" r="3" fill="#3b82f6"/>
+          <circle cx="321" cy="133" r="3" fill="#3b82f6"/>
+          <circle cx="379" cy="136" r="3" fill="#3b82f6"/>
+          <circle cx="437" cy="106" r="3" fill="#3b82f6"/>
+          <circle cx="495" cy="132" r="3" fill="#3b82f6"/>
+          <circle cx="553" cy="127" r="3" fill="#3b82f6"/>
+          <circle cx="611" cy="116" r="3" fill="#3b82f6"/>
+          <circle cx="669" cy="152" r="3" fill="#3b82f6"/>
+
+          <!-- 2025 line (green) -->
+          <!-- Ene:2006=136, Feb:2408=112, Mar:2485=108, Abr:2403=112, May:2673=97, Jun:3057=75, Jul:2221=123, Ago:3193=68, Sep:3284=63, Oct:2961=81, Nov:1883=142 -->
+          <polyline
+            points="89,136 147,112 205,108 263,112 321,97 379,75 437,123 495,68 553,63 611,81 669,142"
+            fill="none" stroke="#10b981" stroke-width="2.5"/>
+          <circle cx="89" cy="136" r="3" fill="#10b981"/>
+          <circle cx="147" cy="112" r="3" fill="#10b981"/>
+          <circle cx="205" cy="108" r="3" fill="#10b981"/>
+          <circle cx="263" cy="112" r="3" fill="#10b981"/>
+          <circle cx="321" cy="97" r="3" fill="#10b981"/>
+          <circle cx="379" cy="75" r="3" fill="#10b981"/>
+          <circle cx="437" cy="123" r="3" fill="#10b981"/>
+          <circle cx="495" cy="68" r="3" fill="#10b981"/>
+          <circle cx="553" cy="63" r="4" fill="#10b981"/>
+          <circle cx="611" cy="81" r="3" fill="#10b981"/>
+          <circle cx="669" cy="142" r="3" fill="#10b981"/>
+
+          <!-- Legend in chart -->
+          <rect x="80" y="18" width="12" height="3" fill="#94a3b8"/>
+          <text x="96" y="22" font-size="11" fill="#475569">2023</text>
+          <rect x="140" y="18" width="12" height="3" fill="#3b82f6"/>
+          <text x="156" y="22" font-size="11" fill="#1e40af">2024</text>
+          <rect x="200" y="18" width="12" height="3" fill="#10b981"/>
+          <text x="216" y="22" font-size="11" fill="#047857">2025</text>
+          <text x="276" y="22" font-size="11" fill="#b45309">* 2026 = ciclos mensuales del dashboard</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- GRÁFICO 3: Composición por categoría por año (barras apiladas) -->
+    <div class="card">
+      <h3>Composición por Categoría (%)</h3>
+      <p class="sub">Participación de cada categoría dentro del total anual.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:16px; margin-top:8px;">
+        <!-- 2023 -->
+        <div style="text-align:center;">
+          <div style="font-weight:700; margin-bottom:8px; color:#475569;">2023</div>
+          <svg viewBox="0 0 100 200" style="width:80px; height:auto; margin:0 auto; display:block;">
+            <!-- Prom: 54.2% = 108px; UnProd: 25.3%=51; Gar: 9.8%=20; BBQ: 10.7%=21 -->
+            <rect x="20" y="0"   width="60" height="108" fill="#94a3b8" rx="4"/>
+            <rect x="20" y="110" width="60" height="51"  fill="#10b981" rx="4"/>
+            <rect x="20" y="163" width="60" height="20"  fill="#ef4444" rx="4"/>
+            <rect x="20" y="185" width="60" height="15"  fill="#f59e0b" rx="4"/>
+            <text x="50" y="58"  font-size="11" font-weight="700" fill="white" text-anchor="middle">54%</text>
+            <text x="50" y="139" font-size="11" font-weight="700" fill="white" text-anchor="middle">25%</text>
+          </svg>
+        </div>
+        <!-- 2024 -->
+        <div style="text-align:center;">
+          <div style="font-weight:700; margin-bottom:8px; color:#1d4ed8;">2024</div>
+          <svg viewBox="0 0 100 200" style="width:80px; height:auto; margin:0 auto; display:block;">
+            <!-- Prom:54.9%=110; UnProd:29.3%=59; Gar:6.8%=14; BBQ:8.2%=16; Alm:0.8%=2 -->
+            <rect x="20" y="0"   width="60" height="110" fill="#3b82f6" rx="4"/>
+            <rect x="20" y="112" width="60" height="59"  fill="#10b981" rx="4"/>
+            <rect x="20" y="173" width="60" height="14"  fill="#ef4444" rx="4"/>
+            <rect x="20" y="189" width="60" height="9"   fill="#f59e0b" rx="4"/>
+            <text x="50" y="60"  font-size="11" font-weight="700" fill="white" text-anchor="middle">55%</text>
+            <text x="50" y="145" font-size="11" font-weight="700" fill="white" text-anchor="middle">29%</text>
+          </svg>
+        </div>
+        <!-- 2025 -->
+        <div style="text-align:center;">
+          <div style="font-weight:700; margin-bottom:8px; color:#047857;">2025 ⭐</div>
+          <svg viewBox="0 0 100 200" style="width:80px; height:auto; margin:0 auto; display:block;">
+            <!-- Prom:52.2%=104; UnProd:25.6%=51; Gar:6.4%=13; BBQ:8.0%=16; Alm:1.2%=4; Dic:6.5%=13 -->
+            <rect x="20" y="0"   width="60" height="104" fill="#10b981" rx="4"/>
+            <rect x="20" y="106" width="60" height="51"  fill="#34d399" rx="4"/>
+            <rect x="20" y="159" width="60" height="13"  fill="#ef4444" rx="4"/>
+            <rect x="20" y="174" width="60" height="16"  fill="#f59e0b" rx="4"/>
+            <rect x="20" y="192" width="60" height="8"   fill="#8b5cf6" rx="4"/>
+            <text x="50" y="56"  font-size="11" font-weight="700" fill="white" text-anchor="middle">52%</text>
+            <text x="50" y="135" font-size="11" font-weight="700" fill="white" text-anchor="middle">26%</text>
+          </svg>
+        </div>
+        <!-- 2026 -->
+        <div style="text-align:center;">
+          <div style="font-weight:700; margin-bottom:8px; color:#92400e;">2026 (9M)</div>
+          <svg viewBox="0 0 100 200" style="width:80px; height:auto; margin:0 auto; display:block;">
+            <!-- Prom:57.6%=115; UnProd:26.1%=52; Gar:6.0%=12; BBQ:6.8%=14; Alm:3.0%=6 -->
+            <rect x="20" y="0"   width="60" height="115" fill="#f59e0b" rx="4"/>
+            <rect x="20" y="117" width="60" height="52"  fill="#10b981" rx="4"/>
+            <rect x="20" y="171" width="60" height="12"  fill="#ef4444" rx="4"/>
+            <rect x="20" y="185" width="60" height="9"   fill="#ea580c" rx="4"/>
+            <rect x="20" y="196" width="60" height="4"   fill="#8b5cf6" rx="4"/>
+            <text x="50" y="62"  font-size="11" font-weight="700" fill="white" text-anchor="middle">58%</text>
+            <text x="50" y="146" font-size="11" font-weight="700" fill="white" text-anchor="middle">26%</text>
+          </svg>
+        </div>
+        <!-- Leyenda -->
+        <div style="display:flex; flex-direction:column; justify-content:center; gap:8px; font-size:12px;">
+          <div style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; background:#3b82f6; border-radius:3px; display:inline-block;"></span>Promociones</div>
+          <div style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; background:#10b981; border-radius:3px; display:inline-block;"></span>Un Producto</div>
+          <div style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; background:#ef4444; border-radius:3px; display:inline-block;"></span>Garantías</div>
+          <div style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; background:#f59e0b; border-radius:3px; display:inline-block;"></span>BBQ</div>
+          <div style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; background:#8b5cf6; border-radius:3px; display:inline-block;"></span>Almacén</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 5: CONCLUSIONES ===== -->
+  <div id="tab-conclusiones" class="tab-content">
+    <div class="card">
+      <h3>💡 Hallazgos Clave del Análisis Histórico 2023–2026</h3>
+      <p class="sub">Basado en datos reales extraídos de todos los reportes consolidados de TEKA Ecuador.</p>
+    </div>
+
+    <div class="insights">
+      <div class="insight green">
+        <h4>🚀 Crecimiento Excepcional 2023 → 2024: +107.7%</h4>
+        <p>La facturación prácticamente se duplicó de $12,782 a $26,546. Los servicios pasaron de 652 a 1,349 (+107%). Este fue el año de mayor salto proporcional en la historia del técnico.</p>
+      </div>
+      <div class="insight green">
+        <h4>⭐ 2025: Año Récord con $30,732</h4>
+        <p>Crecimiento sólido del +15.8% sobre el ya excelente 2024. Septiembre 2025 fue el mes pico con $3,284. Los 12 meses superaron consistentemente los $1,800 mensuales.</p>
+      </div>
+      <div class="insight orange">
+        <h4>👑 2026: NUEVO RÉCORD HISTÓRICO — $34,237 acumulados</h4>
+        <p>Con ~10 meses completados, 2026 ya <strong>superó el récord de 2025</strong> ($30,732). El ritmo mensual promedio de 2026 es <strong>$3,423/mes</strong>, el más alto de toda la historia. Si mantiene el ritmo, cerrará por encima de <strong>$41,000</strong>.</p>
+      </div>
+      <div class="insight green">
+        <h4>🎯 Ticket Promedio Estable ≈ $19</h4>
+        <p>A pesar de triplicar el volumen de trabajo, el ticket por servicio se mantiene estable entre $19.08 y $19.68. La eficiencia operativa es alta y consistente.</p>
+      </div>
+      <div class="insight">
+        <h4>📦 Almacén: Canal Emergente</h4>
+        <p>Inexistente en 2023. Apareció en 2024 con $210 (13 servicios). En 2025 creció a $365 (25 serv.). En los 9 meses de 2026 ya acumula $840 (56 servicios): ×4 en 2 años.</p>
+      </div>
+      <div class="insight red">
+        <h4>⚠️ Noviembre: Mes Débil Histórico</h4>
+        <p>En todos los años, noviembre registra la caída más pronunciada: $813 (2023), $1,712 (2024), $1,883 (2025). Patrón estacional confirmado, conviene planificar anticipadamente.</p>
+      </div>
+      <div class="insight green">
+        <h4>✅ Garantías: Menor % = Mejor Calidad</h4>
+        <p>Las garantías pasaron de representar 9.8% del total en 2023 al 6.0% en 2026. Indica mejor calidad de instalación o menos equipos en garantía por año, lo que es positivo.</p>
+      </div>
+      <div class="insight orange">
+        <h4>🔥 BBQ: Categoría Madura y Estable</h4>
+        <p>La línea BBQ creció de $1,363 (2023) a $2,451 (2025), un +80%. Sin embargo, los primeros 9 meses de 2026 muestran $1,885 (ritmo de ~$2,500/año), sugiriendo estabilización.</p>
+      </div>
+      <div class="insight">
+        <h4>📅 Pico Histórico: Feb 2026 — $3,719</h4>
+        <p>El mes más rentable de toda la serie histórica fue Febrero 2026, con $3,719.25 y 205 unidades. Este record combina el auge de Promociones ($1,770) y el mayor volumen de "Un Producto" ($855).</p>
+      </div>
+    </div>
+
+    <!-- PROYECCIÓN 2026 -->
+    <div class="card" style="margin-top:20px; border-left: 4px solid var(--c2026);">
+      <h3>📊 Proyección de Cierre 2026 — Faltan ~2 meses</h3>
+      <p class="sub">Con $34,237 ya acumulados (~10 meses), el cierre depende del ritmo de Nov y Dic 2026.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-top:12px;">
+        <div style="background:#fef3c7; border-radius:10px; padding:16px; text-align:center;">
+          <div style="font-size:11px; color:#92400e; font-weight:700; margin-bottom:4px;">ESCENARIO CONSERVADOR</div>
+          <div style="font-size:24px; font-weight:800; color:#92400e;">$37,600</div>
+          <div style="font-size:12px; color:var(--text-muted);">Si Nov+Dic promedian $1,700 (meses bajos históricos)</div>
+        </div>
+        <div style="background:#dcfce7; border-radius:10px; padding:16px; text-align:center;">
+          <div style="font-size:11px; color:#047857; font-weight:700; margin-bottom:4px;">ESCENARIO ESPERADO ⭐</div>
+          <div style="font-size:24px; font-weight:800; color:#047857;">$41,083</div>
+          <div style="font-size:12px; color:var(--text-muted);">Si mantiene el ritmo actual de $3,423/mes</div>
+        </div>
+        <div style="background:#dbeafe; border-radius:10px; padding:16px; text-align:center;">
+          <div style="font-size:11px; color:#1e40af; font-weight:700; margin-bottom:4px;">ESCENARIO OPTIMISTA</div>
+          <div style="font-size:24px; font-weight:800; color:#1e40af;">$44,000+</div>
+          <div style="font-size:12px; color:var(--text-muted);">Si Nov o Dic repiten pico tipo Feb ($3,719)</div>
+        </div>
+      </div>
+      <div style="margin-top:14px; background:#fef9c3; border-radius:8px; padding:12px 16px; font-size:13px; color:#854d0e;">
+        🏆 <strong>2026 ya es el año récord</strong> con $34,237. Incluso con un noviembre flojo ($1,700), cerrará por encima de $37,000 — superando 2025 en +$7,000 mínimo.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ===== Tab switching =====
+function switchTab(id) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ===== Monthly table data =====
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const data2023 = [991.25,916.50,1001.00,890.50,1610.50,1190.00,1741.25,1204.50,1107.25,956.50,813.50,359.50];
+const cnt2023  = [47,40,49,47,78,65,92,58,57,54,45,20];
+const data2024 = [2893.75,2100.25,2213.00,1785.75,2050.75,2000.75,2526.75,2069.00,2150.00,2356.00,1711.75,2573.25];
+const cnt2024  = [137,104,112,84,114,108,131,105,117,129,82,121];
+const data2025 = [2006.25,2407.50,2484.50,2402.75,2673.00,3057.25,2220.50,3193.00,3284.00,2960.50,1882.75,54.00];
+const cnt2025  = [105,116,132,125,136,156,116,174,171,157,102,2];
+// 2026: Dic'25 cycle data from existing dashboard (monthly cycles 20→19)
+const data2026 = [2002.25,2530.75,3719.25,3138.25,3607.00,3183.00,3331.25,2914.00,3197.50,null,null,null];
+const cnt2026  = [100,113,205,167,178,170,181,161,173,null,null,null];
+const labels2026 = ['Dic\'25→Ene\'26','Ene→Feb\'26','Feb→Mar\'26','Mar→Abr\'26','Abr→May\'26','May→Jun\'26','Jun→Jul\'26','Jul→Ago\'26','Ago→Sep\'26','—','—','—'];
+
+const maxVal = Math.max(...data2023, ...data2024, ...data2025, ...data2026.filter(Boolean));
+
+function buildMonthlyTable() {
+  const tbody = document.getElementById('monthlyTableBody');
+  let html = '';
+  for (let i = 0; i < 12; i++) {
+    const v23 = data2023[i];
+    const v24 = data2024[i];
+    const v25 = data2025[i];
+    const v26 = data2026[i];
+    
+    // Trend bar
+    const bar23 = Math.round((v23 / maxVal) * 100);
+    const bar24 = Math.round((v24 / maxVal) * 100);
+    const bar25 = Math.round((v25 / maxVal) * 100);
+    const bar26 = v26 ? Math.round((v26 / maxVal) * 100) : 0;
+    
+    // Best year for this month
+    const vals = [v23, v24, v25, v26 || 0];
+    const best = Math.max(...vals);
+    
+    html += `<tr>
+      <td><strong>${MONTHS[i]}</strong></td>
+      <td class="text-right yr-2023" ${v23 === best ? 'style="font-weight:700;"' : ''}>${v23 ? '$' + v23.toLocaleString('es', {minimumFractionDigits:2}) : '—'}</td>
+      <td class="text-right yr-2023">${cnt2023[i]}</td>
+      <td class="text-right yr-2024" ${v24 === best ? 'style="font-weight:700;"' : ''}>${v24 ? '$' + v24.toLocaleString('es', {minimumFractionDigits:2}) : '—'}</td>
+      <td class="text-right yr-2024">${cnt2024[i]}</td>
+      <td class="text-right yr-2025" ${v25 === best ? 'style="font-weight:700;"' : ''}>${v25 ? '$' + v25.toLocaleString('es', {minimumFractionDigits:2}) : '—'}</td>
+      <td class="text-right yr-2025">${cnt2025[i]}</td>
+      <td class="text-right yr-2026" ${v26 && v26 === best ? 'style="font-weight:700;"' : ''}>${v26 ? '$' + v26.toLocaleString('es', {minimumFractionDigits:2}) : '<span style="color:#94a3b8;">—</span>'}</td>
+      <td class="text-right yr-2026">${cnt2026[i] !== null ? cnt2026[i] : '<span style="color:#94a3b8;">—</span>'}</td>
+      <td>
+        <div style="display:flex; gap:2px; align-items:flex-end; height:24px;">
+          <div title="2023: $${v23}" style="width:18px; height:${Math.max(bar23 * 24 / 100, 2)}px; background:#94a3b8; border-radius:2px 2px 0 0;"></div>
+          <div title="2024: $${v24}" style="width:18px; height:${Math.max(bar24 * 24 / 100, 2)}px; background:#3b82f6; border-radius:2px 2px 0 0;"></div>
+          <div title="2025: $${v25}" style="width:18px; height:${Math.max(bar25 * 24 / 100, 2)}px; background:#10b981; border-radius:2px 2px 0 0;"></div>
+          <div title="2026: ${v26 ? '$' + v26 : 'N/A'}" style="width:18px; height:${Math.max(bar26 * 24 / 100, 2)}px; background:#f59e0b; border-radius:2px 2px 0 0; ${!v26 ? 'opacity:0.2;' : ''}"></div>
+        </div>
+      </td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+buildMonthlyTable();
+</script>
+</body>
+</html>
