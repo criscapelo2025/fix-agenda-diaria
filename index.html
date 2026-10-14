@@ -2963,6 +2963,44 @@
         window.formatMonedaReporte = formatMonedaReporte;
 
         const ACCESORIOS_DEFAULT = { 'Enchufe 110V': 5.00, 'Enchufe 220 20V': 10.00, 'Enchufe 220V 50V': 10.00, 'Manguera c/bridas': 5.00, 'Ducto 4 pulgadas metro': 5.00, 'Enchufe chinito': 5.00, 'Acople': 5.00, 'Segunda visita': 12.00, 'Visita fuera de garantía': 20.00, 'Movilización $20': 20.00, 'Movilización $10': 10.00 };
+        window.ACCESORIOS_DEFAULT = ACCESORIOS_DEFAULT;
+
+        // Costos unitarios de inventario para cálculo en tiempo real de rentabilidad
+        const ACCESORIOS_COSTOS = {
+            'Enchufe 110V': 0.36,
+            'Enchufe 220 20V': 1.19,
+            'Enchufe 220V 50V': 2.50,
+            'Ducto 4 pulgadas metro': 2.00,
+            'Manguera c/bridas': 0.85,
+            'Enchufe chinito': 1.20,
+            'Acople': 0.96,
+            'Segunda visita': 0.00,
+            'Visita fuera de garantía': 0.00,
+            'Movilización $20': 0.00,
+            'Movilización $10': 0.00
+        };
+        window.ACCESORIOS_COSTOS = ACCESORIOS_COSTOS;
+
+        function getAccesorioCosto(name) {
+            if (!name) return 0;
+            if (ACCESORIOS_COSTOS.hasOwnProperty(name)) return ACCESORIOS_COSTOS[name];
+            const clean = name.trim().toLowerCase();
+            for (const [k, v] of Object.entries(ACCESORIOS_COSTOS)) {
+                if (k.toLowerCase() === clean) return v;
+            }
+            if (clean.includes('110')) return 0.36;
+            if (clean.includes('220') && (clean.includes('20') || clean.includes('20a') || clean.includes('20v'))) return 1.19;
+            if (clean.includes('220') && (clean.includes('50') || clean.includes('50a') || clean.includes('50v'))) return 2.50;
+            if (clean.includes('ducto')) return 2.00;
+            if (clean.includes('manguera')) return 0.85;
+            if (clean.includes('chinito')) return 1.20;
+            if (clean.includes('acople')) return 0.96;
+            if (clean.includes('segunda')) return 0.00;
+            if (clean.includes('garantia') || clean.includes('garantía')) return 0.00;
+            if (clean.includes('movilizacion') || clean.includes('movilización')) return 0.00;
+            return 0;
+        }
+        window.getAccesorioCosto = getAccesorioCosto;
 
         let visitsArray = [];      
         window.visitsArray = visitsArray;
@@ -11153,19 +11191,254 @@
         };
 
 
-        function renderInventoryView() {
-            const container = document.getElementById('inventoryTableBody'); if(!container) return;
+        function updateInvSelectInfo() {
             const selectAcc = document.getElementById('invAccSelect');
-            if(selectAcc && selectAcc.options.length === 0) { Object.keys(ACCESORIOS_DEFAULT).forEach(n => selectAcc.add(new Option(n, n))); }
-            container.innerHTML = Object.entries(ACCESORIOS_DEFAULT).map(item => {
-                const name = item[0]; const price = item[1];
-                const totalIn = inventoryEntries.filter(e => e.accesorio === name).reduce((sum, e) => sum + e.cantidad, 0);
-                let totalOut = 0;
-                visitsArray.filter(v => v.estado === 'Atendido' && v.accesoriosVendidos).forEach(v => { const sold = v.accesoriosVendidos.find(a => a.nombre === name); if(sold) totalOut += sold.cantidad; });
-                const stock = totalIn - totalOut;
-                return `<tr class="border-b border-white/50 row-hover font-black uppercase"><td class="p-4 text-xs font-black text-fix-main tracking-tighter">${name}</td><td class="p-4 text-center text-[10px] font-mono font-bold text-stone-700">${totalIn}</td><td class="p-4 text-center text-[10px] font-mono font-bold text-fix-error">${totalOut}</td><td class="p-4 text-center"><span class="px-3 py-1.5 rounded-md shadow-sm border border-white text-xs font-mono font-black ${stock <= 5 ? 'bg-rose-100/90 text-rose-800' : 'bg-emerald-100/90 text-emerald-800'}">${stock}</span></td><td class="p-4 text-right text-[10px] font-mono text-stone-600 italic">$${price.toFixed(2)}</td></tr>`;
-            }).join('');
+            const infoEl = document.getElementById('invAccHint');
+            if (!selectAcc || !infoEl) return;
+            const name = selectAcc.value;
+            const pvp = ACCESORIOS_DEFAULT[name] || 0;
+            const costo = getAccesorioCosto(name);
+            const utilidad = pvp - costo;
+            const margen = pvp > 0 ? ((utilidad / pvp) * 100).toFixed(1) : '0.0';
+            infoEl.innerHTML = `<span class="text-stone-500 font-bold uppercase text-[9px]">Costo:</span> <span class="text-rose-700 font-mono font-black text-[11px]">$${costo.toFixed(2)}</span> &nbsp;|&nbsp; <span class="text-stone-500 font-bold uppercase text-[9px]">PVP:</span> <span class="text-stone-900 font-mono font-black text-[11px]">$${pvp.toFixed(2)}</span> &nbsp;|&nbsp; <span class="text-stone-500 font-bold uppercase text-[9px]">Utilidad:</span> <span class="text-emerald-700 font-mono font-black text-[11px]">+$${utilidad.toFixed(2)} (${margen}%)</span>`;
         }
+        window.updateInvSelectInfo = updateInvSelectInfo;
+
+        function renderInventoryView() {
+            const tableBody = document.getElementById('inventoryTableBody');
+            if (!tableBody) return;
+
+            const selectAcc = document.getElementById('invAccSelect');
+            if (selectAcc && selectAcc.options.length === 0) {
+                Object.keys(ACCESORIOS_DEFAULT).forEach(n => {
+                    const opt = new Option(n, n);
+                    selectAcc.add(opt);
+                });
+                selectAcc.addEventListener('change', updateInvSelectInfo);
+            }
+            updateInvSelectInfo();
+
+            const searchQuery = (document.getElementById('invSearchInput')?.value || '').trim().toLowerCase();
+
+            // Conjunto ordenado de insumos: los estándar primero, más cualquier accesorio extra registrado
+            const itemKeys = new Set(Object.keys(ACCESORIOS_DEFAULT));
+            if (Array.isArray(inventoryEntries)) {
+                inventoryEntries.forEach(e => {
+                    if (e && e.accesorio && e.accesorio.trim()) itemKeys.add(e.accesorio.trim());
+                });
+            }
+            if (Array.isArray(visitsArray)) {
+                visitsArray.forEach(v => {
+                    if (v && v.accesoriosVendidos && Array.isArray(v.accesoriosVendidos)) {
+                        v.accesoriosVendidos.forEach(a => {
+                            if (a && a.nombre && a.nombre.trim()) itemKeys.add(a.nombre.trim());
+                        });
+                    }
+                });
+            }
+
+            let globalEntradas = 0;
+            let globalUtilizado = 0;
+            let globalStock = 0;
+            let globalCobrado = 0;
+            let globalCosto = 0;
+            let globalStockValorCosto = 0;
+
+            const rowsData = [];
+
+            itemKeys.forEach(name => {
+                const pvpUnit = ACCESORIOS_DEFAULT[name] !== undefined ? ACCESORIOS_DEFAULT[name] : 0;
+                const costoUnit = getAccesorioCosto(name);
+
+                // Total In: sumatoria de ingresos en stock
+                const totalIn = (inventoryEntries || [])
+                    .filter(e => e && (e.accesorio || '').trim() === name)
+                    .reduce((sum, e) => sum + (parseFloat(e.cantidad) || 0), 0);
+
+                // Total Out y Total Cobrado: obtenido de visitas atendidas
+                let totalOut = 0;
+                let totalCobradoItem = 0;
+
+                (visitsArray || []).forEach(v => {
+                    const isAttended = (v.estado || '').toUpperCase() === 'ATENDIDO';
+                    if (!isAttended || !v.accesoriosVendidos || !Array.isArray(v.accesoriosVendidos)) return;
+                    v.accesoriosVendidos.forEach(a => {
+                        if (!a || !a.nombre) return;
+                        if (a.nombre.trim() === name) {
+                            const q = parseFloat(a.cantidad) || 0;
+                            const p = (a.precio !== undefined && a.precio !== null && !isNaN(parseFloat(a.precio)))
+                                ? parseFloat(a.precio)
+                                : pvpUnit;
+                            totalOut += q;
+                            totalCobradoItem += (q * p);
+                        }
+                    });
+                });
+
+                const stock = totalIn - totalOut;
+                const totalCostoItem = totalOut * costoUnit;
+                const utilidadItem = totalCobradoItem - totalCostoItem;
+                const margenPct = totalCobradoItem > 0 ? (utilidadItem / totalCobradoItem) * 100 : 0;
+                const stockValorCosto = Math.max(0, stock) * costoUnit;
+
+                // Acumuladores globales
+                globalEntradas += totalIn;
+                globalUtilizado += totalOut;
+                globalStock += stock;
+                globalCobrado += totalCobradoItem;
+                globalCosto += totalCostoItem;
+                globalStockValorCosto += stockValorCosto;
+
+                rowsData.push({
+                    name,
+                    totalIn,
+                    totalOut,
+                    stock,
+                    costoUnit,
+                    pvpUnit,
+                    totalCobradoItem,
+                    totalCostoItem,
+                    utilidadItem,
+                    margenPct,
+                    stockValorCosto
+                });
+            });
+
+            const globalUtilidad = globalCobrado - globalCosto;
+            const globalMargenPct = globalCobrado > 0 ? (globalUtilidad / globalCobrado) * 100 : 0;
+
+            // Actualizar tarjetas KPI superiores en tiempo real
+            const elCobrado = document.getElementById('invKpiTotalCobrado');
+            if (elCobrado) elCobrado.textContent = '$' + globalCobrado.toFixed(2);
+
+            const elCosto = document.getElementById('invKpiTotalCosto');
+            if (elCosto) elCosto.textContent = '$' + globalCosto.toFixed(2);
+
+            const elUtilidad = document.getElementById('invKpiUtilidad');
+            if (elUtilidad) {
+                elUtilidad.textContent = (globalUtilidad >= 0 ? '+' : '') + '$' + globalUtilidad.toFixed(2);
+                elUtilidad.className = 'text-2xl md:text-3xl font-mono font-black tracking-tight ' + 
+                    (globalUtilidad >= 0 ? 'text-emerald-600' : 'text-rose-600');
+            }
+
+            const elMargen = document.getElementById('invKpiMargen');
+            if (elMargen) elMargen.textContent = globalMargenPct.toFixed(1) + '%';
+
+            const elItemsVendidos = document.getElementById('invKpiItemsVendidos');
+            if (elItemsVendidos) elItemsVendidos.textContent = globalUtilizado;
+
+            // Filtrar según el término de búsqueda si existe
+            const filteredRows = searchQuery
+                ? rowsData.filter(r => r.name.toLowerCase().includes(searchQuery))
+                : rowsData;
+
+            // Renderizar filas de la tabla
+            if (filteredRows.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-xs font-bold text-stone-400 uppercase italic">No se encontraron insumos que coincidan con "${searchQuery}"</td></tr>`;
+            } else {
+                tableBody.innerHTML = filteredRows.map(r => {
+                    const isLowStock = r.stock <= 5;
+                    const margenBadge = r.margenPct >= 70 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                                        r.margenPct >= 40 ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                                        r.margenPct > 0   ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                                                            'bg-stone-100 text-stone-600 border-stone-200';
+
+                    return `<tr class="border-b border-white/60 row-hover font-bold transition-colors">
+                        <td class="p-3 text-xs font-black text-stone-900 tracking-tight flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full ${r.stock > 0 ? 'bg-emerald-500' : 'bg-rose-400'}"></span>
+                            <span>${r.name}</span>
+                        </td>
+                        <td class="p-3 text-center text-xs font-mono font-bold text-stone-700">${r.totalIn}</td>
+                        <td class="p-3 text-center text-xs font-mono font-black text-blue-800 bg-blue-50/40">${r.totalOut}</td>
+                        <td class="p-3 text-center">
+                            <span class="px-2.5 py-1 rounded-md shadow-xs border text-xs font-mono font-black ${isLowStock ? 'bg-rose-100/90 text-rose-800 border-rose-300' : 'bg-emerald-100/90 text-emerald-800 border-emerald-300'}">
+                                ${r.stock}
+                            </span>
+                        </td>
+                        <td class="p-3 text-right text-xs font-mono text-stone-600">$${r.costoUnit.toFixed(2)}</td>
+                        <td class="p-3 text-right text-xs font-mono text-stone-800 font-bold">$${r.pvpUnit.toFixed(2)}</td>
+                        <td class="p-3 text-right text-xs font-mono font-black text-stone-900 bg-emerald-50/20">$${r.totalCobradoItem.toFixed(2)}</td>
+                        <td class="p-3 text-right text-xs font-mono font-bold text-rose-900 bg-rose-50/20">$${r.totalCostoItem.toFixed(2)}</td>
+                        <td class="p-3 text-right text-xs font-mono font-black text-emerald-700 bg-emerald-50/40">+$${r.utilidadItem.toFixed(2)}</td>
+                        <td class="p-3 text-center">
+                            <span class="px-2 py-0.5 rounded-full border text-[10px] font-mono font-black ${margenBadge}">
+                                ${r.margenPct.toFixed(1)}%
+                            </span>
+                        </td>
+                    </tr>`;
+                }).join('');
+            }
+
+            // Renderizar pie de totales de la tabla
+            const tableFoot = document.getElementById('inventoryTableFoot');
+            if (tableFoot) {
+                tableFoot.innerHTML = `<tr class="bg-stone-900 text-white font-mono font-black text-xs border-t-2 border-stone-950">
+                    <td class="p-3.5 uppercase tracking-wider text-amber-300 font-sans font-black">TOTALES GENERALES</td>
+                    <td class="p-3.5 text-center text-stone-200">${globalEntradas}</td>
+                    <td class="p-3.5 text-center text-cyan-300">${globalUtilizado}</td>
+                    <td class="p-3.5 text-center">
+                        <span class="px-2.5 py-0.5 rounded bg-stone-800 text-emerald-300 border border-stone-700">${globalStock}</span>
+                    </td>
+                    <td class="p-3.5 text-right text-stone-400 font-normal">-</td>
+                    <td class="p-3.5 text-right text-stone-400 font-normal">-</td>
+                    <td class="p-3.5 text-right text-emerald-300 text-sm font-black">$${globalCobrado.toFixed(2)}</td>
+                    <td class="p-3.5 text-right text-rose-300 text-sm font-black">$${globalCosto.toFixed(2)}</td>
+                    <td class="p-3.5 text-right text-amber-300 text-sm font-black">+$${globalUtilidad.toFixed(2)}</td>
+                    <td class="p-3.5 text-center">
+                        <span class="px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/50 text-[11px] font-black">
+                            ${globalMargenPct.toFixed(1)}%
+                        </span>
+                    </td>
+                </tr>`;
+            }
+        }
+        window.renderInventoryView = renderInventoryView;
+
+        window.exportInventoryCSV = function() {
+            const itemKeys = new Set(Object.keys(ACCESORIOS_DEFAULT));
+            if (Array.isArray(inventoryEntries)) {
+                inventoryEntries.forEach(e => { if (e && e.accesorio) itemKeys.add(e.accesorio.trim()); });
+            }
+            if (Array.isArray(visitsArray)) {
+                visitsArray.forEach(v => {
+                    if (v && v.accesoriosVendidos && Array.isArray(v.accesoriosVendidos)) {
+                        v.accesoriosVendidos.forEach(a => { if (a && a.nombre) itemKeys.add(a.nombre.trim()); });
+                    }
+                });
+            }
+
+            let csv = "Insumo,Entradas,Utilizado (Vendido),Stock,Costo Unitario,PVP Unitario,Total Cobrado,Total Costo,Utilidad,Margen %\n";
+            itemKeys.forEach(name => {
+                const pvpUnit = ACCESORIOS_DEFAULT[name] !== undefined ? ACCESORIOS_DEFAULT[name] : 0;
+                const costoUnit = getAccesorioCosto(name);
+                const totalIn = (inventoryEntries || []).filter(e => e && (e.accesorio || '').trim() === name).reduce((sum, e) => sum + (parseFloat(e.cantidad) || 0), 0);
+                let totalOut = 0;
+                let totalCobradoItem = 0;
+                (visitsArray || []).forEach(v => {
+                    const isAttended = (v.estado || '').toUpperCase() === 'ATENDIDO';
+                    if (!isAttended || !v.accesoriosVendidos || !Array.isArray(v.accesoriosVendidos)) return;
+                    v.accesoriosVendidos.forEach(a => {
+                        if (a && a.nombre && a.nombre.trim() === name) {
+                            const q = parseFloat(a.cantidad) || 0;
+                            const p = (a.precio !== undefined && a.precio !== null && !isNaN(parseFloat(a.precio))) ? parseFloat(a.precio) : pvpUnit;
+                            totalOut += q;
+                            totalCobradoItem += (q * p);
+                        }
+                    });
+                });
+                const stock = totalIn - totalOut;
+                const totalCostoItem = totalOut * costoUnit;
+                const utilidadItem = totalCobradoItem - totalCostoItem;
+                const margenPct = totalCobradoItem > 0 ? (utilidadItem / totalCobradoItem) * 100 : 0;
+                csv += `"${name}",${totalIn},${totalOut},${stock},${costoUnit.toFixed(2)},${pvpUnit.toFixed(2)},${totalCobradoItem.toFixed(2)},${totalCostoItem.toFixed(2)},${utilidadItem.toFixed(2)},${margenPct.toFixed(1)}%\n`;
+            });
+
+            const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `inventario_utilidad_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        };
 
         // --- LÓGICA DE DIRECTORIO DE CLIENTES ---
         function renderClientes() {
@@ -16106,23 +16379,132 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
             </div>
 
             <div id="inventoryView" class="hidden lg:col-span-3 space-y-6 admin-only">
-                <div class="glass-card p-6 md:p-8 rounded-2xl font-black italic uppercase">
-                    <h2 class="text-xl font-black uppercase mb-8 border-b-2 border-white/60 pb-4 font-sans italic text-fix-report tracking-tighter">STOCK DE INVENTARIO</h2>
-                    <div class="glass-panel p-6 md:p-8 mb-8 flex flex-wrap gap-4 items-end border-white/70 shadow-md">
-                        <div class="flex-grow">
-                            <label class="text-[9px] ml-2 text-stone-600 mb-2 block">ACCESORIO / INSUMO</label>
-                            <select id="invAccSelect" class="w-full p-4.5 glass-input rounded-2xl font-black text-sm uppercase outline-none text-stone-800 shadow-inner"></select>
+                <div class="glass-card p-6 md:p-8 rounded-2xl">
+                    <!-- Encabezado con estado en vivo -->
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b-2 border-white/60 pb-4">
+                        <div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-2xl">📦</span>
+                                <h2 class="text-xl md:text-2xl font-black uppercase font-sans italic text-fix-report tracking-tighter">INVENTARIO & UTILIDAD EN TIEMPO REAL</h2>
+                            </div>
+                            <p class="text-[10px] md:text-xs text-stone-500 font-bold uppercase tracking-wider mt-1">Cálculo de Facturación Cobrada vs. Costo de Insumos & Margen Neto</p>
                         </div>
-                        <div class="w-32 md:w-40">
-                            <label class="text-[9px] ml-2 text-stone-600 mb-2 block">ENTRADA</label>
-                            <input type="number" id="invQty" placeholder="0" class="w-full p-4.5 glass-input rounded-2xl text-center font-black font-mono text-lg text-stone-800 shadow-inner outline-none">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/15 text-emerald-800 border border-emerald-500/30 shadow-xs">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                TIEMPO REAL SINCRONIZADO
+                            </span>
                         </div>
-                        <button onclick="saveInventoryEntry()" class="glass-card bg-fix-report/90 border-white/60 text-white px-8 py-5 rounded-2xl font-black text-xs active:scale-95 transition-all italic text-center shadow-lg hover:shadow-emerald-900/20 hover:scale-105">💾 SUMAR STOCK</button>
                     </div>
-                    <div class="overflow-x-auto rounded-2xl border border-white/80 shadow-sm bg-white/30 backdrop-blur-md">
+
+                    <!-- Métricas Financieras KPI -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        <!-- Card 1: Total Cobrado -->
+                        <div class="glass-panel p-5 rounded-2xl border-white/80 shadow-sm relative overflow-hidden bg-gradient-to-br from-white/70 to-slate-50/70">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-black uppercase text-stone-600 tracking-wider">TOTAL COBRADO</span>
+                                <span class="text-base p-1.5 rounded-lg bg-blue-100/80 text-blue-800">💵</span>
+                            </div>
+                            <div id="invKpiTotalCobrado" class="text-2xl md:text-3xl font-mono font-black text-stone-900 tracking-tight">$0.00</div>
+                            <div class="text-[10px] font-bold text-stone-500 mt-2 flex items-center gap-1">
+                                <span id="invKpiItemsVendidos" class="text-blue-700 font-black">0</span> unidades cobradas en visitas
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Costo Total Insumos -->
+                        <div class="glass-panel p-5 rounded-2xl border-white/80 shadow-sm relative overflow-hidden bg-gradient-to-br from-white/70 to-rose-50/50">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-black uppercase text-stone-600 tracking-wider">COSTO TOTAL INSUMOS</span>
+                                <span class="text-base p-1.5 rounded-lg bg-rose-100/80 text-rose-800">🧾</span>
+                            </div>
+                            <div id="invKpiTotalCosto" class="text-2xl md:text-3xl font-mono font-black text-rose-900 tracking-tight">$0.00</div>
+                            <div class="text-[10px] font-bold text-stone-500 mt-2">
+                                Costo de unidades despachadas
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Utilidad Neta (Ganancia) -->
+                        <div class="glass-panel p-5 rounded-2xl border-emerald-300/70 shadow-md relative overflow-hidden bg-gradient-to-br from-emerald-50/90 via-white/80 to-emerald-50/50 ring-1 ring-emerald-500/20">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider">UTILIDAD NETA (GANANCIA)</span>
+                                <span class="text-base p-1.5 rounded-lg bg-emerald-100 text-emerald-800 shadow-xs">💰</span>
+                            </div>
+                            <div id="invKpiUtilidad" class="text-2xl md:text-3xl font-mono font-black text-emerald-600 tracking-tight">+$0.00</div>
+                            <div class="text-[10px] font-bold text-emerald-700 mt-2 flex items-center gap-1">
+                                <span>Total Cobrado − Costo Insumos</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 4: Margen Global -->
+                        <div class="glass-panel p-5 rounded-2xl border-white/80 shadow-sm relative overflow-hidden bg-gradient-to-br from-white/70 to-indigo-50/50">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-black uppercase text-stone-600 tracking-wider">MARGEN DE RENTABILIDAD</span>
+                                <span class="text-base p-1.5 rounded-lg bg-indigo-100/80 text-indigo-800">📈</span>
+                            </div>
+                            <div id="invKpiMargen" class="text-2xl md:text-3xl font-mono font-black text-indigo-900 tracking-tight">0.0%</div>
+                            <div class="text-[10px] font-bold text-stone-500 mt-2 flex items-center gap-1">
+                                Retorno neto sobre la facturación
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel de Entrada de Stock -->
+                    <div class="glass-panel p-6 md:p-8 mb-8 border-white/70 shadow-md rounded-2xl">
+                        <div class="flex flex-col md:flex-row gap-4 items-end">
+                            <div class="flex-grow w-full">
+                                <div class="flex justify-between items-center mb-2">
+                                    <label class="text-[9px] ml-2 text-stone-600 font-black uppercase block">ACCESORIO / INSUMO</label>
+                                    <span id="invAccHint" class="text-[10px] font-bold"></span>
+                                </div>
+                                <select id="invAccSelect" onchange="updateInvSelectInfo()" class="w-full p-4 glass-input rounded-2xl font-black text-sm uppercase outline-none text-stone-800 shadow-inner"></select>
+                            </div>
+                            <div class="w-full md:w-44">
+                                <label class="text-[9px] ml-2 text-stone-600 font-black uppercase mb-2 block">CANTIDAD ENTRADA</label>
+                                <input type="number" id="invQty" min="1" placeholder="0" class="w-full p-4 glass-input rounded-2xl text-center font-black font-mono text-lg text-stone-800 shadow-inner outline-none">
+                            </div>
+                            <button onclick="saveInventoryEntry()" class="w-full md:w-auto glass-card bg-fix-report/90 hover:bg-fix-report border-white/60 text-white px-8 py-4.5 rounded-2xl font-black text-xs active:scale-95 transition-all italic text-center shadow-lg hover:shadow-emerald-900/20 hover:scale-105 shrink-0 flex items-center justify-center gap-2">
+                                <span>💾</span>
+                                <span>SUMAR STOCK</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Controles de la Tabla (Búsqueda y Exportación) -->
+                    <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
+                        <div class="relative w-full sm:w-80">
+                            <input type="text" id="invSearchInput" oninput="renderInventoryView()" placeholder="🔍 BUSCAR INSUMO O ACCESORIO..." class="w-full p-3.5 pl-4 glass-input rounded-xl text-xs font-bold uppercase outline-none text-stone-800 shadow-sm border border-white/80">
+                        </div>
+                        <div class="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+                            <div class="text-[11px] font-bold text-stone-500 uppercase flex items-center gap-3">
+                                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Óptimo (&gt;5)</span>
+                                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Crítico (≤5)</span>
+                            </div>
+                            <button type="button" onclick="exportInventoryCSV()" class="glass-card bg-stone-800 hover:bg-stone-900 text-white px-3.5 py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5 shadow-sm transition-all active:scale-95 shrink-0" title="Exportar reporte de inventario a formato CSV">
+                                <span>📥</span>
+                                <span>CSV</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Detalle Financiero de Inventario -->
+                    <div class="overflow-x-auto rounded-2xl border border-white/80 shadow-sm bg-white/40 backdrop-blur-md">
                         <table class="w-full border-collapse admin-table">
-                            <thead><tr><th class="text-left">Nombre Insumo</th><th>Entradas</th><th>Utilizado</th><th>Stock Disp.</th><th class="text-right">PVP Unitario</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th class="text-left py-3.5 px-4">Insumo / Accesorio</th>
+                                    <th class="text-center py-3.5 px-3">Entradas</th>
+                                    <th class="text-center py-3.5 px-3">Utilizado (Vendido)</th>
+                                    <th class="text-center py-3.5 px-3">Stock Disp.</th>
+                                    <th class="text-right py-3.5 px-3">Costo Unit.</th>
+                                    <th class="text-right py-3.5 px-3">PVP Unit.</th>
+                                    <th class="text-right py-3.5 px-3 bg-emerald-500/10 text-emerald-900">Total Cobrado ($)</th>
+                                    <th class="text-right py-3.5 px-3 bg-rose-500/10 text-rose-900">Costo Total ($)</th>
+                                    <th class="text-right py-3.5 px-3 bg-emerald-600/15 text-emerald-950">Utilidad ($)</th>
+                                    <th class="text-center py-3.5 px-3">Margen (%)</th>
+                                </tr>
+                            </thead>
                             <tbody id="inventoryTableBody" class="font-bold text-stone-800"></tbody>
+                            <tfoot id="inventoryTableFoot"></tfoot>
                         </table>
                     </div>
                 </div>
