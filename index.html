@@ -13222,15 +13222,411 @@ function getEditModalData() {
             if (files && files.length > 0) {
                 parseInvoiceWithGemini(files[0]);
             }
+            if (event.target) event.target.value = '';
+        }
+
+        // --- CARGADOR DINÁMICO DE PDF.JS PARA LECTURA LOCAL E HÍBRIDA DE FACTURAS ---
+        let _pdfJsLoadPromise = null;
+        function ensurePdfJsLoaded() {
+            if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+            if (_pdfJsLoadPromise) return _pdfJsLoadPromise;
+            _pdfJsLoadPromise = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                script.onload = () => {
+                    if (window.pdfjsLib) {
+                        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                        resolve(window.pdfjsLib);
+                    } else {
+                        reject(new Error('pdfjsLib no disponible'));
+                    }
+                };
+                script.onerror = () => {
+                    _pdfJsLoadPromise = null;
+                    reject(new Error('No se pudo cargar pdf.js'));
+                };
+                document.head.appendChild(script);
+            });
+            return _pdfJsLoadPromise;
+        }
+
+        // Extrae texto estructurado (línea por línea) y renderiza la primera página como JPEG desde un archivo PDF
+        async function extractPdfTextAndImage(file) {
+            let fullText = '';
+            let pageImageBase64 = null;
+            try {
+                const pdfjsLib = await ensurePdfJsLoaded();
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const maxPages = Math.min(pdf.numPages, 3);
+                const pageTexts = [];
+
+                for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+                    const page = await pdf.getPage(pageNum);
+                    const textContent = await page.getTextContent();
+                    // Agrupar fragmentos por coordenada Y (misma línea)
+                    const rows = [];
+                    for (const item of (textContent.items || [])) {
+                        const str = (item.str || '').trim();
+                        if (!str) continue;
+                        const x = item.transform ? item.transform[4] : 0;
+                        const y = item.transform ? item.transform[5] : 0;
+                        let row = rows.find(r => Math.abs(r.y - y) < 4);
+                        if (!row) {
+                            row = { y, items: [] };
+                            rows.push(row);
+                        }
+                        row.items.push({ x, str });
+                    }
+                    rows.sort((a, b) => b.y - a.y);
+                    const lines = rows.map(r => {
+                        r.items.sort((a, b) => a.x - b.x);
+                        return r.items.map(i => i.str).join(' ');
+                    });
+                    pageTexts.push(lines.join('\n'));
+
+                    // Renderizar página 1 a imagen JPEG ligera (para modelos de visión si el PDF es escaneado)
+                    if (pageNum === 1) {
+                        try {
+                            const viewport = page.getViewport({ scale: 1.8 });
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            canvas.width = viewport.width;
+                            canvas.height = viewport.height;
+                            await page.render({ canvasContext: ctx, viewport }).promise;
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                            pageImageBase64 = dataUrl.split(',')[1];
+                        } catch (renderErr) {
+                            console.warn('No se pudo renderizar página PDF a imagen:', renderErr);
+                        }
+                    }
+                }
+                fullText = pageTexts.join('\n');
+            } catch (err) {
+                console.warn('Extracción con pdf.js no disponible:', err);
+            }
+            return { fullText, pageImageBase64 };
+        }
+
+        // Normaliza y comprime cualquier imagen (JPG/PNG/WEBP/HEIC) a image/jpeg optimizado para evitar errores 400/413
+        function compressAndNormalizeImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const dataUrl = e.target.result;
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            const maxDim = 1600;
+                            let w = img.width;
+                            let h = img.height;
+                            if (w > maxDim || h > maxDim) {
+                                if (w > h) {
+                                    h = Math.round((h * maxDim) / w);
+                                    w = maxDim;
+                                } else {
+                                    w = Math.round((w * maxDim) / h);
+                                    h = maxDim;
+                                }
+                            }
+                            const canvas = document.createElement('canvas');
+                            canvas.width = w;
+                            canvas.height = h;
+                            const ctx = canvas.getContext('2d');
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, w, h);
+                            ctx.drawImage(img, 0, 0, w, h);
+                            const jpegUrl = canvas.toDataURL('image/jpeg', 0.85);
+                            resolve({ mimeType: 'image/jpeg', base64Data: jpegUrl.split(',')[1], dataUrl: jpegUrl });
+                        } catch (_) {
+                            resolve({ mimeType: 'image/jpeg', base64Data: dataUrl.split(',')[1], dataUrl });
+                        }
+                    };
+                    img.onerror = () => {
+                        resolve({ mimeType: 'image/jpeg', base64Data: (dataUrl || '').split(',')[1] || '', dataUrl });
+                    };
+                    img.src = dataUrl;
+                };
+                reader.onerror = () => resolve({ mimeType: 'image/jpeg', base64Data: '', dataUrl: '' });
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Normaliza fechas DD/MM/YYYY, DD-MM-YYYY, YYYY/MM/DD o DD/MMM/YYYY a YYYY-MM-DD
+        function normalizeInvoiceDate(raw) {
+            if (!raw) return '';
+            const s = String(raw).trim();
+            let m = s.match(/\b(20\d{2})[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])\b/);
+            if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+            m = s.match(/\b(0?[1-9]|[12]\d|3[01])[-/.](0?[1-9]|1[0-2])[-/.](20\d{2}|\d{2})\b/);
+            if (m) {
+                const yr = m[3].length === 2 ? '20' + m[3] : m[3];
+                return `${yr}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`;
+            }
+            const meses = { ene: '01', feb: '02', mar: '03', abr: '04', may: '05', jun: '06', jul: '07', ago: '08', sep: '09', set: '09', oct: '10', nov: '11', dic: '12' };
+            m = s.toLowerCase().match(/\b(0?[1-9]|[12]\d|3[01])[\s\-/de]+([a-z]{3,10})[\s\-/de]+(20\d{2})\b/);
+            if (m) {
+                const mesKey = m[2].substring(0, 3);
+                if (meses[mesKey]) return `${m[3]}-${meses[mesKey]}-${String(m[1]).padStart(2, '0')}`;
+            }
+            return '';
+        }
+
+        // Detecta el almacén / lugar de compra a partir del texto de la factura
+        function detectStoreFromText(text) {
+            if (!text) return '';
+            const upper = text.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const rules = [
+                { match: ['KYWI', 'COMERCIAL KYWI'], value: 'COMERCIAL KYWI' },
+                { match: ['COMERCIAL SOLIS', 'SOLIS'], value: 'COMERCIAL SOLIS' },
+                { match: ['COMO HOGAR', 'COMOHOGAR'], value: 'COMO HOGAR' },
+                { match: ['SUKASA', 'TODHOGAR', 'CORPORACION FAVORITA'], value: 'SUKASA' },
+                { match: ['MACAOFERTAS', 'MACA OFERTAS'], value: 'MACAOFERTAS' },
+                { match: ['MARCO MERCARD'], value: 'MARCO MERCARD' },
+                { match: ['MERCARD'], value: 'MERCARD' },
+                { match: ['HOME VEGA', 'HOMEVEGA'], value: 'HOME VEGA' },
+                { match: ['LUNA PAZMINO', 'LUNA PAZMIÑO'], value: 'LUNA PAZMIÑO' },
+                { match: ['BOYACA', 'ALMACENES BOYACA'], value: 'ALMACENES BOYACÁ' },
+                { match: ['VTORIA HOGAR', 'VICTORIA HOGAR'], value: 'VTORIA HOGAR' },
+                { match: ['CHORDELEG', 'ALMACENES CHORDELEG'], value: 'ALMACENES CHORDELEG' },
+                { match: ['TEKA ECUADOR', 'TEKA DIRECTO'], value: 'TEKA DIRECTO' }
+            ];
+            for (const r of rules) {
+                if (r.match.some(kw => upper.includes(kw))) return r.value;
+            }
+            return '';
+        }
+
+        // Extractor inteligente local para Facturas Electrónicas del SRI (RIDE PDF / XML / OCR)
+        function parseEcuadorInvoiceText(rawText) {
+            const result = {
+                nombreCliente: '',
+                callePrincipal: '',
+                cedula: '',
+                telefono: '',
+                email: '',
+                numFactura: '',
+                lugarCompra: '',
+                fechaEmision: ''
+            };
+            if (!rawText || typeof rawText !== 'string') return result;
+
+            // Si es un XML del SRI
+            if (rawText.includes('<factura') || rawText.includes('<comprobante') || rawText.includes('<razonSocialComprador>')) {
+                const getTag = (tag) => {
+                    const m = rawText.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+                    return m ? m[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim() : '';
+                };
+                result.nombreCliente = getTag('razonSocialComprador');
+                result.cedula = getTag('identificacionComprador');
+                result.callePrincipal = getTag('direccionComprador');
+                result.fechaEmision = normalizeInvoiceDate(getTag('fechaEmision'));
+                const estab = getTag('estab');
+                const ptoEmi = getTag('ptoEmi');
+                const sec = getTag('secuencial');
+                if (estab && ptoEmi && sec) result.numFactura = `${estab}-${ptoEmi}-${sec}`;
+                const emisor = getTag('nombreComercial') || getTag('razonSocial');
+                result.lugarCompra = detectStoreFromText(emisor + ' ' + rawText) || emisor;
+
+                const infoMatches = [...rawText.matchAll(/<campoAdicional\s+nombre=["']([^"']+)["'][^>]*>([\s\S]*?)<\/campoAdicional>/gi)];
+                for (const m of infoMatches) {
+                    const k = (m[1] || '').toLowerCase();
+                    const v = (m[2] || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+                    if (!v) continue;
+                    if (!result.email && (k.includes('mail') || k.includes('correo') || v.includes('@'))) result.email = v;
+                    if (!result.telefono && (k.includes('tel') || k.includes('cel') || k.includes('fono'))) result.telefono = v;
+                    if (!result.callePrincipal && (k.includes('dir') || k.includes('domicilio') || k.includes('calle'))) result.callePrincipal = v;
+                }
+                return result;
+            }
+
+            const text = rawText.replace(/\r/g, '\n');
+            const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+            // 1. Número de Factura (ej: 001-002-000123456 o 016 907 000311549)
+            const facMatch = text.match(/(?:FACTURA|No\.?|Nro\.?|N°)\s*[:#-]?\s*(\d{3}\s*[- ]\s*\d{3}\s*[- ]\s*\d{6,9})/i)
+                || text.match(/\b(\d{3}\s*-\s*\d{3}\s*-\s*\d{6,9})\b/)
+                || text.match(/\b(\d{3}\s+\d{3}\s+\d{9})\b/);
+            if (facMatch) {
+                result.numFactura = facMatch[1].replace(/\s+/g, '-').replace(/-+/g, '-').trim();
+            }
+
+            // 2. Fecha de Emisión
+            const fechaLabelMatch = text.match(/Fecha\s*(?:de\s*)?Emisi[oó]n\s*[:.]?\s*([0-9]{1,4}[-/.][0-9A-Za-z]{1,10}[-/.][0-9]{2,4})/i);
+            if (fechaLabelMatch) {
+                result.fechaEmision = normalizeInvoiceDate(fechaLabelMatch[1]);
+            }
+            if (!result.fechaEmision) {
+                for (const line of lines) {
+                    if (/fecha/i.test(line)) {
+                        const d = normalizeInvoiceDate(line);
+                        if (d) { result.fechaEmision = d; break; }
+                    }
+                }
+            }
+            if (!result.fechaEmision) {
+                const anyDate = text.match(/\b(\d{2}\/\d{2}\/20\d{2}|20\d{2}-\d{2}-\d{2})\b/);
+                if (anyDate) result.fechaEmision = normalizeInvoiceDate(anyDate[1]);
+            }
+
+            // 3. Lugar de Compra (Almacén Emisor)
+            result.lugarCompra = detectStoreFromText(text);
+
+            // 4. Identificación / Cédula / RUC del Comprador
+            const idBuyerMatch = text.match(/(?:Identificaci[oó]n(?:\s*del\s*Comprador)?|R\.?U\.?C\.?\s*\/\s*C\.?I\.?|C[eé]dula\s*(?:\/\s*RUC)?|RUC\s*Cliente|CI\/RUC)\s*[:.]?\s*(\d{10,13})\b/i);
+            if (idBuyerMatch) {
+                result.cedula = idBuyerMatch[1].trim();
+            } else {
+                const allIds = [...text.matchAll(/\b(\d{13}|\d{10})\b/g)].map(m => m[1]).filter(id => id.length === 10 || (id.length === 13 && id.endsWith('001')));
+                const uniqueIds = [...new Set(allIds)];
+                if (uniqueIds.length >= 2) {
+                    result.cedula = uniqueIds[1]; // El primero suele ser el RUC del almacén emisor y el segundo el del comprador
+                } else if (uniqueIds.length === 1) {
+                    result.cedula = uniqueIds[0];
+                }
+            }
+
+            // 5. Nombre del Cliente / Razón Social del Comprador
+            const buyerPatterns = [
+                /Raz[oó]n\s*Social\s*\/\s*Nombres\s*y\s*Apellidos\s*[:.]?\s*([^\n\r]+?)(?=\s+(?:Identificaci[oó]n|R\.?U\.?C|C\.?I|Fecha|Direcci[oó]n)\b|$)/i,
+                /(?:Nombres\s*y\s*Apellidos|Nombre\s*del\s*Cliente|Comprador|Cliente|Sr\(?a\)?\.?)\s*[:.]?\s*([^\n\r]+?)(?=\s+(?:Identificaci[oó]n|R\.?U\.?C|C\.?I|Fecha|Direcci[oó]n|Tel[eé]fono)\b|$)/i
+            ];
+            for (const pat of buyerPatterns) {
+                const m = text.match(pat);
+                if (m && m[1]) {
+                    let candidate = m[1].replace(/\s{2,}/g, ' ').trim();
+                    candidate = candidate.replace(/^[:.\-\s]+|[:.\-\s]+$/g, '');
+                    if (candidate.length >= 3 && !/^(CONSUMIDOR|IDENTIFICACION|FECHA|DIRECCION)/i.test(candidate)) {
+                        result.nombreCliente = candidate;
+                        break;
+                    }
+                }
+            }
+            // Si el nombre está en la línea siguiente al encabezado "Razón Social / Nombres y Apellidos"
+            if (!result.nombreCliente) {
+                for (let i = 0; i < lines.length - 1; i++) {
+                    if (/Raz[oó]n\s*Social\s*\/\s*Nombres\s*y\s*Apellidos/i.test(lines[i])) {
+                        const afterColon = lines[i].split(/Apellidos\s*[:.]?/i)[1]?.trim();
+                        const cand = afterColon || lines[i + 1];
+                        if (cand && cand.length >= 3 && !/Identificaci|Fecha|Direcci/i.test(cand)) {
+                            result.nombreCliente = cand.replace(/\s+(?:Identificaci[oó]n|RUC|CI).*$/i, '').trim();
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 6. Dirección / Calle Principal del Cliente (evitando Dirección Matriz y Sucursal del emisor)
+            for (const line of lines) {
+                if (/Direcci[oó]n\s*(?:Matriz|Sucursal|Emisor|Establecimiento)/i.test(line)) continue;
+                const dirMatch = line.match(/(?:Direcci[oó]n(?:\s*Comprador|\s*Cliente)?|Domicilio|Calle(?:\s*Principal)?)\s*[:.]?\s*(.+)/i);
+                if (dirMatch && dirMatch[1]) {
+                    let d = dirMatch[1].replace(/\s+(?:Tel[eé]fono|Telf|Celular|Email|Correo|Fecha).*$/i, '').trim();
+                    if (d.length >= 3 && !/^(Matriz|Sucursal)/i.test(d)) {
+                        result.callePrincipal = d;
+                        break;
+                    }
+                }
+            }
+
+            // 7. Teléfono del Cliente
+            const telLabelMatch = text.match(/(?:Tel[eé]fono(?:\s*Comprador|\s*Cliente)?|Celular|Telf\.?|Fono)\s*[:.]?\s*(\+?\d[\d\s\-]{6,14}\d)/i);
+            if (telLabelMatch) {
+                result.telefono = telLabelMatch[1].replace(/\s+/g, ' ').trim();
+            } else {
+                const cellMatch = text.match(/\b(09\d{8}|\+?593\s*9\d[\d\s]{7,9})\b/);
+                if (cellMatch) result.telefono = cellMatch[1].trim();
+            }
+
+            // 8. Email / Correo del Cliente (excluyendo correos corporativos del almacén emisor)
+            const storeDomains = ['kywi.com', 'sukasa.com', 'comohogar.com', 'favorita.com', 'teka.com', 'teka.ec', 'boyaca.com', 'marcimex.com', 'sri.gob.ec'];
+            const allEmails = [...text.matchAll(/\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/g)].map(m => m[1].toLowerCase());
+            const buyerEmail = allEmails.find(em => !storeDomains.some(dom => em.endsWith(dom) || em.includes('@' + dom)));
+            if (buyerEmail) {
+                result.email = buyerEmail;
+            } else if (allEmails.length > 0) {
+                result.email = allEmails[allEmails.length - 1];
+            }
+
+            return result;
+        }
+
+        function hasExtractedInvoiceData(data) {
+            if (!data) return false;
+            let count = 0;
+            if (data.nombreCliente) count++;
+            if (data.cedula) count++;
+            if (data.numFactura) count++;
+            if (data.fechaEmision) count++;
+            if (data.callePrincipal) count++;
+            if (data.telefono) count++;
+            if (data.email) count++;
+            if (data.lugarCompra) count++;
+            return count >= 2;
+        }
+
+        function mergeInvoiceData(primary, fallback) {
+            const keys = ['nombreCliente', 'callePrincipal', 'cedula', 'telefono', 'email', 'numFactura', 'lugarCompra', 'fechaEmision'];
+            const merged = {};
+            for (const k of keys) {
+                const pVal = (primary && primary[k] ? String(primary[k]).trim() : '');
+                const fVal = (fallback && fallback[k] ? String(fallback[k]).trim() : '');
+                merged[k] = pVal || fVal || '';
+            }
+            if (merged.fechaEmision) {
+                merged.fechaEmision = normalizeInvoiceDate(merged.fechaEmision) || merged.fechaEmision;
+            }
+            return merged;
+        }
+
+        function extractJsonFromGeminiResponse(jsonResp) {
+            const parts = jsonResp?.candidates?.[0]?.content?.parts || [];
+            // Filtrar partes de "thought" (modelos Gemini 2.5 / 3 con pensamiento activo)
+            const nonThoughtParts = parts.filter(p => !p.thought && typeof p.text === 'string');
+            const textSource = (nonThoughtParts.length > 0 ? nonThoughtParts : parts)
+                .map(p => p.text || '')
+                .join('\n')
+                .trim();
+            if (!textSource) return null;
+
+            const cleaned = textSource.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+            try {
+                return JSON.parse(cleaned);
+            } catch (_) {
+                const match = cleaned.match(/\{[\s\S]*\}/);
+                if (match) {
+                    return JSON.parse(match[0]);
+                }
+                throw new Error('Respuesta JSON inválida del modelo');
+            }
+        }
+
+        // OCR local en el navegador como respaldo para fotos cuando no hay API Key o se agota la cuota
+        let _tesseractPromise = null;
+        async function runLocalOcrFallback(imageDataUrl) {
+            if (!imageDataUrl) return '';
+            if (!window.Tesseract) {
+                if (!_tesseractPromise) {
+                    _tesseractPromise = new Promise((resolve, reject) => {
+                        const s = document.createElement('script');
+                        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+                        s.onload = () => resolve(window.Tesseract);
+                        s.onerror = () => { _tesseractPromise = null; reject(new Error('No se pudo cargar OCR local')); };
+                        document.head.appendChild(s);
+                    });
+                }
+                await _tesseractPromise;
+            }
+            const res = await window.Tesseract.recognize(imageDataUrl, 'spa');
+            return res?.data?.text || '';
         }
 
         async function parseInvoiceWithGemini(file) {
-            const apiKey = getGeminiApiKey();
-            if (!apiKey) {
-                openGeminiApiKeyModal();
-                showMessage("⚠️ Ingrese su API Key de Gemini", "fix-pending");
-                return;
-            }
+            if (!file) return;
+            const apiKey = (getGeminiApiKey() || '').trim();
+            const fileName = (file.name || '').toLowerCase();
+            const isXml = fileName.endsWith('.xml') || file.type === 'text/xml' || file.type === 'application/xml';
+            const isPdf = fileName.endsWith('.pdf') || file.type === 'application/pdf';
 
             const dropZoneContent = document.getElementById('dropZoneContent');
             const dropZoneLoading = document.getElementById('dropZoneLoading');
@@ -13241,21 +13637,82 @@ function getEditModalData() {
             }
 
             try {
-                const base64Url = await convertToBase64(file);
-                const mimeType = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
-                const base64Data = base64Url.split(',')[1];
+                let extractedText = '';
+                let localData = null;
+                let inlineMimeType = '';
+                let inlineBase64 = '';
+                let imagePreviewUrl = '';
 
+                // PASO 1: Extracción local rápida si es XML o PDF
+                if (isXml) {
+                    extractedText = await file.text();
+                    localData = parseEcuadorInvoiceText(extractedText);
+                    if (hasExtractedInvoiceData(localData) && !apiKey) {
+                        populateInvoiceFields(localData);
+                        showMessage("✅ Factura XML procesada y datos cargados", "fix-report");
+                        return;
+                    }
+                } else if (isPdf) {
+                    const pdfRes = await extractPdfTextAndImage(file);
+                    extractedText = pdfRes.fullText || '';
+                    if (extractedText.trim().length > 20) {
+                        localData = parseEcuadorInvoiceText(extractedText);
+                    }
+                    if (pdfRes.pageImageBase64) {
+                        inlineMimeType = 'image/jpeg';
+                        inlineBase64 = pdfRes.pageImageBase64;
+                        imagePreviewUrl = 'data:image/jpeg;base64,' + pdfRes.pageImageBase64;
+                    } else {
+                        const base64Url = await convertToBase64(file);
+                        inlineMimeType = 'application/pdf';
+                        inlineBase64 = base64Url.split(',')[1] || '';
+                    }
+                    // Si no hay API Key configurada pero el PDF electrónico ya tiene los datos legibles, usarlos directamente
+                    if (!apiKey && hasExtractedInvoiceData(localData)) {
+                        populateInvoiceFields(localData);
+                        showMessage("✅ Factura procesada y datos cargados", "fix-report");
+                        return;
+                    }
+                } else {
+                    // Imagen (JPG, PNG, WEBP, etc.) -> Normalizar y comprimir en canvas
+                    const normImg = await compressAndNormalizeImage(file);
+                    inlineMimeType = normImg.mimeType;
+                    inlineBase64 = normImg.base64Data;
+                    imagePreviewUrl = normImg.dataUrl;
+                }
+
+                // Si no hay API Key y no se pudo resolver solo con PDF/XML local
+                if (!apiKey) {
+                    if (imagePreviewUrl) {
+                        try {
+                            const ocrText = await runLocalOcrFallback(imagePreviewUrl);
+                            const ocrData = parseEcuadorInvoiceText(ocrText);
+                            if (hasExtractedInvoiceData(ocrData)) {
+                                populateInvoiceFields(ocrData);
+                                showMessage("✅ Factura procesada y datos cargados", "fix-report");
+                                return;
+                            }
+                        } catch (ocrErr) {
+                            console.warn("OCR local no disponible:", ocrErr);
+                        }
+                    }
+                    openGeminiApiKeyModal();
+                    showMessage("⚠️ Ingrese su API Key de Gemini para leer esta factura", "fix-pending");
+                    return;
+                }
+
+                // PASO 2: Consulta a Gemini IA (con modelos filtrados y soporte para modelos con Thinking)
                 const promptText = `Eres un asistente contable experto para Ecuador / Latinoamérica.
-Lee la factura adjunta (en formato PDF o imagen) y extrae con total exactitud ÚNICAMENTE los siguientes 8 datos para el registro:
-1. nombreCliente: Nombre completo o Razón Social del cliente / comprador a quien se emite la factura (ej: "JUAN CARLOS PEREZ").
-2. callePrincipal: Dirección domiciliaria o calle principal del cliente (ej: "AV. DE LAS AMÉRICAS Y ESPAÑA").
-3. cedula: Cédula de identidad, RUC o pasaporte del cliente/comprador.
-4. telefono: Teléfono celular o convencional del cliente.
-5. email: Correo electrónico del cliente.
+Lee la factura adjunta y extrae con total exactitud ÚNICAMENTE los siguientes 8 datos del COMPRADOR / CLIENTE para el registro:
+1. nombreCliente: Nombre completo o Razón Social del cliente / comprador a quien se emite la factura (ej: "JUAN CARLOS PEREZ"). No pongas el nombre del almacén emisor.
+2. callePrincipal: Dirección domiciliaria o calle principal del comprador/cliente (ej: "AV. DE LAS AMÉRICAS Y ESPAÑA"). No pongas la Dirección Matriz ni Sucursal del almacén.
+3. cedula: Cédula de identidad, RUC o pasaporte del comprador/cliente (no el RUC del almacén emisor).
+4. telefono: Teléfono celular o convencional del comprador/cliente.
+5. email: Correo electrónico del comprador/cliente.
 6. numFactura: Número completo o secuencial de la factura de compra (ej: "001-002-000123456").
 7. lugarCompra: Nombre comercial del almacén o tienda emisora de la factura. Preferiblemente elige la que coincida entre estas opciones: ${JSON.stringify(LUGARES_COMPRA)}. Si es otra, indica el nombre comercial de la tienda emisora.
-8. fechaEmision: Fecha de emisión de la factura estrictamente en formato YYYY-MM-DD (ej: "2025-06-14").
-
+8. fechaEmision: Fecha de emisión de la factura estrictamente en formato YYYY-MM-DD (ej: "2026-06-14").
+${extractedText ? `\nTexto extraído del documento como referencia adicional:\n"""\n${extractedText.substring(0, 6000)}\n"""\n` : ''}
 Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
 {
   "nombreCliente": "",
@@ -13269,95 +13726,80 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
 }
 Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agregues bloques markdown ni texto extra.`;
 
-                // Descubrimiento dinámico de modelos activos con la API Key del usuario
                 let candidateEndpoints = [];
                 try {
-                    const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
-                        headers: { 'x-goog-api-key': apiKey }
-                    });
+                    const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
                     if (listResp.ok) {
                         const listData = await listResp.json();
-                        // Palabras clave de modelos que NO soportan visión / lectura de facturas
-                        const nonVisionKeywords = ['tts', 'audio', 'speech', 'embed', 'imagen', 'live', 'realtime', 'voice'];
+                        // Excluir modelos que NO son multimodales de texto/visión o no soportan JSON
+                        const excludedKeywords = [
+                            'tts', 'audio', 'speech', 'embed', 'imagen', 'image', 'live',
+                            'realtime', 'voice', 'gemma', 'aqa', 'learnlm', 'robotics',
+                            'computer-use', 'deep-research', 'veo', 'lyria', 'thinking', 'customtools'
+                        ];
                         const validModels = (listData.models || []).filter(m => {
                             if (!m.supportedGenerationMethods || !m.supportedGenerationMethods.includes('generateContent')) return false;
                             const name = (m.name || '').toLowerCase();
-                            return !nonVisionKeywords.some(kw => name.includes(kw));
+                            if (!name.includes('gemini')) return false;
+                            return !excludedKeywords.some(kw => name.includes(kw));
                         });
 
-                        // Priorizar modelos Flash visuales estándar (2.5-flash, 2.0-flash, 3.8-flash, etc.)
                         function scoreModel(name) {
                             const n = (name || '').toLowerCase();
-                            if (n.includes('gemini-2.5-flash') && !n.includes('lite') && !n.includes('preview')) return 100;
-                            if (n.includes('gemini-2.0-flash') && !n.includes('lite')) return 90;
-                            if (n.includes('gemini-3.8-flash')) return 85;
-                            if (n.includes('gemini-3.5-flash')) return 80;
-                            if (n.includes('flash')) return 70;
+                            if (n === 'models/gemini-2.5-flash') return 110;
+                            if (n === 'models/gemini-2.5-flash-lite') return 105;
+                            if (n === 'models/gemini-2.0-flash' || n === 'models/gemini-2.0-flash-001') return 100;
+                            if (n === 'models/gemini-1.5-flash' || n === 'models/gemini-1.5-flash-latest') return 95;
+                            if (n.includes('gemini-2.5-flash') && !n.includes('preview')) return 90;
+                            if (n.includes('gemini-2.0-flash') && !n.includes('exp')) return 85;
+                            if (n.includes('flash')) return 75;
                             if (n.includes('pro')) return 60;
                             return 10;
                         }
                         validModels.sort((a, b) => scoreModel(b.name) - scoreModel(a.name));
-
-                        candidateEndpoints = validModels.map(m => `https://generativelanguage.googleapis.com/v1beta/${m.name}:generateContent`);
-                    } else if (listResp.status === 400 || listResp.status === 403) {
-                        const errJson = await listResp.json().catch(() => null);
-                        const msg = errJson?.error?.message || `Clave API no autorizada (${listResp.status})`;
-                        throw new Error(msg);
+                        candidateEndpoints = validModels.slice(0, 6).map(m => `https://generativelanguage.googleapis.com/v1beta/${m.name}:generateContent`);
                     }
                 } catch (discoveryErr) {
-                    if (discoveryErr.message && (discoveryErr.message.includes('API key') || discoveryErr.message.includes('API_KEY'))) {
-                        throw discoveryErr;
-                    }
                     console.warn("No se pudo listar modelos dinámicamente, usando lista por defecto:", discoveryErr);
                 }
 
-                // Si no se obtuvieron dinámicamente, usar los modelos visuales estándar de Gemini
                 if (candidateEndpoints.length === 0) {
                     candidateEndpoints = [
                         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
                         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
-                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent',
-                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
-                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
+                        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
                         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent'
                     ];
                 }
 
                 let lastError = null;
-                let invoiceData = null;
+                let geminiData = null;
 
                 for (const endpoint of candidateEndpoints) {
                     try {
-                        const url = `${endpoint}?key=${apiKey}`;
+                        const url = `${endpoint}?key=${encodeURIComponent(apiKey)}`;
+                        const parts = [{ text: promptText }];
+                        if (inlineBase64 && inlineMimeType) {
+                            parts.push({
+                                inlineData: {
+                                    mimeType: inlineMimeType,
+                                    data: inlineBase64
+                                }
+                            });
+                        }
+
                         const resp = await fetch(url, {
                             method: 'POST',
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'x-goog-api-key': apiKey
-                            },
+                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                contents: [{
-                                    parts: [
-                                        { text: promptText },
-                                        {
-                                            inlineData: {
-                                                mimeType: mimeType,
-                                                data: base64Data
-                                            }
-                                        }
-                                    ]
-                                }],
+                                contents: [{ parts }],
                                 generationConfig: {
                                     responseMimeType: "application/json",
                                     temperature: 0.1
                                 }
                             })
                         });
-
-                        if (resp.status === 404) {
-                            lastError = new Error("Modelo no encontrado (404)");
-                            continue;
-                        }
 
                         if (!resp.ok) {
                             const errText = await resp.text().catch(() => '');
@@ -13368,42 +13810,57 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                                     detailedMsg = parsed.error.message;
                                 }
                             } catch (_) {
-                                if (errText) detailedMsg = errText.substring(0, 80);
+                                if (errText) detailedMsg = errText.substring(0, 90);
                             }
                             lastError = new Error(detailedMsg);
-                            // Solo interrumpir si la clave es inválida
-                            const isFatalAuth = detailedMsg.includes('API_KEY_INVALID') || detailedMsg.includes('API key not valid');
+                            const isFatalAuth = detailedMsg.includes('API_KEY_INVALID') || detailedMsg.includes('API key not valid') || detailedMsg.includes('reported as leaked');
                             if (isFatalAuth) {
-                                throw lastError;
+                                break;
                             }
-                            // Si el modelo da error de modalidad u otro 400, continuar con el siguiente candidato
                             continue;
                         }
 
                         const jsonResp = await resp.json();
-                        let resultText = jsonResp.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (!resultText) throw new Error("No se obtuvo respuesta del modelo Gemini");
-
-                        resultText = resultText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-                        invoiceData = JSON.parse(resultText);
-                        break;
+                        const parsed = extractJsonFromGeminiResponse(jsonResp);
+                        if (parsed && typeof parsed === 'object') {
+                            geminiData = parsed;
+                            break;
+                        }
                     } catch (e) {
                         lastError = e;
-                        if (e.message && (e.message.includes('404') || e.message.includes('not found') || e.message.includes('modality') || e.message.includes('not enabled'))) {
-                            continue;
-                        }
-                        throw e;
+                        continue;
                     }
                 }
 
-                if (!invoiceData) {
-                    throw lastError || new Error("No se pudo procesar la factura con los modelos disponibles.");
+                // PASO 3: Combinar resultado de Gemini con extracción local (o usar extracción local / OCR de respaldo si Gemini falló)
+                let finalData = mergeInvoiceData(geminiData, localData);
+
+                if (!hasExtractedInvoiceData(finalData) && !geminiData && imagePreviewUrl) {
+                    try {
+                        const ocrText = await runLocalOcrFallback(imagePreviewUrl);
+                        const ocrData = parseEcuadorInvoiceText(ocrText);
+                        finalData = mergeInvoiceData(finalData, ocrData);
+                    } catch (ocrErr) {
+                        console.warn("Respaldo OCR no pudo completarse:", ocrErr);
+                    }
                 }
 
-                populateInvoiceFields(invoiceData);
-                showMessage("✅ Factura procesada y datos cargados", "fix-report");
+                if (geminiData || hasExtractedInvoiceData(finalData)) {
+                    populateInvoiceFields(finalData);
+                    showMessage("✅ Factura procesada y datos cargados", "fix-report");
+                } else {
+                    const errMsg = lastError?.message || '';
+                    if (errMsg.includes('API_KEY_INVALID') || errMsg.includes('API key not valid') || errMsg.includes('reported as leaked') || errMsg.includes('403')) {
+                        openGeminiApiKeyModal();
+                        showMessage("⚠️ Clave API de Gemini expirada o inválida. Actualícela o suba el PDF original.", "fix-pending");
+                    } else if (errMsg.includes('quota') || errMsg.includes('429') || errMsg.includes('exhausted')) {
+                        showMessage("⚠️ Límite de cuota de Gemini alcanzado. Intente en unos segundos o suba el PDF electrónico.", "fix-pending");
+                    } else {
+                        throw lastError || new Error("No se pudieron extraer datos legibles de la factura.");
+                    }
+                }
             } catch (err) {
-                console.error("Error al procesar factura con Gemini:", err);
+                console.error("Error al procesar factura:", err);
                 const userMsg = err.message ? err.message.substring(0, 90) : 'Error desconocido';
                 showMessage("❌ " + userMsg, "fix-error");
             } finally {
@@ -13423,6 +13880,8 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
             function highlightAndSet(el, value) {
                 if (!el || !value) return;
                 el.value = value;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
                 el.classList.add('gemini-field-highlight');
                 setTimeout(() => {
                     el.classList.remove('gemini-field-highlight');
@@ -13431,47 +13890,51 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
 
             if (data.nombreCliente) {
                 const el = form.elements['nombreCliente'] || document.querySelector('input[name="nombreCliente"]');
-                highlightAndSet(el, data.nombreCliente.toUpperCase());
+                highlightAndSet(el, String(data.nombreCliente).toUpperCase().trim());
             }
 
             if (data.callePrincipal) {
                 const el = form.elements['callePrincipal'] || document.querySelector('input[name="callePrincipal"]');
-                highlightAndSet(el, data.callePrincipal.toUpperCase());
+                highlightAndSet(el, String(data.callePrincipal).toUpperCase().trim());
             }
 
             if (data.cedula) {
                 const el = form.elements['cedula'] || document.querySelector('input[name="cedula"]');
-                highlightAndSet(el, data.cedula.trim());
+                highlightAndSet(el, String(data.cedula).trim());
             }
 
             if (data.telefono) {
                 const el = form.elements['telefono'] || document.querySelector('input[name="telefono"]');
-                highlightAndSet(el, data.telefono.trim());
+                highlightAndSet(el, String(data.telefono).trim());
             }
 
             if (data.email) {
                 const el = form.elements['email'] || document.querySelector('input[name="email"]');
-                highlightAndSet(el, data.email.toLowerCase().trim());
+                highlightAndSet(el, String(data.email).toLowerCase().trim());
             }
 
             if (data.numFactura) {
                 const el = form.elements['numFactura'] || document.querySelector('input[name="numFactura"]');
-                highlightAndSet(el, data.numFactura.toUpperCase().trim());
+                highlightAndSet(el, String(data.numFactura).toUpperCase().trim());
             }
 
             if (data.fechaEmision) {
                 const el = document.getElementById('inputEmision');
-                highlightAndSet(el, data.fechaEmision.trim());
+                const normalizedDate = normalizeInvoiceDate(data.fechaEmision) || String(data.fechaEmision).trim();
+                highlightAndSet(el, normalizedDate);
             }
 
             if (data.lugarCompra) {
                 const selectLugar = document.getElementById('selectLugar');
                 if (selectLugar) {
-                    const rawLugar = data.lugarCompra.toUpperCase().trim();
+                    const norm = (s) => String(s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]/g, '');
+                    const detectedStore = detectStoreFromText(data.lugarCompra) || data.lugarCompra;
+                    const rawNorm = norm(detectedStore);
                     let matched = false;
                     for (let i = 0; i < selectLugar.options.length; i++) {
-                        const optVal = selectLugar.options[i].value.toUpperCase().trim();
-                        if (optVal && (rawLugar.includes(optVal) || optVal.includes(rawLugar))) {
+                        const optVal = selectLugar.options[i].value;
+                        const optNorm = norm(optVal);
+                        if (optNorm && (rawNorm.includes(optNorm) || optNorm.includes(rawNorm))) {
                             selectLugar.selectedIndex = i;
                             matched = true;
                             break;
@@ -13485,6 +13948,7 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                             }
                         }
                     }
+                    selectLugar.dispatchEvent(new Event('change', { bubbles: true }));
                     selectLugar.classList.add('gemini-field-highlight');
                     setTimeout(() => {
                         selectLugar.classList.remove('gemini-field-highlight');
@@ -15461,21 +15925,21 @@ Si algún dato no aparece en el documento, déjalo como cadena vacía "". No agr
                     <form id="visitForm" onsubmit="event.preventDefault();">
                         <!-- ZONA INTELIGENTE DE ARRASTRE DE FACTURAS CON GEMINI -->
                         <div id="invoiceDropZone" class="mb-6 p-4 rounded-2xl border-2 border-dashed border-blue-400/80 hover:border-fix-main bg-blue-50/50 hover:bg-blue-100/50 transition-all cursor-pointer text-center relative group shadow-sm">
-                            <input type="file" id="invoiceFileInput" accept="application/pdf,image/png,image/jpeg,image/webp,image/jpg" class="hidden" onchange="handleInvoiceFileSelect(event)">
+                            <input type="file" id="invoiceFileInput" accept="application/pdf,text/xml,application/xml,.pdf,.xml,image/*" class="hidden" onchange="handleInvoiceFileSelect(event)">
                             <div id="dropZoneContent" class="flex flex-col items-center justify-center gap-1.5 py-2">
                                 <div class="w-10 h-10 rounded-full bg-blue-600/10 text-fix-main flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
                                     📄
                                 </div>
                                 <div>
                                     <p class="text-xs font-black uppercase text-fix-main tracking-wide">
-                                        Arrastra aquí la Factura (PDF o Foto) o haz clic para subir
+                                        Arrastra aquí la Factura (PDF, Foto o XML) o haz clic para subir
                                     </p>
                                     <p class="text-[9px] text-stone-500 font-bold uppercase mt-0.5">
-                                        Gemini IA autocompletará los datos del registro
+                                        Autocompletado inteligente de datos para el registro
                                     </p>
                                 </div>
                                 <div class="flex items-center justify-center gap-2 mt-1">
-                                    <span class="text-[8px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-black uppercase">PDF</span>
+                                    <span class="text-[8px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-black uppercase">PDF / XML</span>
                                     <span class="text-[8px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-black uppercase">JPG / PNG</span>
                                     <button type="button" onclick="event.stopPropagation(); openGeminiApiKeyModal();" class="text-[9px] text-stone-500 hover:text-fix-main underline font-black ml-2" title="Configurar clave API de Gemini">
                                         🔑 Configurar API Key
